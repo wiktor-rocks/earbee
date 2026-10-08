@@ -4,7 +4,8 @@
  *   1 Tokens       colours, fonts, sizes (script.js reads some of them)
  *   2 Base         element defaults; no animations except two
  *   3 Controls     buttons, sliders, keys
- *   4 Screens      welcome, loading screen, loading overlay
+ *   4 Screens      welcome, loading screen, loading overlay,
+ *                  download dialog
  *   5 Player       top bar, stage (video + waveform), transport,
  *                  panels, EQ, shortcut legend
  * ============================================================ */
@@ -295,6 +296,13 @@ body.dragging .welcome-drop {
   color: var(--accent);
 }
 
+.welcome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 10px;
+}
+
 .welcome-open {
   padding: 12px 28px;
   font-size: 16px;
@@ -408,6 +416,85 @@ body.dragging .welcome-hint {
   font-family: var(--display);
   font-size: 18px;
   letter-spacing: 0.04em;
+}
+
+/* Cancel (while downloading) on the loading screen and the overlay: plain
+   text, not the display font around it. */
+.loading-screen button,
+.loading-card button {
+  font-family: var(--sans);
+  letter-spacing: normal;
+}
+
+/* ---------- Download dialog ---------- */
+
+.download-dialog {
+  width: min(520px, calc(100vw - 32px));
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.download-dialog::backdrop {
+  background: var(--overlay-bg);
+}
+
+.download-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 20px 22px;
+}
+
+.download-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--muted);
+}
+
+.download-field input {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.4 var(--sans);
+}
+
+.download-kind {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.download-kind legend {
+  padding: 0 0 6px;
+  color: var(--muted);
+}
+
+.download-kind label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.download-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.download-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 /* ---------- Loader bars (loading screen and overlay) ---------- */

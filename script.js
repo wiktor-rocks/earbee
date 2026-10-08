@@ -28,6 +28,10 @@
  *   load shows a loading screen (#loadingScreen) in their place; later
  *   loads an overlay over the player (setLoading, §9).
  *
+ *   Links (YouTube) are downloaded by the main process: downloader.js,
+ *   reached through window.transcribee (preload.js). The page shows the
+ *   progress, then opens the downloaded file like any other (§11).
+ *
  * SECTIONS
  *   1 Config   2 Pure helpers   3 Settings   4 Audio engine   5 Transport
  *   6 Waveform   7 Video   8 Instances   9 UI   10 Setting controls
@@ -1887,10 +1891,20 @@ const dom = {
   welcome: $("welcome"),
   welcomeOpen: $("welcomeOpen"),
   welcomeMessage: $("welcomeMessage"),
+  welcomeDownload: $("welcomeDownload"),
   loadingScreen: $("loadingScreen"),
+  loadingStatus: $("loadingStatus"),
   loadingFileName: $("loadingFileName"),
+  loadingCancel: $("loadingCancel"),
   app: $("app"),
   loadingOverlay: $("loadingOverlay"),
+  overlayStatus: $("overlayStatus"),
+  overlayCancel: $("overlayCancel"),
+  downloadButton: $("downloadButton"),
+  downloadDialog: /** @type {HTMLDialogElement} */ ($("downloadDialog")),
+  downloadForm: /** @type {HTMLFormElement} */ ($("downloadForm")),
+  downloadUrl: /** @type {HTMLInputElement} */ ($("downloadUrl")),
+  downloadClose: $("downloadClose"),
   fileInput: /** @type {HTMLInputElement} */ ($("file")),
   fileName: $("fileName"),
   message: $("message"),
@@ -1986,18 +2000,20 @@ function renderEqEnabled() {
   dom.eqSection.classList.toggle("bypassed", !settings.eqEnabled);
 }
 
-// Shows that `file` is loading, or (null) that loading is over.
+// Shows that `name` (a file, or a link being downloaded) is loading, or
+// (null) that loading is over.
 //   First file: the loading screen replaces the welcome screen. The player
 //     may be shown underneath during the load (showPlayer() runs before the
 //     waveform draws, so it can measure itself); the opaque screen hides it.
 //   Later files: a translucent overlay over the player.
 // Whatever is underneath is inert, so it can't be clicked, focused or typed into.
-function setLoading(file) {
-  const busy = file !== null;
+function setLoading(name) {
+  const busy = name !== null;
   dom.app.inert = busy;
+  setLoadingStatus("Loading");
 
   if (busy && dom.app.hidden) {
-    dom.loadingFileName.textContent = file.name;
+    dom.loadingFileName.textContent = name;
     dom.welcome.hidden = true;
     dom.loadingScreen.hidden = false;
     return;
@@ -2011,6 +2027,15 @@ function setLoading(file) {
     dom.welcome.hidden = false;
     dom.welcomeOpen.focus();
   }
+}
+
+// What the loading screen and overlay say ("Downloading… 42 %"), and
+// whether they offer Cancel (only while downloading).
+function setLoadingStatus(text, cancelable = false) {
+  dom.loadingStatus.textContent = text;
+  dom.overlayStatus.textContent = text;
+  dom.loadingCancel.hidden = !cancelable;
+  dom.overlayCancel.hidden = !cancelable;
 }
 
 // Swaps the welcome screen for the player, once, when the first file loads
@@ -2225,6 +2250,7 @@ function computePeaks(audioBuffer) {
   );
 }
 
+// Loads `file` into the player; returns notices about what works only partly.
 async function loadMediaFile(file) {
   if (file.size > CONFIG.maxFileBytes) {
     throw new AppError(`“${file.name}” is too large to open (the limit is ${formatGigabytes(CONFIG.maxFileBytes)}).`);
@@ -2283,18 +2309,20 @@ async function loadMediaFile(file) {
     notices.push(`The picture in “${file.name}” can't be shown (${prepared?.reason}), but its audio plays.`);
   }
   if (!waveformAvailable) notices.push("The waveform couldn't be drawn, but playback works.");
-  showNotice(notices.join(" "));
+  return notices;
 }
 
-async function openFile(file) {
-  if (!file || loading) return;
+// Runs `task` (loading `name`) with the loading screen or overlay up, one
+// task at a time; its failure is shown as an error.
+async function withLoading(name, task) {
+  if (loading) return;
 
   loading = true;
   clearMessage();
-  setLoading(file);
+  setLoading(name);
 
   try {
-    await loadMediaFile(file);
+    await task();
   } catch (error) {
     reportError(error);
   } finally {
@@ -2302,6 +2330,11 @@ async function openFile(file) {
     setLoading(null);
     renderTransportState(transport.state);
   }
+}
+
+function openFile(file) {
+  if (!file) return;
+  return withLoading(file.name, async () => showNotice((await loadMediaFile(file)).join(" ")));
 }
 
 function bindFileInput() {
@@ -2331,6 +2364,111 @@ function bindFileDrop() {
     event.preventDefault();
     document.body.classList.remove("dragging");
     openFile(event.dataTransfer?.files?.[0]);
+  });
+}
+
+/* ---------- Downloading a link ---------- */
+
+/**
+ * The bridge preload.js exposes; missing outside Electron.
+ * @typedef {object} DownloadProgress
+ * @property {"setup" | "update" | "download" | "join"} stage
+ * @property {number} [part]  1-based; video downloads picture, then sound
+ * @property {number} [parts]
+ * @property {number | null} [fraction]
+ * @property {number | null} [eta]  seconds
+ *
+ * @typedef {{ ok: true, name: string, path: string, bytes: Uint8Array }
+ *   | { ok: false, canceled: boolean, error: string }} DownloadResult
+ *
+ * @typedef {object} DownloadBridge
+ * @property {(url: string, kind: string) => Promise<DownloadResult>} download
+ * @property {() => Promise<void>} cancelDownload
+ * @property {(callback: (progress: DownloadProgress) => void) => () => void} onDownloadProgress
+ */
+const downloads = /** @type {DownloadBridge | undefined} */ (/** @type {any} */ (window).transcribee);
+
+let downloadKind = "audio"; // the dialog's last choice, for this session
+
+const formatEta = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;
+
+/**
+ * @param {DownloadProgress} progress
+ * @param {string} kind
+ */
+function describeDownload({ stage, part = 1, parts = 1, fraction, eta }, kind) {
+  const percent = fraction == null ? "" : ` ${Math.floor(fraction * 100)} %`;
+  if (stage === "setup") return `Setting up the downloader (first time only)…${percent}`;
+  if (stage === "update") return "Updating the downloader…";
+  if (stage === "join") return kind === "video" ? "Joining picture and sound…" : "Saving…";
+  const what = parts === 1 ? "Downloading" : part === 1 ? "Downloading the picture" : "Downloading the sound";
+  return `${what}…${percent}${eta ? ` · ${formatEta(eta)} left` : ""}`;
+}
+
+// Downloads `url` (in the main process) and opens the file. Canceling just
+// returns to what was there before.
+function downloadLink(url, kind) {
+  if (!downloads) return;
+  return withLoading(url, async () => {
+    setLoadingStatus(describeDownload({ stage: "download", fraction: 0 }, kind), true);
+    const stopListening = downloads.onDownloadProgress((progress) =>
+      setLoadingStatus(describeDownload(progress, kind), progress.stage !== "join"),
+    );
+    let result;
+    try {
+      result = await downloads.download(url, kind);
+    } finally {
+      stopListening();
+    }
+    if (!result.ok) {
+      if (result.canceled) return;
+      throw new AppError(result.error);
+    }
+
+    setLoadingStatus("Loading");
+    dom.loadingFileName.textContent = result.name;
+    const notices = await loadMediaFile(new File([result.bytes], result.name));
+    showNotice([`Saved as ${result.path}.`, ...notices].join(" "));
+  });
+}
+
+function openDownloadDialog(url = "") {
+  if (!downloads || loading || dom.downloadDialog.open) return;
+  dom.downloadUrl.value = url;
+  const kind = /** @type {HTMLInputElement} */ (dom.downloadForm.elements.namedItem("downloadKind"));
+  /** @type {RadioNodeList} */ (/** @type {unknown} */ (kind)).value = downloadKind;
+  dom.downloadDialog.showModal();
+  dom.downloadUrl.focus();
+  dom.downloadUrl.select();
+}
+
+const looksLikeLink = (text) => /^https?:\/\/\S+$/i.test(text.trim());
+
+function bindDownloads() {
+  if (!downloads) return; // not in Electron: no download buttons
+  dom.welcomeDownload.hidden = false;
+  dom.downloadButton.hidden = false;
+  onClick(dom.welcomeDownload, () => openDownloadDialog());
+  onClick(dom.downloadButton, () => openDownloadDialog());
+  onClick(dom.downloadClose, () => dom.downloadDialog.close());
+  onClick(dom.loadingCancel, () => downloads.cancelDownload());
+  onClick(dom.overlayCancel, () => downloads.cancelDownload());
+
+  dom.downloadForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    const kind = new FormData(dom.downloadForm).get("downloadKind");
+    downloadKind = kind === "video" ? "video" : "audio";
+    dom.downloadDialog.close();
+    guarded(downloadLink)(dom.downloadUrl.value.trim(), downloadKind);
+  });
+
+  // Pasting a link anywhere but a text field opens the dialog with it.
+  window.addEventListener("paste", (event) => {
+    if (event.target instanceof HTMLElement && isTextField(event.target)) return;
+    const text = event.clipboardData?.getData("text") ?? "";
+    if (!looksLikeLink(text)) return;
+    event.preventDefault();
+    openDownloadDialog(text.trim());
   });
 }
 
@@ -2522,7 +2660,7 @@ const isKeyboardFocusedSlider = (target) =>
   target.tagName === "INPUT" && target.type === "range" && target !== clickedElement;
 
 function handleShortcutKey(event) {
-  if (loading || isTextField(event.target)) return;
+  if (loading || dom.downloadDialog.open || isTextField(event.target)) return;
   if (event.code.startsWith("Arrow") && isKeyboardFocusedSlider(event.target)) return;
 
   const shortcut = findShortcut(event);
@@ -2589,6 +2727,7 @@ function start() {
   bindControls();
   bindFileInput();
   bindFileDrop();
+  bindDownloads();
   bindShortcuts();
   dom.welcomeOpen.focus();
 }

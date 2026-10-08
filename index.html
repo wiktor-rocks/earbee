@@ -37,8 +37,11 @@
         <p class="welcome-tagline">Slow down, loop and transcribe the music you're learning</p>
 
         <div class="welcome-drop">
-          <button id="welcomeOpen" class="primary welcome-open" type="button">Open audio or video…</button>
-          <p class="welcome-hint">or drop a file anywhere in this window</p>
+          <div class="welcome-actions">
+            <button id="welcomeOpen" class="primary welcome-open" type="button">Open audio or video…</button>
+            <button id="welcomeDownload" class="welcome-open" type="button" hidden>From YouTube…</button>
+          </div>
+          <p class="welcome-hint">or drop a file anywhere in this window, or paste a YouTube link</p>
           <p class="welcome-formats">MP3 · WAV · FLAC · M4A · OGG — MP4 · MOV · WebM · MKV</p>
         </div>
 
@@ -54,9 +57,10 @@
         </div>
         <div class="loading-line">
           <span class="loader" aria-hidden="true"> <span></span><span></span><span></span><span></span> </span>
-          Loading
+          <span id="loadingStatus">Loading</span>
         </div>
         <div id="loadingFileName" class="loading-file"></div>
+        <button id="loadingCancel" type="button" hidden>Cancel</button>
       </div>
     </div>
 
@@ -71,6 +75,7 @@
           <input id="file" type="file" accept="audio/*,video/*,.mkv" />
           Open file…
         </label>
+        <button id="downloadButton" type="button" hidden>From YouTube…</button>
 
         <div id="fileName" class="file-name">No file loaded</div>
       </header>
@@ -203,9 +208,41 @@
     <div id="loadingOverlay" class="loading-overlay" role="status" hidden>
       <div class="loading-card">
         <span class="loader" aria-hidden="true"> <span></span><span></span><span></span><span></span> </span>
-        Loading
+        <span id="overlayStatus">Loading</span>
+        <button id="overlayCancel" class="small" type="button" hidden>Cancel</button>
       </div>
     </div>
+
+    <!-- Download a link (see downloader.js); opened by the "From YouTube…"
+         buttons or by pasting a link. -->
+    <dialog id="downloadDialog" class="download-dialog" aria-labelledby="downloadTitle">
+      <form id="downloadForm" class="download-form">
+        <h2 id="downloadTitle">Download from YouTube</h2>
+        <label class="download-field">
+          Link
+          <input
+            id="downloadUrl"
+            type="url"
+            required
+            placeholder="https://www.youtube.com/watch?v=…"
+            spellcheck="false"
+            autocomplete="off"
+          />
+        </label>
+        <fieldset class="download-kind">
+          <legend>Get</legend>
+          <label><input type="radio" name="downloadKind" value="audio" checked /> Audio</label>
+          <label><input type="radio" name="downloadKind" value="video" /> Video (up to 1080p)</label>
+        </fieldset>
+        <p class="download-note">
+          Saved in your Downloads folder, under TranscriBee. Only download what you have the rights to.
+        </p>
+        <div class="download-buttons">
+          <button id="downloadClose" type="button">Cancel</button>
+          <button class="primary" type="submit">Download</button>
+        </div>
+      </form>
+    </dialog>
 
     <script type="module" src="script.js"></script>
   </body>
