@@ -4,6 +4,19 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
+    <!--
+      Only the app's own files may load. Exceptions, each needed by a library:
+        blob: scripts and workers   Signalsmith's audio worklet and Mediabunny's
+                                    workers are created from Blob URLs
+        'wasm-unsafe-eval'          Signalsmith runs as WebAssembly
+        'unsafe-inline' styles      WaveSurfer writes <style> and style
+                                    attributes into its shadow DOM
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' blob: 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob:; object-src 'none'; base-uri 'none'; form-action 'none'"
+    />
+
     <title>TranscriBee</title>
 
     <!-- Fonts are bundled from npm (Fontsource), so the app works offline. -->

@@ -60,14 +60,17 @@ app
       webPreferences: {
         offscreen: true,
         preload: path.join(__dirname, "preload.cjs"),
+        sandbox: true, // as in main.js
         contextIsolation: true,
         backgroundThrottling: false,
       },
     });
     win.webContents.setFrameRate(60);
     win.webContents.focus();
+    const securityWarnings = [];
     win.webContents.on("console-message", (e) => {
-      if (e.level === "error" || e.level === "warning") console.log("  [page]", e.message);
+      if (e.message.includes("Electron Security Warning")) securityWarnings.push(e.message.split("\n")[0]);
+      else if (e.level === "error" || e.level === "warning") console.log("  [page]", e.message);
     });
     await win.loadFile(path.join(PROJECT, "index.html"));
     const wc = win.webContents;
@@ -247,7 +250,7 @@ app
     check("drag leave clears highlight", !(await js(`document.body.classList.contains("dragging")`)));
     // Drop a file to open it
     await js(
-      `(async () => { const blob = await (await fetch(${JSON.stringify("file://" + path.join(FIXTURES, "tone.wav"))})).blob(); const dt = new DataTransfer(); dt.items.add(new File([blob], "tone.wav", { type: "audio/wav" })); window.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, cancelable: true })); })()`,
+      `(() => { const bytes = Uint8Array.from(atob(${JSON.stringify(fs.readFileSync(path.join(FIXTURES, "tone.wav")).toString("base64"))}), (c) => c.charCodeAt(0)); const dt = new DataTransfer(); dt.items.add(new File([bytes], "tone.wav", { type: "audio/wav" })); window.dispatchEvent(new DragEvent("drop", { dataTransfer: dt, cancelable: true })); })()`,
     );
     for (let i = 0; i < 100; i++) {
       await sleep(50);
@@ -256,6 +259,11 @@ app
     await sleep(300);
     sc = await screens();
     check("dropped file opens the player", !sc.welcome && sc.app, JSON.stringify(sc));
+    check(
+      "window title names the file",
+      (await js(`document.title`)) === "TranscriBee — tone.wav",
+      await js(`document.title`),
+    );
     const widths = await js(
       `(() => { const w = document.querySelector("#waveform > div").shadowRoot.querySelector(".wrapper").getBoundingClientRect().width; return { wrapper: w, container: document.getElementById("waveform").clientWidth }; })()`,
     );
@@ -874,6 +882,13 @@ app
       check("switching to audio frees all video codecs", afterAudio === 0, `live after audio: ${afterAudio}`);
       const problems = await js(`__problems`);
       check("no unhandled errors, rejections or CSP violations", problems.length === 0, problems.join("\n"));
+    }
+
+    // ---------- Security (last: the eval probe itself counts as a violation) ----------
+    {
+      const evalBlocked = await js(`(() => { try { eval("1"); return false; } catch { return true; } })()`);
+      check("Content-Security-Policy is in force (eval blocked)", evalBlocked);
+      check("no Electron security warnings", securityWarnings.length === 0, securityWarnings.join(" | "));
     }
 
     console.log(`\n${pass} pass, ${fail} fail`);

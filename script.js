@@ -2274,6 +2274,7 @@ async function loadMediaFile(file) {
   transport.load(duration);
   setLoopRegion(null);
   dom.fileName.textContent = file.name;
+  document.title = `TranscriBee — ${file.name}`; // also the window title
   timer.done();
 
   const notices = [];

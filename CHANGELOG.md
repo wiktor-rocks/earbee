@@ -150,6 +150,56 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
   - `npm run check` is clean; `npm test` passes 102/102.
   - Screenshots compared pixel by pixel before and after (welcome, error, drag, loading, player, loop): the only differences are inside the logo, from the resampled image. The video screenshot differs only by which frame was captured.
 
+### Phase 7: Electron hardening, window niceties, packaged build
+
+- **What:**
+  - **Security:**
+    - the page has a Content-Security-Policy and runs sandboxed;
+    - it can't navigate away or open other windows;
+    - Electron's "Insecure Content-Security-Policy" console warning is gone.
+  - **Window:**
+    - the title names the open file ("TranscriBee — song.mp3");
+    - the window can't be made smaller than 900 × 640;
+    - it remembers its size, position and maximised state between runs;
+    - it opens with the app's dark background instead of a white flash.
+  - **Packaging:**
+    - `npm run build:dir` (unpacked Linux build) and `npm run build:linux` (AppImage) join `build:win`;
+    - the package ships only what the app needs.
+- **Why:**
+  - Electron's defaults allow far more than this app uses.
+  - The window niceties were requested.
+  - No packaged build had been checked since the app started loading its libraries from `./node_modules` paths, which must work from inside the app archive.
+- **How:**
+  - **CSP** (a `<meta>` in `index.html`): only the app's own files may load. The exceptions are commented in place, each needed by a library:
+    - `blob:` scripts and workers: Signalsmith's audio worklet and Mediabunny's workers are created from Blob URLs;
+    - `'wasm-unsafe-eval'`: Signalsmith is WebAssembly;
+    - inline styles: WaveSurfer writes `<style>` into its shadow DOM.
+  - **`main.js`:** `sandbox: true`; `will-navigate` is always prevented; `setWindowOpenHandler` denies.
+  - **Window state:** stored in `window-state.json` in the user-data folder.
+    - On load, it's ignored if malformed or if the saved position doesn't overlap a connected display by at least 100 px (a monitor unplugged since), and it's raised to the minimum size.
+    - It's written in the window's `closed` event, from bounds remembered on every resize, move or maximise. The `close` event alone turned out not to fire when the page itself closes the window, which the smoke test caught.
+  - **Title:** `loadMediaFile` sets `document.title`, which Electron uses as the window title.
+  - **Build:**
+    - `build.files` lists the app files and the two images. The runtime libraries are added by electron-builder, so the archive is 12.7 MB, with no tests, change log or dev tools.
+    - Linux targets AppImage with the executable `transcribee`; Windows stays portable, with `icon.ico`.
+- **New test, `tests/smoke.cjs`:** it starts the real app (main.js included, which `run.cjs` never exercises) and drives it over the Chrome DevTools Protocol, using Node's built-in WebSocket. It checks:
+  - the title;
+  - that the CSP blocks an injected inline script (DevTools' own evaluation is exempt, so it can't be probed with `eval`);
+  - that pop-ups and navigation are blocked;
+  - that the state is saved on close;
+  - restore, an off-screen position, the minimum size and a corrupt state file.
+
+  Under tiling window managers (i3, sway), which size every window themselves, the size assertions are reported as SKIP and only a clean start is checked.
+
+- **`run.cjs`** now uses a sandboxed window like the app. It checks that the CSP is in force (eval is blocked), that no Electron security warnings appear, and the window title. It passes dropped-file bytes from Node instead of fetching a `file://` URL, which the CSP rightly blocks.
+- **Packaged-build testing:** `TB_APP_PATH=<…>/resources/app.asar TB_APP_BINARY=<…>/transcribee npm test` runs both suites against a build.
+- **Where:** `main.js`, `index.html` (CSP), `script.js` §11 (title), `package.json` (`build`, the build scripts), `tests/smoke.cjs`, `tests/run.cjs`, `tests/launch.cjs`.
+- **Verified by:**
+  - In the project: `npm test` gives 105/105 plus 15/15 in the smoke test.
+  - Against the unpacked Linux build (`npm run build:dir`): also 105/105 and 15/15, with fonts, WaveSurfer, Mediabunny, Signalsmith, video and the window state all working from inside `app.asar`.
+  - On this machine (i3) the window-size assertions are skipped.
+  - The Windows build wasn't built or run here.
+
 ---
 
 ## 2026-10-08: Loading screen and stronger aura

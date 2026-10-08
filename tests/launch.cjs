@@ -1,10 +1,12 @@
-// Starts the end-to-end tests (run.cjs) in Electron.
+// Starts the end-to-end tests (run.cjs) in Electron, then the smoke test of
+// the real app (smoke.cjs).
 //   - Generates the test media first if it is missing (make-fixtures.sh).
 //   - Clears ELECTRON_RUN_AS_NODE, which VS Code's terminal sets and which
 //     would make Electron run as plain Node.
 //   - Uses a throwaway profile directory, so runs don't share state.
-//   - TB_APP_PATH=<dir> tests another copy of the app (e.g. a packaged
-//     build's unpacked resources/app) instead of the project root.
+//   - TB_APP_PATH=<dir> makes run.cjs test another copy of the app's files
+//     (e.g. a packaged build's resources/app.asar) instead of the project;
+//     TB_APP_BINARY=<file> makes smoke.cjs start a packaged executable.
 const { spawnSync } = require("child_process");
 const fs = require("fs");
 const os = require("os");
@@ -29,4 +31,7 @@ const run = spawnSync(electron, [path.join(tests, "run.cjs"), `--user-data-dir=$
   env,
 });
 fs.rmSync(profile, { recursive: true, force: true });
-process.exit(run.status ?? 1);
+
+// Then the real app, main.js included (see smoke.cjs).
+const smoke = spawnSync(process.execPath, [path.join(tests, "smoke.cjs")], { stdio: "inherit", env });
+process.exit(run.status || smoke.status || 0);
