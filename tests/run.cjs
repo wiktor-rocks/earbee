@@ -61,12 +61,15 @@ app
     });
     // As main.js does, but with the fake yt-dlp. The app's preload runs
     // alongside the instrumentation preload.
-    require(path.join(PROJECT, "downloader.js")).handleDownloads(ipcMain, {
+    require(path.join(PROJECT, "electron", "downloader.js")).handleDownloads(ipcMain, {
       binDir: path.join(OUTPUT, "unused-bin"),
       saveDir: DOWNLOADS,
       ytDlp: path.join(__dirname, "fake-yt-dlp.cjs"),
     });
-    session.defaultSession.registerPreloadScript({ type: "frame", filePath: path.join(PROJECT, "preload.js") });
+    session.defaultSession.registerPreloadScript({
+      type: "frame",
+      filePath: path.join(PROJECT, "electron", "preload.js"),
+    });
     const win = new BrowserWindow({
       show: false,
       width: 1200,

@@ -12,7 +12,7 @@ module.exports = [
   },
   {
     // Electron main process and preload, config and test runner: CommonJS in Node.
-    files: ["main.js", "downloader.js", "preload.js", "eslint.config.js", "tests/**/*.cjs"],
+    files: ["electron/**/*.js", "eslint.config.js", "tests/**/*.cjs"],
     languageOptions: { sourceType: "commonjs", globals: globals.node },
   },
   {

@@ -3,7 +3,7 @@
   "productName": "TranscriBee",
   "version": "1.0.0",
   "description": "A music-transcription player: slow down, pitch-shift, EQ and loop songs and videos, and step through them with the keyboard.",
-  "main": "main.js",
+  "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
     "start:gpu-info": "electron . --gpu-info",
@@ -51,9 +51,7 @@
     "productName": "TranscriBee",
     "icon": "assets/icon-512.png",
     "files": [
-      "main.js",
-      "downloader.js",
-      "preload.js",
+      "electron/**",
       "index.html",
       "style.css",
       "script.js",
