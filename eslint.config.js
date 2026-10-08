@@ -4,10 +4,23 @@ const globals = require("globals");
 const { importX } = require("eslint-plugin-import-x");
 
 // The page's layers (src/). Imports only go downward:
-//   core → config → audio, video, waveform → context → ui → features → app.js
+//   core, themes → config → audio, video, waveform → context → ui → features → app.js
 // Each zone lists what a layer may not import.
 const below = (target, ...from) => from.map((path) => ({ target, from: path }));
 const layering = [
+  // Themes are data plus pure logic, independent of everything else.
+  ...below(
+    "./src/themes",
+    "./src/core",
+    "./src/config.js",
+    "./src/audio",
+    "./src/video",
+    "./src/waveform.js",
+    "./src/context.js",
+    "./src/ui",
+    "./src/features",
+    "./src/app.js",
+  ),
   ...below(
     "./src/core",
     "./src/config.js",

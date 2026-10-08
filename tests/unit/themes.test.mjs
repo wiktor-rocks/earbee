@@ -1,0 +1,116 @@
+// The colour themes (src/themes): every theme is complete and readable, and
+// the logic that picks and applies one.
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { describe, test } from "node:test";
+import {
+  DEFAULT_PREFS,
+  REQUIRED_ROLES,
+  ROLES,
+  THEMES,
+  contrast,
+  cssVariables,
+  getTheme,
+  normalizePrefs,
+  parseHex,
+  resolveTheme,
+} from "../../src/themes/index.js";
+
+const distance = (a, b) => Math.hypot(...parseHex(a).map((c, i) => c - parseHex(b)[i]));
+
+describe("every theme", () => {
+  test("has a unique id, a name and a scheme", () => {
+    assert.equal(new Set(THEMES.map((theme) => theme.id)).size, THEMES.length);
+    for (const theme of THEMES) {
+      assert.ok(theme.name, theme.id);
+      assert.ok(["dark", "light"].includes(theme.scheme), theme.id);
+    }
+  });
+
+  test("defines every required role as #rrggbb, and nothing unknown", () => {
+    for (const theme of THEMES) {
+      for (const role of REQUIRED_ROLES)
+        assert.match(theme.colors[role] ?? "", /^#[0-9a-f]{6}$/i, `${theme.id}.${role}`);
+      for (const role of Object.keys(theme.colors)) assert.ok(role in ROLES, `${theme.id}: unknown role ${role}`);
+    }
+  });
+
+  // WCAG 2 contrast. Text needs 4.5:1 (AA); graphics such as the played
+  // waveform, the loop and focus rings need 3:1. The unplayed waveform is
+  // deliberately soft, but must stay visible.
+  for (const theme of THEMES) {
+    test(`${theme.name}: readable`, () => {
+      const v = cssVariables(theme);
+      const atLeast = (minimum, fg, ...backgrounds) => {
+        for (const bg of backgrounds) {
+          const ratio = contrast(v[fg], v[bg]);
+          assert.ok(ratio >= minimum, `${fg} on ${bg}: ${ratio.toFixed(2)} < ${minimum}`);
+        }
+      };
+      atLeast(4.5, "--text", "--bg", "--surface", "--surface-2", "--surface-hover");
+      atLeast(4.5, "--muted", "--bg", "--surface");
+      atLeast(4.5, "--danger", "--bg", "--surface");
+      atLeast(4.5, "--accent-ink", "--accent", "--accent-hover");
+      atLeast(4.5, "--cursor", "--surface");
+      atLeast(3, "--accent", "--surface");
+      atLeast(3, "--loop", "--surface");
+      atLeast(1.5, "--wave", "--surface");
+      const apart = distance(v["--loop"], v["--accent"]);
+      assert.ok(apart >= 90, `loop and accent too alike (${apart.toFixed(0)})`);
+    });
+  }
+});
+
+describe("cssVariables", () => {
+  test("sets every variable, deriving the optional ones", () => {
+    const nord = getTheme("nord");
+    assert.equal(nord.colors.surfaceHover, undefined);
+    const v = cssVariables(nord);
+    assert.deepEqual(Object.keys(v).sort(), Object.values(ROLES).sort());
+    for (const value of Object.values(v)) assert.match(value, /^#[0-9a-f]{6}$/i);
+    assert.equal(v["--bg"], "#2e3440");
+  });
+
+  test("a theme's own value wins over the derived one", () => {
+    assert.equal(cssVariables(getTheme("transcribee"))["--surface-hover"], "#262b36");
+  });
+});
+
+describe("picking a theme", () => {
+  test("an explicit choice, whatever the system", () => {
+    assert.equal(resolveTheme({ choice: "dracula" }, false).id, "dracula");
+  });
+
+  test("automatic follows the system with the chosen pair", () => {
+    const prefs = { choice: "auto", dark: "nord", light: "solarized-light" };
+    assert.equal(resolveTheme(prefs, true).id, "nord");
+    assert.equal(resolveTheme(prefs, false).id, "solarized-light");
+  });
+
+  test("unknown or mismatched ids fall back to the defaults", () => {
+    assert.equal(resolveTheme({ choice: "gone" }, true).id, DEFAULT_PREFS.choice);
+    assert.equal(resolveTheme({ choice: "auto", dark: "solarized-light" }, true).id, DEFAULT_PREFS.dark);
+    assert.equal(resolveTheme(null, true).id, DEFAULT_PREFS.choice);
+  });
+
+  test("stored prefs are cleaned up", () => {
+    assert.deepEqual(normalizePrefs("junk"), DEFAULT_PREFS);
+    assert.deepEqual(normalizePrefs({ choice: "auto", dark: "nord", light: "monokai" }), {
+      choice: "auto",
+      dark: "nord",
+      light: DEFAULT_PREFS.light,
+    });
+  });
+});
+
+test("style.css defaults are the TranscriBee theme", () => {
+  // The page's fallback (before or without JavaScript) must look like the
+  // default theme.
+  const css = readFileSync(new URL("../../style.css", import.meta.url), "utf8");
+  const root = css.slice(css.indexOf(":root {"), css.indexOf("}", css.indexOf(":root {")));
+  for (const [variable, value] of Object.entries(cssVariables(getTheme("transcribee")))) {
+    const match = new RegExp(`${variable}:\\s*([^;]+);`).exec(root);
+    assert.ok(match, `${variable} missing from :root`);
+    assert.equal(match[1].trim().toLowerCase(), value, variable);
+  }
+});
