@@ -3,6 +3,8 @@
 //   Security   The page runs sandboxed with context isolation and no Node
 //              access; it may not navigate away or open other windows.
 //              Its Content-Security-Policy is in index.html.
+//   Downloads  The page's one bridge out (preload.js): downloading a link
+//              with yt-dlp, done here in downloader.js.
 //   Window     Remembers its size, position and maximised state between
 //              runs (window-state.json in the user-data folder). The title
 //              follows the page's <title>, which names the open file.
@@ -10,9 +12,10 @@
 //              rendering if the GPU process keeps crashing.
 //              `npm run start:no-gpu` forces software rendering;
 //              `npm run start:gpu-info` logs what the GPU is doing.
-const { app, BrowserWindow, screen } = require("electron");
+const { app, BrowserWindow, ipcMain, net, screen } = require("electron");
 const fs = require("fs");
 const path = require("path");
+const { handleDownloads } = require("./downloader");
 
 const MIN_WIDTH = 900;
 const MIN_HEIGHT = 640;
@@ -90,6 +93,7 @@ function createWindow() {
     icon: path.join(__dirname, "assets", "icon-512.png"),
     backgroundColor: "#0e1014", // the page background, so opening doesn't flash white
     webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
       sandbox: true,
       contextIsolation: true,
       nodeIntegration: false,
@@ -115,6 +119,11 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  handleDownloads(ipcMain, {
+    binDir: path.join(app.getPath("userData"), "bin"),
+    saveDir: path.join(app.getPath("downloads"), "TranscriBee"),
+    fetch: net.fetch, // follows the system's proxy settings
+  });
   createWindow();
 
   if (app.commandLine.hasSwitch("gpu-info")) {
