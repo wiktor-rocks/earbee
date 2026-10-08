@@ -1,7 +1,7 @@
 // Runs the loading diagnostics: every measurement in PLAN, each in a fresh
 // Electron process (profile-load.cjs), and writes the results to
 // tests/output/diagnostics/results.json plus a summary table on stdout.
-// Linux only. Takes about half an hour: the two video runs wait about 7
+// Linux only. Takes about 40 minutes: the two video runs wait about 7
 // minutes each for the video proxy.
 //
 //   bash tests/diagnostics/make-long-media.sh   # once: the long test media
@@ -18,7 +18,7 @@ const path = require("path");
 const MEDIA = path.join(__dirname, "..", "output", "long-media");
 const OUTPUT = path.join(__dirname, "..", "output", "diagnostics");
 
-// [mode, file, memory limit]
+// [mode, file, memory limit, decode workers (workers / seams)]
 const PLAN = [
   // The app, as a user opens files: how load time and memory grow with length.
   ["app", "mp3-10min.mp3"],
@@ -58,6 +58,22 @@ const PLAN = [
   ["stream", "mp3-60min.mp3"],
   ["stream", "mp3-120min.mp3"],
   ["stream", "mp3-60min.mp3", "2G"],
+  // Parallel decoding (the app's decoder): how decode time falls with the
+  // number of workers, to choose CONFIG.audio.parallel.maxWorkers.
+  ["workers", "mp3-60min.mp3", null, 1],
+  ["workers", "mp3-60min.mp3", null, 2],
+  ["workers", "mp3-60min.mp3", null, 3],
+  ["workers", "mp3-60min.mp3", null, 4],
+  ["workers", "mp3-60min.mp3", null, 6],
+  ["workers", "opus-60min.webm", null, 1],
+  ["workers", "opus-60min.webm", null, 4],
+  // The joins: 4 parts against 1, sample by sample, in every format.
+  ["seams", "mp3-60min.mp3", null, 4],
+  ["seams", "aac-60min.m4a", null, 4],
+  ["seams", "opus-60min.webm", null, 4],
+  ["seams", "wav-60min.wav", null, 4],
+  ["seams", "video-60min.mp4", null, 4],
+  ["seams", "mp3-10min.mp3", null, 8],
 ];
 
 const filter = process.argv[2] ?? "";
@@ -67,8 +83,8 @@ delete env.ELECTRON_RUN_AS_NODE;
 fs.mkdirSync(OUTPUT, { recursive: true });
 
 const results = [];
-for (const [mode, file, limit] of PLAN) {
-  const id = `${mode}-${file.replace(/\.\w+$/, "")}${limit ? `-limit${limit}` : ""}`;
+for (const [mode, file, limit, workers] of PLAN) {
+  const id = `${mode}-${file.replace(/\.\w+$/, "")}${limit ? `-limit${limit}` : ""}${workers ? `-w${workers}` : ""}`;
   if (!id.includes(filter)) continue;
   const media = path.join(MEDIA, file);
   if (!fs.existsSync(media)) {
@@ -87,7 +103,14 @@ for (const [mode, file, limit] of PLAN) {
   process.stdout.write(`${id} … `);
   const startedAt = Date.now();
   const run = spawnSync(limited[0], limited[1], {
-    env: { ...env, TB_DIAG_MODE: mode, TB_DIAG_FILE: media, TB_DIAG_OUT: out, TB_DIAG_LIMIT: limit ?? "" },
+    env: {
+      ...env,
+      TB_DIAG_MODE: mode,
+      TB_DIAG_FILE: media,
+      TB_DIAG_OUT: out,
+      TB_DIAG_LIMIT: limit ?? "",
+      TB_DIAG_WORKERS: String(workers ?? ""),
+    },
     encoding: "utf8",
     timeout: 50 * 60_000,
   });
@@ -110,6 +133,11 @@ for (const [mode, file, limit] of PLAN) {
   console.log(
     `${result.outcome}, ${result.loadMs ?? "?"} ms, peak renderer ${result.memory?.peakRendererMB ?? "?"} MB`,
   );
+  if (mode === "seams" && result.joins) {
+    console.log(
+      `  ${result.identical ? "identical" : `max diff ${result.maxDiff} at ${result.maxDiffAt} s, SNR ${result.snrDb} dB`}; joins ${JSON.stringify(result.joins)}`,
+    );
+  }
 }
 
 fs.writeFileSync(

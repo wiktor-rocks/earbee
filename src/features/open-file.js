@@ -17,6 +17,7 @@ import { AppError } from "../core/errors.js";
 import { isVideoFile } from "../core/files.js";
 import { formatMemory } from "../core/format.js";
 import { decodedBytes, fitsInMemory } from "../core/memory.js";
+import { workerCount } from "../core/parts.js";
 import { peaksPerSecondFor } from "../core/peaks.js";
 import { resetSoundSettings } from "../ui/controls.js";
 import {
@@ -134,7 +135,10 @@ export async function loadMediaFile(media, signal) {
         signal,
         prepare: async (info) => {
           await checkMemory(media, info, isVideo);
-          return peakFactorFor(info);
+          return {
+            peakFactor: peakFactorFor(info),
+            workers: workerCount(info.duration, navigator.hardwareConcurrency, CONFIG.audio.parallel),
+          };
         },
         onProgress: (fraction) => setLoadingStatus(`Loading ${Math.floor(fraction * 100)} %`, true),
       }),
@@ -163,7 +167,7 @@ export async function loadMediaFile(media, signal) {
   else player.videoView.clear();
   // The samples move to the audio thread (no copy) while the waveform draws.
   await Promise.all([
-    timer.time("transfer", () => player.engine.loadChannels(decoded.channels)),
+    timer.time("transfer", () => player.engine.loadPieces(decoded.pieces)),
     timer.time("waveform", () => player.waveform.load(decoded.peaks, decoded.duration)),
   ]);
   player.transport.load(decoded.duration);

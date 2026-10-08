@@ -13,13 +13,15 @@
  *   transport.on("position" | "state" | "jump") ─► waveform, video, UI
  *
  *   engine     Web Audio graph: Signalsmith (speed + pitch) → EQ → volume
- *              → limiter, in a context at the open track's sample rate.
+ *              → limiter, in a context at the open track's sample rate; it
+ *              plays the track from several pieces, one after the other.
  *              Knows nothing about the UI or `settings`.
- *   decoder    A file's audio, decoded in chunks in a Worker (Mediabunny +
- *              WebCodecs) straight into one Float32Array per channel, with
- *              the waveform peaks; progress and Cancel. Never the whole file
- *              in memory, so hour-long files open (see
- *              docs/diagnostics/long-file-loading.md).
+ *   decoder    A file's audio, decoded in chunks in Workers (Mediabunny +
+ *              WebCodecs) straight into Float32Arrays, with the waveform
+ *              peaks; progress and Cancel. A long track is split into parts
+ *              decoded at once (one per spare core, up to 4), joined where
+ *              their samples match. Never the whole file in memory, so
+ *              hour-long files open (see docs/diagnostics/long-file-loading.md).
  *   transport  Playback state and position. Mirrors Signalsmith's timeline,
  *              so the position of what is being heard is computed exactly.
  *   waveform   WaveSurfer drawing, zoom, minimap and the A–B loop region.
@@ -43,8 +45,9 @@
  * FILES (src/), in layers: a file imports only from layers above it in
  * this list, never below (enforced by `npm run lint`)
  *   core/          Pure helpers, no DOM: format, peaks, timeline (and the
- *                  Segment / Loop / LoopRegion types), emitter, files,
- *                  errors, memory
+ *                  Segment / Loop / LoopRegion types), emitter, files (and
+ *                  the Media type), errors, memory, parts (splitting and
+ *                  joining a parallel decode)
  *   themes/        Colour themes: palettes and pure logic; independent of
  *                  everything else (the main process uses it too)
  *   config.js      CONFIG: every tunable number
@@ -59,6 +62,8 @@
  *                  theme-picker.js
  *   app.js         This file: creates and wires the components, the
  *                  SHORTCUTS table, start()
+ *   vendor/        Signalsmith Stretch, patched to read across several
+ *                  buffers (see its README.md); imported by audio/engine.js
  *
  * COMMON CHANGES
  *   Speed preset or EQ band   Edit CONFIG.speed.presets / CONFIG.eq.bands.
@@ -89,8 +94,11 @@
  *                             dragging in waveform.js.
  *   Opening files             features/open-file.js (loadMediaFile: the order
  *                             of a load, the memory check, error wording);
- *                             decoding in audio/decoder.js. Measure long
- *                             files with `npm run diagnose:loading`.
+ *                             decoding in audio/decoder.js; how many parts
+ *                             and how they join in CONFIG.audio.parallel.
+ *                             Measure long files with `npm run
+ *                             diagnose:loading` (its "seams" runs compare a
+ *                             parallel decode with a one-part one).
  *   A new feature             A file in features/ with a bind…() function,
  *                             called from start() below.
  *   Any change                Run `npm run check` and `npm test` (unit tests

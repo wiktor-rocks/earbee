@@ -184,6 +184,7 @@ async function createHarness() {
   return {
     blocked,
     mediaReads,
+    share: mediaFiles.share, // serves a file to the page by URL, as downloads are
     win,
     securityWarnings,
     wc,

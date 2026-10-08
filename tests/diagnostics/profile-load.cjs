@@ -12,6 +12,11 @@
 //     stream         decode in chunks with mediabunny (WebCodecs), keeping
 //                    the samples in preallocated Float32Arrays
 //     stream-discard the same, dropping each chunk (decode speed alone)
+//     workers        the app's decoder (src/audio/decoder.js) in
+//                    TB_DIAG_WORKERS parts at once: decode time alone
+//     seams          the app's decoder in one part, then in TB_DIAG_WORKERS
+//                    parts, compared sample by sample: is the parallel
+//                    result the same track, and is there a step at a join?
 //   TB_DIAG_FILE  the media file
 //   TB_DIAG_OUT   where to write the JSON result
 //
@@ -28,6 +33,7 @@ const PROJECT = path.resolve(__dirname, "..", "..");
 const MODE = process.env.TB_DIAG_MODE;
 const FILE = process.env.TB_DIAG_FILE;
 const OUT = process.env.TB_DIAG_OUT;
+const WORKERS = Number(process.env.TB_DIAG_WORKERS) || 4;
 const LOAD_TIMEOUT_MS = 15 * 60_000;
 const PROXY_TIMEOUT_MS = 30 * 60_000;
 
@@ -191,6 +197,80 @@ const BENCHMARKS = {
     window.__keep = store;
     return result;
   })()`,
+
+  // The app's decoder, in `workers` parts; with `compare`, first in one
+  // part, and the two compared.
+  parts: (workers, compare) => `(async () => {
+    const file = document.getElementById("__diagFile").files[0];
+    const { decodeFile } = await import("./src/audio/decoder.js");
+    const { splitFrames } = await import("./src/core/parts.js");
+    const peakFactor = 400;
+    let info = null;
+    const decode = async (count) => {
+      const t = performance.now();
+      const decoded = await decodeFile(file, { workers: count, prepare: (i) => ((info = i), { peakFactor }) });
+      return { decoded, ms: Math.round(performance.now() - t) };
+    };
+    const result = { steps: {}, workers: ${workers} };
+    let one = null;
+    if (${compare}) {
+      one = await decode(1);
+      result.steps.oneWorker = one.ms;
+    }
+    const many = await decode(${workers});
+    result.steps.decode = many.ms;
+    const { pieces, sampleRate } = many.decoded;
+    Object.assign(result, { sampleRate, channels: pieces[0].length, pieces: pieces.length, frames: pieces.reduce((sum, piece) => sum + piece[0].length, 0) });
+    result.duration = result.frames / sampleRate;
+    if (!one) {
+      window.__keep = many;
+      return result;
+    }
+
+    // Where each piece starts in the one-part track, and how far that is
+    // from where the timestamps put it (the join's lag).
+    const reference = one.decoded.pieces[0];
+    result.framesOnePart = reference[0].length;
+    const planned = splitFrames(Math.ceil(info.duration * sampleRate), ${workers}, peakFactor);
+    const starts = [];
+    let at = 0;
+    for (const piece of pieces) { starts.push(at); at += piece[0].length; }
+    result.joins = starts.slice(1).map((start, k) => ({ at: +(start / sampleRate).toFixed(3), lag: start - planned[k + 1].from }));
+
+    // Sample by sample, over every channel.
+    let max = 0, maxAt = 0, error = 0, power = 0;
+    const span = Math.round(sampleRate / 10);
+    const near = result.joins.map(() => 0); // the largest difference in the 0.1 s after each join
+    const steps = result.joins.map(() => 0); // the step at the join the track itself doesn't take
+    for (let c = 0; c < reference.length; c++) {
+      const a = reference[c];
+      pieces.forEach((piece, k) => {
+        const b = piece[c];
+        const start = starts[k];
+        for (let i = 0; i < b.length && start + i < a.length; i++) {
+          const d = a[start + i] - b[i];
+          const size = Math.abs(d);
+          if (size > max) { max = size; maxAt = start + i; }
+          error += d * d;
+          power += a[start + i] * a[start + i];
+          if (k > 0 && i < span) near[k - 1] = Math.max(near[k - 1], size);
+        }
+        if (k > 0) {
+          const before = pieces[k - 1][c];
+          steps[k - 1] = Math.max(steps[k - 1], Math.abs(b[0] - before[before.length - 1] - (a[start] - a[start - 1])));
+        }
+      });
+    }
+    result.joins.forEach((join, k) => Object.assign(join, { maxDiffNext100ms: near[k], extraStep: steps[k] }));
+    Object.assign(result, {
+      identical: max === 0,
+      maxDiff: max,
+      maxDiffAt: +(maxAt / sampleRate).toFixed(3),
+      snrDb: error ? +(10 * Math.log10(power / error)).toFixed(1) : null,
+    });
+    one = null;
+    return result;
+  })()`,
 };
 
 /* ---------- Run ---------- */
@@ -330,6 +410,8 @@ app.whenReady().then(async () => {
         code = BENCHMARKS.decode(rate);
       } else if (MODE === "stream") code = BENCHMARKS.stream(true);
       else if (MODE === "stream-discard") code = BENCHMARKS.stream(false);
+      else if (MODE === "workers") code = BENCHMARKS.parts(WORKERS, false);
+      else if (MODE === "seams") code = BENCHMARKS.parts(WORKERS, true);
       else throw new Error(`Unknown mode ${MODE}`);
 
       const benchmark = await Promise.race([

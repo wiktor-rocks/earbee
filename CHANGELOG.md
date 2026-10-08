@@ -43,6 +43,64 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-09: Long files decode in parallel
+
+- **What:**
+  - **About 3× faster.** Long files load about 3× faster:
+    - an hour of MP3 in 7.4 s instead of 19.1 s (2 h: 13.0 s instead of 38.6 s);
+    - an hour of AAC (like a YouTube download) in 5.4 s instead of 15.2 s;
+    - a 1-hour video in 5.4 s instead of 16.3 s;
+    - an hour of WAV in 2.2 s instead of 5.8 s.
+  - **Opus wins back its loss:** an hour takes 7.7 s, against 25.1 s since the last change and 15.2 s before it.
+  - **Playback is unchanged:** no clicks where the parts meet.
+  - **Memory:** the peak is 1–12 % higher (an hour of MP3: 1.77 GB instead of 1.68 GB). Every memory-limited run of the diagnostic still loads.
+- **Why:**
+  - **The user asked for it**, as the follow-up in the long-file report: decoding in parallel could cut decoding time severalfold for every format and win back the Opus loss.
+  - **The risk:** a click where the parts join, so it needed careful testing.
+- **How:**
+  - **Splitting.**
+    - A track of at least `CONFIG.audio.parallel.minDuration` (60 s) is split into `min(cores − 1, 4)` parts. Each part is decoded by its own Worker, reading the file in its own pieces, so nothing is read whole.
+    - Inner boundaries are multiples of the peak factor, so the parts' waveform peaks put end to end are the whole track's.
+  - **Warming up.**
+    - A decoder started mid-stream needs earlier audio to warm up, and Mediabunny starts exactly where asked. So each part but the first starts 1 s early (`preRoll`) and drops the warm-up.
+    - Without it, the spike measured errors of up to 0.25 at every join for MP3, AAC and Opus.
+  - **Joining by the samples.**
+    - Timestamps aren't always sample-exact: in WebM, every Opus part was 48 frames (1 ms) late, because WebM rounds to the millisecond and Opus's codec delay isn't applied mid-stream.
+    - So each part decodes a little past its end. The next part is placed where its first 2,048 samples equal the earlier part's, within ±50 ms of where its timestamps say (`findJoin`, tolerance 1e-4). A silent start trusts the timestamps.
+    - If nothing matches, or a part came back nearly empty, the whole track is decoded again in one part: slower, never wrong.
+  - **No copying.**
+    - The parts aren't copied into one array, which would need twice the memory for a moment. The engine hands them to the time stretcher one after the other (`loadPieces`).
+    - That exposed a bug in Signalsmith Stretch 1.3.2 (the latest on npm): reading a block that spans two buffers advanced the wrong position, giving garbage and a `RangeError` in the worklet.
+    - The app now uses a copy with a two-line fix in `src/vendor/signalsmith-stretch/`. Its README describes the fix and how to upgrade. The npm dependency is removed, and the folder is excluded from Prettier, ESLint and type checking (`@ts-nocheck`).
+  - **How many workers:** measured with 1, 2, 3, 4 and 6 workers on an hour of MP3: 20.6, 10.1, 7.1, 6.1 and 5.6 s. Six cost 270 MB more for half a second, so the maximum is 4.
+  - **AAC at low bitrates isn't bit-exact** after a join. It differs by about −96 dB (SNR 79 dB on the 32 kb/s test chirp), most likely because its noise filling depends on where decoding started, as after any seek. The joins themselves have no step. At YouTube-like bitrates it was identical.
+- **Where:**
+  - `src/core/parts.js` (new: `splitFrames`, `workerCount`, `findJoin`, `joinParts`);
+  - `src/audio/decode-worker.js` (decodes `{ from, to, preRoll }` of the track; progress in frames);
+  - `src/audio/decoder.js` (`decodeInWorkers`: one worker opens the file and `prepare` runs, then the others open it; `findJoins`; the one-part fallback; the result is `pieces`);
+  - `src/audio/engine.js` (`loadPieces` replaces `loadChannels`; imports the vendored Signalsmith);
+  - `src/features/open-file.js` (`prepare` returns `{ peakFactor, workers }`);
+  - `src/config.js` (`audio.parallel`);
+  - `src/vendor/signalsmith-stretch/` (new);
+  - `src/app.js` header, `README.md`, `docs/diagnostics/long-file-loading.md` (new section "After parallel decoding").
+- **Verified by:**
+  - `npm run check`;
+  - **unit:** 79 pass. `tests/unit/parts.test.mjs` (new) covers splitting, worker counts, finding joins (off by ±48 and ±100 frames, silence, no match, a repeating tone), and that parts cut at their joins give back the whole track and its peaks;
+  - **e2e:** 168 pass. New topic `tests/e2e/11-parallel.cjs`:
+    - the patched stretcher renders three pieces exactly like one;
+    - 90 s chirps (new fixtures `long-chirp.mp3/.m4a/.webm`, from `make-fixtures.sh`) decoded in 3 parts and in 1 are identical for MP3 and Opus, and have no step at the joins and an SNR above 60 dB for AAC;
+    - the app uses several workers and none are left;
+    - playing across a join runs at normal speed;
+    - a loop over a join stays in it and wraps;
+    - `11-resources.cjs` / `12-security.cjs` were renumbered to `12-` / `13-` to stay last;
+  - **smoke:** 19 pass;
+  - **diagnostics:**
+    - new modes `workers` and `seams` in `tests/diagnostics/profile-load.cjs`, with runs in `run.cjs`'s PLAN;
+    - every format's hour (MP3, AAC, Opus, WAV, video) decoded in 4 parts is **identical, sample for sample**, to the one-part decode, with the Opus lag of −48 frames corrected at every join; so is the 10-minute MP3 in 8 parts;
+    - the full diagnostic was re-run for the load times above;
+  - **the spike before it** (scratch code): parts with and without pre-roll compared against one worker; Signalsmith rendered offline from one and from three buffers;
+  - **packaged build:** `npm run build:dir` plus the packaged test run.
+
 ## 2026-10-09: Downloads are read from disk, not sent to the page whole
 
 - **What:**

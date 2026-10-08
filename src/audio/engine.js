@@ -1,6 +1,7 @@
 // Pinned to 1.3.2: the transport mirrors its timeline and loop behaviour
 // (see transport.js), so an upgrade needs re-checking against its source.
-import SignalsmithStretch from "../../node_modules/signalsmith-stretch/SignalsmithStretch.mjs";
+// Patched to read across several buffers (see src/vendor/signalsmith-stretch).
+import SignalsmithStretch from "../vendor/signalsmith-stretch/SignalsmithStretch.mjs";
 import { CONFIG } from "../config.js";
 import { AppError } from "../core/errors.js";
 
@@ -8,7 +9,7 @@ import { AppError } from "../core/errors.js";
  * AUDIO ENGINE
  * Signalsmith → EQ chain → master volume → limiter → speakers.
  *
- * Exposes: init, useSampleRate, loadChannels, schedule, setVolume, setEq,
+ * Exposes: init, useSampleRate, loadPieces, schedule, setVolume, setEq,
  *          now, outputDelay, sampleRate, resume
  * Values set before init() are remembered and applied when the graph
  * is built, so settings can change before any audio is loaded.
@@ -104,20 +105,23 @@ export function createAudioEngine({ onError }) {
     stretch?.schedule(segment).catch(onError);
   }
 
-  async function loadChannels(channels) {
-    // Signalsmith expects one buffer per channel; the buffers are transferred.
+  // The track as pieces played one after the other ([piece][channel], see
+  // audio/decoder.js); the buffers are transferred, not copied.
+  async function loadPieces(pieces) {
     await stretch.dropBuffers();
-    await stretch.addBuffers(
-      channels,
-      channels.map((channel) => channel.buffer),
-    );
+    for (const channels of pieces) {
+      await stretch.addBuffers(
+        channels,
+        channels.map((channel) => channel.buffer),
+      );
+    }
   }
 
   return {
     init,
     useSampleRate,
     schedule,
-    loadChannels,
+    loadPieces,
     sampleRate: () => context?.sampleRate ?? 0,
     now: () => context?.currentTime ?? 0,
     // Time from audio leaving the graph to it reaching the speakers.

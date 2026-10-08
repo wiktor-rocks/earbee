@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-08.
 **Question:** opening a file that's about an hour long takes very long, or fails. Why? What should change?
-**Status:** diagnosed, then fixed the same day. [After the fix](#after-the-fix) has the new measurements; the rest of the report describes the app before the fix.
+**Status:** diagnosed, then fixed the same day. [After the fix](#after-the-fix) has the new measurements, and [After parallel decoding](#after-parallel-decoding-and-downloads-by-url) (2026-10-09) the follow-ups. The rest of the report describes the app before the fix.
 **Re-run:**
 
 ```
@@ -11,6 +11,98 @@ node tests/diagnostics/run.cjs
 ```
 
 The results land in `tests/output/diagnostics/`. See [How it was measured](#how-it-was-measured).
+
+---
+
+## After parallel decoding (and downloads by URL)
+
+Two follow-ups from the list at the end of "After the fix" were implemented (see `CHANGELOG.md`, "Long files decode in parallel" and "Downloads are read from disk").
+
+- **Parallel decoding.**
+  - A track of a minute or more is split into one part per spare core, up to 4. Each part is decoded by its own Worker (`src/audio/decoder.js`, `core/parts.js`).
+  - The parts aren't copied into one array. The time stretcher plays them one after the other, which needed a fix in Signalsmith Stretch (see below).
+- **Downloads by URL.** The page reads a download from disk through a private URL (`electron/media-files.js`) instead of receiving its bytes.
+
+### Load times
+
+Same machine, same files, `npm run diagnose:loading`:
+
+| File                          | Before the fix |   One worker |       4 workers | Peak renderer (one worker → 4) |
+| ----------------------------- | -------------: | -----------: | --------------: | -----------------------------: |
+| MP3 10 min                    |          4.3 s |        3.9 s |       **1.8 s** |                   399 → 507 MB |
+| MP3 30 min                    |         12.7 s |       11.4 s |       **3.9 s** |                 892 → 1,032 MB |
+| MP3 60 min                    |         25.7 s |       19.1 s |       **7.4 s** |               1,675 → 1,766 MB |
+| MP3 90 min                    |             ❌ |       34.4 s |      **10.8 s** |               2,302 → 2,561 MB |
+| MP3 120 min                   |             ❌ |       38.6 s |      **13.0 s** |               2,908 → 3,252 MB |
+| AAC 30 / 45 min               |             ❌ | 8.5 / 12.4 s | **2.8 / 3.9 s** |   885 / 1,268 → 994 / 1,352 MB |
+| AAC 60 min                    |             ❌ |       15.2 s |       **5.4 s** |               1,552 → 1,712 MB |
+| Opus 60 min                   |         15.2 s |       25.1 s |       **7.7 s** |               1,628 → 1,836 MB |
+| WAV 60 min                    |         20.7 s |        5.8 s |       **2.2 s** |               1,497 → 1,510 MB |
+| Video 60 min, 720p            |             ❌ |       16.3 s |       **5.4 s** |               1,722 → 1,962 MB |
+| MP3 60 min, 2 GB memory limit |        💥 died |       19.8 s |       **7.0 s** |               1,665 → 1,780 MB |
+
+- **Faster:** loads are 2.6–3.5× faster, and Opus wins back its loss: 7.7 s, against 15.2 s before any fix.
+- **Memory:** the peak is 1–12 % higher. That's four decoders and their working memory alive at once, and it grows with the length (+90 MB for an hour of MP3, +340 MB for two). Every memory-limited run still loads.
+- **The UI:** it stays responsive (longest freeze 0.1–0.2 s).
+
+**How many workers** (the app's decoder alone, an hour of MP3, on this 8-thread CPU):
+
+| Workers | Decode | Peak renderer |
+| ------: | -----: | ------------: |
+|       1 | 20.6 s |      1,662 MB |
+|       2 | 10.1 s |      1,692 MB |
+|       3 |  7.1 s |      1,777 MB |
+|       4 |  6.1 s |      1,785 MB |
+|       6 |  5.6 s |      2,055 MB |
+
+Beyond 4 workers the gain is small and the memory grows, so `CONFIG.audio.parallel.maxWorkers` is 4 (with one core left free: `min(cores − 1, 4)`). For Opus, 4 workers take 6.8 s against 28.6 s for one.
+
+### The joins
+
+The risk of decoding in parts is the joins. A decoder started in the middle of a stream needs some earlier audio to warm up: MP3's bit reservoir, the overlap of AAC's and Opus's transforms. Without it, the first samples of a part are wrong, which you hear as a click. And a part has to start at exactly the right sample.
+
+- **Pre-roll.** Each part but the first starts decoding 1 s early (`preRoll`) and drops the warm-up.
+  - Without the pre-roll, the comparison below found errors of up to 0.25 at every join for MP3, AAC and Opus.
+  - With it, the samples are exact.
+- **Placing a part by its samples.**
+  - The timestamps aren't always sample-exact: in the WebM files, every Opus part came out 48 frames (1 ms) late. WebM timestamps are rounded to the millisecond, and Opus's codec delay isn't taken off mid-stream.
+  - So each part decodes a little past its end. The next part is placed where its first 2,048 samples equal the earlier part's, within ±50 ms of where the timestamps put it (`findJoin`).
+  - If no place matches, the track is decoded again in one part. That's slower, but never wrong.
+- **The check.** The `seams` runs decode each file with one worker and with 4 (8 for a 10-minute MP3), compare every sample, and report each join's lag:
+
+| File (60 min, 4 parts) | One worker | 4 workers | Result                  | Lag at the joins (frames) |
+| ---------------------- | ---------: | --------: | ----------------------- | ------------------------- |
+| MP3                    |     22.5 s |     6.1 s | identical, every sample | 0, 0, 0                   |
+| AAC                    |     14.7 s |     4.2 s | identical               | 0, 0, 0                   |
+| Opus (WebM)            |     27.4 s |     6.6 s | identical               | −48, −48, −48 (corrected) |
+| WAV                    |      5.2 s |     1.9 s | identical               | 0, 0, 0                   |
+| Video (AAC sound)      |     14.3 s |     4.7 s | identical               | 0, 0, 0                   |
+| MP3 10 min, 8 parts    |      3.6 s |     1.3 s | identical               | all 0                     |
+
+- **AAC at low bitrates isn't bit-exact** after a join. The e2e fixture, a 90 s chirp at 32 kb/s, differs by about 1.5·10⁻⁵ (−96 dB, below the 16-bit step) after each join, with an SNR of 79 dB overall.
+  - The likely cause is the decoder's noise filling, whose random generator depends on where decoding started, as after any seek.
+  - The joins themselves have no step. `tests/e2e/11-parallel.cjs` checks MP3 and Opus for identity and AAC for no step plus SNR > 60 dB.
+- **Signalsmith Stretch had a bug when reading across buffers.**
+  - Version 1.3.2, the latest, misreads its input when a block spans two of the buffers it was given (`addBuffers` more than once). It gave garbage and a `RangeError` in the worklet.
+  - The app now uses a copy with a two-line fix, in `src/vendor/signalsmith-stretch/`.
+  - An offline render of a signal from one buffer and from three gives identical output; `11-parallel.cjs` checks this on every run.
+
+### Downloads by URL
+
+A 1-hour 720p video (736 MB) opened as a download:
+
+|                      | Before (bytes over IPC) | Now (by URL) |
+| -------------------- | ----------------------: | -----------: |
+| Page memory: peak    |                  2.4 GB |       1.6 GB |
+| Page memory: settled |                  2.3 GB |       1.6 GB |
+| Load                 |                  19.1 s |       15.5 s |
+
+These are one-worker figures, measured before parallel decoding. The file is no longer kept in the page's memory while the video is open.
+
+### What could come next
+
+- **Start playing while decoding:** Signalsmith accepts audio in pieces. With parallel parts, the first part could play as soon as it's decoded.
+- **Fewer parts on a low-memory machine:** the parallel peak is up to 12 % higher. The memory check could count it, or fall back to fewer workers when memory is tight.
 
 ---
 
@@ -58,7 +150,7 @@ Computing the peaks chunk by chunk as they arrived cost 2–4 s instead, so the 
 
 **The video proxy for a 1-hour video,** not measurable before: 108,000 frames, 172 MB, built in 7.2 minutes in the background after loading. Memory stayed at about 1.7 GB throughout, and playback works meanwhile. So the proxy's size is now counted in the memory check, and the 2 GB file-size limit for videos is gone.
 
-**What could come next:**
+**What could come next** (the first and the third have since been done; see "After parallel decoding" above):
 
 - **Decode in parallel:** several workers, each decoding a part of the file, appended in order with Signalsmith's `addBuffers`. On this 8-thread CPU that could cut decoding by several times for every format, and would win back the Opus loss. The risk is the seams: each part must start sample-exact and without a click (MP3's bit reservoir, Opus pre-roll), so it needs a test comparing the result with a serial decode.
 - **Start playing while decoding:** Signalsmith accepts audio in pieces. The transport and waveform would need to handle a duration that's still growing.

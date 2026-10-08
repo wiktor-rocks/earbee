@@ -1,5 +1,6 @@
 node_modules/
 dist/
+src/vendor/
 tests/fixtures/
 tests/output/
 package-lock.json

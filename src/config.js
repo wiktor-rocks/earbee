@@ -41,6 +41,22 @@ export const CONFIG = {
     // A track may use at most this share of the memory the system has
     // available; a longer one is refused instead of crashing the app.
     maxMemoryShare: 0.8,
+    // Decoding in parallel: a track of at least `minDuration` seconds is
+    // split into one part per spare core, at most `maxWorkers` (4 decode an
+    // hour of MP3 3× faster than 1; 7 are no faster than 4). Each part but
+    // the first starts decoding `preRoll` seconds early, so its decoder has
+    // warmed up (MP3, AAC and Opus are then sample-exact), and the parts
+    // are joined where their samples match: within `maxLag` seconds of
+    // where the timestamps say, over `joinWindow` frames, to `joinTolerance`
+    // (see core/parts.js findJoin and docs/diagnostics/long-file-loading.md).
+    parallel: {
+      minDuration: 60,
+      maxWorkers: 4,
+      preRoll: 1,
+      maxLag: 0.05,
+      joinWindow: 2048,
+      joinTolerance: 1e-4,
+    },
   },
 
   video: {

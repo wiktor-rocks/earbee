@@ -18,7 +18,16 @@ const tests = __dirname;
 const unit = spawnSync(process.execPath, ["--test", path.join(__dirname, "unit", "*.test.mjs")], { stdio: "inherit" });
 if (unit.status !== 0) process.exit(unit.status ?? 1);
 const fixtures = path.join(tests, "fixtures");
-const needed = ["tone.wav", "counter.webm", "bad.mp3", "dl-audio.m4a", "dl-video.webm"];
+const needed = [
+  "tone.wav",
+  "counter.webm",
+  "bad.mp3",
+  "dl-audio.m4a",
+  "dl-video.webm",
+  "long-chirp.mp3",
+  "long-chirp.m4a",
+  "long-chirp.webm",
+];
 
 if (!needed.every((name) => fs.existsSync(path.join(fixtures, name)))) {
   const made = spawnSync("bash", [path.join(tests, "make-fixtures.sh")], { stdio: "inherit" });

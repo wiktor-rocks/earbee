@@ -1,22 +1,31 @@
-// Decodes the audio of one file, chunk by chunk, off the page's main
-// thread (a module Worker; see decoder.js for the page side).
+// Decodes the audio of one file, or one part of it, chunk by chunk, off
+// the page's main thread (a module Worker; see decoder.js for the page
+// side, which runs several of these on one file in parallel).
 //
 // Messages, in order:
 //   page → { type: "open", media }   (a File, or { name, url }: core/files.js)
 //   ←      { type: "info", duration, sampleRate, channels }
-//   page → { type: "decode", peakFactor }   (or terminates the worker)
-//   ←      { type: "progress", fraction } …  (at most every 100 ms)
-//   ←      { type: "done", channels, peaks, sampleRate, duration }
+//   page → { type: "decode", peakFactor, from, to, preRoll }
+//          (or terminates the worker): frames [from, to) of the track,
+//          counted from its first sample; `to` Infinity = to the end
+//   ←      { type: "progress", written } …  (at most every 100 ms)
+//   ←      { type: "done", channels, peaks, written }
 // or at any point ← { type: "error", kind, message }, kind being
 //   "cannot-decode"  the format or codec can't be read here
 //   "no-audio"       the file has no audio track
 //   "out-of-memory"  the decoded track doesn't fit in memory
 //   "failed"         anything else
 //
-// The file is read in pieces (BlobSource or UrlSource), never whole, and the samples go
-// straight into one Float32Array per channel at the file's own rate. Both
-// are what makes long files work: decodeAudioData needed about twice the
-// decoded size at its peak, and failed outright on long AAC files.
+// The file is read in pieces (BlobSource or UrlSource), never whole, and the
+// samples go straight into one Float32Array per channel at the file's own
+// rate. Both are what makes long files work: decodeAudioData needed about
+// twice the decoded size at its peak, and failed outright on long AAC files.
+//
+// A part that starts later than the beginning starts decoding `preRoll`
+// seconds before `from` (a decoder started mid-stream needs a little audio
+// to warm up; Mediabunny starts exactly where asked) and drops what comes
+// before `from`. Where `from` is comes from the timestamps, which can be a
+// few frames off; decoder.js corrects that when it joins the parts.
 import {
   ALL_FORMATS,
   AudioSampleSink,
@@ -83,25 +92,46 @@ async function open(media) {
   if (!track) throw new DecodeError("no-audio", "no audio track");
   if (!(await track.canDecode())) throw new DecodeError("cannot-decode", `can't decode ${track.codec ?? "its codec"}`);
 
-  const duration = await track.computeDuration();
-  return { input, track, duration, sampleRate: track.sampleRate, channels: track.numberOfChannels };
+  const [end, first] = await Promise.all([track.computeDuration(), track.getFirstTimestamp()]);
+  return {
+    input,
+    track,
+    first,
+    duration: end - first,
+    sampleRate: track.sampleRate,
+    channels: track.numberOfChannels,
+  };
 }
 
-async function decode({ track, duration, sampleRate, channels }, peakFactor) {
-  const expected = Math.ceil(duration * sampleRate);
-  const store = createChannelStore(channels, expected + sampleRate);
+async function decode({ track, first, duration, sampleRate, channels }, { peakFactor, from, to, preRoll }) {
+  const wanted = Number.isFinite(to) ? to - from : Infinity;
+  const capacity = Number.isFinite(wanted) ? wanted : Math.ceil(duration * sampleRate) - from + sampleRate;
+  const store = createChannelStore(channels, Math.max(1, capacity));
+  let started = from === 0; // the first part takes everything from the start
   let reportedAt = -Infinity; // the first chunk always reports
 
-  for await (const sample of new AudioSampleSink(track).samples()) {
+  const start = from === 0 ? first : Math.max(first, first + from / sampleRate - preRoll);
+  for await (const sample of new AudioSampleSink(track).samples(start)) {
+    let full;
     try {
       const frames = sample.numberOfFrames;
-      const start = store.reserve(frames);
+      let skip = 0;
+      if (!started) {
+        // Warming up: drop what comes before `from`.
+        const position = Math.round((sample.timestamp - first) * sampleRate);
+        if (position + frames <= from) continue;
+        skip = Math.max(0, from - position);
+        started = true;
+      }
+      const count = Math.min(frames - skip, wanted - store.written);
+      const at = store.reserve(count);
       for (let c = 0; c < channels; c++) {
         // A mono chunk in a stereo track (rare) fills every channel.
         const plane = Math.min(c, sample.numberOfChannels - 1);
-        const target = store.channel(c).subarray(start, start + frames);
-        sample.copyTo(target, { planeIndex: plane, format: "f32-planar", frameCount: frames });
+        const target = store.channel(c).subarray(at, at + count);
+        sample.copyTo(target, { planeIndex: plane, format: "f32-planar", frameOffset: skip, frameCount: count });
       }
+      full = store.written >= wanted;
     } finally {
       sample.close();
     }
@@ -109,8 +139,9 @@ async function decode({ track, duration, sampleRate, channels }, peakFactor) {
     const now = performance.now();
     if (now - reportedAt > 100) {
       reportedAt = now;
-      scope.postMessage({ type: "progress", fraction: Math.min(1, store.written / expected) });
+      scope.postMessage({ type: "progress", written: store.written });
     }
+    if (full) break; // also stops the decoder
   }
 
   // The peaks in one pass at the end: 0.7 s per hour, against 2–4 s for
@@ -120,7 +151,7 @@ async function decode({ track, duration, sampleRate, channels }, peakFactor) {
   // slice(): with a factor of 1 the peaks would be the samples themselves,
   // and one buffer can't be transferred twice. Peaks are small.
   const peaks = decoded.map((samples) => downsamplePeaks(samples, peakFactor).slice(0));
-  return { channels: decoded, peaks, duration: store.written / sampleRate };
+  return { channels: decoded, peaks, written: store.written };
 }
 
 let opened = null;
@@ -132,9 +163,9 @@ scope.onmessage = async ({ data }) => {
       const { duration, sampleRate, channels } = opened;
       scope.postMessage({ type: "info", duration, sampleRate, channels });
     } else if (data.type === "decode") {
-      const result = await decode(opened, data.peakFactor);
+      const result = await decode(opened, data);
       opened.input.dispose?.();
-      scope.postMessage({ type: "done", sampleRate: opened.sampleRate, ...result }, [
+      scope.postMessage({ type: "done", ...result }, [
         ...result.channels.map((array) => array.buffer),
         ...result.peaks.map((array) => array.buffer),
       ]);
