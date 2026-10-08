@@ -1,7 +1,7 @@
 /* ============================================================
  * TranscriBee styles
  *
- *   1 Tokens       colours, fonts, sizes (script.js reads some of them)
+ *   1 Tokens       colours, fonts, sizes (the page's code reads some of them)
  *   2 Base         element defaults; no animations except two
  *   3 Controls     buttons, sliders, keys
  *   4 Screens      welcome, loading screen, loading overlay,
@@ -34,7 +34,7 @@
   --aura-mid: color-mix(in srgb, var(--accent) 12%, transparent);
   --aura-shadow: color-mix(in srgb, var(--accent) 45%, transparent);
 
-  /* Read by script.js for the waveform drawing */
+  /* Read by src/waveform.js for the waveform drawing */
   --wave: #3b4252;
   --wave-progress: var(--accent);
   --minimap-wave: #343a48;

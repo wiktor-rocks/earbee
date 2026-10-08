@@ -1,6 +1,6 @@
 // @ts-check
 /* =====================================================================
- * TranscriBee: renderer script
+ * TranscriBee: the page's entry point. Read this first.
  *
  * A music-transcription player: open a song or a video, slow it down,
  * shift its pitch, EQ it, and step through it with the keyboard.
@@ -24,18 +24,29 @@
  *   settings   The single copy of every user setting (plain values).
  *
  *   Until the first file loads, a welcome screen (#welcome) stands in for
- *   the player (#app); showPlayer() swaps them once (§9, §11). The first
- *   load shows a loading screen (#loadingScreen) in their place; later
- *   loads an overlay over the player (setLoading, §9).
+ *   the player (#app); showPlayer() swaps them once. The first load shows a
+ *   loading screen (#loadingScreen) in their place; later loads an overlay
+ *   over the player (setLoading in ui/dom.js).
  *
- *   Links (YouTube) are downloaded by the main process: downloader.js,
- *   reached through window.transcribee (preload.js). The page shows the
- *   progress, then opens the downloaded file like any other (§11).
+ *   Links (YouTube) are downloaded by the main process
+ *   (electron/downloader.js), reached through window.transcribee
+ *   (electron/preload.js). The page shows the progress, then opens the
+ *   downloaded file like any other (features/download.js).
  *
- * SECTIONS
- *   1 Config   2 Pure helpers   3 Settings   4 Audio engine   5 Transport
- *   6 Waveform   7 Video   8 Instances   9 UI   10 Setting controls
- *   11 File loading   12 Playback actions   13 Keyboard shortcuts   14 Startup
+ * FILES (src/), in layers: a file imports only from layers above it in
+ * this list, never below (enforced by `npm run lint`)
+ *   core/          Pure helpers, no DOM: format, peaks, timeline (and the
+ *                  Segment / Loop / LoopRegion types), emitter, files, errors
+ *   config.js      CONFIG: every tunable number
+ *   audio/         engine.js, transport.js
+ *   video/         view.js (the picture), proxy.js (low-res copy for seeking)
+ *   waveform.js    The waveform, zoom, minimap, loop drawing and dragging
+ *   context.js     `settings`, and `player`: the components above, once created
+ *   ui/            dom.js (elements, messages, rendering, loading screens),
+ *                  controls.js (sliders, chips, EQ), shortcuts.js (key handling)
+ *   features/      playback.js, loop.js, open-file.js, download.js
+ *   app.js         This file: creates and wires the components, the
+ *                  SHORTCUTS table, start()
  *
  * COMMON CHANGES
  *   Speed preset or EQ band   Edit CONFIG.speed.presets / CONFIG.eq.bands.
@@ -43,10 +54,11 @@
  *   Step sizes (← / →)        Edit CONFIG.step.sizes (↑ / ↓ cycle through them).
  *   Slider range or default   Edit CONFIG. Sliders get min/max/step from it,
  *                             and the scale labels under them are generated.
- *   New slider setting        Add a range to CONFIG, a value to `settings`,
- *                             an entry to SLIDERS (§10), and an
- *                             <input type="range"> plus readout to index.html.
- *   New keyboard shortcut     Add an entry to SHORTCUTS (§13); the legend
+ *   New slider setting        Add a range to CONFIG, a value to `settings`
+ *                             (context.js), an entry to SLIDERS
+ *                             (ui/controls.js), and an <input type="range">
+ *                             plus readout to index.html.
+ *   New keyboard shortcut     Add an entry to SHORTCUTS (below); the legend
  *                             at the bottom of the window updates itself.
  *   Colours and fonts         Tokens at the top of style.css (the waveform
  *                             reads its colours from there too).
@@ -54,13 +66,16 @@
  *                             video/* type). Codecs are whatever WebCodecs
  *                             decodes: H.264, VP8/VP9, AV1; not HEVC here.
  *   A new view that follows   Subscribe to transport.on("position"/"state"/
- *   playback                  "jump") in §8, like the waveform and video.
- *   A–B loop                  State and actions in §12 (setLoopRegion);
- *                             audio looping in the transport (§5), drawing
- *                             and dragging in the waveform (§6).
- *   Any change                Run `npm run check` and `npm test`, and record
- *                             it in CHANGELOG.md (what, why, how, where), so
- *                             the next person or LLM can follow.
+ *   playback                  "jump") below, like the waveform and video.
+ *   A–B loop                  State and actions in features/loop.js; audio
+ *                             looping in audio/transport.js, drawing and
+ *                             dragging in waveform.js.
+ *   A new feature             A file in features/ with a bind…() function,
+ *                             called from start() below.
+ *   Any change                Run `npm run check` and `npm test` (unit tests
+ *                             alone: `npm run test:unit`), and record it in
+ *                             CHANGELOG.md (what, why, how, where), so the
+ *                             next person or LLM can follow.
  * ===================================================================== */
 
 import { createAudioEngine } from "./audio/engine.js";

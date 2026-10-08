@@ -4,24 +4,86 @@ TranscriBee is an Electron app for transcribing music. You open a song or a vide
 
 **Files**
 
-- `main.js`: the Electron main process (window, security, window state).
-- `downloader.js` and `preload.js`: downloading a link with yt-dlp, and the page's bridge to it.
+- `electron/`: the Electron main process: `main.js` (window, security), `window-state.js`, `downloader.js` (yt-dlp) and `preload.js` (the page's bridge to it).
+- `src/`: the page, as ES modules in layers. `core/` → `config.js` → `audio/`, `video/`, `waveform.js` → `context.js` → `ui/` → `features/` → `app.js`.
 - `index.html` and `style.css`: the page and its look.
-- `script.js`: all app logic, in one file split into numbered sections (§1 Config … §14 Startup).
 - `assets/`: the logo and icons; `scripts/make-images.py` makes them from the source image.
-- `tests/`: end-to-end and smoke tests (`npm test`).
+- `tests/`: unit tests (`unit/`), end-to-end tests (`run.cjs` + `e2e/`) and the smoke test; all run with `npm test`.
 
-The architecture overview, and a list of where to make common changes, is in the comment at the top of `script.js`. Read that first. `README.md` covers running, testing and building.
+The architecture overview, the file map and a list of where to make common changes are in the comment at the top of `src/app.js`. Read that first. `README.md` covers running, testing and building.
 
 **How to read an entry.** Newest first, one entry per round of work. Each change records:
 
 - **What:** the behaviour, as the user sees it.
 - **Why:** the request or problem behind it.
 - **How:** the mechanism, and any constraint that isn't obvious from the code.
-- **Where:** `script.js` sections and function names, rather than line numbers, which drift.
+- **Where:** files and function names, rather than line numbers, which drift.
 - **Verified by:** how it was tested.
 
+**Older entries** (before "Modules") refer to `script.js` and its numbered sections, and to `main.js`, `downloader.js` and `preload.js` at the top level. Here is where each now lives:
+
+| Then                                     | Now                                                                                         |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------- |
+| §1 Config                                | `src/config.js`                                                                             |
+| §2 Pure helpers                          | `src/core/` (`format.js`, `peaks.js`, `timeline.js`, `emitter.js`, `files.js`, `errors.js`) |
+| §3 Settings                              | `src/context.js`                                                                            |
+| §4 Audio engine                          | `src/audio/engine.js`                                                                       |
+| §5 Transport                             | `src/audio/transport.js`                                                                    |
+| §6 Waveform                              | `src/waveform.js`                                                                           |
+| §7 Video                                 | `src/video/view.js`, `src/video/proxy.js`                                                   |
+| §8 Instances                             | `src/app.js`; the `returnPoint` listeners are in `features/playback.js` (`bindPlayback`)    |
+| §9 UI                                    | `src/ui/dom.js`; the generated controls are in `src/ui/controls.js`                         |
+| §10 Setting controls                     | `src/ui/controls.js`                                                                        |
+| §11 File loading                         | `src/features/open-file.js`, `src/features/download.js`                                     |
+| §12 Playback actions                     | `src/features/playback.js`, `src/features/loop.js`                                          |
+| §13 Keyboard shortcuts                   | `src/ui/shortcuts.js`; the `SHORTCUTS` table is in `src/app.js`                             |
+| §14 Startup                              | `src/app.js` (`start`)                                                                      |
+| `main.js`, `downloader.js`, `preload.js` | `electron/`                                                                                 |
+| `tests/run.cjs` (one sequence)           | `tests/run.cjs` + `tests/e2e/`                                                              |
+
 ---
+
+## 2026-10-08: Modules (ready for large changes)
+
+A structural refactor with no behaviour change: the code is split into files with enforced layers, and gains fast unit tests.
+
+- **What:** nothing the user can see changes. For whoever works on the code:
+  - `script.js` (2,739 lines) is now 21 modules in `src/`;
+  - the main process lives in `electron/`;
+  - `npm test` starts with 34 unit tests that run in plain Node in about a second;
+  - the end-to-end tests are split into a harness plus 11 topic files.
+- **Why:** to make large changes safer and easier. A single file of numbered sections had no boundaries, so any part could reach any other. And every test had to start Electron.
+- **How:**
+  - **No build step.** The page was already an ES module, so the split uses plain `import`s from `file://`, as before.
+    - `src/package.json` (`"type": "module"`) lets Node's test runner import the same files.
+    - The library imports keep their `node_modules` paths, adjusted for depth.
+  - **Layers.** A file in `src/` only imports from the layers above it: `core` → `config` → `audio` / `video` / `waveform` → `context` → `ui` → `features` → `app.js`. `eslint-plugin-import-x` enforces this (`no-restricted-paths`) and forbids import cycles (`no-cycle`). It was checked with deliberately wrong imports.
+  - **Shared state** lives in `context.js`: `settings`, and `player`, the components that `app.js` creates and puts there before anything binds.
+  - **Callbacks across layers** are wired in `app.js`: engine errors, waveform loop drags, video notices. So the components never import the UI.
+  - **Small moves so the layering holds:**
+    - `peaksPerSecondFor` and `isVideoFile` take their `CONFIG` values as arguments, so `core/` imports nothing outside itself;
+    - the `Loop` and `LoopRegion` types join `Segment` in `core/timeline.js`;
+    - `bindControls` became `bindTransportButtons` (`features/playback.js`) and `bindSettingControls` (`ui/controls.js`);
+    - the `SHORTCUTS` table moved to `app.js`, while the key handling stays in `ui/shortcuts.js` (`bindShortcuts(shortcuts, isBlocked)`);
+    - the `returnPoint` listeners moved into `bindPlayback()`;
+    - `window-state.js` came out of `main.js`.
+  - **Unit tests** (`tests/unit/*.test.mjs`, `node:test`):
+    - `core/`: formatting, peaks, timeline and loop maths, emitter, file types;
+    - the transport against a fake engine and clock: speed, pausing at what was heard, seeking, the end of the track, the loop rules;
+    - the downloader's link checks, failure messages and file names.
+
+    A mutation check showed they catch real breakage: breaking the loop-end rule, then the heard-position pause, each failed exactly the matching test.
+
+  - **End-to-end tests:** `tests/e2e/harness.cjs` holds the setup and helpers; `01-static-ui.cjs` … `11-security.cjs` run in the same order and window as before, and `tests/run.cjs` is a short runner. The check names and order are identical (compared by script).
+  - The architecture comment moved to the top of `src/app.js`, with a file map in place of the section list. The table at the top of this file maps the old `§` sections to files.
+- **Where:**
+  - `src/**`, `electron/**`, `index.html` (loads `src/app.js`);
+  - `package.json` (`main`, `build.files`, `test:unit`), `jsconfig.json`, `eslint.config.js`;
+  - `tests/unit/`, `tests/e2e/`, `tests/run.cjs`, `tests/launch.cjs`;
+  - `README.md`, `style.css` (two comments).
+- **Verified by:**
+  - after every step (8 commits), `npm run check` and `npm test`: 34 unit + 129 end-to-end + 16 smoke checks;
+  - the full suite against a packaged Linux build.
 
 ## 2026-10-08: Download from YouTube
 

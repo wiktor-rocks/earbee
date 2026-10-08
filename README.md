@@ -24,16 +24,17 @@ The shortcut legend at the bottom of the window lists every key.
 
 ## Commands
 
-| Command                                   | What it does                                                                              |
-| ----------------------------------------- | ----------------------------------------------------------------------------------------- |
-| `npm install`                             | Install dependencies                                                                      |
-| `npm start`                               | Run the app (reloads on file changes)                                                     |
-| `npm run start:gpu-info` / `start:no-gpu` | Run with GPU diagnostics / with software rendering                                        |
-| `npm test`                                | End-to-end tests (`tests/run.cjs`), then a smoke test of the real app (`tests/smoke.cjs`) |
-| `npm run check`                           | Formatting (Prettier), lint (ESLint) and type check (TypeScript on JSDoc)                 |
-| `npm run format`                          | Format all files                                                                          |
-| `npm run build:dir`                       | Unpacked Linux build in `dist/linux-unpacked`                                             |
-| `npm run build:linux` / `build:win`       | Linux AppImage / Windows portable `.exe`                                                  |
+| Command                                   | What it does                                                                                                       |
+| ----------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `npm install`                             | Install dependencies                                                                                               |
+| `npm start`                               | Run the app (reloads on file changes)                                                                              |
+| `npm run start:gpu-info` / `start:no-gpu` | Run with GPU diagnostics / with software rendering                                                                 |
+| `npm test`                                | Unit tests, then end-to-end tests (`tests/run.cjs`), then a smoke test of the real app (`tests/smoke.cjs`)         |
+| `npm run test:unit`                       | Unit tests only: plain Node, about a second                                                                        |
+| `npm run check`                           | Formatting (Prettier), lint (ESLint, including the import layering in `src/`) and type check (TypeScript on JSDoc) |
+| `npm run format`                          | Format all files                                                                                                   |
+| `npm run build:dir`                       | Unpacked Linux build in `dist/linux-unpacked`                                                                      |
+| `npm run build:linux` / `build:win`       | Linux AppImage / Windows portable `.exe`                                                                           |
 
 To test a packaged build:
 
@@ -46,20 +47,38 @@ TB_APP_BINARY=$PWD/dist/linux-unpacked/transcribee npm test
 ## Files
 
 ```
-main.js            Electron main process: window, security, window state
-downloader.js      Downloading links with yt-dlp (main process)
-preload.js         The page's bridge to downloader.js (window.transcribee)
+electron/          The main process (CommonJS, Node)
+  main.js            window, security, wiring
+  window-state.js    remembers the window's size and position
+  downloader.js      downloading links with yt-dlp
+  preload.js         the page's bridge to downloader.js (window.transcribee)
+src/               The page (ES modules, no build step), in layers:
+  core/              pure helpers, no DOM (unit-tested)
+  config.js          every tunable number
+  audio/             engine.js (Web Audio + Signalsmith), transport.js
+  video/             view.js, proxy.js
+  waveform.js        WaveSurfer drawing, zoom, the loop region
+  context.js         settings, and the shared components (`player`)
+  ui/                dom.js, controls.js, shortcuts.js
+  features/          playback.js, loop.js, open-file.js, download.js
+  app.js             entry point: creates and wires everything
 index.html         The page: welcome screen, loading screen, player
 style.css          All styles; colour and font tokens at the top
-script.js          All app logic, in numbered sections (§1 Config … §14 Startup)
 assets/            Logo and icons (generated from transcribee-source.png
                    by scripts/make-images.py)
-tests/             run.cjs (end-to-end), smoke.cjs (real app), preload.cjs
-                   (instrumentation), fake-yt-dlp.cjs (offline downloads),
-                   launch.cjs, make-fixtures.sh
+tests/
+  unit/              node:test unit tests (core, transport, downloader)
+  run.cjs            end-to-end runner: e2e/harness.cjs plus topic files
+  e2e/               01-static-ui.cjs … 11-security.cjs
+  smoke.cjs          the real app: security, window state, the bridge
+  preload.cjs        page instrumentation for the e2e tests
+  fake-yt-dlp.cjs    stands in for yt-dlp, so downloads test offline
+  launch.cjs, make-fixtures.sh
 CHANGELOG.md       What changed, why, how and where, newest first
 ```
 
-**Start with the comment at the top of `script.js`.** It maps how the parts fit together (engine, transport, waveform, video, UI) and lists where to make common changes: speed presets, EQ bands, step sizes, shortcuts, colours.
+**Start with the comment at the top of `src/app.js`.** It maps how the parts fit together (engine, transport, waveform, video, UI), lists the files and their layers, and says where to make common changes: speed presets, EQ bands, step sizes, shortcuts, colours, new features.
+
+**Layers.** In `src/`, a file only imports from the layers above it: `core` → `config` → `audio` / `video` / `waveform` → `context` → `ui` → `features` → `app.js`. `npm run lint` fails on an import that goes the other way, or on an import cycle. So `core/`, `audio/transport.js` and the rest of the lower layers stay free of the UI, and can be unit-tested in plain Node.
 
 **Record every change in [CHANGELOG.md](CHANGELOG.md):** what, why, how and where.
