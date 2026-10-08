@@ -1,4 +1,5 @@
 import { CONFIG } from "../config.js";
+import { readWhole } from "../core/files.js";
 import { downsamplePeaks } from "../core/peaks.js";
 
 /* =====================================================================
@@ -8,7 +9,8 @@ import { downsamplePeaks } from "../core/peaks.js";
  * decode-worker.js; formats it can't read fall back to decodeAudioData
  * on the whole file (the old way, fine for short files).
  *
- * decodeFile(file, { prepare, onProgress, signal }):
+ * decodeFile(media, { prepare, onProgress, signal }):  media: a File, or a
+ * download's { name, url } (core/files.js)
  *   prepare(info)  called once the track is known, before decoding:
  *                  info = { duration, sampleRate, channels }; returns the
  *                  peak factor (samples per peak), or throws to refuse
@@ -37,8 +39,10 @@ export class DecodeFailure extends Error {
 
 const aborted = () => new DOMException("Decoding was canceled.", "AbortError");
 
-/** @param {File} file @param {DecodeOptions} options */
-function decodeInWorker(file, { prepare, onProgress, signal }) {
+/** @typedef {import("../core/files.js").Media} Media */
+
+/** @param {Media} media @param {DecodeOptions} options */
+function decodeInWorker(media, { prepare, onProgress, signal }) {
   return new Promise((resolve, reject) => {
     let worker;
     try {
@@ -83,15 +87,15 @@ function decodeInWorker(file, { prepare, onProgress, signal }) {
       }
     });
 
-    worker.postMessage({ type: "open", file });
+    worker.postMessage({ type: "open", media });
   });
 }
 
 // The whole file at once, as the app first did. Resampled to
 // CONFIG.audio.fallbackSampleRate.
-/** @param {File} file @param {DecodeOptions} options */
-async function decodeWhole(file, { prepare, signal }) {
-  const bytes = await file.arrayBuffer();
+/** @param {Media} media @param {DecodeOptions} options */
+async function decodeWhole(media, { prepare, signal }) {
+  const bytes = await readWhole(media);
   if (signal?.aborted) throw aborted();
 
   const context = new OfflineAudioContext(1, 1, CONFIG.audio.fallbackSampleRate);
@@ -110,17 +114,17 @@ async function decodeWhole(file, { prepare, signal }) {
 }
 
 /**
- * @param {File} file
+ * @param {Media} media
  * @param {DecodeOptions} options
  * @returns {Promise<{ channels: Float32Array[], peaks: Float32Array[], sampleRate: number, duration: number }>}
  */
-export async function decodeFile(file, options) {
+export async function decodeFile(media, options) {
   try {
-    return await decodeInWorker(file, options);
+    return await decodeInWorker(media, options);
   } catch (error) {
     if (error instanceof DecodeFailure && error.kind === "cannot-decode") {
-      console.debug(`Decoding “${file.name}” in one piece: ${error.message}`);
-      return decodeWhole(file, options);
+      console.debug(`Decoding “${media.name}” in one piece: ${error.message}`);
+      return decodeWhole(media, options);
     }
     throw error;
   }

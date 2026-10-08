@@ -2,7 +2,7 @@
 // thread (a module Worker; see decoder.js for the page side).
 //
 // Messages, in order:
-//   page → { type: "open", file }
+//   page → { type: "open", media }   (a File, or { name, url }: core/files.js)
 //   ←      { type: "info", duration, sampleRate, channels }
 //   page → { type: "decode", peakFactor }   (or terminates the worker)
 //   ←      { type: "progress", fraction } …  (at most every 100 ms)
@@ -13,7 +13,7 @@
 //   "out-of-memory"  the decoded track doesn't fit in memory
 //   "failed"         anything else
 //
-// The file is read in pieces (BlobSource), never whole, and the samples go
+// The file is read in pieces (BlobSource or UrlSource), never whole, and the samples go
 // straight into one Float32Array per channel at the file's own rate. Both
 // are what makes long files work: decodeAudioData needed about twice the
 // decoded size at its peak, and failed outright on long AAC files.
@@ -22,7 +22,9 @@ import {
   AudioSampleSink,
   BlobSource,
   Input,
+  UrlSource,
 } from "../../node_modules/mediabunny/dist/bundles/mediabunny.mjs";
+import { mediaSource } from "../core/files.js";
 import { downsamplePeaks } from "../core/peaks.js";
 
 const scope = /** @type {any} */ (self);
@@ -70,8 +72,8 @@ function createChannelStore(channels, capacity) {
   };
 }
 
-async function open(file) {
-  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(file) });
+async function open(media) {
+  const input = new Input({ formats: ALL_FORMATS, source: mediaSource(media, { BlobSource, UrlSource }) });
   let track;
   try {
     track = await input.getPrimaryAudioTrack();
@@ -126,7 +128,7 @@ let opened = null;
 scope.onmessage = async ({ data }) => {
   try {
     if (data.type === "open") {
-      opened = await open(data.file);
+      opened = await open(data.media);
       const { duration, sampleRate, channels } = opened;
       scope.postMessage({ type: "info", duration, sampleRate, channels });
     } else if (data.type === "decode") {

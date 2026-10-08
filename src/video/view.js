@@ -39,12 +39,14 @@
  *
  * Exposes: preload, prepare, show, clear, discard,
  *          start, advance, showFrameAt
- *   prepare(file) → { video, reason }: opens a file without touching the
+ *   prepare(media) → { video, reason }: opens a file (a File, or a
+ *   download's { name, url }; core/files.js) without touching the
  *   video on screen; `video` is null (with a reason) if it has no
  *   picture this app can decode. Never throws.
  * ===================================================================== */
 
 import { CONFIG } from "../config.js";
+import { mediaSource } from "../core/files.js";
 import { createVideoProxy } from "./proxy.js";
 
 /**
@@ -95,11 +97,12 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
 
   /* ---------- Opening files ---------- */
 
-  async function prepare(file) {
+  /** @param {import("../core/files.js").Media} media */
+  async function prepare(media) {
     let input = null;
     try {
-      const { Input, BlobSource, ALL_FORMATS, VideoSampleSink, EncodedPacketSink } = await preload();
-      input = new Input({ formats: ALL_FORMATS, source: new BlobSource(file) });
+      const { Input, BlobSource, UrlSource, ALL_FORMATS, VideoSampleSink, EncodedPacketSink } = await preload();
+      input = new Input({ formats: ALL_FORMATS, source: mediaSource(media, { BlobSource, UrlSource }) });
 
       const track = await input.getPrimaryVideoTrack();
       if (!track) return failed(input, "it has no video track");

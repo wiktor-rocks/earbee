@@ -36,7 +36,8 @@ if (initialTheme?.variables) {
 }
 
 contextBridge.exposeInMainWorld("transcribee", {
-  // Resolves to { ok: true, name, path, bytes } or { ok: false, canceled, error }.
+  // Resolves to { ok: true, name, path, url } or { ok: false, canceled, error };
+  // `url` serves the saved file in pieces (media-files.js).
   download: (url, kind) => ipcRenderer.invoke("download:start", String(url), String(kind)),
   cancelDownload: () => ipcRenderer.invoke("download:cancel"),
   // Calls `callback` with each progress report; returns a function that stops it.

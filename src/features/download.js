@@ -18,7 +18,8 @@ import { isLoading, loadMediaFile, withLoading } from "./open-file.js";
  * @property {number | null} [eta]  seconds
  * @property {string} [title]  the video's, once known
  *
- * @typedef {{ ok: true, name: string, path: string, bytes: Uint8Array }
+ * `url` serves the saved file to the page in pieces (electron/media-files.js).
+ * @typedef {{ ok: true, name: string, path: string, url: string }
  *   | { ok: false, canceled: boolean, error: string }} DownloadResult
  *
  * @typedef {object} DownloadBridge
@@ -69,7 +70,8 @@ function downloadLink(url, kind) {
 
     setLoadingStatus("Loading");
     dom.loadingFileName.textContent = result.name;
-    const notices = await loadMediaFile(new File([result.bytes], result.name), signal);
+    // Read from disk by URL, never whole (see electron/media-files.js).
+    const notices = await loadMediaFile({ name: result.name, url: result.url }, signal);
     showNotice([`Saved as ${result.path}.`, ...notices].join(" "));
   });
 }

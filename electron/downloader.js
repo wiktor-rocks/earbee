@@ -441,11 +441,13 @@ function createDownloader({ binDir, saveDir, ytDlp, jsRuntime = process.execPath
 }
 
 /**
- * Answers the page's download requests (see preload.js).
+ * Answers the page's download requests (see preload.js). The page gets the
+ * saved file's URL from `share` (media-files.js), never its bytes: it reads
+ * the file from disk in pieces, as it does a file the user opens.
  * @param {import("electron").IpcMain} ipcMain
- * @param {Parameters<typeof createDownloader>[0]} options
+ * @param {Parameters<typeof createDownloader>[0] & { share: (file: string) => string }} options
  */
-function handleDownloads(ipcMain, options) {
+function handleDownloads(ipcMain, { share, ...options }) {
   const downloader = createDownloader(options);
 
   ipcMain.handle("download:start", async (event, url, kind) => {
@@ -454,7 +456,7 @@ function handleDownloads(ipcMain, options) {
     };
     try {
       const file = await downloader.download(url, kind, send);
-      return { ok: true, name: path.basename(file), path: file, bytes: await fs.promises.readFile(file) };
+      return { ok: true, name: path.basename(file), path: file, url: share(file) };
     } catch (error) {
       if (!(error instanceof DownloadError)) console.error("Download failed:", error);
       return {

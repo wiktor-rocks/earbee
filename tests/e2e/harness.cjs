@@ -1,7 +1,7 @@
 // The end-to-end harness: an offscreen window with the app, and the helpers
 // the topic files use (see run.cjs for how the run works). createHarness()
 // returns them all in one object, `h`.
-const { app, BrowserWindow, ipcMain, nativeTheme, session } = require("electron");
+const { app, BrowserWindow, ipcMain, nativeTheme, protocol, session } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -25,6 +25,7 @@ function prepare() {
   fs.mkdirSync(OUTPUT, { recursive: true });
   fs.rmSync(DOWNLOADS, { recursive: true, force: true });
   app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
+  require(path.join(PROJECT, "electron", "media-files.js")).registerMediaScheme(protocol); // as main.js does
 }
 
 async function createHarness() {
@@ -34,16 +35,26 @@ async function createHarness() {
       details.url.startsWith("file:") ||
       details.url.startsWith("devtools:") ||
       details.url.startsWith("data:") ||
-      details.url.startsWith("blob:");
+      details.url.startsWith("blob:") ||
+      details.url.startsWith("transcribee-media:");
     if (!ok) blocked.push(details.url);
     cb({ cancel: !ok });
   });
   // As main.js does, but with the fake yt-dlp. The app's preload runs
   // alongside the instrumentation preload.
+  // Its reads are counted (mediaReads), to see downloads read by URL.
+  const { SCHEME, createMediaFiles } = require(path.join(PROJECT, "electron", "media-files.js"));
+  const mediaFiles = createMediaFiles();
+  const mediaReads = { count: 0 };
+  protocol.handle(SCHEME, (request) => {
+    mediaReads.count++;
+    return mediaFiles.respond(request);
+  });
   require(path.join(PROJECT, "electron", "downloader.js")).handleDownloads(ipcMain, {
     binDir: path.join(OUTPUT, "unused-bin"),
     saveDir: DOWNLOADS,
     ytDlp: path.join(TESTS, "fake-yt-dlp.cjs"),
+    share: mediaFiles.share,
   });
   // As main.js does, with a fresh theme file each run; the system is
   // treated as dark, so "Automatic" is predictable.
@@ -172,6 +183,7 @@ async function createHarness() {
 
   return {
     blocked,
+    mediaReads,
     win,
     securityWarnings,
     wc,

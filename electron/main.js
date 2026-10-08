@@ -4,7 +4,8 @@
 //              access; it may not navigate away or open other windows.
 //              Its Content-Security-Policy is in index.html.
 //   Downloads  Through the page's bridge (preload.js): downloading a link
-//              with yt-dlp, done here in downloader.js.
+//              with yt-dlp, done here in downloader.js. The page reads the
+//              saved file by a private URL (media-files.js), in pieces.
 //   System     The memory available for a track (system.js); if the page's
 //              process dies, a message and a reload instead of a blank
 //              window.
@@ -17,9 +18,10 @@
 //              rendering if the GPU process keeps crashing.
 //              `npm run start:no-gpu` forces software rendering;
 //              `npm run start:gpu-info` logs what the GPU is doing.
-const { app, BrowserWindow, dialog, ipcMain, nativeTheme, net } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, protocol } = require("electron");
 const path = require("path");
 const { handleDownloads } = require("./downloader");
+const { createMediaFiles, registerMediaScheme } = require("./media-files");
 const { handleRendererCrash, handleSystem } = require("./system");
 const { createThemeStore, handleThemes } = require("./theme-store");
 const { loadWindowState, rememberWindowState } = require("./window-state");
@@ -28,6 +30,8 @@ const ROOT = path.join(__dirname, ".."); // the app's files: index.html, src/, a
 
 const MIN_SIZE = { width: 900, height: 640 };
 const DEFAULT_BOUNDS = { width: 1200, height: 800 };
+
+registerMediaScheme(protocol); // must happen before the app is ready
 
 app.on("child-process-gone", (_event, details) => {
   if (details.type === "GPU") {
@@ -89,10 +93,13 @@ app.whenReady().then(() => {
   handleThemes(ipcMain, themeStore, followTheme);
   handleSystem(ipcMain);
   nativeTheme.on("updated", followTheme); // "Automatic" follows the system
+  const mediaFiles = createMediaFiles();
+  mediaFiles.handle(protocol);
   handleDownloads(ipcMain, {
     binDir: path.join(app.getPath("userData"), "bin"),
     saveDir: path.join(app.getPath("downloads"), "TranscriBee"),
     fetch: net.fetch, // follows the system's proxy settings
+    share: mediaFiles.share,
   });
   createWindow();
 

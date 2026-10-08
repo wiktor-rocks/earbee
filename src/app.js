@@ -37,7 +37,8 @@
  *   Links (YouTube) are downloaded by the main process
  *   (electron/downloader.js), reached through window.transcribee
  *   (electron/preload.js). The page shows the progress, then opens the
- *   downloaded file like any other (features/download.js).
+ *   downloaded file like any other (features/download.js), reading it from
+ *   disk by a private URL (electron/media-files.js), never whole.
  *
  * FILES (src/), in layers: a file imports only from layers above it in
  * this list, never below (enforced by `npm run lint`)

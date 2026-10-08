@@ -83,57 +83,57 @@ async function availableMemory() {
 // Refuses a file whose decoded sound (plus, for a video, its proxy)
 // wouldn't fit in memory, before decoding. Neither file is ever read whole,
 // so its size on disk doesn't matter.
-async function checkMemory(file, info, isVideo) {
+async function checkMemory(media, info, isVideo) {
   const proxyBytes = isVideo ? (info.duration * CONFIG.video.proxy.bitrate) / 8 : 0;
   const needed = decodedBytes(info.duration, info.sampleRate, info.channels) + proxyBytes;
   const available = await availableMemory();
   if (!fitsInMemory(needed, available, CONFIG.audio.maxMemoryShare)) {
     throw new AppError(
-      `“${file.name}” is too long to open: its sound needs about ${formatMemory(needed)} of memory, ` +
+      `“${media.name}” is too long to open: its sound needs about ${formatMemory(needed)} of memory, ` +
         `and ${formatMemory(available)} is available. Closing other programs may help.`,
     );
   }
 }
 
 // A decoding failure, in words for the user.
-function explainDecodeFailure(error, file, isVideo) {
+function explainDecodeFailure(error, media, isVideo) {
   if (!(error instanceof DecodeFailure)) return error;
   if (error.kind === "no-audio") {
-    return new AppError(`“${file.name}” has no sound, so there's nothing to play.`, error);
+    return new AppError(`“${media.name}” has no sound, so there's nothing to play.`, error);
   }
   if (error.kind === "out-of-memory") {
-    return new AppError(`“${file.name}” is too long to open: there isn't enough memory for its sound.`, error);
+    return new AppError(`“${media.name}” is too long to open: there isn't enough memory for its sound.`, error);
   }
   return new AppError(
     isVideo
-      ? `Couldn't read the audio in “${file.name}”. Videos need a soundtrack this app can decode.`
-      : `Couldn't open “${file.name}”. It isn't an audio file this app can decode.`,
+      ? `Couldn't read the audio in “${media.name}”. Videos need a soundtrack this app can decode.`
+      : `Couldn't open “${media.name}”. It isn't an audio file this app can decode.`,
     error,
   );
 }
 
 /**
- * Loads `file` into the player; returns notices about what works only
- * partly. Aborting `signal` (Cancel) rejects with an AbortError and
- * changes nothing.
- * @param {File} file
+ * Loads `media` (a File, or a download's { name, url }: core/files.js)
+ * into the player; returns notices about what works only partly. Aborting
+ * `signal` (Cancel) rejects with an AbortError and changes nothing.
+ * @param {import("../core/files.js").Media} media
  * @param {AbortSignal} [signal]
  */
-export async function loadMediaFile(file, signal) {
-  const isVideo = isVideoFile(file, CONFIG.video.extensions);
-  const timer = createLoadTimer(file.name);
+export async function loadMediaFile(media, signal) {
+  const isVideo = isVideoFile(media, CONFIG.video.extensions);
+  const timer = createLoadTimer(media.name);
   const [, waveformAvailable] = await timer.time("init", () =>
     Promise.all([player.engine.init(), player.waveform.init()]),
   );
-  const picture = isVideo ? timer.time("video", () => player.videoView.prepare(file)) : Promise.resolve(null);
+  const picture = isVideo ? timer.time("video", () => player.videoView.prepare(media)) : Promise.resolve(null);
 
   let decoded;
   try {
     decoded = await timer.time("decode", () =>
-      decodeFile(file, {
+      decodeFile(media, {
         signal,
         prepare: async (info) => {
-          await checkMemory(file, info, isVideo);
+          await checkMemory(media, info, isVideo);
           return peakFactorFor(info);
         },
         onProgress: (fraction) => setLoadingStatus(`Loading ${Math.floor(fraction * 100)} %`, true),
@@ -141,7 +141,7 @@ export async function loadMediaFile(file, signal) {
     );
   } catch (error) {
     picture.then((prepared) => player.videoView.discard(prepared?.video));
-    throw isAbort(error) ? error : explainDecodeFailure(error, file, isVideo);
+    throw isAbort(error) ? error : explainDecodeFailure(error, media, isVideo);
   }
   setLoadingStatus("Loading");
 
@@ -170,13 +170,13 @@ export async function loadMediaFile(file, signal) {
   // A new file starts fresh: no loop, and default speed, pitch, volume and EQ.
   setLoopRegion(null);
   resetSoundSettings();
-  dom.fileName.textContent = file.name;
-  document.title = `TranscriBee — ${file.name}`; // also the window title
+  dom.fileName.textContent = media.name;
+  document.title = `TranscriBee — ${media.name}`; // also the window title
   timer.done();
 
   const notices = [];
   if (isVideo && !prepared?.video) {
-    notices.push(`The picture in “${file.name}” can't be shown (${prepared?.reason}), but its audio plays.`);
+    notices.push(`The picture in “${media.name}” can't be shown (${prepared?.reason}), but its audio plays.`);
   }
   if (!waveformAvailable) notices.push("The waveform couldn't be drawn, but playback works.");
   return notices;

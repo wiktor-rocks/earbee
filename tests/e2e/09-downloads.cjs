@@ -96,6 +96,8 @@ module.exports = async function (h) {
       u.file === "Test Song “Quotes” Slashes [fakeId123].mp4" && u.video,
       JSON.stringify(u),
     );
+    // The picture is read from disk by URL in pieces, not sent over whole.
+    check("the download is read by URL, not sent as bytes", h.mediaReads.count > 0, `${h.mediaReads.count} reads`);
     check(
       "only the finished files are saved (no parts)",
       JSON.stringify(savedFiles()) ===

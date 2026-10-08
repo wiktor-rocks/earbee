@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, mock, test } from "node:test";
 import { createEmitter } from "../../src/core/emitter.js";
-import { fileExtension, isVideoFile } from "../../src/core/files.js";
+import { fileExtension, isVideoFile, mediaSource } from "../../src/core/files.js";
 import {
   clamp,
   formatEta,
@@ -53,6 +53,26 @@ describe("files", () => {
     assert.ok(isVideoFile({ name: "clip.MP4", type: "" }, extensions));
     assert.ok(isVideoFile({ name: "clip.bin", type: "video/quicktime" }, extensions));
     assert.ok(!isVideoFile({ name: "song.m4a", type: "audio/mp4" }, extensions));
+    // A download, served by URL: no type, so by extension.
+    assert.ok(isVideoFile({ name: "clip.mp4", url: "transcribee-media://t/clip.mp4" }, extensions));
+    assert.ok(!isVideoFile({ name: "song.m4a", url: "transcribee-media://t/song.m4a" }, extensions));
+  });
+
+  test("a File is read as a Blob, a download by its URL", () => {
+    class BlobSource {
+      constructor(blob) {
+        this.blob = blob;
+      }
+    }
+    class UrlSource {
+      constructor(url) {
+        this.url = url;
+      }
+    }
+    const file = new File(["x"], "song.mp3");
+    assert.equal(/** @type {any} */ (mediaSource(file, { BlobSource, UrlSource })).blob, file);
+    const download = { name: "song.m4a", url: "transcribee-media://t/song.m4a" };
+    assert.equal(/** @type {any} */ (mediaSource(download, { BlobSource, UrlSource })).url, download.url);
   });
 });
 

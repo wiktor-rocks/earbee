@@ -4,7 +4,7 @@ TranscriBee is an Electron app for transcribing music. You open a song or a vide
 
 **Files**
 
-- `electron/`: the Electron main process: `main.js` (window, security), `window-state.js`, `theme-store.js`, `downloader.js` (yt-dlp) and `preload.js` (the page's bridge to them).
+- `electron/`: the Electron main process: `main.js` (window, security), `window-state.js`, `theme-store.js`, `downloader.js` (yt-dlp), `media-files.js` (serving downloads to the page), `system.js` and `preload.js` (the page's bridge to them).
 - `src/`: the page, as ES modules in layers. `core/`, `themes/` → `config.js` → `audio/`, `video/`, `waveform.js` → `context.js` → `ui/` → `features/` → `app.js`.
 - `index.html` and `style.css`: the page and its look.
 - `assets/`: the logo and icons; `scripts/make-images.py` makes them from the source image.
@@ -42,6 +42,50 @@ The architecture overview, the file map and a list of where to make common chang
 | `tests/run.cjs` (one sequence)           | `tests/run.cjs` + `tests/e2e/`                                                              |
 
 ---
+
+## 2026-10-09: Downloads are read from disk, not sent to the page whole
+
+- **What:**
+  - **Less memory for downloads.** A downloaded song or video is now read from disk in pieces, like a file opened from disk.
+  - **The numbers (1-hour 720p video, 736 MB, opened as a download):** the page's memory settles at 1.6 GB instead of 2.3 GB, with a peak of 1.6 GB instead of 2.4 GB. The load takes 15.5 s instead of 19.1 s.
+  - **Nothing else changes for the user.**
+- **Why:**
+  - **The user asked for it**, as a follow-up of the long-file report ("What could come next").
+  - **The cause:**
+    - the main process read the whole saved file and sent it over IPC (`bytes`);
+    - the page wrapped it in a `File` that lived in memory;
+    - the video view keeps reading that `File` while the video is open, so for a video the whole file stayed in the page's memory for the whole session.
+  - **Files opened from disk never had this problem:** their `File` is backed by the disk.
+- **How:**
+  - **The private URL.**
+    - The sandboxed page can't turn a path into a disk-backed `File`. So the main process serves each download under a private URL: `transcribee-media://<random token>/<name>`.
+    - The scheme is registered as privileged: fetchable, also from Workers, and streamed.
+    - Mediabunny's `UrlSource` reads it with HTTP byte ranges (206 Partial Content) as it needs them, with a cache of at most 64 MiB per source.
+  - **Only what the app shares is served.**
+    - Only files the app itself shares are served, each under a fresh random token. An unknown token, or anything looking like a path, gets 404.
+    - It answers GET and HEAD only.
+    - It sends `Access-Control-Allow-Origin: *` and exposes `Content-Range`, because the page's `file://` origin fetches as `null`.
+  - **The CSP** allows `connect-src transcribee-media:`.
+  - **On the page**, something to open is now a `Media`: a `File`, or `{ name, url }` for a download. The decoder worker and the video view build their Mediabunny source from it (`mediaSource`), so both read the download by URL. The decoding fallback for formats Mediabunny can't read fetches the bytes whole, as it reads a `File` whole.
+  - **The spike before it:** a `fetch` with a `Range` header, and `UrlSource` decoding the whole sound of the 1-hour video, both worked from the page and from a module Worker. The audio decoded in 12.2 s.
+- **Where:**
+  - `electron/media-files.js` (new: `registerMediaScheme`, `createMediaFiles` → `share`, `handle`, `respond`; `parseRange`);
+  - `electron/main.js` (registers the scheme before ready, passes `share` to the downloader);
+  - `electron/downloader.js` (`handleDownloads` returns `url` instead of `bytes`);
+  - `electron/preload.js` (comment);
+  - `index.html` (CSP);
+  - `src/core/files.js` (the `Media` type, `mediaSource`, `readWhole`; `isVideoFile` works without a `type`);
+  - `src/audio/decode-worker.js`, `src/audio/decoder.js`, `src/video/view.js` (`prepare(media)`);
+  - `src/features/open-file.js` (`loadMediaFile(media)`), `src/features/download.js`.
+- **Verified by:**
+  - `npm run check`;
+  - **unit:** 70 pass. New tests: `tests/unit/media-files.test.mjs` (range parsing, 200/206/416/404/405, HEAD, the CORS headers, a file gone since sharing), and `Media` in `core.test.mjs`;
+  - **e2e:** 160 pass. New checks:
+    - a downloaded video is read through the scheme (the harness counts reads);
+    - unknown or path-like media URLs get 404 (`12-security.cjs`);
+  - **the e2e harness** registers the scheme as `main.js` does and allows it in its request filter;
+  - **smoke:** 19 pass;
+  - **memory:** measured with a scratch script that opens the 1-hour video in the real page, both ways, each in a fresh process (the numbers above).
 
 ## 2026-10-08: Long files open reliably
 
