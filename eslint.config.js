@@ -56,6 +56,11 @@ module.exports = [
     languageOptions: { sourceType: "commonjs", globals: globals.node },
   },
   {
+    // Unit tests: ES modules in Node.
+    files: ["tests/**/*.mjs"],
+    languageOptions: { sourceType: "module", globals: globals.node },
+  },
+  {
     rules: {
       "no-unused-vars": ["error", { args: "after-used", caughtErrors: "none" }],
     },

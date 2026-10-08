@@ -1,5 +1,6 @@
-// Starts the end-to-end tests (run.cjs) in Electron, then the smoke test of
-// the real app (smoke.cjs).
+// Runs the unit tests (tests/unit, plain Node, about a second), then the
+// end-to-end tests (run.cjs) in Electron, then the smoke test of the real
+// app (smoke.cjs). Stops at the first group that fails.
 //   - Generates the test media first if it is missing (make-fixtures.sh).
 //   - Clears ELECTRON_RUN_AS_NODE, which VS Code's terminal sets and which
 //     would make Electron run as plain Node.
@@ -13,6 +14,9 @@ const os = require("os");
 const path = require("path");
 
 const tests = __dirname;
+
+const unit = spawnSync(process.execPath, ["--test", path.join(__dirname, "unit", "*.test.mjs")], { stdio: "inherit" });
+if (unit.status !== 0) process.exit(unit.status ?? 1);
 const fixtures = path.join(tests, "fixtures");
 const needed = ["tone.wav", "counter.webm", "bad.mp3", "dl-audio.m4a", "dl-video.webm"];
 
