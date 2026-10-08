@@ -18,6 +18,28 @@ The architecture overview, and a list of where to make common changes, is in the
 
 ---
 
+## 2026-10-08: Tidy-up
+
+A general clean-up after the feature rounds, done in phases. Each phase leaves the tests green and is its own git commit. Apart from the items marked as deliberate changes, nothing should behave differently.
+
+### Phase 1: Git and tests in the repository
+- **What:**
+  - **Git.** The project is under git, with a baseline commit of the state before any cleanup.
+  - **Tests.** The end-to-end test suite (99 checks) now lives in `tests/` and runs with `npm test`. It used to live in a temporary folder outside the project.
+- **Why:** a safety net before cleaning up: every change can be diffed and reverted, and every phase can be re-tested.
+- **How:**
+  - `.gitignore` excludes `node_modules/`, `dist/`, the generated test media and screenshots, and local assistant settings.
+  - `tests/launch.cjs`:
+    - generates the test media if it's missing (`tests/make-fixtures.sh`, using ffmpeg; about 6 MB, so not committed);
+    - removes `ELECTRON_RUN_AS_NODE`, which VS Code's terminal sets and which would make Electron run as plain Node;
+    - runs `tests/run.cjs` in Electron with a throwaway profile.
+  - The header of `run.cjs` explains how the suite works: an offscreen window at 60 fps, real input events, focus emulation, the instrumentation in `preload.cjs`, all network requests blocked. It also says that a display server is required and how to add a check.
+  - `TB_APP_PATH` lets the suite test another copy of the app, such as a packaged build.
+- **Where:** `.gitignore`; `tests/` (`launch.cjs`, `run.cjs`, `preload.cjs`, `make-fixtures.sh`); the `test` and `test:fixtures` scripts in `package.json`.
+- **Verified by:** `npm test` from a clean checkout generates the media and passes 99/99.
+
+---
+
 ## 2026-10-08: Loading screen and stronger aura
 
 ### Stronger aura behind the logo
