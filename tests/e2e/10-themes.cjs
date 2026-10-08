@@ -2,9 +2,10 @@
 // canvases), keyboard use, Automatic, saving the choice.
 // Part of the end-to-end run (see run.cjs); `h` is the harness.
 const fs = require("fs");
+const path = require("path");
 
 module.exports = async function (h) {
-  const { wc, js, dbg, key, shot, playing, ensurePaused, check, sleep, themeFile } = h;
+  const { wc, js, dbg, key, shot, playing, ensurePaused, check, sleep, themeFile, PROJECT } = h;
   const variable = (name) => js(`getComputedStyle(document.documentElement).getPropertyValue("${name}").trim()`);
   const themeId = () => js(`document.documentElement.dataset.theme`);
   const menuOpen = () => js(`document.getElementById("themeMenu").matches(":popover-open")`);
@@ -35,8 +36,9 @@ module.exports = async function (h) {
     (await menuOpen()) && (await js(`document.activeElement.dataset.choice`)) === "transcribee",
   );
   check(
-    "menu lists Automatic and six themes",
-    (await js(`document.querySelectorAll("#themeMenu .theme-item").length`)) === 7,
+    "menu lists Automatic and every palette file",
+    (await js(`document.querySelectorAll("#themeMenu .theme-item").length`)) ===
+      1 + fs.readdirSync(path.join(PROJECT, "src", "themes", "palettes")).length,
   );
   key("Space");
   await sleep(300);
@@ -87,7 +89,13 @@ module.exports = async function (h) {
     await shot(`theme-${id}.png`);
   }
 
-  // Automatic: the last dark and last light themes chosen, by system mode.
+  // Automatic: the last dark and last light themes chosen (the loop above
+  // went through them all in menu order), by system mode.
+  const lastOf = (scheme) =>
+    js(
+      `[...document.querySelectorAll("#themeMenu .theme-item:not([data-choice=auto])")].filter((item) => (item.querySelector("small")?.textContent === "light") === ${scheme === "light"}).at(-1).dataset.choice`,
+    );
+  const [lastDark, lastLight] = [await lastOf("dark"), await lastOf("light")];
   await pick("auto");
   const emulate = (scheme) =>
     dbg.sendCommand("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: scheme }] });
@@ -99,8 +107,8 @@ module.exports = async function (h) {
   const inDark = await themeId();
   check(
     "Automatic follows the system",
-    inLight === "solarized-light" && inDark === "one-dark",
-    `${inLight} / ${inDark}`,
+    inLight === lastLight && inDark === lastDark,
+    `${inLight} / ${inDark} (expected ${lastLight} / ${lastDark})`,
   );
   check(
     "light themes set color-scheme for native controls",

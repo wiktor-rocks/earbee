@@ -6,7 +6,10 @@
 //
 // A new theme: add a file in palettes/ and list it in THEMES below. The
 // unit tests check that it defines every role and has readable contrast.
+import catppuccinLatte from "./palettes/catppuccin-latte.js";
 import dracula from "./palettes/dracula.js";
+import githubLight from "./palettes/github-light.js";
+import gruvboxLight from "./palettes/gruvbox-light.js";
 import monokai from "./palettes/monokai.js";
 import nord from "./palettes/nord.js";
 import oneDark from "./palettes/one-dark.js";
@@ -29,7 +32,18 @@ import transcribee from "./palettes/transcribee.js";
  */
 
 /** @type {Theme[]} */
-export const THEMES = [transcribee, monokai, dracula, nord, oneDark, solarizedLight];
+// Dark themes first, then light ones; the menu lists them in this order.
+export const THEMES = [
+  transcribee,
+  monokai,
+  dracula,
+  nord,
+  oneDark,
+  solarizedLight,
+  catppuccinLatte,
+  githubLight,
+  gruvboxLight,
+];
 export const DEFAULT_THEME = transcribee;
 
 /** @type {ThemePrefs} */

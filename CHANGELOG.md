@@ -43,6 +43,26 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-08: Three light themes
+
+- **What:** **Catppuccin Latte**, **GitHub Light** and **Gruvbox Light** join Solarized Light in the theme menu, listed after the dark themes. Any of them can be Automatic's light theme: Automatic uses the last light theme chosen.
+- **Why:** the user asked for a couple more light themes.
+- **How:**
+  - **Catppuccin Latte:** Mantle/Base/Crust backgrounds, Mauve accent, Teal loop.
+  - **GitHub Light (Primer):** white panels, blue accent, purple loop.
+  - **Gruvbox Light:** bg0/bg1, orange accent, blue loop.
+
+  Each is one palette file, mapped onto the roles from the official colours. The contrast tests passed all three except Catppuccin's red, which was a shade too light as error text on its background (4.46:1). It is now `#c80e36` (4.83:1).
+
+- **Where:** `src/themes/palettes/catppuccin-latte.js`, `github-light.js`, `gruvbox-light.js`; `THEMES` in `src/themes/index.js` (now ordered dark, then light); `tests/e2e/10-themes.cjs`; `README.md`.
+- **Verified by:**
+  - **Unit tests:** 52, all passing; the contrast checks cover every theme.
+  - **End-to-end:** 145, with two checks made independent of the theme list:
+    - the menu must list every file in `palettes/`, so a theme file missing from `THEMES` fails;
+    - Automatic's expected themes are taken from the menu order.
+  - **Smoke:** 19.
+  - **Screenshots:** `tests/output/theme-*.png`.
+
 ## 2026-10-08: Colour themes
 
 - **What:**
