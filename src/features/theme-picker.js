@@ -91,13 +91,11 @@ function renderMenu() {
 }
 
 // Opens the menu under (or above) the button that asked for it, or closes
-// it if it's open. The button is the popover's source, so pressing it
-// doesn't count as a click outside: without that, the press would close the
-// menu (light dismiss) and the click would open it again.
+// it if it was open.
 function openFrom(button) {
   if (isOpen()) return menu.hidePopover();
   renderMenu();
-  /** @type {any} */ (menu).showPopover({ source: button });
+  menu.showPopover();
   const anchor = button.getBoundingClientRect();
   const room = window.innerHeight - anchor.bottom;
   menu.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - menu.offsetWidth - 8))}px`;
@@ -121,7 +119,18 @@ function moveFocus(event) {
 
 export function bindThemePicker() {
   buildMenu();
-  for (const button of [$("themeButton"), $("welcomeThemeButton")]) onClick(button, () => openFrom(button));
+  for (const button of [$("themeButton"), $("welcomeThemeButton")]) {
+    // Pressing the button while the menu is open closes it (light dismiss:
+    // a press outside the menu), before the click arrives; that click must
+    // not open it again. So remember whether it was open at the press.
+    // (A click from the keyboard, detail 0, has no press: it just toggles.)
+    let closedByPress = false;
+    button.addEventListener("pointerdown", () => (closedByPress = isOpen()));
+    onClick(button, (/** @type {MouseEvent} */ event) => {
+      if (!(event.detail > 0 && closedByPress)) openFrom(button);
+      closedByPress = false;
+    });
+  }
   menu.addEventListener("keydown", moveFocus);
   menu.addEventListener("toggle", (/** @type {any} */ event) => {
     if (event.newState !== "closed" || !opener) return;

@@ -47,9 +47,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 - **What:** with the theme menu open, clicking the palette button closes it. Before, the menu closed and opened again at once.
 - **Why:** the user asked for it: the button should toggle the menu.
-- **How:** the menu is a popover with light dismiss. Pressing the button counted as a click outside, so the press closed the menu, and the click that followed found it closed and opened it again. Now the button is passed as the popover's `source` (`showPopover({ source: button })`), so presses on it don't light-dismiss the menu, and the click handler's toggle works. Clicks anywhere else still close it.
-- **Where:** `src/features/theme-picker.js` (`openFrom`); `tests/e2e/10-themes.cjs`.
-- **Verified by:** `npm run check`. A new e2e check in `10-themes.cjs` clicks the button with real mouse input (press and release, which light dismiss reacts to; the existing checks used `element.click()`, which it ignores): a second click must close the menu and a third must open it. Not run yet, because the change is small; it runs with the next `npm test`.
+- **How:**
+  - **The cause:** the menu is a popover with light dismiss. Pressing the button counts as a press outside the menu, so the menu closes when the mouse button comes up, before the `click` event. The click then found the menu closed and opened it again.
+  - **What didn't work:** the first attempt passed the button as the popover's `source` (`showPopover({ source })`), expecting presses on it not to light-dismiss. Chromium 152 still dismissed the menu (seen in an event log: `pointerdown` open, `pointerup` closed, then `click`, then the menu opened again).
+  - **The fix:** each palette button notes on `pointerdown` whether the menu is open (`closedByPress`). If it was, the click that follows does nothing more, because the press already closed the menu. A click from the keyboard (`detail` 0) has no press and just toggles. Clicks anywhere else still close the menu.
+  - **Running one topic:** the e2e runner now takes `TB_TOPICS` (for example `TB_TOPICS=02,10`) to run only some topics. That's how this was tested without the whole suite.
+- **Where:** `src/features/theme-picker.js` (`bindThemePicker`, `openFrom`); `tests/e2e/10-themes.cjs`; `tests/run.cjs` (`TB_TOPICS`); `README.md`.
+- **Verified by:**
+  - `npm run check`;
+  - `TB_TOPICS=02,10` (37 checks, all pass), including a new check that clicks the button with real mouse input (press and release, which light dismiss reacts to; the existing checks used `element.click()`, which it ignores). A second click must close the menu and a third must open it.
+  - The new check failed before the fix, with the `source` approach as well.
 
 ## 2026-10-09: The wheel zooms on the waveform and scrolls on the minimap
 

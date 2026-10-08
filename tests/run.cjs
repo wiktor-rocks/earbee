@@ -57,7 +57,11 @@ app
   .whenReady()
   .then(async () => {
     const h = await createHarness();
-    for (const topic of TOPICS) await require(path.join(__dirname, "e2e", topic))(h);
+    // TB_TOPICS=10,03 runs only the topics whose names start with those
+    // numbers (later topics may rely on what earlier ones loaded).
+    const only = process.env.TB_TOPICS?.split(",").map((n) => n.trim().padStart(2, "0"));
+    const topics = only ? TOPICS.filter((topic) => only.some((n) => topic.startsWith(`${n}-`))) : TOPICS;
+    for (const topic of topics) await require(path.join(__dirname, "e2e", topic))(h);
     console.log(`\n${results.pass} pass, ${results.fail} fail`);
     app.exit(results.fail ? 1 : 0);
   })
