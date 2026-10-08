@@ -3,8 +3,10 @@
 //   Security   The page runs sandboxed with context isolation and no Node
 //              access; it may not navigate away or open other windows.
 //              Its Content-Security-Policy is in index.html.
-//   Downloads  The page's one bridge out (preload.js): downloading a link
+//   Downloads  Through the page's bridge (preload.js): downloading a link
 //              with yt-dlp, done here in downloader.js.
+//   Theme      The chosen colour theme (theme-store.js): applied by the
+//              preload before the page renders, and the window background.
 //   Window     Remembers its size, position and maximised state between
 //              runs (window-state.js). The title follows the page's
 //              <title>, which names the open file.
@@ -12,9 +14,10 @@
 //              rendering if the GPU process keeps crashing.
 //              `npm run start:no-gpu` forces software rendering;
 //              `npm run start:gpu-info` logs what the GPU is doing.
-const { app, BrowserWindow, ipcMain, net } = require("electron");
+const { app, BrowserWindow, ipcMain, nativeTheme, net } = require("electron");
 const path = require("path");
 const { handleDownloads } = require("./downloader");
+const { createThemeStore, handleThemes } = require("./theme-store");
 const { loadWindowState, rememberWindowState } = require("./window-state");
 
 const ROOT = path.join(__dirname, ".."); // the app's files: index.html, src/, assets/
@@ -44,6 +47,8 @@ if (!app.isPackaged) {
 
 /* ---------- Window ---------- */
 
+let themeStore = null; // set once the app is ready
+
 function createWindow() {
   const { maximized, ...bounds } = loadWindowState(MIN_SIZE, DEFAULT_BOUNDS);
   const win = new BrowserWindow({
@@ -52,7 +57,7 @@ function createWindow() {
     minHeight: MIN_SIZE.height,
     title: "TranscriBee",
     icon: path.join(ROOT, "assets", "icon-512.png"),
-    backgroundColor: "#0e1014", // the page background, so opening doesn't flash white
+    backgroundColor: themeStore.current().colors.bg, // the page background, so opening doesn't flash
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       sandbox: true,
@@ -72,6 +77,12 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+  themeStore = createThemeStore(path.join(app.getPath("userData"), "theme.json"), nativeTheme);
+  const followTheme = () => {
+    for (const win of BrowserWindow.getAllWindows()) win.setBackgroundColor(themeStore.current().colors.bg);
+  };
+  handleThemes(ipcMain, themeStore, followTheme);
+  nativeTheme.on("updated", followTheme); // "Automatic" follows the system
   handleDownloads(ipcMain, {
     binDir: path.join(app.getPath("userData"), "bin"),
     saveDir: path.join(app.getPath("downloads"), "TranscriBee"),

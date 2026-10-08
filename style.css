@@ -515,6 +515,94 @@ body.dragging .welcome-hint {
   gap: 10px;
 }
 
+/* ---------- Colour-theme menu ---------- */
+
+.theme-button {
+  display: grid;
+  place-items: center;
+  padding: 8px 10px;
+}
+
+.welcome-theme {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+
+/* A popover: placed next to its button by features/theme-picker.js. */
+.theme-menu {
+  position: fixed;
+  inset: auto;
+  min-width: 270px;
+  margin: 0;
+  padding: 6px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 12px 32px color-mix(in srgb, var(--bg) 70%, transparent);
+}
+
+.theme-menu hr {
+  margin: 6px 4px;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+
+.theme-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 7px 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  text-align: left;
+}
+
+.theme-item:hover,
+.theme-item:focus-visible {
+  background: var(--surface-hover);
+}
+
+.theme-item[aria-checked="true"] {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.theme-item[aria-checked="true"]::after {
+  content: "✓";
+  margin-left: auto;
+}
+
+.theme-name {
+  display: flex;
+  flex-direction: column;
+}
+
+.theme-name small {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+/* Four squares: background, panel, accent, loop. Automatic's shows its
+   dark and light themes' backgrounds (set by the menu). */
+.theme-swatch {
+  display: flex;
+  flex: none;
+  width: 34px;
+  height: 20px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+
+.theme-swatch span {
+  flex: 1;
+}
+
 /* ---------- Loader bars (loading screen and overlay) ---------- */
 
 /* Animation 2 of 2: four equalizer bars. */

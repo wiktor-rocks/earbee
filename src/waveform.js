@@ -25,7 +25,8 @@ import { clamp } from "./core/format.js";
  * view or resumeFollow() is called (on every seek), so you can look ahead
  * while it plays.
  *
- * Exposes: preload, init, load, setTime, follow, resumeFollow, setLoop
+ * Exposes: preload, init, load, setTime, follow, resumeFollow, setLoop,
+ *          refreshColors (after the colour variables changed, e.g. a theme)
  * ===================================================================== */
 
 /**
@@ -41,6 +42,8 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   let waveSurfer = null;
   let modulesPromise = null;
   let initPromise = null;
+  let minimap = null;
+  let createMinimap = null; // makes a minimap plugin in the current colours
   let duration = 0;
   let zoomLevel = null; // px per second; null = fit to width
   // True while the user drags the waveform or minimap, so following the
@@ -79,16 +82,13 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
         throw new Error("WaveSurfer or Minimap plugin failed to load.");
       }
 
-      // Colours live in style.css as custom properties.
-      const styles = getComputedStyle(document.documentElement);
-      const color = (name) => styles.getPropertyValue(name).trim();
+      createMinimap = () => MinimapPlugin.create(minimapOptions());
+      minimap = createMinimap();
 
       waveSurfer = WaveSurfer.create({
         container,
         height: "auto",
-        waveColor: color("--wave"),
-        progressColor: color("--wave-progress"),
-        cursorColor: color("--cursor"),
+        ...waveColors(),
         cursorWidth: 2,
         normalize: true,
         interact: false, // seeking is handled by bindPointerSeek()
@@ -98,19 +98,7 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
         autoScroll: false,
         autoCenter: false,
         hideScrollbar: true,
-        plugins: [
-          MinimapPlugin.create({
-            container: minimapContainer,
-            height: 46,
-            waveColor: color("--minimap-wave"),
-            progressColor: color("--minimap-progress"),
-            cursorColor: color("--cursor"),
-            overlayColor: color("--minimap-overlay"),
-            normalize: true,
-            interact: false,
-            dragToSeek: false,
-          }),
-        ],
+        plugins: [minimap],
       });
 
       bindPointerSeek();
@@ -122,6 +110,44 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       console.error("WaveSurfer init failed:", error);
       return false;
     }
+  }
+
+  /* ---------- Colours ---------- */
+
+  // Colours live in style.css as custom properties (a theme may change
+  // them). WaveSurfer draws on canvases, so they are read as values here.
+  function cssColor(name) {
+    return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+
+  const waveColors = () => ({
+    waveColor: cssColor("--wave"),
+    progressColor: cssColor("--wave-progress"),
+    cursorColor: cssColor("--cursor"),
+  });
+
+  const minimapOptions = () => ({
+    container: minimapContainer,
+    height: 46,
+    waveColor: cssColor("--minimap-wave"),
+    progressColor: cssColor("--minimap-progress"),
+    cursorColor: cssColor("--cursor"),
+    overlayColor: cssColor("--minimap-overlay"),
+    normalize: true,
+    interact: false,
+    dragToSeek: false,
+  });
+
+  // Redraws in the current colours, after they changed. The minimap plugin
+  // can't change colours once made, so it is replaced; its scrubbing looks
+  // up the minimap's elements on each drag, so it keeps working.
+  function refreshColors() {
+    if (!waveSurfer) return;
+    waveSurfer.setOptions(waveColors());
+    waveSurfer.unregisterPlugin(minimap);
+    minimap = waveSurfer.registerPlugin(createMinimap());
+    // The new minimap places its visible-range overlay on the next scroll.
+    waveSurfer.setScroll(waveSurfer.getScroll());
   }
 
   // Resolves to whether the waveform is available.
@@ -416,6 +442,7 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     init,
     load,
     follow,
+    refreshColors,
     resumeFollow: () => (followPaused = false),
     setTime: (time) => waveSurfer?.setTime(time),
     /** @param {LoopRegion | null} next */

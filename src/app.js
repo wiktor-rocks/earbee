@@ -37,14 +37,18 @@
  * this list, never below (enforced by `npm run lint`)
  *   core/          Pure helpers, no DOM: format, peaks, timeline (and the
  *                  Segment / Loop / LoopRegion types), emitter, files, errors
+ *   themes/        Colour themes: palettes and pure logic; independent of
+ *                  everything else (the main process uses it too)
  *   config.js      CONFIG: every tunable number
  *   audio/         engine.js, transport.js
  *   video/         view.js (the picture), proxy.js (low-res copy for seeking)
  *   waveform.js    The waveform, zoom, minimap, loop drawing and dragging
  *   context.js     `settings`, and `player`: the components above, once created
  *   ui/            dom.js (elements, messages, rendering, loading screens),
- *                  controls.js (sliders, chips, EQ), shortcuts.js (key handling)
- *   features/      playback.js, loop.js, open-file.js, download.js
+ *                  controls.js (sliders, chips, EQ), shortcuts.js (key
+ *                  handling), theme.js (applying a theme)
+ *   features/      playback.js, loop.js, open-file.js, download.js,
+ *                  theme-picker.js
  *   app.js         This file: creates and wires the components, the
  *                  SHORTCUTS table, start()
  *
@@ -61,7 +65,12 @@
  *   New keyboard shortcut     Add an entry to SHORTCUTS (below); the legend
  *                             at the bottom of the window updates itself.
  *   Colours and fonts         Tokens at the top of style.css (the waveform
- *                             reads its colours from there too).
+ *                             reads its colours from there too). Colours
+ *                             come from the theme (src/themes); the :root
+ *                             values are the default theme's.
+ *   New colour theme          Add a file in src/themes/palettes/ and list it
+ *                             in THEMES (src/themes/index.js); the unit tests
+ *                             check it's complete and readable.
  *   Video file types          CONFIG.video.extensions (also anything with a
  *                             video/* type). Codecs are whatever WebCodecs
  *                             decodes: H.264, VP8/VP9, AV1; not HEVC here.
@@ -84,6 +93,7 @@ import { player, settings, totalSemitones } from "./context.js";
 import { bindDownloads } from "./features/download.js";
 import { setLoopEnd, setLoopRegion, setLoopStart, toggleLoop, clearLoop } from "./features/loop.js";
 import { bindFileDrop, bindFileInput, isLoading } from "./features/open-file.js";
+import { bindThemePicker, isThemeMenuOpen, loadThemePrefs } from "./features/theme-picker.js";
 import {
   bindPlayback,
   bindTransportButtons,
@@ -106,10 +116,15 @@ import {
 } from "./ui/controls.js";
 import { $, dom, renderStepSize, renderTrackTime, renderTransportState, reportError, showNotice } from "./ui/dom.js";
 import { bindShortcuts, renderShortcutLegend } from "./ui/shortcuts.js";
+import { onThemeChange, setThemePrefs } from "./ui/theme.js";
 import { createVideoView } from "./video/view.js";
 import { createWaveform } from "./waveform.js";
 
 /** @typedef {import("./ui/shortcuts.js").Shortcut} Shortcut */
+
+// The colour theme first, before anything is drawn (the preload has
+// normally applied it already; see ui/theme.js).
+setThemePrefs(loadThemePrefs());
 
 /* =====================================================================
  * COMPONENTS
@@ -140,6 +155,9 @@ const videoView = createVideoView({
 });
 
 Object.assign(player, { engine, transport, waveform, videoView });
+
+// The waveform draws on canvases, which don't follow the CSS colours.
+onThemeChange(() => waveform.refreshColors());
 
 // Everything that follows playback subscribes here.
 transport.on("position", (time) => {
@@ -226,7 +244,8 @@ function start() {
   bindFileInput();
   bindFileDrop();
   bindDownloads();
-  bindShortcuts(SHORTCUTS, () => isLoading() || dom.downloadDialog.open);
+  bindThemePicker();
+  bindShortcuts(SHORTCUTS, () => isLoading() || dom.downloadDialog.open || isThemeMenuOpen());
   dom.welcomeOpen.focus();
 }
 

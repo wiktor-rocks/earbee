@@ -1,7 +1,7 @@
 // The end-to-end harness: an offscreen window with the app, and the helpers
 // the topic files use (see run.cjs for how the run works). createHarness()
 // returns them all in one object, `h`.
-const { app, BrowserWindow, ipcMain, session } = require("electron");
+const { app, BrowserWindow, ipcMain, nativeTheme, session } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
@@ -45,6 +45,13 @@ async function createHarness() {
     saveDir: DOWNLOADS,
     ytDlp: path.join(TESTS, "fake-yt-dlp.cjs"),
   });
+  // As main.js does, with a fresh theme file each run; the system is
+  // treated as dark, so "Automatic" is predictable.
+  nativeTheme.themeSource = "dark";
+  const themeFile = path.join(OUTPUT, "theme.json");
+  fs.rmSync(themeFile, { force: true });
+  const { createThemeStore, handleThemes } = require(path.join(PROJECT, "electron", "theme-store.js"));
+  handleThemes(ipcMain, createThemeStore(themeFile, nativeTheme), () => {});
   session.defaultSession.registerPreloadScript({
     type: "frame",
     filePath: path.join(PROJECT, "electron", "preload.js"),
@@ -180,6 +187,7 @@ async function createHarness() {
     firstMoved,
     playing,
     ensurePaused,
+    themeFile,
     check,
     sleep,
     PROJECT,

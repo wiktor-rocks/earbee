@@ -69,6 +69,11 @@ module.exports = [
     languageOptions: { sourceType: "commonjs", globals: globals.node },
   },
   {
+    // The preload runs in the page, before it: browser globals too.
+    files: ["electron/preload.js"],
+    languageOptions: { globals: { ...globals.node, ...globals.browser } },
+  },
+  {
     // Unit tests: ES modules in Node.
     files: ["tests/**/*.mjs"],
     languageOptions: { sourceType: "module", globals: globals.node },
