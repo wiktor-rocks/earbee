@@ -1,206 +1,199 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <title>TranscriBee</title>
+    <title>TranscriBee</title>
 
-  <!-- Fonts are bundled from npm (Fontsource), so the app works offline. -->
-  <link rel="stylesheet" href="node_modules/@fontsource-variable/nunito/index.css" />
-  <link rel="stylesheet" href="node_modules/@fontsource/righteous/index.css" />
+    <!-- Fonts are bundled from npm (Fontsource), so the app works offline. -->
+    <link rel="stylesheet" href="node_modules/@fontsource-variable/nunito/index.css" />
+    <link rel="stylesheet" href="node_modules/@fontsource/righteous/index.css" />
 
-  <link rel="stylesheet" href="style.css" />
-</head>
+    <link rel="stylesheet" href="style.css" />
+  </head>
 
-<body>
+  <body>
+    <!-- Shown until the first file loads; then the player (#app) replaces it. -->
+    <main id="welcome" class="welcome">
+      <div class="welcome-content">
+        <div class="logo-aura">
+          <img class="welcome-logo" src="transcribee.png" alt="" />
+        </div>
+        <h1 class="welcome-title">Transcri<b>Bee</b></h1>
+        <p class="welcome-tagline">Slow down, loop and transcribe the music you're learning</p>
 
-  <!-- Shown until the first file loads; then the player (#app) replaces it. -->
-  <main id="welcome" class="welcome">
-    <div class="welcome-content">
-      <div class="logo-aura">
-        <img class="welcome-logo" src="transcribee.png" alt="" />
+        <div class="welcome-drop">
+          <button id="welcomeOpen" class="primary welcome-open" type="button">Open audio or video…</button>
+          <p class="welcome-hint">or drop a file anywhere in this window</p>
+          <p class="welcome-formats">MP3 · WAV · FLAC · M4A · OGG — MP4 · MOV · WebM · MKV</p>
+        </div>
+
+        <div id="welcomeMessage" class="message welcome-message" role="status"></div>
       </div>
-      <h1 class="welcome-title">Transcri<b>Bee</b></h1>
-      <p class="welcome-tagline">Slow down, loop and transcribe the music you're learning</p>
+    </main>
 
-      <div class="welcome-drop">
-        <button id="welcomeOpen" class="primary welcome-open" type="button">Open audio or video…</button>
-        <p class="welcome-hint">or drop a file anywhere in this window</p>
-        <p class="welcome-formats">MP3 · WAV · FLAC · M4A · OGG — MP4 · MOV · WebM · MKV</p>
+    <!-- Replaces the welcome screen while the first file loads. -->
+    <div id="loadingScreen" class="loading-screen" role="status" hidden>
+      <div class="loading-screen-content">
+        <div class="logo-aura pulsing">
+          <img class="welcome-logo" src="transcribee.png" alt="" />
+        </div>
+        <div class="loading-line">
+          <span class="loader" aria-hidden="true"> <span></span><span></span><span></span><span></span> </span>
+          Loading
+        </div>
+        <div id="loadingFileName" class="loading-file"></div>
       </div>
-
-      <div id="welcomeMessage" class="message welcome-message" role="status"></div>
     </div>
-  </main>
 
-
-  <!-- Replaces the welcome screen while the first file loads. -->
-  <div id="loadingScreen" class="loading-screen" role="status" hidden>
-    <div class="loading-screen-content">
-      <div class="logo-aura pulsing">
-        <img class="welcome-logo" src="transcribee.png" alt="" />
-      </div>
-      <div class="loading-line">
-        <span class="loader" aria-hidden="true">
-          <span></span><span></span><span></span><span></span>
+    <div id="app" class="app" hidden>
+      <header class="topbar">
+        <span class="brand">
+          <span>Transcri<b>Bee</b></span>
+          <img class="brand-logo" src="transcribee.png" alt="" />
         </span>
+
+        <label class="open-button">
+          <input id="file" type="file" accept="audio/*,video/*,.mkv" />
+          Open file…
+        </label>
+
+        <div id="fileName" class="file-name">No file loaded</div>
+      </header>
+
+      <div id="stage" class="stage">
+        <div id="videoPane" class="video-pane" hidden>
+          <canvas id="videoCanvas" aria-label="Video"></canvas>
+        </div>
+
+        <div id="waveform" class="waveform"></div>
+
+        <div id="waveform-minimap" class="waveform-minimap" aria-label="Full track overview"></div>
+      </div>
+
+      <section class="transport" aria-label="Transport">
+        <div class="transport-buttons">
+          <button id="skipBack" type="button" title="Step back (←)" aria-label="Step back">
+            <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                d="M13 8H3M7 4L3 8l4 4"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+          <button
+            id="play"
+            class="primary"
+            type="button"
+            title="Play / pause; plays again from where you started (Space)"
+          >
+            ▶ Play
+          </button>
+          <button id="stop" type="button" title="Stop (.)">■ Stop</button>
+          <button id="skipForward" type="button" title="Step forward (→)" aria-label="Step forward">
+            <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+              <path
+                d="M3 8h10M9 4l4 4-4 4"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
+
+        <output id="skipStep" class="skip-step" title="Change with ↑ / ↓">Step 1 s</output>
+
+        <div id="message" class="message" role="status"></div>
+
+        <output id="loopInfo" class="loop-info" aria-label="Loop" hidden></output>
+
+        <output id="trackTime" class="track-time" aria-label="Playback position and track duration"
+          >0:00.000 / 0:00.000</output
+        >
+      </section>
+
+      <section class="panels">
+        <section class="panel">
+          <header class="panel-header">
+            <h2>Speed</h2>
+            <output id="speedValue" class="readout">1.00×</output>
+          </header>
+
+          <input id="speed" type="range" aria-label="Speed" />
+
+          <div id="speedScale" class="scale"></div>
+
+          <div id="speedChips" class="chips" aria-label="Speed presets"></div>
+        </section>
+
+        <section class="panel">
+          <header class="panel-header">
+            <h2>Pitch</h2>
+            <output id="pitchValue" class="readout">+0.00 st</output>
+          </header>
+
+          <div class="slider-row">
+            <label for="semitoneShift">Semitones</label>
+            <input id="semitoneShift" type="range" />
+            <output id="semitoneValue">+0 st</output>
+          </div>
+
+          <div class="slider-row">
+            <label for="centShift">Fine tune</label>
+            <input id="centShift" type="range" />
+            <output id="centValue">+0 ct</output>
+          </div>
+
+          <button id="resetPitch" class="small panel-footer-button" type="button">Reset pitch</button>
+        </section>
+
+        <section class="panel">
+          <header class="panel-header">
+            <h2>Volume</h2>
+            <output id="volumeValue" class="readout">100%</output>
+          </header>
+
+          <input id="volume" type="range" aria-label="Volume" />
+
+          <div id="volumeScale" class="scale"></div>
+        </section>
+
+        <section id="eqSection" class="panel eq bypassed">
+          <header class="panel-header">
+            <h2>EQ</h2>
+            <div class="panel-actions">
+              <button id="eqToggle" class="small toggle" type="button" aria-pressed="false" aria-label="EQ on/off">
+                Off
+              </button>
+              <button id="resetEq" class="small" type="button">Reset</button>
+            </div>
+          </header>
+
+          <div id="eqFaders" class="eq-faders"></div>
+        </section>
+      </section>
+
+      <footer class="shortcuts" aria-labelledby="shortcutsTitle">
+        <h2 id="shortcutsTitle">Shortcuts</h2>
+        <ul id="shortcutList" class="shortcut-list"></ul>
+      </footer>
+    </div>
+
+    <div id="loadingOverlay" class="loading-overlay" role="status" hidden>
+      <div class="loading-card">
+        <span class="loader" aria-hidden="true"> <span></span><span></span><span></span><span></span> </span>
         Loading
       </div>
-      <div id="loadingFileName" class="loading-file"></div>
-    </div>
-  </div>
-
-
-  <div id="app" class="app" hidden>
-
-    <header class="topbar">
-      <span class="brand">
-        <span>Transcri<b>Bee</b></span>
-        <img class="brand-logo" src="transcribee.png" alt="" />
-      </span>
-
-      <label class="open-button">
-        <input id="file" type="file" accept="audio/*,video/*,.mkv" />
-        Open file…
-      </label>
-
-      <div id="fileName" class="file-name">No file loaded</div>
-    </header>
-
-
-    <div id="stage" class="stage">
-      <div id="videoPane" class="video-pane" hidden>
-        <canvas id="videoCanvas" aria-label="Video"></canvas>
-      </div>
-
-      <div id="waveform" class="waveform"></div>
-
-      <div
-        id="waveform-minimap"
-        class="waveform-minimap"
-        aria-label="Full track overview"
-      ></div>
     </div>
 
-
-    <section class="transport" aria-label="Transport">
-      <div class="transport-buttons">
-        <button id="skipBack" type="button" title="Step back (←)" aria-label="Step back"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M13 8H3M7 4L3 8l4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-        <button id="play" class="primary" type="button" title="Play / pause; plays again from where you started (Space)">▶ Play</button>
-        <button id="stop" type="button" title="Stop (.)">■ Stop</button>
-        <button id="skipForward" type="button" title="Step forward (→)" aria-label="Step forward"><svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3 8h10M9 4l4 4-4 4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
-      </div>
-
-      <output id="skipStep" class="skip-step" title="Change with ↑ / ↓">Step 1 s</output>
-
-      <div id="message" class="message" role="status"></div>
-
-      <output id="loopInfo" class="loop-info" aria-label="Loop" hidden></output>
-
-      <output
-        id="trackTime"
-        class="track-time"
-        aria-label="Playback position and track duration"
-      >0:00.000 / 0:00.000</output>
-    </section>
-
-
-    <section class="panels">
-
-      <section class="panel">
-        <header class="panel-header">
-          <h2>Speed</h2>
-          <output id="speedValue" class="readout">1.00×</output>
-        </header>
-
-        <input id="speed" type="range" aria-label="Speed" />
-
-        <div id="speedScale" class="scale"></div>
-
-        <div id="speedChips" class="chips" aria-label="Speed presets"></div>
-      </section>
-
-
-      <section class="panel">
-        <header class="panel-header">
-          <h2>Pitch</h2>
-          <output id="pitchValue" class="readout">+0.00 st</output>
-        </header>
-
-        <div class="slider-row">
-          <label for="semitoneShift">Semitones</label>
-          <input id="semitoneShift" type="range" />
-          <output id="semitoneValue">+0 st</output>
-        </div>
-
-        <div class="slider-row">
-          <label for="centShift">Fine tune</label>
-          <input id="centShift" type="range" />
-          <output id="centValue">+0 ct</output>
-        </div>
-
-        <button id="resetPitch" class="small panel-footer-button" type="button">Reset pitch</button>
-      </section>
-
-
-      <section class="panel">
-        <header class="panel-header">
-          <h2>Volume</h2>
-          <output id="volumeValue" class="readout">100%</output>
-        </header>
-
-        <input id="volume" type="range" aria-label="Volume" />
-
-        <div id="volumeScale" class="scale"></div>
-      </section>
-
-
-      <section id="eqSection" class="panel eq bypassed">
-        <header class="panel-header">
-          <h2>EQ</h2>
-          <div class="panel-actions">
-            <button
-              id="eqToggle"
-              class="small toggle"
-              type="button"
-              aria-pressed="false"
-              aria-label="EQ on/off"
-            >Off</button>
-            <button id="resetEq" class="small" type="button">Reset</button>
-          </div>
-        </header>
-
-        <div id="eqFaders" class="eq-faders"></div>
-      </section>
-
-    </section>
-
-
-    <footer class="shortcuts" aria-labelledby="shortcutsTitle">
-      <h2 id="shortcutsTitle">Shortcuts</h2>
-      <ul id="shortcutList" class="shortcut-list"></ul>
-    </footer>
-
-  </div>
-
-
-  <div
-    id="loadingOverlay"
-    class="loading-overlay"
-    role="status"
-    hidden
-  >
-    <div class="loading-card">
-      <span class="loader" aria-hidden="true">
-        <span></span><span></span><span></span><span></span>
-      </span>
-      Loading
-    </div>
-  </div>
-
-
-  <script type="module" src="script.js"></script>
-
-</body>
+    <script type="module" src="script.js"></script>
+  </body>
 </html>

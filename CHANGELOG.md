@@ -3,6 +3,7 @@
 TranscriBee is an Electron app for transcribing music. You open a song or a video, slow it down, shift its pitch, EQ it, loop a passage, and step through it with the keyboard.
 
 **Files**
+
 - `main.js`: the Electron main process.
 - `index.html` and `style.css`: the page and its look.
 - `script.js`: all app logic, in one file split into numbered sections (§1 Config … §14 Startup).
@@ -10,6 +11,7 @@ TranscriBee is an Electron app for transcribing music. You open a song or a vide
 The architecture overview, and a list of where to make common changes, is in the comment at the top of `script.js`. Read that first.
 
 **How to read an entry.** Newest first, one entry per round of work. Each change records:
+
 - **What:** the behaviour, as the user sees it.
 - **Why:** the request or problem behind it.
 - **How:** the mechanism, and any constraint that isn't obvious from the code.
@@ -23,6 +25,7 @@ The architecture overview, and a list of where to make common changes, is in the
 A general clean-up after the feature rounds, done in phases. Each phase leaves the tests green and is its own git commit. Apart from the items marked as deliberate changes, nothing should behave differently.
 
 ### Phase 1: Git and tests in the repository
+
 - **What:**
   - **Git.** The project is under git, with a baseline commit of the state before any cleanup.
   - **Tests.** The end-to-end test suite (99 checks) now lives in `tests/` and runs with `npm test`. It used to live in a temporary folder outside the project.
@@ -39,6 +42,7 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
 - **Verified by:** `npm test` from a clean checkout generates the media and passes 99/99.
 
 ### Phase 2: Leftovers removed, package metadata filled in
+
 - **What:**
   - **Deleted:** `dist/`, a 100 MB Windows build from Sep 26 that predates almost every feature, and the empty `transcribee_prototype.code-workspace`.
   - **`package.json` now describes the real app:**
@@ -50,11 +54,30 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
 - **Where:** `package.json`, `package-lock.json`.
 - **Verified by:** `npm test`, 99/99.
 
+### Phase 3: Formatter, linter, type checking
+
+- **What:** code-quality tooling, with no build step:
+  - `npm run format` (Prettier) and `npm run lint` (ESLint);
+  - `npm run typecheck` (TypeScript checking `script.js` from its JSDoc);
+  - `npm run check`, which runs all three.
+
+  Prettier has been run once over every file.
+
+- **Why:** style stays uniform without effort, and mistakes such as unused variables, typos in property names and wrong argument types are caught before running the app.
+- **How:**
+  - **Prettier** (`.prettierrc.json`) matches the existing style: 2 spaces, double quotes, 120 columns, trailing commas. So the one-off reformat changed little in `script.js`, mostly indentation in `index.html`, and moved `main.js` from 4 to 2 spaces.
+  - **ESLint** (`eslint.config.js`) uses the recommended rules with browser globals for `script.js` and Node globals for `main.js` and `tests/`. It checks for mistakes only; style is left to Prettier.
+  - **TypeScript** (`jsconfig.json`, plus `// @ts-check` at the top of `script.js`) checks only the app's own code. `maxNodeModuleJsDepth: 0` keeps it from type-checking the libraries' JavaScript: without it, over 300 errors came from Mediabunny and Signalsmith internals.
+  - **Test fix:** the step-button test now trims text, because the reformatted markup puts the arrow icons on their own lines. The whitespace doesn't render.
+- **Where:** `.prettierrc.json`, `.prettierignore`, `eslint.config.js`, `jsconfig.json`, and the new scripts in `package.json`. The dev dependencies are `prettier`, `eslint`, `@eslint/js`, `globals` and `typescript`.
+- **Verified by:** `format:check` and `lint` are clean; `npm test` passes 99/99. Ten type errors in the app's code remain, and Phase 4 fixes them.
+
 ---
 
 ## 2026-10-08: Loading screen and stronger aura
 
 ### Stronger aura behind the logo
+
 - **What:** the amber glow behind the bee on the welcome screen is clearly stronger.
 - **Why:** the user asked for a more intense "aura".
 - **How:**
@@ -65,6 +88,7 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
 - **Where:** `index.html` (`.logo-aura` around both logos), `style.css` (`.logo-aura`, `.welcome-logo`, `.welcome`).
 
 ### A loading screen for the first file
+
 - **What:**
   - **First file:** opening a file from the welcome screen swaps it for a full loading screen. It shows the bee with a **pulsing aura**, the animated equalizer bars with "Loading", and the file name.
     - If the file fails, the welcome screen comes back with the error and the Open button focused.
@@ -104,7 +128,7 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
 - **Why:** the user asked for a decent-looking start screen instead of a player full of disabled controls with nothing loaded.
 - **How:**
   - `#welcome` and `#app` are sibling screens, and `#app` starts `hidden`. `showPlayer()` swaps them, once.
-  - **Order matters:** `showPlayer()` is called in `loadMediaFile` right after the new file has decoded, *before* the waveform draws. WaveSurfer measures its container when it draws, and a hidden container measures 0 px wide. This is the same reason the video layout switch happens before drawing.
+  - **Order matters:** `showPlayer()` is called in `loadMediaFile` right after the new file has decoded, _before_ the waveform draws. WaveSurfer measures its container when it draws, and a hidden container measures 0 px wide. This is the same reason the video layout switch happens before drawing.
   - **Messages:** `showMessage()` writes to whichever screen's message line is visible, so `reportError`, `showNotice` and `clearMessage` work unchanged on both screens.
   - **While loading,** both screens are made `inert` under the loading overlay.
   - **Shared file input:** the welcome button calls `click()` on the existing hidden file input, so there is only one.
@@ -180,6 +204,7 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
 ## 2026-10-08: Zoom where the mouse is
 
 ### Wheel zoom keeps the spot under the mouse in place
+
 - **What:**
   - **Zoom:** zooming in or out with the mouse wheel keeps the moment under the pointer where it is, so you can zoom straight into the bar you're pointing at. Before, the zoom stayed centred on the playback cursor.
   - **While playing:** after you zoom or scroll by hand (wheel zoom, Ctrl+wheel, dragging the minimap), the view stays where you put it. So you can look ahead at the bar that's coming up.
@@ -188,7 +213,7 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
     - after a deliberate move of the playhead: click, arrow step, step button, Space replay or loop wrap.
 - **Why:** the user asked for zoom at the mouse position. The rule for following during playback was their choice: stay until the cursor arrives.
 - **How:**
-  - **Anchoring.** WaveSurfer's `zoom()` re-renders synchronously and shifts the scroll to keep its *progress cursor* in place. So `zoomBy` reads the time under the pointer first, zooms, then corrects the scroll so that time is back under the pointer. It measures the wrapper after the re-render, so WaveSurfer's own shift is already accounted for.
+  - **Anchoring.** WaveSurfer's `zoom()` re-renders synchronously and shifts the scroll to keep its _progress cursor_ in place. So `zoomBy` reads the time under the pointer first, zooms, then corrects the scroll so that time is back under the pointer. It measures the wrapper after the re-render, so WaveSurfer's own shift is already accounted for.
   - **Repeated wheel steps.** Scroll positions are whole pixels, so re-reading the anchor after every step would drift about half a pixel each time. While the pointer stays put, `zoomAnchor` keeps the original time across steps. A new pointer x, or a view that has moved by more than 2 px, takes a new anchor.
   - **WaveSurfer auto-scroll is now off** (`autoScroll: false`, `autoCenter: false`). WaveSurfer scrolled to its cursor on every `setTime()` whenever the cursor was off-screen. That silently overrode the app's own `follow()`, so a view moved away from the cursor snapped straight back. Following is now done only by `follow()`.
   - **Pausing.** `followPaused` is set on a hand zoom or scroll, cleared in `follow()` once the cursor is visible, and cleared by `resumeFollow()`, which §8 calls on every transport `"jump"`.
@@ -208,6 +233,7 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
 ## 2026-10-08: Arrow-key stepping
 
 ### ← / → move the cursor by a step; ↑ / ↓ change the step
+
 - **What:**
   - **← / →** move the cursor back or forward by the current step. Holding a key repeats it, which works as rewind or fast-forward.
   - **↑ / ↓** pick a larger or smaller step from 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5 and 10 s. The default is 1 s, and the step stops at either end of the list. Holding ↑ / ↓ changes the step only once.
@@ -241,6 +267,7 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
 ## 2026-10-08: Polish round (A–B loop, Space replay, offline, messages)
 
 ### A–B loop
+
 - **What:**
   - **Drawing and adjusting:**
     - Shift+drag on the waveform draws a loop. A plain click still seeks.
@@ -262,7 +289,7 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
 - **Why:** looping a passage is the core of transcribing (Transcribe!'s main feature).
 - **How:**
   - **Audio.** It uses Signalsmith Stretch's own looping, which is gapless: each timeline segment carries `loopStart` / `loopEnd`, and the audio worklet moves the input time back by the loop length once it reaches `loopEnd`. This was checked against the 1.3.2 source. Two constraints follow from that source:
-    1. A new segment copies the previous segment's loop fields. So the transport *always* sends `loopStart` / `loopEnd`, with `0, 0` meaning no loop.
+    1. A new segment copies the previous segment's loop fields. So the transport _always_ sends `loopStart` / `loopEnd`, with `0, 0` meaning no loop.
     2. A playing segment that starts at or after `loopEnd` would be pulled back one loop length per audio block. So the transport never starts a playing segment there; it starts at the loop start instead.
   - **Cursor.** The transport's mirror of the timeline (`timelinePositionAt`) applies the same wrap, so the cursor, the clock and the video follow the loop exactly.
   - **Video.** When the position goes backwards during playback (a wrap), the transport emits `"jump"`, so the video restarts decoding at the loop start.
@@ -282,6 +309,7 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
   - `style.css`: the `--loop*` tokens, `::part(loop-region)`, `.loop-info`.
 
 ### Space plays again from where you started listening
+
 - **What:**
   - Space pauses, and the cursor stays where it paused.
   - Space again plays from where that playback started.
@@ -301,11 +329,13 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
   - §13: the Space and `,` entries.
 
 ### Keyboard: Shift shortcuts
+
 - **What:** shortcuts can now be Shift + key (`shift: true` in `SHORTCUTS`). The legend shows them as `Shift + L`.
-- **How:** key *releases* match by key alone, ignoring Shift. Otherwise, pressing Shift while holding the play-while-held key (Z) would miss the release and leave it playing. Releases of every shortcut are still matched and `preventDefault`ed, because a focused button "clicks" on Space *release*.
+- **How:** key _releases_ match by key alone, ignoring Shift. Otherwise, pressing Shift while holding the play-while-held key (Z) would miss the release and leave it playing. Releases of every shortcut are still matched and `preventDefault`ed, because a focused button "clicks" on Space _release_.
 - **Where:** §13 `findShortcut`, `renderShortcutLegend`.
 
 ### Works offline
+
 - **What:** the app no longer needs the internet. Before, the audio engine came from the jsDelivr CDN (no internet meant no sound) and the fonts from Google Fonts.
 - **How:**
   - `signalsmith-stretch` comes from npm, pinned to exactly `1.3.2`. The transport mirrors its internal behaviour, so an upgrade needs re-checking against its source. The npm file is byte-identical to the CDN file the app used before.
@@ -313,6 +343,7 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
 - **Where:** `package.json` dependencies, the `import` at the top of `script.js`, the `<link>`s in `index.html`, `--sans` in `style.css`.
 
 ### Errors vs notices; tidy UI
+
 - **What:**
   - **Messages.** The message line in the transport bar distinguishes two kinds:
     - **errors** (something failed): red monospace;
@@ -326,11 +357,14 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
   - `style.css`: `.message`, `.message.notice`.
 
 ### Verified by
+
 **Logic checks**
+
 - 8 unit checks of `timelinePositionAt`: no loop, before B, a wrap at B, multiple wraps, a start before A, half speed, inactive, zero loop fields.
 
 **End-to-end harness**
 51 checks in an offscreen Electron window, using real key and mouse input, with every network request blocked:
+
 - **Loop at 1× and 0.5×:**
   - the cursor stays inside the loop and wraps;
   - the audio thread's own input time also stays inside it;
@@ -356,7 +390,7 @@ A summary of the earlier rounds, so this log has a starting point.
   - `script.js` was refactored into one modular file with numbered sections, a CONFIG block that holds every tunable number, a single `settings` object, and a table of slider settings (`SLIDERS`).
   - A small event emitter isolates listener errors.
 - **Transport (§5).**
-  - Playback state and position mirror Signalsmith's timeline, so the position of what is *heard* (allowing for the output delay) is computed exactly.
+  - Playback state and position mirror Signalsmith's timeline, so the position of what is _heard_ (allowing for the output delay) is computed exactly.
   - Signalsmith's `schedule()` discards every segment that starts before a new one. So segments are never scheduled in the future; the end of the track is a timer instead. Breaking this rule once caused "no sound at all".
   - `pendingJump` keeps a seek target on screen until it becomes audible.
 - **Audio graph.** Signalsmith (speed and pitch) → 5-band EQ (off by default) → volume → a brick-wall limiter.

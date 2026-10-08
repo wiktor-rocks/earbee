@@ -1,3 +1,4 @@
+// @ts-check
 /* =====================================================================
  * TranscriBee: renderer script
  *
@@ -373,7 +374,10 @@ function createAudioEngine({ onError }) {
   async function loadChannels(channels) {
     // Signalsmith expects one buffer per channel; the buffers are transferred.
     await stretch.dropBuffers();
-    await stretch.addBuffers(channels, channels.map((channel) => channel.buffer));
+    await stretch.addBuffers(
+      channels,
+      channels.map((channel) => channel.buffer),
+    );
   }
 
   return {
@@ -1341,7 +1345,8 @@ function createVideoView({ pane, canvas, onVisibilityChange }) {
 
       const track = await input.getPrimaryVideoTrack();
       if (!track) return failed(input, "it has no video track");
-      if (!(await track.canDecode())) return failed(input, `${track.codec?.toUpperCase() ?? "its"} video isn't supported`);
+      if (!(await track.canDecode()))
+        return failed(input, `${track.codec?.toUpperCase() ?? "its"} video isn't supported`);
 
       const sink = new VideoSampleSink(track);
       const proxySourceSink = new VideoSampleSink(track); // its own decoder
@@ -1385,9 +1390,11 @@ function createVideoView({ pane, canvas, onVisibilityChange }) {
     showFrameAt(0);
 
     video.proxy = createVideoProxy({ track: video.track, sourceSink: video.proxySourceSink });
-    video.proxy.build(() => looping).catch((error) => {
-      if (!video.discarded) console.warn("Video proxy failed:", error);
-    });
+    video.proxy
+      .build(() => looping)
+      .catch((error) => {
+        if (!video.discarded) console.warn("Video proxy failed:", error);
+      });
   }
 
   function clear() {
@@ -1857,10 +1864,12 @@ function reportError(error) {
 }
 
 // Wraps an event handler so its failures are shown instead of dropped.
-const guarded = (handler) => (...args) =>
-  Promise.resolve()
-    .then(() => handler(...args))
-    .catch(reportError);
+const guarded =
+  (handler) =>
+  (...args) =>
+    Promise.resolve()
+      .then(() => handler(...args))
+      .catch(reportError);
 
 /* ---------- Renderers ---------- */
 
@@ -2076,7 +2085,10 @@ function initSliders() {
     Object.assign(input, { min, max, step });
 
     setSetting(key, settings[key]);
-    input.addEventListener("input", guarded(() => setSetting(key, input.value)));
+    input.addEventListener(
+      "input",
+      guarded(() => setSetting(key, input.value)),
+    );
   }
 }
 
@@ -2320,16 +2332,28 @@ function bindControls() {
   dom.playButton.addEventListener("click", guarded(replayOrPause));
   dom.stopButton.addEventListener("click", guarded(stop));
 
-  dom.skipBackButton.addEventListener("click", guarded(() => skip(-1)));
-  dom.skipForwardButton.addEventListener("click", guarded(() => skip(1)));
+  dom.skipBackButton.addEventListener(
+    "click",
+    guarded(() => skip(-1)),
+  );
+  dom.skipForwardButton.addEventListener(
+    "click",
+    guarded(() => skip(1)),
+  );
 
   for (const chip of dom.speedChips.children) {
-    chip.addEventListener("click", guarded(() => setSetting("speed", chip.dataset.speed)));
+    chip.addEventListener(
+      "click",
+      guarded(() => setSetting("speed", chip.dataset.speed)),
+    );
   }
 
   dom.resetPitchButton.addEventListener("click", guarded(resetPitch));
   dom.resetEqButton.addEventListener("click", guarded(resetEq));
-  dom.eqToggle.addEventListener("click", guarded(() => setEqEnabled(!settings.eqEnabled)));
+  dom.eqToggle.addEventListener(
+    "click",
+    guarded(() => setEqEnabled(!settings.eqEnabled)),
+  );
 }
 
 /* =====================================================================
@@ -2347,7 +2371,12 @@ function bindControls() {
  * ===================================================================== */
 
 const SHORTCUTS = [
-  { codes: ["Space"], keys: ["Space"], description: "Play / pause (replays from where you started)", down: replayOrPause },
+  {
+    codes: ["Space"],
+    keys: ["Space"],
+    description: "Play / pause (replays from where you started)",
+    down: replayOrPause,
+  },
   { codes: ["Comma"], keys: [","], description: "Pause / resume here", down: togglePlay },
   { codes: ["Period"], keys: ["."], description: "Stop", down: stop },
   { codes: ["KeyZ", "Semicolon"], keys: ["Z", ";"], description: "Play while held", down: holdToPlay, up: releaseHold },
@@ -2374,8 +2403,7 @@ function findShortcut(event) {
   if (event.ctrlKey || event.metaKey || event.altKey) return undefined;
   const isRelease = event.type === "keyup";
   return SHORTCUTS.find(
-    (shortcut) =>
-      shortcut.codes.includes(event.code) && (isRelease || Boolean(shortcut.shift) === event.shiftKey),
+    (shortcut) => shortcut.codes.includes(event.code) && (isRelease || Boolean(shortcut.shift) === event.shiftKey),
   );
 }
 

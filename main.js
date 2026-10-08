@@ -6,53 +6,53 @@ const path = require("path");
 // rendering; `npm run start:gpu-info` logs what the GPU is doing.
 
 app.on("child-process-gone", (_event, details) => {
-    if (details.type === "GPU") {
-        console.warn(`GPU process gone: ${details.reason} (exit code ${details.exitCode})`);
-    }
+  if (details.type === "GPU") {
+    console.warn(`GPU process gone: ${details.reason} (exit code ${details.exitCode})`);
+  }
 });
 
 async function logGpuInfo() {
-    const info = await app.getGPUInfo("basic");
-    const activeGpu = info.gpuDevice?.find((device) => device.active);
-    console.log("GPU features:", app.getGPUFeatureStatus());
-    console.log("Active GPU:", activeGpu ?? info.gpuDevice);
+  const info = await app.getGPUInfo("basic");
+  const activeGpu = info.gpuDevice?.find((device) => device.active);
+  console.log("GPU features:", app.getGPUFeatureStatus());
+  console.log("Active GPU:", activeGpu ?? info.gpuDevice);
 }
 
 if (!app.isPackaged) {
-    require("electron-reload")(__dirname, {
-        electron: require(`${__dirname}/node_modules/electron`)
-    });
+  require("electron-reload")(__dirname, {
+    electron: require(`${__dirname}/node_modules/electron`),
+  });
 }
 
 function createWindow() {
-    const win = new BrowserWindow({
-        width: 1200,
-        height: 800,
-        webPreferences: {
-            contextIsolation: true,
-            nodeIntegration: false
-        }
-    });
+  const win = new BrowserWindow({
+    width: 1200,
+    height: 800,
+    webPreferences: {
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
 
-    win.loadFile(path.join(__dirname, "index.html"));
+  win.loadFile(path.join(__dirname, "index.html"));
 }
 
 app.whenReady().then(() => {
-    createWindow();
+  createWindow();
 
-    if (app.commandLine.hasSwitch("gpu-info")) {
-        logGpuInfo().catch((error) => console.error("Couldn't read GPU info:", error));
+  if (app.commandLine.hasSwitch("gpu-info")) {
+    logGpuInfo().catch((error) => console.error("Couldn't read GPU info:", error));
+  }
+
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow();
     }
-
-    app.on("activate", () => {
-        if (BrowserWindow.getAllWindows().length === 0) {
-            createWindow();
-        }
-    });
+  });
 });
 
 app.on("window-all-closed", () => {
-    if (process.platform !== "darwin") {
-        app.quit();
-    }
+  if (process.platform !== "darwin") {
+    app.quit();
+  }
 });

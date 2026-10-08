@@ -1,0 +1,15 @@
+{
+  // Type-checks script.js from its JSDoc comments; nothing is compiled.
+  "compilerOptions": {
+    "checkJs": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "strict": false,
+    "skipLibCheck": true,
+    "maxNodeModuleJsDepth": 0
+  },
+  "include": ["script.js"]
+}
