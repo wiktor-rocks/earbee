@@ -12,6 +12,7 @@ A desktop player for transcribing music by ear. Open a song or a video, slow it 
 - **Video:** the picture is decoded frame by frame with WebCodecs (via [Mediabunny](https://mediabunny.dev)) and always shows the frame at the audio position, so it stays in sync at any speed.
 - **5-band EQ, volume up to 200 %,** and a limiter.
 - **Download from YouTube.** Paste a link, or click **From YouTube…**, to get the audio or the video (up to 1080p). It's saved to `~/Downloads/TranscriBee/` and opened. This uses [yt-dlp](https://github.com/yt-dlp/yt-dlp), which TranscriBee downloads on first use (about 40 MB) and keeps up to date; nothing else needs installing. Only download what you have the rights to.
+- **Colour themes:** TranscriBee, Monokai, Dracula, Nord, One Dark and Solarized Light, or **Automatic**, which follows your system's dark or light mode. Pick one with the palette button in the top bar; it's remembered.
 - **Works offline.** All libraries and fonts are bundled. Only downloading needs the internet.
 
 The shortcut legend at the bottom of the window lists every key.
@@ -50,26 +51,29 @@ TB_APP_BINARY=$PWD/dist/linux-unpacked/transcribee npm test
 electron/          The main process (CommonJS, Node)
   main.js            window, security, wiring
   window-state.js    remembers the window's size and position
+  theme-store.js     remembers the colour theme; applies it before the page shows
   downloader.js      downloading links with yt-dlp
   preload.js         the page's bridge to downloader.js (window.transcribee)
 src/               The page (ES modules, no build step), in layers:
   core/              pure helpers, no DOM (unit-tested)
+  themes/            colour themes: palettes/ (one file each) and the logic
   config.js          every tunable number
   audio/             engine.js (Web Audio + Signalsmith), transport.js
   video/             view.js, proxy.js
   waveform.js        WaveSurfer drawing, zoom, the loop region
   context.js         settings, and the shared components (`player`)
-  ui/                dom.js, controls.js, shortcuts.js
-  features/          playback.js, loop.js, open-file.js, download.js
+  ui/                dom.js, controls.js, shortcuts.js, theme.js
+  features/          playback.js, loop.js, open-file.js, download.js,
+                     theme-picker.js
   app.js             entry point: creates and wires everything
 index.html         The page: welcome screen, loading screen, player
 style.css          All styles; colour and font tokens at the top
 assets/            Logo and icons (generated from transcribee-source.png
                    by scripts/make-images.py)
 tests/
-  unit/              node:test unit tests (core, transport, downloader)
+  unit/              node:test unit tests (core, transport, downloader, themes)
   run.cjs            end-to-end runner: e2e/harness.cjs plus topic files
-  e2e/               01-static-ui.cjs … 11-security.cjs
+  e2e/               01-static-ui.cjs … 12-security.cjs
   smoke.cjs          the real app: security, window state, the bridge
   preload.cjs        page instrumentation for the e2e tests
   fake-yt-dlp.cjs    stands in for yt-dlp, so downloads test offline
@@ -80,5 +84,7 @@ CHANGELOG.md       What changed, why, how and where, newest first
 **Start with the comment at the top of `src/app.js`.** It maps how the parts fit together (engine, transport, waveform, video, UI), lists the files and their layers, and says where to make common changes: speed presets, EQ bands, step sizes, shortcuts, colours, new features.
 
 **Layers.** In `src/`, a file only imports from the layers above it: `core` → `config` → `audio` / `video` / `waveform` → `context` → `ui` → `features` → `app.js`. `npm run lint` fails on an import that goes the other way, or on an import cycle. So `core/`, `audio/transport.js` and the rest of the lower layers stay free of the UI, and can be unit-tested in plain Node.
+
+**Adding a colour theme.** Copy a file in `src/themes/palettes/` (for example `nord.js`), give it a new `id`, `name`, `scheme` (`"dark"` or `"light"`) and colours for each role, then add it to `THEMES` in `src/themes/index.js`. The roles are listed, with what each colours, in `ROLES` in that file. `npm run test:unit` checks that the theme defines every role and that its text, accent, loop and error colours have enough contrast. It names any pair that fails.
 
 **Record every change in [CHANGELOG.md](CHANGELOG.md):** what, why, how and where.

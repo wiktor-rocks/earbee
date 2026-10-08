@@ -4,8 +4,8 @@ TranscriBee is an Electron app for transcribing music. You open a song or a vide
 
 **Files**
 
-- `electron/`: the Electron main process: `main.js` (window, security), `window-state.js`, `downloader.js` (yt-dlp) and `preload.js` (the page's bridge to it).
-- `src/`: the page, as ES modules in layers. `core/` → `config.js` → `audio/`, `video/`, `waveform.js` → `context.js` → `ui/` → `features/` → `app.js`.
+- `electron/`: the Electron main process: `main.js` (window, security), `window-state.js`, `theme-store.js`, `downloader.js` (yt-dlp) and `preload.js` (the page's bridge to them).
+- `src/`: the page, as ES modules in layers. `core/`, `themes/` → `config.js` → `audio/`, `video/`, `waveform.js` → `context.js` → `ui/` → `features/` → `app.js`.
 - `index.html` and `style.css`: the page and its look.
 - `assets/`: the logo and icons; `scripts/make-images.py` makes them from the source image.
 - `tests/`: unit tests (`unit/`), end-to-end tests (`run.cjs` + `e2e/`) and the smoke test; all run with `npm test`.
@@ -42,6 +42,62 @@ The architecture overview, the file map and a list of where to make common chang
 | `tests/run.cjs` (one sequence)           | `tests/run.cjs` + `tests/e2e/`                                                              |
 
 ---
+
+## 2026-10-08: Colour themes
+
+- **What:**
+  - **Six themes:** TranscriBee (the original look, still the default), Monokai, Dracula, Nord, One Dark and Solarized Light.
+  - **Automatic:** follows the system's dark or light mode, using the last dark and the last light theme chosen.
+  - **The picker:** a palette button at the right of the top bar (and in the top-right corner of the welcome screen). It opens a menu listing Automatic and each theme with a four-colour swatch (background, panel, accent, loop).
+  - **Choosing:** applies the theme at once. The menu stays open so themes can be compared, and ↑/↓, Enter and Escape work.
+  - **Remembered:** the choice is restored on the next start without a flash of the old colours.
+- **Why:** the user asked for a robust, modular colour-theme system with the classic editor themes.
+- **How:**
+  - **Themes are data.** One ES module per theme in `src/themes/palettes/`, giving colours for a fixed set of **roles** (`ROLES` in `src/themes/index.js`).
+    - **Required roles:** bg, surface, surface2, border, text, muted, accent, accentInk, danger, loop, wave, cursor.
+    - **Optional roles** are derived when absent: surfaceHover, accentHover, minimapWave, minimapProgress.
+    - **Mapping editor palettes onto roles:** e.g. Dracula: purple accent, cyan loop; Nord: Frost accent, Aurora yellow loop. Each file notes its source.
+  - **Independent.** `src/themes/` imports nothing from the app (a lint zone enforces it), and no other code imports a palette. The page's styles keep reading the same CSS variables. The theme only changes their values (`ui/theme.js` sets them on `<html>`, with `color-scheme` and `data-theme`).
+  - **Literal colours.** `cssVariables(theme)` turns roles into variables, deriving the optional ones in JavaScript, because the waveform draws on canvases, which can't resolve `var()` or `color-mix()`. The glows, overlays and loop fills in `style.css` are `color-mix()`es of the base tokens, so they follow automatically.
+  - **The waveform** gets a generic `refreshColors()`, called by `app.js` on `onThemeChange`. It recolours WaveSurfer with `setOptions()` and replaces the minimap plugin, which copies its options when made and can't be recoloured. Its scrubbing looks the minimap up on each drag, so it keeps working.
+  - **Saving and no flash:**
+    - `electron/theme-store.js` keeps `theme.json` in the user-data folder and sets the window's background colour from the theme;
+    - the main process loads the palettes with `require()` of ES modules (Electron 44 / Node 24; a spike confirmed this, and the packaged build too);
+    - the preload asks for the theme synchronously (`sendSync("theme:initial")`) and sets the variables the moment `<html>` exists (a `MutationObserver`; `<html>` doesn't exist yet when a preload runs). That's before any page CSS or script runs.
+    - Outside Electron, `localStorage` is used instead.
+  - **Robustness:**
+    - unknown, removed or mismatched theme ids fall back to the defaults (`normalizePrefs`);
+    - an unreadable `theme.json` means the defaults;
+    - the `theme:initial` handler always answers, even if something inside it fails. Found while testing: a missing answer makes `sendSync` wait forever, so the handler must be registered before any window exists.
+  - **Contrast was checked, and fixed where needed.** The unit tests require, for every theme:
+    - text ≥ 4.5:1 on every background;
+    - muted labels, error text and the cursor ≥ 4.5:1;
+    - accent and loop ≥ 3:1;
+    - the unplayed waveform ≥ 1.5:1;
+    - the loop clearly different from the accent.
+
+    They caught dim error text in Monokai, Nord and One Dark, Nord's green loop being too close to its blue accent, and Solarized Light's muted text and cyan accent; those shades were adjusted, keeping each palette's hues.
+
+  - A unit test also keeps the `:root` fallback in `style.css` equal to the TranscriBee theme.
+- **Where:**
+  - `src/themes/` (`index.js`, `palettes/*.js`), `src/ui/theme.js`, `src/features/theme-picker.js`, `src/app.js` (first statement, the waveform wiring, `bindThemePicker`, the shortcut blocker);
+  - `src/waveform.js` (`refreshColors`, `minimapOptions`, `waveColors`);
+  - `electron/theme-store.js`, `electron/main.js`, `electron/preload.js`;
+  - `index.html` (the palette buttons, `#themeMenu`); `style.css` §4 "Colour-theme menu";
+  - `eslint.config.js` (the themes zone; browser globals for the preload).
+- **Verified by:**
+  - **Unit tests:** `tests/unit/themes.test.mjs`, 15 checks (49 unit tests in all).
+  - **E2E:** `tests/e2e/10-themes.cjs`, 16 checks:
+    - the menu, keyboard and Escape;
+    - shortcuts blocked while it's open;
+    - Nord's variables on the page;
+    - both waveform canvases checked pixel by pixel for the theme's colours;
+    - the minimap overlay intact;
+    - the choice saved;
+    - Automatic under an emulated system mode;
+    - a screenshot per theme in `tests/output/theme-*.png`.
+  - **Smoke test:** a saved theme is applied on the next start of the real app.
+  - **Totals:** 145 end-to-end and 19 smoke checks pass, on the project and on a packaged Linux build.
 
 ## 2026-10-08: Modules (ready for large changes)
 
