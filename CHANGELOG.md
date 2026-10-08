@@ -4,11 +4,13 @@ TranscriBee is an Electron app for transcribing music. You open a song or a vide
 
 **Files**
 
-- `main.js`: the Electron main process.
+- `main.js`: the Electron main process (window, security, window state).
 - `index.html` and `style.css`: the page and its look.
 - `script.js`: all app logic, in one file split into numbered sections (§1 Config … §14 Startup).
+- `assets/`: the logo and icons; `scripts/make-images.py` makes them from the source image.
+- `tests/`: end-to-end and smoke tests (`npm test`).
 
-The architecture overview, and a list of where to make common changes, is in the comment at the top of `script.js`. Read that first.
+The architecture overview, and a list of where to make common changes, is in the comment at the top of `script.js`. Read that first. `README.md` covers running, testing and building.
 
 **How to read an entry.** Newest first, one entry per round of work. Each change records:
 
@@ -199,6 +201,20 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
   - Against the unpacked Linux build (`npm run build:dir`): also 105/105 and 15/15, with fonts, WaveSurfer, Mediabunny, Signalsmith, video and the window state all working from inside `app.asar`.
   - On this machine (i3) the window-size assertions are skipped.
   - The Windows build wasn't built or run here.
+
+### Phase 8: README
+
+- **What:** a `README.md`. It covers:
+  - what the app does;
+  - requirements (Node 22+; ffmpeg and a display server for the tests; Pillow for the image script);
+  - every npm command, and how to test a packaged build;
+  - the file layout;
+  - pointers to the `script.js` header and this change log.
+
+  This log's file list is updated for `assets/`, `scripts/` and `tests/`.
+
+- **Why:** there was no entry point for someone opening the project for the first time.
+- **Where:** `README.md`, the header of `CHANGELOG.md`.
 
 ---
 

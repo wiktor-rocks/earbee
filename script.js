@@ -54,8 +54,9 @@
  *   A–B loop                  State and actions in §12 (setLoopRegion);
  *                             audio looping in the transport (§5), drawing
  *                             and dragging in the waveform (§6).
- *   Any change                Record it in CHANGELOG.md (what, why, how,
- *                             where), so the next person or LLM can follow.
+ *   Any change                Run `npm run check` and `npm test`, and record
+ *                             it in CHANGELOG.md (what, why, how, where), so
+ *                             the next person or LLM can follow.
  * ===================================================================== */
 
 // Pinned to 1.3.2: the transport mirrors its timeline and loop behaviour
