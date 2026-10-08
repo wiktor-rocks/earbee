@@ -853,6 +853,29 @@ app
     check("video stays synced in loop (≥90% within 100 ms)", syncedShare >= 0.9, `${(syncedShare * 100).toFixed(1)}%`);
     await shot("video-loop.png");
 
+    // ---------- Resources and robustness ----------
+    {
+      // Open the video several times, then an audio file: every decoder and
+      // encoder of the earlier files must have been closed.
+      const counts = [];
+      for (let i = 0; i < 3; i++) {
+        await openFile(path.join(FIXTURES, "counter.webm"));
+        await sleep(1500); // let the proxy build start
+        counts.push(await js(`__codecs.live()`));
+      }
+      await openFile(path.join(FIXTURES, "tone.wav"));
+      await sleep(1000);
+      const afterAudio = await js(`__codecs.live()`);
+      check(
+        "video codecs don't pile up across loads",
+        Math.max(...counts) - Math.min(...counts) <= 1,
+        JSON.stringify(counts),
+      );
+      check("switching to audio frees all video codecs", afterAudio === 0, `live after audio: ${afterAudio}`);
+      const problems = await js(`__problems`);
+      check("no unhandled errors, rejections or CSP violations", problems.length === 0, problems.join("\n"));
+    }
+
     console.log(`\n${pass} pass, ${fail} fail`);
     app.exit(fail ? 1 : 0);
   })

@@ -101,6 +101,33 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
 - **Where:** `script.js` (every section), `index.html` (step ids), `style.css` (`.step-size`), `tests/run.cjs` (step ids).
 - **Verified by:** `npm run check` is clean (format, lint, 0 type errors); `npm test` passes 99/99.
 
+### Phase 5: Error paths and resource cleanup
+
+- **What:**
+  - **Deliberate change:** if part of a video can't be decoded during use, a notice now says so ("…the picture may stop updating. The audio is unaffected."), once per file. Before, the picture just froze, with only a console warning.
+  - **Small fix:** the video view's pending "head start" timer is now cancelled when a file is closed or replaced. It was harmless before, but it was left running.
+  - **New tests** for leaks and unhandled errors.
+- **Why:** to make sure every failure either reaches the user or is clearly harmless, and that opening file after file doesn't leak decoders.
+- **Review findings** (no change needed):
+  - **Opening a new file releases the old one:** the decode cursor and its frames, the proxy's encoder and decoder and its encoded chunks, the Mediabunny input, the Signalsmith buffers (`dropBuffers`), and the transport's timer and animation frame.
+  - **Every other `console.warn` is either reported another way or harmless:**
+    - an unreadable video becomes the "picture can't be shown" notice;
+    - a waveform failure becomes the "waveform couldn't be drawn" notice;
+    - a warm-up failure is retried, and reported if the file load then fails;
+    - a proxy failure only makes seeking slower.
+  - The policy is written in the §7 header.
+- **How:**
+  - `createVideoView` takes an `onProblem(message)` callback, wired to `showNotice` in §8.
+  - `reset()` clears `heldRun` and `sharpHeldUntil`. `heldRun` moved up to the view's other state variables.
+- **Test instrumentation** (`tests/preload.cjs`):
+  - counts live `VideoDecoder` / `VideoEncoder` objects (created minus closed, or failed);
+  - records unhandled promise rejections, uncaught errors and Content-Security-Policy violations.
+- **Where:** `script.js` §7 (header, `createVideoView`, `reset`, `run`) and §8; `tests/preload.cjs`; `tests/run.cjs`.
+- **Verified by:** 3 new checks, 102 in total, all passing:
+  - opening the video three times in a row keeps exactly 1 live codec each time;
+  - switching to an audio file leaves 0;
+  - the whole run produces no unhandled error, rejection or CSP violation.
+
 ---
 
 ## 2026-10-08: Loading screen and stronger aura

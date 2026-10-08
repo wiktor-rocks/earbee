@@ -1159,6 +1159,11 @@ function createWaveform({ container, minimapContainer, onSeek, onLoopChange }) {
  * drawn are painted, and every sample is closed as soon as it isn't
  * needed (they hold decoder memory).
  *
+ * Errors: the picture is never allowed to break playback. Failures are
+ * logged with console.warn; the proxy is optional (without it, seeking is
+ * just slower), and a decoding failure is reported once per file through
+ * onProblem.
+ *
  * Exposes: preload, prepare, show, clear, discard,
  *          start, advance, showFrameAt
  *   prepare(file) → { video, reason }: opens a file without touching the
@@ -1354,8 +1359,9 @@ function createVideoProxy({ track, sourceSink }) {
  * @param {HTMLElement} options.pane The box the picture sits in (hidden for audio files).
  * @param {HTMLCanvasElement} options.canvas
  * @param {(visible: boolean) => void} options.onVisibilityChange Switch the page layout.
+ * @param {(message: string) => void} options.onProblem Tell the user the picture is in trouble.
  */
-function createVideoView({ pane, canvas, onVisibilityChange }) {
+function createVideoView({ pane, canvas, onVisibilityChange, onProblem }) {
   const { maxLagSeconds } = CONFIG.video;
   const context2d = canvas.getContext("2d");
 
@@ -1382,6 +1388,8 @@ function createVideoView({ pane, canvas, onVisibilityChange }) {
   let proxyRequest = null; // time wanted from the proxy (latest wins)
   let proxyBusy = false;
   let sharpHeldUntil = 0; // performance.now() until which run() waits (head start)
+  /** @type {ReturnType<typeof setTimeout> | undefined} */
+  let heldRun; // timer for a run() waiting out the head start
 
   // Loads Mediabunny without creating anything; safe at startup.
   function preload() {
@@ -1473,6 +1481,8 @@ function createVideoView({ pane, canvas, onVisibilityChange }) {
     shownTime = null;
     shownIsProxy = false;
     proxyRequest = null;
+    clearTimeout(heldRun);
+    sharpHeldUntil = 0;
   }
 
   /* ---------- Drawing ---------- */
@@ -1689,8 +1699,6 @@ function createVideoView({ pane, canvas, onVisibilityChange }) {
     }
   }
 
-  let heldRun = null; // timer for a run() waiting out the head start
-
   async function run() {
     if (looping) return;
     const wait = sharpHeldUntil - performance.now();
@@ -1733,6 +1741,11 @@ function createVideoView({ pane, canvas, onVisibilityChange }) {
     } catch (error) {
       console.warn("Video decoding failed:", error);
       closeCursor();
+      // The next request retries; the user hears about it once per file.
+      if (current && !current.problemReported) {
+        current.problemReported = true;
+        onProblem("Part of the video couldn't be decoded, so the picture may stop updating. The audio is unaffected.");
+      }
     } finally {
       looping = false;
     }
@@ -1826,6 +1839,7 @@ const videoView = createVideoView({
   pane: $("videoPane"),
   canvas: /** @type {HTMLCanvasElement} */ ($("videoCanvas")),
   onVisibilityChange: (visible) => $("stage").classList.toggle("has-video", visible),
+  onProblem: (message) => showNotice(message),
 });
 
 // Everything that follows playback subscribes here.
