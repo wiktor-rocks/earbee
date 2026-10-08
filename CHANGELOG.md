@@ -38,6 +38,18 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
 - **Where:** `.gitignore`; `tests/` (`launch.cjs`, `run.cjs`, `preload.cjs`, `make-fixtures.sh`); the `test` and `test:fixtures` scripts in `package.json`.
 - **Verified by:** `npm test` from a clean checkout generates the media and passes 99/99.
 
+### Phase 2: Leftovers removed, package metadata filled in
+- **What:**
+  - **Deleted:** `dist/`, a 100 MB Windows build from Sep 26 that predates almost every feature, and the empty `transcribee_prototype.code-workspace`.
+  - **`package.json` now describes the real app:**
+    - name `transcribee`, product name `TranscriBee`, app ID `com.transcribee.app`;
+    - a description, keywords, the author, and `private: true`;
+    - the placeholder `test` script is gone, and the scripts are grouped (start, test, build).
+- **Why:** leftovers mislead (an old `.exe` looks like a current build), and the metadata ends up in the packaged app.
+- **Note:** because the product name changed, Electron keeps its profile folder (cache and the like) under a new name. The app stores no user data there, so nothing is lost.
+- **Where:** `package.json`, `package-lock.json`.
+- **Verified by:** `npm test`, 99/99.
+
 ---
 
 ## 2026-10-08: Loading screen and stronger aura

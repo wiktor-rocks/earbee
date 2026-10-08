@@ -1,19 +1,27 @@
 {
-  "name": "transcribee_prototype",
+  "name": "transcribee",
+  "productName": "TranscriBee",
   "version": "1.0.0",
-  "description": "",
+  "description": "A music-transcription player: slow down, pitch-shift, EQ and loop songs and videos, and step through them with the keyboard.",
   "main": "main.js",
   "scripts": {
-    "test": "node tests/launch.cjs",
     "start": "electron .",
     "start:gpu-info": "electron . --gpu-info",
     "start:no-gpu": "electron . --disable-gpu",
-    "build:win": "electron-builder --win",
-    "test:fixtures": "bash tests/make-fixtures.sh"
+    "test": "node tests/launch.cjs",
+    "test:fixtures": "bash tests/make-fixtures.sh",
+    "build:win": "electron-builder --win"
   },
-  "keywords": [],
-  "author": "",
+  "keywords": [
+    "music",
+    "transcription",
+    "audio",
+    "slow-down",
+    "electron"
+  ],
+  "author": "Wiktor Wieczorkiewicz",
   "license": "ISC",
+  "private": true,
   "devDependencies": {
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
@@ -27,8 +35,8 @@
     "wavesurfer.js": "^8.0.1"
   },
   "build": {
-    "appId": "com.transcribee.prototype",
-    "productName": "Transcribee Prototype",
+    "appId": "com.transcribee.app",
+    "productName": "TranscriBee",
     "win": {
       "signAndEditExecutable": false,
       "target": "portable"
