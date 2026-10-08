@@ -1,5 +1,5 @@
 // Pinned to 1.3.2: the transport mirrors its timeline and loop behaviour
-// (see §5), so an upgrade needs re-checking against its source.
+// (see transport.js), so an upgrade needs re-checking against its source.
 import SignalsmithStretch from "../../node_modules/signalsmith-stretch/SignalsmithStretch.mjs";
 import { CONFIG } from "../config.js";
 import { AppError } from "../core/errors.js";
