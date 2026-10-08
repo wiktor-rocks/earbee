@@ -43,6 +43,31 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-08: Diagnostic of slow and failing long-file loads
+
+- **What:** a measured report on why opening an hour-long file is slow or fails, with recommendations: `docs/diagnostics/long-file-loading.md`. Also the tools that produced it, so it can be re-run after a fix: `npm run diagnose:loading`. No app behaviour changed.
+- **Why:** the user asked why loading a one-hour file takes very long or fails, and wanted a proper diagnostic to base the fix on.
+- **Findings** (details and numbers in the report):
+  - `decodeAudioData` (in `loadMediaFile`) is 96 % of the load time and peaks at 2.1× the decoded size.
+  - Most of that time is resampling from 44.1 to 48 kHz: 14.5 of 24.4 s for a 1-hour MP3.
+  - It fails with a generic `EncodingError` on AAC from about 45–60 min and MP3 from about 90–120 min, with gigabytes still free. AAC is what YouTube downloads use, so hour-long downloads and videos don't open.
+  - The app then wrongly says the file "isn't an audio file".
+  - With 2–3 GB free, the whole app dies with no message.
+  - Streaming decode with mediabunny opened every file tested, at about half the peak memory.
+- **How:**
+  - each measurement runs in a fresh Electron process with the real page and preload;
+  - the file goes into the app's file input over the DevTools protocol;
+  - memory is sampled from `/proc` every 50 ms;
+  - a page heartbeat measures freezes;
+  - low-memory machines are simulated with `systemd-run --user --scope -p MemoryMax=…`.
+- **Where:**
+  - `docs/diagnostics/long-file-loading.md` (the report);
+  - `tests/diagnostics/make-long-media.sh` (synthetic long media, into `tests/output/long-media/`), `profile-load.cjs` (one measurement), `run.cjs` (the plan and summary);
+  - `package.json` (`diagnose:loading`), `README.md`.
+- **Verified by:**
+  - the full run: 25 measurements plus 3 threshold runs;
+  - `npm run check`.
+
 ## 2026-10-08: A new file starts with default sound settings
 
 - **What:** when a file opens, speed, pitch (semitones and cents), volume and the EQ (band gains and On/Off) go back to their defaults, as the A–B loop already did. The step size stays, since it's how you move around rather than how it sounds, and so does the theme. A file that fails to open changes nothing, so the current song keeps its settings.

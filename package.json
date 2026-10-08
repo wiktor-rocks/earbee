@@ -11,6 +11,7 @@
     "test": "node tests/launch.cjs",
     "test:unit": "node --test \"tests/unit/*.test.mjs\"",
     "test:fixtures": "bash tests/make-fixtures.sh",
+    "diagnose:loading": "bash tests/diagnostics/make-long-media.sh && node tests/diagnostics/run.cjs",
     "check": "npm run format:check && npm run lint && npm run typecheck",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
