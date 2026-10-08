@@ -207,9 +207,13 @@
 
     <div id="loadingOverlay" class="loading-overlay" role="status" hidden>
       <div class="loading-card">
-        <span class="loader" aria-hidden="true"> <span></span><span></span><span></span><span></span> </span>
-        <span id="overlayStatus">Loading</span>
-        <button id="overlayCancel" class="small" type="button" hidden>Cancel</button>
+        <div class="loading-card-line">
+          <span class="loader" aria-hidden="true"> <span></span><span></span><span></span><span></span> </span>
+          <span id="overlayStatus">Loading</span>
+          <button id="overlayCancel" class="small" type="button" hidden>Cancel</button>
+        </div>
+        <!-- Downloads only: the video's title -->
+        <div id="overlayTitle" class="loading-file"></div>
       </div>
     </div>
 

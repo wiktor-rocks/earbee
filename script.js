@@ -1899,6 +1899,7 @@ const dom = {
   app: $("app"),
   loadingOverlay: $("loadingOverlay"),
   overlayStatus: $("overlayStatus"),
+  overlayTitle: $("overlayTitle"),
   overlayCancel: $("overlayCancel"),
   downloadButton: $("downloadButton"),
   downloadDialog: /** @type {HTMLDialogElement} */ ($("downloadDialog")),
@@ -2011,6 +2012,7 @@ function setLoading(name) {
   const busy = name !== null;
   dom.app.inert = busy;
   setLoadingStatus("Loading");
+  dom.overlayTitle.textContent = "";
 
   if (busy && dom.app.hidden) {
     dom.loadingFileName.textContent = name;
@@ -2377,6 +2379,7 @@ function bindFileDrop() {
  * @property {number} [parts]
  * @property {number | null} [fraction]
  * @property {number | null} [eta]  seconds
+ * @property {string} [title]  the video's, once known
  *
  * @typedef {{ ok: true, name: string, path: string, bytes: Uint8Array }
  *   | { ok: false, canceled: boolean, error: string }} DownloadResult
@@ -2411,9 +2414,10 @@ function downloadLink(url, kind) {
   if (!downloads) return;
   return withLoading(url, async () => {
     setLoadingStatus(describeDownload({ stage: "download", fraction: 0 }, kind), true);
-    const stopListening = downloads.onDownloadProgress((progress) =>
-      setLoadingStatus(describeDownload(progress, kind), progress.stage !== "join"),
-    );
+    const stopListening = downloads.onDownloadProgress((progress) => {
+      setLoadingStatus(describeDownload(progress, kind), progress.stage !== "join");
+      if (progress.title) dom.loadingFileName.textContent = dom.overlayTitle.textContent = progress.title;
+    });
     let result;
     try {
       result = await downloads.download(url, kind);

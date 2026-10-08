@@ -8,6 +8,8 @@
 //   https://fake.test/slow      the same, slowly (to test Cancel)
 //   https://fake.test/private   fails like a private video
 //   https://fake.test/offline   fails like yt-dlp without a network
+//   https://fake.test/forbidden YouTube refuses the stream (HTTP 403)
+//   https://fake.test/flaky     refuses once (403), then works like /song
 const fs = require("fs");
 const path = require("path");
 
@@ -31,6 +33,15 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
       "[youtube] 0ffline: Unable to download webpage: <urlopen error [Errno -3] Temporary failure in name resolution> (caused by TransportError('<urlopen error [Errno -3] Temporary failure in name resolution>'))",
     );
   }
+
+  const forbidden = "unable to download video data: HTTP Error 403: Forbidden";
+  if (url.pathname === "/forbidden") fail(forbidden);
+  const flakyMarker = path.join(__dirname, "output", "fake-yt-dlp-flaky");
+  if (url.pathname === "/flaky" && !fs.existsSync(flakyMarker)) {
+    fs.writeFileSync(flakyMarker, "");
+    fail(forbidden);
+  }
+  fs.rmSync(flakyMarker, { force: true });
 
   const fixtures = path.join(__dirname, "fixtures");
   const wantsVideo = option("-f").includes("bv");

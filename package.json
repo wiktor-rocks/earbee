@@ -52,6 +52,8 @@
     "icon": "assets/icon-512.png",
     "files": [
       "main.js",
+      "downloader.js",
+      "preload.js",
       "index.html",
       "style.css",
       "script.js",

@@ -1003,10 +1003,25 @@ app
       u = await ui();
       check("no network is explained", u.error && u.message.startsWith("Couldn't reach the site"), u.message);
 
+      await download("https://fake.test/forbidden", "audio");
+      await waitIdle();
+      u = await ui();
+      check("a refused (403) download is explained", u.error && u.message.startsWith("YouTube refused"), u.message);
+      await download("https://fake.test/flaky", "audio");
+      await waitIdle();
+      u = await ui();
+      check("a one-off 403 is retried and succeeds", !u.error && u.file.endsWith(".m4a"), JSON.stringify(u));
+      await download("https://fake.test/song", "video"); // back to the video, as the checks below expect
+      await waitIdle();
+
       // Cancel: back to the player, nothing saved or left behind.
       await download("https://fake.test/slow", "audio");
       await sleep(1200);
       u = await ui();
+      check(
+        "the overlay shows the video's title while downloading",
+        (await js(`document.getElementById("overlayTitle").textContent`)) === "Test Song: “Quotes” / Slashes",
+      );
       check(
         "slow download shows a percentage and time left",
         u.cancel && /^Downloading… \d+ % · 0:\d\d left$/.test(u.status),

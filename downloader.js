@@ -16,8 +16,11 @@
 //             ordinary file in ~/Downloads/TranscriBee: .mp4 for video, .m4a
 //             (or .ogg) for audio. Audio is rewritten too, because YouTube's
 //             .m4a is a "DASH" file that not every player opens.
-//   Progress  Sent to the page as { stage, part, parts, fraction, eta }:
-//             "setup" (fetching yt-dlp), "update", "download", "join".
+//   One link, one video: a playlist or search page gets its first video
+//             only (--playlist-items 1); the page shows its title.
+//   Progress  Sent to the page as { stage, part, parts, fraction, eta,
+//             title }: "setup" (fetching yt-dlp), "update", "download",
+//             "join".
 const { spawn } = require("child_process");
 const crypto = require("crypto");
 const fs = require("fs");
@@ -26,6 +29,7 @@ const path = require("path");
 
 const RELEASES = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/";
 const UPDATE_EVERY_MS = 24 * 60 * 60 * 1000;
+const STALL_MS = 30_000; // give up on GitHub after this long without data
 
 // yt-dlp format selectors: "a/b" means a, else b; "x,y" downloads both.
 const FORMATS = {
@@ -80,6 +84,9 @@ function explainFailure(stderrLines) {
     return "Couldn't reach the site. Check your internet connection.";
   }
   if (/^Unsupported URL/i.test(message)) return "That link isn't a video that can be downloaded.";
+  if (/HTTP Error 403/.test(message)) {
+    return "YouTube refused the download (HTTP 403). Try again in a minute; if it keeps happening, YouTube may have changed and the downloader needs its next update.";
+  }
   return message.replace(/\s*\(caused by .*\)$/, "");
 }
 
@@ -91,6 +98,21 @@ function fileNameFor(title, id, extension) {
     .trim()
     .slice(0, 150);
   return `${clean || "Download"} [${id}].${extension}`;
+}
+
+// Removes work folders older than a day: left behind when the app was
+// killed mid-download (a normal exit or a cancel removes its own).
+function removeStaleWorkFolders() {
+  try {
+    for (const name of fs.readdirSync(os.tmpdir())) {
+      if (!name.startsWith("transcribee-download-")) continue;
+      const folder = path.join(os.tmpdir(), name);
+      if (Date.now() - fs.statSync(folder).mtimeMs > UPDATE_EVERY_MS)
+        fs.rmSync(folder, { recursive: true, force: true });
+    }
+  } catch (error) {
+    console.warn("Couldn't clean up old download folders:", error);
+  }
 }
 
 /**
@@ -106,7 +128,9 @@ function createDownloader({ binDir, saveDir, ytDlp, jsRuntime = process.execPath
   const asset = releaseAsset();
   const binary = ytDlp ?? (asset && path.join(binDir, asset.endsWith(".exe") ? "yt-dlp.exe" : "yt-dlp"));
   const updateStamp = path.join(binDir, "yt-dlp-checked");
-  let current = null; // the running download: { child, canceled }
+  let current = null; // the running download: { child, canceled, abort }
+
+  removeStaleWorkFolders();
 
   /* ---------- yt-dlp itself ---------- */
 
@@ -118,7 +142,10 @@ function createDownloader({ binDir, saveDir, ytDlp, jsRuntime = process.execPath
       .find(([, name]) => name === asset)?.[0];
     if (!expected) throw new DownloadError(`The downloader isn't available for this system (${asset}).`);
 
-    const response = await fetchOk(RELEASES + asset);
+    // Canceled, or stalled: no data for STALL_MS.
+    const stalled = new AbortController();
+    let stallTimer = setTimeout(() => stalled.abort(), STALL_MS);
+    const response = await fetchOk(RELEASES + asset, stalled.signal);
     const total = Number(response.headers.get("content-length")) || 0;
     const hash = crypto.createHash("sha256");
     const partial = `${binary}.part`;
@@ -127,7 +154,8 @@ function createDownloader({ binDir, saveDir, ytDlp, jsRuntime = process.execPath
     let received = 0;
     try {
       for await (const chunk of response.body) {
-        if (current?.canceled) throw new DownloadCanceled();
+        clearTimeout(stallTimer);
+        stallTimer = setTimeout(() => stalled.abort(), STALL_MS);
         hash.update(chunk);
         received += chunk.length;
         if (!out.write(chunk)) await new Promise((resolve) => out.once("drain", resolve));
@@ -143,19 +171,28 @@ function createDownloader({ binDir, saveDir, ytDlp, jsRuntime = process.execPath
     } catch (error) {
       out.destroy();
       fs.rmSync(partial, { force: true });
-      throw error;
+      throw fetchFailure(error);
+    } finally {
+      clearTimeout(stallTimer);
     }
   }
 
-  async function fetchOk(url) {
+  // Fetches from GitHub; canceling the download or `stalled` aborts it.
+  async function fetchOk(url, stalled = AbortSignal.timeout(STALL_MS)) {
     let response;
     try {
-      response = await fetch(url);
+      response = await fetch(url, { signal: AbortSignal.any([current.abort.signal, stalled]) });
     } catch (error) {
-      throw new DownloadError("Couldn't download yt-dlp. Check your internet connection.", { cause: error });
+      throw fetchFailure(error);
     }
     if (!response.ok) throw new DownloadError(`Couldn't download yt-dlp (HTTP ${response.status}).`);
     return response;
+  }
+
+  function fetchFailure(error) {
+    if (current?.canceled) return new DownloadCanceled();
+    if (error instanceof DownloadError) return error;
+    return new DownloadError("Couldn't download yt-dlp. Check your internet connection.", { cause: error });
   }
 
   // Makes sure yt-dlp is there and reasonably fresh.
@@ -287,6 +324,73 @@ function createDownloader({ binDir, saveDir, ytDlp, jsRuntime = process.execPath
 
   /* ---------- A download ---------- */
 
+  // One run of yt-dlp: downloads the link's parts into `work`.
+  async function fetchParts(link, kind, work, job, onProgress) {
+    const parts = PARTS[kind];
+    let part = 0;
+    let title = "";
+    let id = "";
+    const files = [];
+    let movedOn = false; // stopped at the start of a second video
+    onProgress({ stage: "download", part: 1, parts, fraction: 0 });
+    const { code, stderr } = await run(
+      [
+        "--ignore-config",
+        "--no-playlist",
+        "--playlist-items",
+        "1",
+        "--newline",
+        "--progress",
+        "--no-colors",
+        "--fixup",
+        "never",
+        "--no-js-runtimes",
+        "--js-runtimes",
+        `node:${jsRuntime}`,
+        "--print",
+        "before_dl:[tb-title] %(id)s %(title)s",
+        "--print",
+        "after_move:[tb-file] %(filepath)s",
+        "--progress-template",
+        "download:[tb-progress] %(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s %(progress.eta)s",
+        "-f",
+        FORMATS[kind],
+        "-o",
+        path.join(work, "part-%(format_id)s.%(ext)s"),
+        "--",
+        link,
+      ],
+      (line) => {
+        const [tag, ...rest] = line.split(" ");
+        if (tag === "[tb-title]") {
+          // Never more than one video, even if yt-dlp moves on to another.
+          if (id && rest[0] !== id) {
+            movedOn = true;
+            return kill(job.child);
+          }
+          part = Math.min(part + 1, parts);
+          [id] = rest;
+          title = rest.slice(1).join(" ");
+          onProgress({ stage: "download", part, parts, fraction: 0, title });
+        } else if (tag === "[tb-progress]") {
+          const [done, total, estimate, eta] = rest.map(Number);
+          const size = total || estimate;
+          onProgress({
+            stage: "download",
+            part: Math.max(part, 1),
+            parts,
+            fraction: size ? Math.min(done / size, 1) : null,
+            eta: Number.isFinite(eta) ? eta : null,
+          });
+        } else if (tag === "[tb-file]") {
+          files.push(rest.join(" "));
+        }
+      },
+    );
+    const ok = code === 0 || (movedOn && files.length === parts);
+    return { ok, stderr, files, title, id };
+  }
+
   /**
    * Downloads `url` as audio or video into saveDir and returns the file's path.
    * @param {string} url
@@ -297,67 +401,25 @@ function createDownloader({ binDir, saveDir, ytDlp, jsRuntime = process.execPath
     if (current) throw new DownloadError("A download is already running.");
     if (!(kind in FORMATS)) throw new DownloadError(`Unknown download kind: ${kind}`);
     const link = checkUrl(url);
-    const job = { child: null, canceled: false };
+    const job = { child: null, canceled: false, abort: new AbortController() };
     current = job;
     const work = fs.mkdtempSync(path.join(os.tmpdir(), "transcribee-download-"));
     try {
       await prepare(onProgress);
       if (job.canceled) throw new DownloadCanceled();
 
-      const parts = PARTS[kind];
-      let part = 0;
-      let title = "";
-      let id = "";
-      const files = [];
-      onProgress({ stage: "download", part: 1, parts, fraction: 0 });
-      const { code, stderr } = await run(
-        [
-          "--ignore-config",
-          "--no-playlist",
-          "--newline",
-          "--progress",
-          "--no-colors",
-          "--fixup",
-          "never",
-          "--no-js-runtimes",
-          "--js-runtimes",
-          `node:${jsRuntime}`,
-          "--print",
-          "before_dl:[tb-title] %(id)s %(title)s",
-          "--print",
-          "after_move:[tb-file] %(filepath)s",
-          "--progress-template",
-          "download:[tb-progress] %(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s %(progress.eta)s",
-          "-f",
-          FORMATS[kind],
-          "-o",
-          path.join(work, "part-%(format_id)s.%(ext)s"),
-          "--",
-          link,
-        ],
-        (line) => {
-          const [tag, ...rest] = line.split(" ");
-          if (tag === "[tb-title]") {
-            part = Math.min(part + 1, parts);
-            [id] = rest;
-            title = rest.slice(1).join(" ");
-          } else if (tag === "[tb-progress]") {
-            const [done, total, estimate, eta] = rest.map(Number);
-            const size = total || estimate;
-            onProgress({
-              stage: "download",
-              part: Math.max(part, 1),
-              parts,
-              fraction: size ? Math.min(done / size, 1) : null,
-              eta: Number.isFinite(eta) ? eta : null,
-            });
-          } else if (tag === "[tb-file]") {
-            files.push(rest.join(" "));
-          }
-        },
-      );
-      if (job.canceled) throw new DownloadCanceled();
-      if (code !== 0) throw new DownloadError(explainFailure(stderr));
+      // YouTube sometimes refuses a stream link (HTTP 403); a fresh run
+      // gets new links, so try once more before giving up.
+      let result;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        result = await fetchParts(link, kind, work, job, onProgress);
+        if (job.canceled) throw new DownloadCanceled();
+        if (result.ok || !result.stderr.some((line) => line.includes("HTTP Error 403"))) break;
+        fs.rmSync(work, { recursive: true, force: true });
+        fs.mkdirSync(work);
+      }
+      const { ok, stderr, files, title, id } = result;
+      if (!ok) throw new DownloadError(explainFailure(stderr));
       if (!files.length) throw new DownloadError("The download produced no file.");
 
       onProgress({ stage: "join" });
@@ -371,6 +433,7 @@ function createDownloader({ binDir, saveDir, ytDlp, jsRuntime = process.execPath
   function cancel() {
     if (!current) return;
     current.canceled = true;
+    current.abort.abort();
     if (current.child) kill(current.child);
   }
 
