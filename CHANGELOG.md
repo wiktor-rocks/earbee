@@ -43,6 +43,21 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-08: A new file starts with default sound settings
+
+- **What:** when a file opens, speed, pitch (semitones and cents), volume and the EQ (band gains and On/Off) go back to their defaults, as the A–B loop already did. The step size stays, since it's how you move around rather than how it sounds, and so does the theme. A file that fails to open changes nothing, so the current song keeps its settings.
+- **Why:** the user asked for it: settings made for one song (e.g. slowed down to 0.5×) shouldn't carry over to the next.
+- **How:**
+  - `resetSoundSettings()` in `ui/controls.js` sets every slider in `SLIDERS` to its `range.initial` (from `CONFIG`) through `setSetting`, so the readouts, speed chips and audio all follow, and sets the EQ back to `CONFIG.eq.enabledInitially`.
+  - `loadMediaFile` calls it right after the loop is cleared, once the new file has loaded.
+- **Where:** `src/ui/controls.js` (`resetSoundSettings`; `SliderSpec.range` now includes `initial`), `src/features/open-file.js` (`loadMediaFile` and its header), `tests/e2e/07-errors.cjs`.
+- **Verified by:** `tests/e2e/07-errors.cjs`, 4 new checks:
+  - all sound settings and the step size are changed as a user would;
+  - a bad file keeps them all;
+  - a good file resets speed, pitch, volume and EQ, the step size stays, and the speed slider and 1× chip show the reset.
+
+  All tests pass: 52 unit, 149 end-to-end, 19 smoke.
+
 ## 2026-10-08: Three light themes
 
 - **What:** **Catppuccin Latte**, **GitHub Light** and **Gruvbox Light** join Solarized Light in the theme menu, listed after the dark themes. Any of them can be Automatic's light theme: Automatic uses the last light theme chosen.

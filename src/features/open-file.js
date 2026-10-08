@@ -1,7 +1,9 @@
 /* =====================================================================
  * OPENING FILES
  * Nothing about the current media changes until the new file has
- * decoded, so a bad file leaves the previous song or video playable.
+ * decoded, so a bad file leaves the previous song or video playable, with
+ * its settings. A file that opens starts fresh: no loop, and the default
+ * speed, pitch, volume and EQ (the step size stays).
  * For video files the audio is decoded as usual while the picture is
  * prepared in parallel; a picture that can't be shown is a notice,
  * not an error.
@@ -13,6 +15,7 @@ import { AppError } from "../core/errors.js";
 import { isVideoFile } from "../core/files.js";
 import { formatGigabytes } from "../core/format.js";
 import { downsamplePeaks, peaksPerSecondFor } from "../core/peaks.js";
+import { resetSoundSettings } from "../ui/controls.js";
 import { clearMessage, dom, renderTransportState, reportError, setLoading, showNotice, showPlayer } from "../ui/dom.js";
 import { setLoopRegion } from "./loop.js";
 
@@ -103,7 +106,9 @@ export async function loadMediaFile(file) {
     timer.time("waveform", () => player.waveform.load(peaks, duration)),
   ]);
   player.transport.load(duration);
+  // A new file starts fresh: no loop, and default speed, pitch, volume and EQ.
   setLoopRegion(null);
+  resetSoundSettings();
   dom.fileName.textContent = file.name;
   document.title = `TranscriBee — ${file.name}`; // also the window title
   timer.done();

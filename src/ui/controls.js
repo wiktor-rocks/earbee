@@ -70,7 +70,7 @@ function applyPitch() {
  * @typedef {object} SliderSpec
  * @property {string} inputId The <input type="range">.
  * @property {string} readoutId The element showing the formatted value.
- * @property {{ min: number, max: number, step: number }} range From CONFIG.
+ * @property {{ min: number, max: number, step: number, initial: number }} range From CONFIG.
  * @property {(value: number) => string} format
  * @property {() => void} onChange Applies the new value (audio, other UI).
  */
@@ -142,6 +142,14 @@ export function setEqEnabled(enabled) {
 export function resetPitch() {
   setSetting("semitones", CONFIG.semitones.initial);
   setSetting("cents", CONFIG.cents.initial);
+}
+
+// Back to the defaults for everything that shapes the sound: speed, pitch,
+// volume and EQ (gains and on/off). The step size is how you move around,
+// not how it sounds, so it stays.
+export function resetSoundSettings() {
+  for (const [key, slider] of Object.entries(SLIDERS)) setSetting(key, slider.range.initial);
+  setEqEnabled(CONFIG.eq.enabledInitially);
 }
 
 export function resetEq() {
