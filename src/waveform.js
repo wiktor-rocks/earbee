@@ -19,8 +19,9 @@ import { clamp } from "./core/format.js";
  * an edge moves that edge; the result goes to onLoopChange, and the
  * region only changes for good when setLoop() is called with it.
  *
- * The wheel scrolls; Ctrl + wheel zooms, keeping the spot under the mouse
- * in place. After the view is moved by hand (zoom, wheel, minimap),
+ * The wheel on the waveform zooms, keeping the spot under the mouse in
+ * place; the wheel on the minimap scrolls the view. After the view is
+ * moved by hand (zoom, wheel, minimap),
  * following the playback cursor pauses until the cursor comes back into
  * view or resumeFollow() is called (on every seek), so you can look ahead
  * while it plays.
@@ -310,8 +311,9 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     waveSurfer.setScroll(waveSurfer.getScroll() + (clientXAt(anchorTime) - clientX));
   }
 
-  // Wheel scrolls horizontally (a touchpad's sideways swipe too); Ctrl +
-  // wheel zooms at the pointer (a touchpad pinch arrives as Ctrl + wheel).
+  // The wheel zooms at the pointer (a touchpad pinch arrives as a wheel
+  // with ctrlKey, and zooms the same way); a touchpad's sideways swipe
+  // scrolls.
   function bindWheelZoom() {
     container.addEventListener(
       "wheel",
@@ -320,11 +322,8 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
         event.preventDefault();
 
         followPaused = true;
-        if (event.ctrlKey) {
-          if (event.deltaY !== 0) zoomBy(Math.exp(-event.deltaY * 0.001), event.clientX);
-          return;
-        }
-        waveSurfer.setScroll(waveSurfer.getScroll() + (event.deltaY || event.deltaX));
+        if (Math.abs(event.deltaY) >= Math.abs(event.deltaX)) zoomBy(Math.exp(-event.deltaY * 0.001), event.clientX);
+        else waveSurfer.setScroll(waveSurfer.getScroll() + event.deltaX);
       },
       { passive: false },
     );
@@ -343,7 +342,7 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
 
   // Dragging the minimap scrolls the main waveform. Grabbing the visible-
   // range overlay keeps the grab point under the pointer; clicking
-  // elsewhere centres the overlay on the pointer.
+  // elsewhere centres the overlay on the pointer. The wheel scrolls too.
   function bindMinimapScrubbing() {
     let drag = null;
 
@@ -400,6 +399,20 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
 
     minimapContainer.addEventListener("pointerup", endDrag);
     minimapContainer.addEventListener("pointercancel", endDrag);
+
+    // The wheel on the minimap scrolls the view (either direction, so a
+    // touchpad's swipes work too).
+    minimapContainer.addEventListener(
+      "wheel",
+      (event) => {
+        const delta = event.deltaY || event.deltaX;
+        if (!duration || delta === 0) return;
+        event.preventDefault();
+        followPaused = true;
+        waveSurfer.setScroll(waveSurfer.getScroll() + delta);
+      },
+      { passive: false },
+    );
   }
 
   /* ---------- Public ---------- */

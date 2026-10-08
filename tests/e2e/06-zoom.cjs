@@ -1,4 +1,5 @@
-// Zooming at the mouse, the wheel, following the cursor.
+// Zooming at the mouse (the wheel on the waveform), scrolling (the wheel on
+// the minimap), following the cursor.
 // Part of the end-to-end run (see run.cjs); `h` is the harness.
 
 module.exports = async function (h) {
@@ -10,9 +11,8 @@ module.exports = async function (h) {
         `(() => { const host = document.querySelector("#waveform > div").shadowRoot; const w = host.querySelector(".wrapper").getBoundingClientRect(); const c = document.getElementById("waveform").getBoundingClientRect(); return { wl: w.left, ww: w.width, cl: c.left, cw: c.width, y: c.top + c.height / 2 }; })()`,
       );
     const timeAt = (v, x, d) => ((x - v.wl) / v.ww) * d;
-    // Ctrl + wheel zooms; pass modifiers = [] explicitly to scroll instead.
-    const wheel = (x, y, deltaY, modifiers = ["control"]) =>
-      wc.sendInputEvent({ type: "mouseWheel", x, y, deltaX: 0, deltaY: -deltaY, modifiers });
+    // A plain wheel, no modifiers: on the waveform it zooms.
+    const wheel = (x, y, deltaY) => wc.sendInputEvent({ type: "mouseWheel", x, y, deltaX: 0, deltaY: -deltaY });
     // Electron's mouseWheel deltaY sign is inverted relative to DOM; probe it.
     let v0 = await view();
     const dur = await duration();
@@ -137,23 +137,26 @@ module.exports = async function (h) {
       endCur > visEnd && endX >= v1.cl && endX <= v1.cl + v1.cw,
       `cursor ${endCur} x ${endX.toFixed(0)} view ${v1.cl}-${v1.cl + v1.cw}`,
     );
-    // ctrl+wheel during playback pauses following too
+    // the wheel on the minimap scrolls, and pauses following too
     const before = await scroll();
     const widthBefore = (await view()).ww;
+    const mini = await js(
+      `(() => { const r = document.getElementById("waveform-minimap").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`,
+    );
     key("Space");
     await sleep(100);
-    wheel(ax, ay, 1500 * zoomSign, []);
+    wheel(Math.round(mini.x), Math.round(mini.y), -1500 * zoomSign);
     await sleep(100);
     check(
-      "plain wheel scrolls, doesn't zoom",
-      (await scroll()) !== before && Math.abs((await view()).ww - widthBefore) < 1,
+      "wheel on the minimap scrolls, doesn't zoom",
+      (await scroll()) > before && Math.abs((await view()).ww - widthBefore) < 1,
       `${before} → ${await scroll()}`,
     );
     const c0 = await scroll();
     await sleep(900);
     const c1 = await scroll();
     await ensurePaused();
-    check("plain wheel scrolls and pauses following", c0 === c1, `${c0} → ${c1}`);
+    check("minimap wheel pauses following", c0 === c1, `${c0} → ${c1}`);
     for (let i = 0; i < 20; i++) wheel(ax, ay, -300 * zoomSign);
     await sleep(200);
   }

@@ -4,7 +4,7 @@ A desktop player for transcribing music by ear. Open a song or a video, slow it 
 
 - **Speed** from 0.25× to 3× with presets, and **pitch** shift in semitones and cents. Both use [Signalsmith Stretch](https://signalsmith-audio.co.uk/code/stretch/).
 - **A–B loop.** Shift+drag on the waveform, drag the edges to adjust, or use `[` `]` `L`.
-- **Waveform** with a minimap. Ctrl + wheel zooms at the mouse; the wheel scrolls.
+- **Waveform** with a minimap. The wheel on the waveform zooms at the mouse; the wheel on the minimap scrolls.
 - **Keyboard stepping:**
   - ← / → step back and forward;
   - ↑ / ↓ change the step (0.01–10 s);

@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-09: The wheel zooms on the waveform and scrolls on the minimap
+
+- **What:** the mouse wheel over the waveform zooms in and out at the mouse, with no Ctrl needed. The wheel over the minimap scrolls the view. Ctrl + wheel is no longer a separate shortcut (a touchpad pinch, which arrives as Ctrl + wheel, still zooms). A touchpad's sideways swipe on the waveform still scrolls.
+- **Why:** the user asked for it: each area gets one simple wheel action, and no modifier shortcuts.
+- **How:** on the waveform, a mostly vertical wheel goes to `zoomBy`, and a mostly sideways one scrolls. On the minimap, a new `wheel` listener scrolls the main waveform by the wheel's delta and pauses following the cursor, like dragging the minimap.
+- **Where:** `src/waveform.js` (`bindWheelZoom`, `bindMinimapScrubbing`, the header comment); the comment in `src/config.js` (`waveform.maxZoomMultiplier`); `README.md`.
+- **Verified by:** `npm run check`, and `tests/e2e/06-zoom.cjs`, which now zooms with a plain wheel and checks that the wheel on the minimap scrolls without zooming and pauses following. All of its checks pass. The rest of the suite wasn't run again, because the change is small.
+
 ## 2026-10-09: Long files decode in parallel
 
 - **What:**

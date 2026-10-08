@@ -86,7 +86,7 @@ export const CONFIG = {
   },
 
   waveform: {
-    // How far in Ctrl + mouse wheel can zoom, relative to fit-to-width.
+    // How far the mouse wheel can zoom in, relative to fit-to-width.
     maxZoomMultiplier: 32,
     // Peaks per second of audio in the drawing: enough for 2 per pixel at
     // maximum zoom on the widest possible window, within these limits.
