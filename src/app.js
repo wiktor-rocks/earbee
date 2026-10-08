@@ -65,243 +65,28 @@
 
 // Pinned to 1.3.2: the transport mirrors its timeline and loop behaviour
 // (see §5), so an upgrade needs re-checking against its source.
-import SignalsmithStretch from "./node_modules/signalsmith-stretch/SignalsmithStretch.mjs";
+import SignalsmithStretch from "../node_modules/signalsmith-stretch/SignalsmithStretch.mjs";
+import { CONFIG } from "./config.js";
+import { AppError } from "./core/errors.js";
+import { createEmitter } from "./core/emitter.js";
+import { isVideoFile } from "./core/files.js";
+import {
+  clamp,
+  formatFrequency,
+  formatGain,
+  formatGigabytes,
+  formatEta,
+  formatPercent,
+  formatPitchTotal,
+  formatSigned,
+  formatSpeed,
+  formatStepSize,
+  formatTrackTime,
+} from "./core/format.js";
+import { downsamplePeaks, peaksPerSecondFor } from "./core/peaks.js";
+import { timelinePositionAt } from "./core/timeline.js";
 
-/* =====================================================================
- * 1. CONFIG
- * Every tunable number lives here.
- * ===================================================================== */
-
-const CONFIG = {
-  speed: { min: 0.25, max: 3, step: 0.01, initial: 1, presets: [0.25, 0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1] },
-  volume: { min: 0, max: 200, step: 1, initial: 100 }, // percent
-  semitones: { min: -12, max: 12, step: 1, initial: 0 },
-  cents: { min: -50, max: 50, step: 1, initial: 0 },
-
-  eq: {
-    gain: { min: -24, max: 24, step: 0.1, initial: 0 }, // dB, per band
-    enabledInitially: false,
-    // `id` is also the fader's element id; its readout is `${id}Value`.
-    bands: [
-      { id: "eqLow", label: "Low", type: "lowshelf", frequency: 120 },
-      { id: "eqLowMid", label: "Lo-mid", type: "peaking", frequency: 400, Q: 1 },
-      { id: "eqMid", label: "Mid", type: "peaking", frequency: 1000, Q: 1 },
-      { id: "eqHighMid", label: "Hi-mid", type: "peaking", frequency: 3000, Q: 1 },
-      { id: "eqHigh", label: "High", type: "highshelf", frequency: 6000 },
-    ],
-  },
-
-  // Step sizes (seconds) for ← / → and the step buttons; ↑ / ↓ pick one.
-  // Holding ← / → repeats the step, which makes it a rewind / fast-forward.
-  step: { sizes: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10], initial: 1 },
-
-  loop: {
-    // Shortest A–B loop; a Shift+drag shorter than this is a plain click.
-    minSeconds: 0.05,
-    // Pointer distance (CSS px) from a loop edge that grabs the edge.
-    edgeGrabPx: 6,
-  },
-
-  audio: {
-    // Smoothing for volume and EQ changes, so they don't click.
-    paramRampSeconds: 0.015,
-    // Brick-wall limiter that stops volume > 100% and EQ boosts clipping.
-    limiter: { threshold: -1, knee: 0, ratio: 20, attack: 0.002, release: 0.1 },
-  },
-
-  // Largest file that can be opened: the audio decoder reads the whole
-  // file into memory, video included.
-  maxFileBytes: 2 * 1024 ** 3,
-
-  video: {
-    // Files treated as video (also anything with a video/* type).
-    extensions: ["mp4", "m4v", "mov", "webm", "mkv", "ogv"],
-    // If decoding falls this far behind playback (heavy file at high
-    // speed), restart decoding at the current position instead of lagging.
-    maxLagSeconds: 0.5,
-    // Low-resolution proxy: a small copy of the video, encoded in the
-    // background after it loads. Its frames are cheap to decode anywhere,
-    // so it fills in at full frame rate (blurry) wherever the sharp frame
-    // still needs decoding: distant seeks, dragging, catching up after a
-    // jump during playback.
-    proxy: {
-      width: 320, // px; height follows the video's aspect ratio
-      maxFps: 30, // higher frame rates are thinned to this
-      keyframeInterval: 15, // frames; seeking decodes at most this many
-      bitrate: 400_000, // bits/s; ≈ 3 MB per minute of video
-      // The proxy is only used when the sharp picture is at least this far
-      // from where it should be, so normal playback never shows it.
-      useWhenOffBySeconds: 0.15,
-      // After a seek, sharp decoding waits this long (or until the proxy
-      // frame is on screen) so the proxy, not the busy sharp decoder, gets
-      // the CPU first and the picture responds at once.
-      headStartMs: 60,
-    },
-  },
-
-  waveform: {
-    // How far in Ctrl + mouse wheel can zoom, relative to fit-to-width.
-    maxZoomMultiplier: 32,
-    // Peaks per second of audio in the drawing: enough for 2 per pixel at
-    // maximum zoom on the widest possible window, within these limits.
-    minPeaksPerSecond: 50,
-    maxPeaksPerSecond: 8000,
-  },
-};
-
-/* =====================================================================
- * 2. PURE HELPERS
- * No DOM, no state: safe to reuse and easy to test.
- * ===================================================================== */
-
-const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
-
-const formatSigned = (value, unit) => `${value >= 0 ? "+" : ""}${value}${unit}`;
-const formatSpeed = (speed) => `${speed.toFixed(2)}×`;
-const formatPercent = (percent) => `${Math.round(percent)}%`;
-const formatFrequency = (hz) => (hz >= 1000 ? `${hz / 1000} kHz` : `${hz} Hz`);
-const formatPitchTotal = (semitones) => `${semitones >= 0 ? "+" : ""}${semitones.toFixed(2)} st`;
-// Prints a step size exactly as written in CONFIG.step.sizes: 0.25 → "0.25".
-const formatStepSize = (seconds) => String(seconds);
-
-function formatGain(gain) {
-  const digits = Number.isInteger(gain) ? gain : gain.toFixed(1);
-  return `${gain > 0 ? "+" : ""}${digits} dB`;
-}
-
-// 83.456 → "1:23.456"; with hours "1:02:03.456".
-function formatTrackTime(time) {
-  const totalMilliseconds = Math.max(0, Math.floor(time * 1000));
-  const totalSeconds = Math.floor(totalMilliseconds / 1000);
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = String(totalSeconds % 60).padStart(2, "0");
-  const milliseconds = String(totalMilliseconds % 1000).padStart(3, "0");
-
-  if (minutes < 60) return `${minutes}:${seconds}.${milliseconds}`;
-
-  const hours = Math.floor(minutes / 60);
-  return `${hours}:${String(minutes % 60).padStart(2, "0")}:${seconds}.${milliseconds}`;
-}
-
-// Reduce samples to one value per `factor` samples, keeping the largest
-// excursion (positive or negative) so peaks survive in the drawing.
-// Runs over every sample of a song, so the inner loop is kept minimal.
-function downsamplePeaks(samples, factor) {
-  if (factor <= 1) return samples;
-
-  const length = samples.length;
-  const peaks = new Float32Array(Math.ceil(length / factor));
-
-  for (let start = 0, out = 0; start < length; start += factor, out++) {
-    const end = Math.min(start + factor, length);
-    let min = 0;
-    let max = 0;
-
-    for (let i = start; i < end; i++) {
-      const sample = samples[i];
-      if (sample > max) max = sample;
-      else if (sample < min) min = sample;
-    }
-
-    peaks[out] = max >= -min ? max : min;
-  }
-
-  return peaks;
-}
-
-// Peaks per second needed to draw a track of `duration` seconds at 2 peaks
-// per device pixel at maximum zoom, in a window at most `widestPx` wide.
-function peaksPerSecondFor(duration, widestPx) {
-  const { maxZoomMultiplier, minPeaksPerSecond, maxPeaksPerSecond } = CONFIG.waveform;
-  const needed = (widestPx / duration) * maxZoomMultiplier * 2;
-  return clamp(Math.ceil(needed), minPeaksPerSecond, maxPeaksPerSecond);
-}
-
-/**
- * One stretch of the playback timeline (Signalsmith's and the transport's
- * copy of it): from `outputTime` on, the track plays from `input` at
- * `rate`, or rests at `input` if not active.
- * @typedef {object} Segment
- * @property {number} outputTime When it starts, in seconds on the AudioContext clock.
- * @property {number} input Track position (s) at outputTime.
- * @property {number} rate Playback speed (1 = normal).
- * @property {boolean} active Playing (true) or resting (false).
- * @property {number} [loopStart] A–B loop in track seconds; 0, 0 means no loop.
- * @property {number} [loopEnd]
- */
-
-/**
- * Position in the track at `time` (AudioContext clock), given a timeline of
- * segments, oldest first. This is the same mapping Signalsmith uses
- * internally, including its loop: once the position reaches loopEnd it
- * moves back by the loop length (segments never start at or after loopEnd,
- * see §5).
- * @param {Segment[]} segments
- * @param {number} time
- * @param {number} duration Track length; the result is clamped to it.
- * @returns {number}
- */
-function timelinePositionAt(segments, time, duration) {
-  let segment = segments[0];
-  for (const candidate of segments) {
-    if (candidate.outputTime > time) break;
-    segment = candidate;
-  }
-  if (!segment) return 0;
-
-  const elapsed = segment.active ? Math.max(0, time - segment.outputTime) : 0;
-  let position = segment.input + elapsed * segment.rate;
-
-  const { loopStart = 0, loopEnd = 0 } = segment;
-  const loopLength = loopEnd - loopStart;
-  if (loopLength > 0 && position >= loopEnd) {
-    position = loopStart + ((position - loopStart) % loopLength);
-  }
-  return clamp(position, 0, duration);
-}
-
-// Minimal event emitter: on(event, listener) returns an unsubscribe function.
-/** @returns {{ on(event: string, listener: (...args: any[]) => void): () => void, emit(event: string, ...args: any[]): void }} */
-// A listener that throws is logged and skipped, so one broken view can't
-// stop the others (or the code that emitted the event).
-function createEmitter() {
-  const listeners = new Map();
-  return {
-    on(event, listener) {
-      if (!listeners.has(event)) listeners.set(event, new Set());
-      listeners.get(event).add(listener);
-      return () => listeners.get(event).delete(listener);
-    },
-    emit(event, ...args) {
-      for (const listener of listeners.get(event) ?? []) {
-        try {
-          listener(...args);
-        } catch (error) {
-          console.error(`Error in a "${event}" listener:`, error);
-        }
-      }
-    },
-  };
-}
-
-const fileExtension = (name) => name.slice(name.lastIndexOf(".") + 1).toLowerCase();
-
-const isVideoFile = (file) =>
-  file.type.startsWith("video/") || CONFIG.video.extensions.includes(fileExtension(file.name));
-
-const formatGigabytes = (bytes) => `${Math.round(bytes / 1024 ** 3)} GB`;
-
-// An error whose message is written for the user. Anything else is shown
-// as an unexpected failure.
-class AppError extends Error {
-  /**
-   * @param {string} message Shown to the user as is.
-   * @param {unknown} [cause] The underlying error, for the console.
-   */
-  constructor(message, cause) {
-    super(message, { cause });
-  }
-}
+/** @typedef {import("./core/timeline.js").Segment} Segment */
 
 /* =====================================================================
  * 3. SETTINGS
@@ -764,8 +549,8 @@ function createWaveform({ container, minimapContainer, onSeek, onLoopChange }) {
   // is safe to call at startup.
   function preload() {
     modulesPromise ??= Promise.all([
-      import("./node_modules/wavesurfer.js/dist/wavesurfer.esm.js"),
-      import("./node_modules/wavesurfer.js/dist/plugins/minimap.esm.js"),
+      import("../node_modules/wavesurfer.js/dist/wavesurfer.esm.js"),
+      import("../node_modules/wavesurfer.js/dist/plugins/minimap.esm.js"),
     ]).catch((error) => {
       modulesPromise = null; // let the next call retry
       throw error;
@@ -1398,7 +1183,7 @@ function createVideoView({ pane, canvas, onVisibilityChange, onProblem }) {
 
   // Loads Mediabunny without creating anything; safe at startup.
   function preload() {
-    modulePromise ??= import("./node_modules/mediabunny/dist/bundles/mediabunny.mjs").catch((error) => {
+    modulePromise ??= import("../node_modules/mediabunny/dist/bundles/mediabunny.mjs").catch((error) => {
       modulePromise = null; // let the next call retry
       throw error;
     });
@@ -2245,7 +2030,7 @@ function createLoadTimer(fileName) {
 // far fewer peaks per second than short ones (see peaksPerSecondFor).
 function computePeaks(audioBuffer) {
   const widestPx = window.screen.width * window.devicePixelRatio;
-  const peaksPerSecond = peaksPerSecondFor(audioBuffer.duration, widestPx);
+  const peaksPerSecond = peaksPerSecondFor(audioBuffer.duration, widestPx, CONFIG.waveform);
   const factor = Math.max(1, Math.round(audioBuffer.sampleRate / peaksPerSecond));
   return Array.from({ length: audioBuffer.numberOfChannels }, (_, i) =>
     downsamplePeaks(audioBuffer.getChannelData(i), factor),
@@ -2259,7 +2044,7 @@ async function loadMediaFile(file) {
   }
 
   const timer = createLoadTimer(file.name);
-  const isVideo = isVideoFile(file);
+  const isVideo = isVideoFile(file, CONFIG.video.extensions);
 
   const [, waveformAvailable] = await timer.time("init", () => Promise.all([engine.init(), waveform.init()]));
   const picture = isVideo ? timer.time("video", () => videoView.prepare(file)) : Promise.resolve(null);
@@ -2392,8 +2177,6 @@ function bindFileDrop() {
 const downloads = /** @type {DownloadBridge | undefined} */ (/** @type {any} */ (window).transcribee);
 
 let downloadKind = "audio"; // the dialog's last choice, for this session
-
-const formatEta = (seconds) => `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;
 
 /**
  * @param {DownloadProgress} progress

@@ -54,7 +54,7 @@
       "electron/**",
       "index.html",
       "style.css",
-      "script.js",
+      "src/**",
       "assets/logo.webp",
       "assets/icon-512.png",
       "package.json"

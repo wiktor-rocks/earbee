@@ -7,7 +7,7 @@ module.exports = [
   js.configs.recommended,
   {
     // The renderer: an ES module running in Chromium.
-    files: ["script.js"],
+    files: ["src/**/*.js"],
     languageOptions: { sourceType: "module", globals: globals.browser },
   },
   {

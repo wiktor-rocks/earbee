@@ -1,5 +1,5 @@
 {
-  // Type-checks script.js from its JSDoc comments; nothing is compiled.
+  // Type-checks the page (src/) from its JSDoc comments; nothing is compiled.
   "compilerOptions": {
     "checkJs": true,
     "noEmit": true,
@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "maxNodeModuleJsDepth": 0
   },
-  "include": ["script.js"]
+  "include": ["src/**/*.js"]
 }
