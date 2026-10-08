@@ -2,7 +2,7 @@
 
 **Date:** 2026-10-08.
 **Question:** opening a file that's about an hour long takes very long, or fails. Why? What should change?
-**Status:** diagnosis only. No app code was changed.
+**Status:** diagnosed, then fixed the same day. [After the fix](#after-the-fix) has the new measurements; the rest of the report describes the app before the fix.
 **Re-run:**
 
 ```
@@ -14,7 +14,59 @@ The results land in `tests/output/diagnostics/`. See [How it was measured](#how-
 
 ---
 
-## Summary
+## After the fix
+
+Recommendations 1–5 were implemented (see `CHANGELOG.md`, "Long files open reliably"):
+
+- **Decoding:** streaming decode in a Worker (`src/audio/decoder.js`, `decode-worker.js`), with progress and Cancel.
+- **Rate:** the audio context runs at the file's rate (`engine.useSampleRate`).
+- **Memory:** a memory check before decoding, with honest error messages.
+- **Crashes:** a renderer-crash handler (`electron/system.js`).
+- **Video limit:** no file-size limit for video any more.
+
+Same machine, same files, same tool (`npm run diagnose:loading`):
+
+| File                                 | Before: load, peak renderer      | After: load, peak renderer     |
+| ------------------------------------ | -------------------------------- | ------------------------------ |
+| MP3 10 min                           | 4.3 s, 578 MB                    | 3.9 s, 399 MB                  |
+| MP3 30 min                           | 12.7 s, 1,485 MB                 | 11.4 s, 892 MB                 |
+| MP3 60 min                           | 25.7 s, 2,779 MB                 | **19.1 s, 1,675 MB**           |
+| MP3 90 min                           | (decode alone: 35.4 s, 4,148 MB) | 34.4 s, 2,302 MB               |
+| MP3 120 min                          | ❌ "isn't an audio file"         | **38.6 s, 2,908 MB**           |
+| AAC 30 / 45 min                      | (decode alone: 12.5 s / 19.0 s)  | 8.5 s / 12.4 s, 885 / 1,268 MB |
+| AAC 60 min (like a YouTube download) | ❌ "isn't an audio file"         | **15.2 s, 1,552 MB**           |
+| Video 60 min, 720p (AAC sound)       | ❌ "isn't an audio file"         | **16.3 s, 1,722 MB**           |
+| WAV 60 min                           | 20.7 s, 3,476 MB                 | **5.8 s, 1,497 MB**            |
+| Opus 60 min                          | 15.2 s, 2,935 MB                 | **25.1 s** (slower), 1,628 MB  |
+| MP3 60 min, 2 GB memory limit        | 💥 the whole app died            | 19.8 s, 1,665 MB               |
+| Video 60 min, 3 GB memory limit      | 💥 the whole app died            | 16.0 s, 1,721 MB               |
+| Longest UI freeze, 60 min            | 2.0 s                            | 0.1–0.2 s                      |
+
+**Every file now loads and plays,** at about the decoded size in memory (1.2–1.3 GB per hour of stereo, plus about 250 MB). That includes every memory limit tested.
+
+**Where the time goes now,** measured in the worker for a 1-hour MP3:
+
+| Step                                       |                                                                              Time |
+| ------------------------------------------ | --------------------------------------------------------------------------------: |
+| Decoding (WebCodecs)                       |                                                                            13.4 s |
+| Copying the samples into the arrays        | about 4 s (`AudioSample.copyTo` plus the memory being touched for the first time) |
+| The waveform peaks, in one pass at the end |                                                                             0.6 s |
+
+Computing the peaks chunk by chunk as they arrived cost 2–4 s instead, so the peaks are computed at the end.
+
+**Opus got slower** (15.2 → 25.1 s per hour): Chromium's WebCodecs Opus decoder takes 18.7 s per hour, against 14.3 s for the decoder inside `decodeAudioData`, and the copy comes on top. YouTube downloads are AAC, so this affects only Opus files opened from disk (`.opus`, `.webm`, `.ogg`).
+
+**The video proxy for a 1-hour video,** not measurable before: 108,000 frames, 172 MB, built in 7.2 minutes in the background after loading. Memory stayed at about 1.7 GB throughout, and playback works meanwhile. So the proxy's size is now counted in the memory check, and the 2 GB file-size limit for videos is gone.
+
+**What could come next:**
+
+- **Decode in parallel:** several workers, each decoding a part of the file, appended in order with Signalsmith's `addBuffers`. On this 8-thread CPU that could cut decoding by several times for every format, and would win back the Opus loss. The risk is the seams: each part must start sample-exact and without a click (MP3's bit reservoir, Opus pre-roll), so it needs a test comparing the result with a serial decode.
+- **Start playing while decoding:** Signalsmith accepts audio in pieces. The transport and waveform would need to handle a duration that's still growing.
+- **Downloads pass the whole file to the page.** The download bridge (`download:start` → `result.bytes`) copies the downloaded file into the page's memory before opening it. For a long video that's its full size on top of the decoded sound. Opening the saved file by path instead would avoid that.
+
+---
+
+## Summary (before the fix)
 
 1. **The cause is how the audio is decoded.** The app decodes the whole file in one `decodeAudioData` call ([open-file.js](../../src/features/open-file.js) `loadMediaFile`). That call takes **96 %** of the load time, holds **2.1×** the decoded audio in memory at its peak, and has a **size limit** of its own.
 2. **Loads fail well before the machine runs out of memory.** `decodeAudioData` fails on **AAC from about 45–60 min** and on **MP3 from about 90–120 min**, even with 5 GB still free. AAC is the format of every YouTube download the app makes (`ba[ext=m4a]` in [downloader.js](../../electron/downloader.js)), including the soundtrack of downloaded videos. **So any hour-long YouTube download fails to open.** So did our 1-hour 720p MP4.
@@ -173,7 +225,7 @@ The page's main thread was blocked in **one block at the end of each load, about
 
 ### 6. Not measured
 
-- **The video proxy for a long video:** the 1-hour video never loaded, so the background re-encode ([proxy.js](../../src/video/proxy.js), about 3 MB per minute of video, so about 180 MB per hour, plus CPU for its whole length) is untested at this length. Measure it once long videos load.
+- **The video proxy for a long video:** the 1-hour video never loaded, so the background re-encode ([proxy.js](../../src/video/proxy.js), about 3 MB per minute of video, so about 180 MB per hour, plus CPU for its whole length) is untested at this length. _Measured after the fix: see [After the fix](#after-the-fix)._
 - **Real music.** The synthetic sound is dense, so encoder and decoder costs should be close, but real files with 96 kHz or 5.1 sound would need more memory.
 - **Windows and macOS.** The memory measurements use Linux `/proc`, and the limits may differ elsewhere.
 - **Longer than 2 hours with streaming.** Memory then is simply the decoded size: about 1.2 GB per hour of stereo at 44.1 kHz.
@@ -258,7 +310,7 @@ With streaming, the compressed file is no longer read into memory, so the limit 
 
   The other modes (`decode`, `decode-native`, `stream`, `stream-discard`) run the same decode code in isolation on the page.
 
-- **`tests/diagnostics/run.cjs`** runs the whole plan (each run in its own process and profile, optionally inside `systemd-run --user --scope -p MemoryMax=… -p MemorySwapMax=0`). It writes one JSON per run, with a 250 ms memory timeline, plus `results.json` and a summary table. A run takes about 15 minutes. `node tests/diagnostics/run.cjs <text>` runs only the ids containing `<text>`.
+- **`tests/diagnostics/run.cjs`** runs the whole plan (each run in its own process and profile, optionally inside `systemd-run --user --scope -p MemoryMax=… -p MemorySwapMax=0`). It writes one JSON per run, with a 250 ms memory timeline, plus `results.json` and a summary table. A run takes about half an hour (the two video runs wait about 7 minutes each for the proxy). `node tests/diagnostics/run.cjs <text>` runs only the ids containing `<text>`.
 - **Caveats:**
   - Summing the resident memory of every process counts shared pages more than once, so "all processes" figures are upper bounds; the renderer figure is the reliable one.
   - Timings vary by a few per cent between runs: the 10-minute MP3 took 4.6 and 4.3 s in two runs, the 1-hour MP3 25.7, 24.4 and 25.0 s in three.

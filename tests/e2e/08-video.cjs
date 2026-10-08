@@ -8,6 +8,7 @@ module.exports = async function (h) {
 
   await openFile(path.join(FIXTURES, "counter.webm"));
   check("new file clears loop", (await loopInfo()).hidden);
+  check("the audio runs at the file's rate (48 kHz Opus)", (await js(`__contexts.at(-1).sampleRate`)) === 48000);
   check("message cleared on load", (await js(`document.getElementById("message").textContent`)) === "");
   await drag(1, 2, ["shift"]);
   loop = await loopRange();

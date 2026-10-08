@@ -1,6 +1,7 @@
 // The page's only ways out of its sandbox, exposed as window.transcribee:
 //   - downloading a link (see downloader.js); the page hides its download
 //     buttons when this is missing (e.g. opened in a plain browser);
+//   - the memory available for a track (see system.js);
 //   - the colour theme (see theme-store.js): the saved one is applied here,
 //     before the page renders, so it never flashes the default colours.
 const { contextBridge, ipcRenderer } = require("electron");
@@ -44,6 +45,9 @@ contextBridge.exposeInMainWorld("transcribee", {
     ipcRenderer.on("download:progress", listener);
     return () => ipcRenderer.removeListener("download:progress", listener);
   },
+
+  // Bytes the system can still give programs, or null if unknown.
+  availableMemory: () => ipcRenderer.invoke("system:available-memory"),
 
   theme: {
     saved: initialTheme?.prefs ?? null, // { choice, dark, light }

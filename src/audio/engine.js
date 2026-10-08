@@ -8,10 +8,16 @@ import { AppError } from "../core/errors.js";
  * AUDIO ENGINE
  * Signalsmith → EQ chain → master volume → limiter → speakers.
  *
- * Exposes: init, decode, loadChannels, schedule, setVolume, setEq,
- *          now, outputDelay, resume
+ * Exposes: init, useSampleRate, loadChannels, schedule, setVolume, setEq,
+ *          now, outputDelay, sampleRate, resume
  * Values set before init() are remembered and applied when the graph
  * is built, so settings can change before any audio is loaded.
+ *
+ * Signalsmith reads its buffers at the context's sample rate, so a track
+ * is played by a context at the track's own rate (useSampleRate); the
+ * browser converts the output to the device's rate as it plays. That
+ * spares decoding a resampled copy of the whole track, which took most of
+ * the load time (docs/diagnostics/long-file-loading.md).
  * ===================================================================== */
 
 /** @param {{ onError: (error: unknown) => void }} options */
@@ -22,6 +28,7 @@ export function createAudioEngine({ onError }) {
   let stretch = null;
   let masterGain = null;
   let initPromise = null;
+  let sampleRate; // wanted context rate; undefined = the device's default
   const eqFilters = {};
   const desired = { volume: 1, eqGains: {}, eqEnabled: false };
 
@@ -60,7 +67,7 @@ export function createAudioEngine({ onError }) {
   }
 
   async function create() {
-    context = new AudioContext();
+    context = new AudioContext(sampleRate ? { sampleRate } : undefined);
     await context.resume();
 
     stretch = await SignalsmithStretch(context);
@@ -73,6 +80,21 @@ export function createAudioEngine({ onError }) {
       throw new AppError("The audio engine couldn't start.", error);
     });
     return initPromise;
+  }
+
+  // Rebuilds the graph in a context at `rate` (Hz) unless it runs at that
+  // rate already. Anything scheduled is gone, so the transport must load()
+  // afterwards; volume and EQ carry over.
+  async function useSampleRate(rate) {
+    await init();
+    if (context.sampleRate === rate) return;
+
+    const old = context;
+    context = stretch = masterGain = initPromise = null;
+    for (const id of Object.keys(eqFilters)) delete eqFilters[id];
+    await old.close();
+    sampleRate = rate;
+    await init();
   }
 
   // Signalsmith keeps a timeline of these segments; each one takes effect
@@ -93,9 +115,10 @@ export function createAudioEngine({ onError }) {
 
   return {
     init,
+    useSampleRate,
     schedule,
     loadChannels,
-    decode: (bytes) => context.decodeAudioData(bytes),
+    sampleRate: () => context?.sampleRate ?? 0,
     now: () => context?.currentTime ?? 0,
     // Time from audio leaving the graph to it reaching the speakers.
     outputDelay: () => (context ? (context.baseLatency || 0) + (context.outputLatency || 0) : 0),

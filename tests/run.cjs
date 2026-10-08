@@ -10,8 +10,9 @@
 //     :focus / keyboard-focus behaviour in an offscreen window).
 //   - preload.cjs instruments the page: it records the Signalsmith worklet
 //     node and AudioContext, offers __sample(ms) (per-frame position, worklet
-//     input time, video frame time, waveform cursor) and an opt-in slow
-//     decode (window.__slowDecode = ms) to observe loading states.
+//     input time, video frame time, waveform cursor), counts decode workers
+//     (__workers) and offers an opt-in slow decode (window.__slowDecode =
+//     ms, holding back the decoder's result) to observe loading states.
 //   - Every network request is blocked, which also proves the app works
 //     offline.
 //   - Downloads run through the app's real preload.js and downloader.js,

@@ -23,6 +23,8 @@ module.exports = async function (h) {
       JSON.stringify(counts),
     );
     check("switching to audio frees all video codecs", afterAudio === 0, `live after audio: ${afterAudio}`);
+    const workers = await js(`__workers.live()`);
+    check("no decode worker left running", workers === 0, `live: ${workers}`);
     const problems = await js(`__problems`);
     check("no unhandled errors, rejections or CSP violations", problems.length === 0, problems.join("\n"));
   }

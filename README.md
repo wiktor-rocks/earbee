@@ -11,6 +11,7 @@ A desktop player for transcribing music by ear. Open a song or a video, slow it 
   - Space replays from where you started listening.
 - **Video:** the picture is decoded frame by frame with WebCodecs (via [Mediabunny](https://mediabunny.dev)) and always shows the frame at the audio position, so it stays in sync at any speed.
 - **5-band EQ, volume up to 200 %,** and a limiter.
+- **Long files:** songs and videos of an hour or two open reliably (an hour of MP3 in about 20 s on a mid-range laptop), with progress and a Cancel button. A file whose sound wouldn't fit in the available memory is refused with a message (about 1.2 GB per hour of stereo audio).
 - **Download from YouTube.** Paste a link, or click **From YouTube…**, to get the audio or the video (up to 1080p). It's saved to `~/Downloads/TranscriBee/` and opened. This uses [yt-dlp](https://github.com/yt-dlp/yt-dlp), which TranscriBee downloads on first use (about 40 MB) and keeps up to date; nothing else needs installing. Only download what you have the rights to.
 - **Colour themes:** dark (TranscriBee, Monokai, Dracula, Nord, One Dark) and light (Solarized Light, Catppuccin Latte, GitHub Light, Gruvbox Light), or **Automatic**, which follows your system's dark or light mode. Pick one with the palette button in the top bar; it's remembered.
 - **Works offline.** All libraries and fonts are bundled. Only downloading needs the internet.

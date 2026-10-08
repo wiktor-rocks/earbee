@@ -47,8 +47,10 @@ function describeDownload({ stage, part = 1, parts = 1, fraction, eta }, kind) {
 // returns to what was there before.
 function downloadLink(url, kind) {
   if (!downloads) return;
-  return withLoading(url, async () => {
+  return withLoading(url, async (signal) => {
     setLoadingStatus(describeDownload({ stage: "download", fraction: 0 }, kind), true);
+    const cancel = () => downloads.cancelDownload();
+    signal.addEventListener("abort", cancel);
     const stopListening = downloads.onDownloadProgress((progress) => {
       setLoadingStatus(describeDownload(progress, kind), progress.stage !== "join");
       if (progress.title) dom.loadingFileName.textContent = dom.overlayTitle.textContent = progress.title;
@@ -58,6 +60,7 @@ function downloadLink(url, kind) {
       result = await downloads.download(url, kind);
     } finally {
       stopListening();
+      signal.removeEventListener("abort", cancel);
     }
     if (!result.ok) {
       if (result.canceled) return;
@@ -66,7 +69,7 @@ function downloadLink(url, kind) {
 
     setLoadingStatus("Loading");
     dom.loadingFileName.textContent = result.name;
-    const notices = await loadMediaFile(new File([result.bytes], result.name));
+    const notices = await loadMediaFile(new File([result.bytes], result.name), signal);
     showNotice([`Saved as ${result.path}.`, ...notices].join(" "));
   });
 }
@@ -90,8 +93,6 @@ export function bindDownloads() {
   onClick(dom.welcomeDownload, () => openDownloadDialog());
   onClick(dom.downloadButton, () => openDownloadDialog());
   onClick(dom.downloadClose, () => dom.downloadDialog.close());
-  onClick(dom.loadingCancel, () => downloads.cancelDownload());
-  onClick(dom.overlayCancel, () => downloads.cancelDownload());
 
   dom.downloadForm.addEventListener("submit", (event) => {
     event.preventDefault();

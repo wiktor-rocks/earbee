@@ -29,7 +29,9 @@ export function formatTrackTime(time) {
   return `${hours}:${String(minutes % 60).padStart(2, "0")}:${seconds}.${milliseconds}`;
 }
 
-export const formatGigabytes = (bytes) => `${Math.round(bytes / 1024 ** 3)} GB`;
+// 1.3 GB, 850 MB: sizes of memory, one decimal for gigabytes.
+export const formatMemory = (bytes) =>
+  bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.round(bytes / 1024 ** 2)} MB`;
 
 // 75 → "1:15" (time left in a download).
 export const formatEta = (seconds) =>

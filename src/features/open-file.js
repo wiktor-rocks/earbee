@@ -1,28 +1,47 @@
 /* =====================================================================
  * OPENING FILES
  * Nothing about the current media changes until the new file has
- * decoded, so a bad file leaves the previous song or video playable, with
- * its settings. A file that opens starts fresh: no loop, and the default
- * speed, pitch, volume and EQ (the step size stays).
- * For video files the audio is decoded as usual while the picture is
- * prepared in parallel; a picture that can't be shown is a notice,
- * not an error.
+ * decoded, so a bad file (or Cancel) leaves the previous song or video
+ * playable, with its settings. A file that opens starts fresh: no loop,
+ * and the default speed, pitch, volume and EQ (the step size stays).
+ * The audio is decoded in chunks off the main thread (audio/decoder.js),
+ * with progress; a track that wouldn't fit in the available memory is
+ * refused before decoding. For video files the picture is prepared in
+ * parallel; a picture that can't be shown is a notice, not an error.
  * ===================================================================== */
 
+import { DecodeFailure, decodeFile } from "../audio/decoder.js";
 import { CONFIG } from "../config.js";
 import { player } from "../context.js";
 import { AppError } from "../core/errors.js";
 import { isVideoFile } from "../core/files.js";
-import { formatGigabytes } from "../core/format.js";
-import { downsamplePeaks, peaksPerSecondFor } from "../core/peaks.js";
+import { formatMemory } from "../core/format.js";
+import { decodedBytes, fitsInMemory } from "../core/memory.js";
+import { peaksPerSecondFor } from "../core/peaks.js";
 import { resetSoundSettings } from "../ui/controls.js";
-import { clearMessage, dom, renderTransportState, reportError, setLoading, showNotice, showPlayer } from "../ui/dom.js";
+import {
+  clearMessage,
+  dom,
+  onClick,
+  renderTransportState,
+  reportError,
+  setLoading,
+  setLoadingStatus,
+  showNotice,
+  showPlayer,
+} from "../ui/dom.js";
 import { setLoopRegion } from "./loop.js";
 
-// True while a file loads; the UI is locked, so loads never overlap.
-let loading = false;
+// The current load, while one runs; the UI is locked, so loads never
+// overlap. Cancel aborts it.
+/** @type {AbortController | null} */
+let loading = null;
 
-export const isLoading = () => loading;
+export const isLoading = () => loading !== null;
+
+export const cancelLoading = () => loading?.abort();
+
+const isAbort = (error) => error instanceof DOMException && error.name === "AbortError";
 
 // Times each phase of a load and logs them in one line with console.debug
 // (shown at DevTools' "Verbose" level). Milliseconds.
@@ -44,68 +63,110 @@ function createLoadTimer(fileName) {
   };
 }
 
-// One peak array per channel, for the waveform drawing. Long tracks get
-// far fewer peaks per second than short ones (see peaksPerSecondFor).
-function computePeaks(audioBuffer) {
+// Samples per waveform peak: long tracks get far fewer peaks per second
+// than short ones (see peaksPerSecondFor).
+function peakFactorFor({ duration, sampleRate }) {
   const widestPx = window.screen.width * window.devicePixelRatio;
-  const peaksPerSecond = peaksPerSecondFor(audioBuffer.duration, widestPx, CONFIG.waveform);
-  const factor = Math.max(1, Math.round(audioBuffer.sampleRate / peaksPerSecond));
-  return Array.from({ length: audioBuffer.numberOfChannels }, (_, i) =>
-    downsamplePeaks(audioBuffer.getChannelData(i), factor),
+  const peaksPerSecond = peaksPerSecondFor(duration, widestPx, CONFIG.waveform);
+  return Math.max(1, Math.round(sampleRate / peaksPerSecond));
+}
+
+// Memory the system has available (main process), or null if unknown.
+async function availableMemory() {
+  try {
+    return (await /** @type {any} */ (window).transcribee?.availableMemory?.()) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Refuses a file whose decoded sound (plus, for a video, its proxy)
+// wouldn't fit in memory, before decoding. Neither file is ever read whole,
+// so its size on disk doesn't matter.
+async function checkMemory(file, info, isVideo) {
+  const proxyBytes = isVideo ? (info.duration * CONFIG.video.proxy.bitrate) / 8 : 0;
+  const needed = decodedBytes(info.duration, info.sampleRate, info.channels) + proxyBytes;
+  const available = await availableMemory();
+  if (!fitsInMemory(needed, available, CONFIG.audio.maxMemoryShare)) {
+    throw new AppError(
+      `“${file.name}” is too long to open: its sound needs about ${formatMemory(needed)} of memory, ` +
+        `and ${formatMemory(available)} is available. Closing other programs may help.`,
+    );
+  }
+}
+
+// A decoding failure, in words for the user.
+function explainDecodeFailure(error, file, isVideo) {
+  if (!(error instanceof DecodeFailure)) return error;
+  if (error.kind === "no-audio") {
+    return new AppError(`“${file.name}” has no sound, so there's nothing to play.`, error);
+  }
+  if (error.kind === "out-of-memory") {
+    return new AppError(`“${file.name}” is too long to open: there isn't enough memory for its sound.`, error);
+  }
+  return new AppError(
+    isVideo
+      ? `Couldn't read the audio in “${file.name}”. Videos need a soundtrack this app can decode.`
+      : `Couldn't open “${file.name}”. It isn't an audio file this app can decode.`,
+    error,
   );
 }
 
-// Loads `file` into the player; returns notices about what works only partly.
-export async function loadMediaFile(file) {
-  if (file.size > CONFIG.maxFileBytes) {
-    throw new AppError(`“${file.name}” is too large to open (the limit is ${formatGigabytes(CONFIG.maxFileBytes)}).`);
-  }
-
-  const timer = createLoadTimer(file.name);
+/**
+ * Loads `file` into the player; returns notices about what works only
+ * partly. Aborting `signal` (Cancel) rejects with an AbortError and
+ * changes nothing.
+ * @param {File} file
+ * @param {AbortSignal} [signal]
+ */
+export async function loadMediaFile(file, signal) {
   const isVideo = isVideoFile(file, CONFIG.video.extensions);
-
+  const timer = createLoadTimer(file.name);
   const [, waveformAvailable] = await timer.time("init", () =>
     Promise.all([player.engine.init(), player.waveform.init()]),
   );
   const picture = isVideo ? timer.time("video", () => player.videoView.prepare(file)) : Promise.resolve(null);
-  const bytes = await timer.time("read", () => file.arrayBuffer());
 
   let decoded;
   try {
-    decoded = await timer.time("decode", () => player.engine.decode(bytes));
+    decoded = await timer.time("decode", () =>
+      decodeFile(file, {
+        signal,
+        prepare: async (info) => {
+          await checkMemory(file, info, isVideo);
+          return peakFactorFor(info);
+        },
+        onProgress: (fraction) => setLoadingStatus(`Loading ${Math.floor(fraction * 100)} %`, true),
+      }),
+    );
   } catch (error) {
     picture.then((prepared) => player.videoView.discard(prepared?.video));
-    throw new AppError(
-      isVideo
-        ? `Couldn't read the audio in “${file.name}”. Videos need a soundtrack this app can decode.`
-        : `Couldn't open “${file.name}”. It isn't an audio file this app can decode.`,
-      error,
-    );
+    throw isAbort(error) ? error : explainDecodeFailure(error, file, isVideo);
   }
-
-  const duration = decoded.duration;
-  const peaks = await timer.time("peaks", () => computePeaks(decoded));
-
-  // The decoded samples go to Signalsmith without a copy: transferring
-  // moves them to the audio thread and empties `decoded`, which is why
-  // the peaks are computed first.
-  const channels = Array.from({ length: decoded.numberOfChannels }, (_, i) => decoded.getChannelData(i));
+  setLoadingStatus("Loading");
 
   const prepared = await picture;
+  if (signal?.aborted) {
+    player.videoView.discard(prepared?.video);
+    throw new DOMException("Loading was canceled.", "AbortError");
+  }
 
+  // From here on the new file replaces the current one.
   player.transport.pause();
+  // A track plays in a context at its own rate (see audio/engine.js).
+  await timer.time("rate", () => player.engine.useSampleRate(decoded.sampleRate));
   // Show the player and switch its layout (video pane shown or hidden)
   // before drawing the waveform: WaveSurfer measures its container when it
   // draws, so it must be visible and at its final size.
   showPlayer();
   if (prepared?.video) player.videoView.show(prepared.video);
   else player.videoView.clear();
-  // The transfer finishes on the audio thread while the waveform draws.
+  // The samples move to the audio thread (no copy) while the waveform draws.
   await Promise.all([
-    timer.time("transfer", () => player.engine.loadChannels(channels)),
-    timer.time("waveform", () => player.waveform.load(peaks, duration)),
+    timer.time("transfer", () => player.engine.loadChannels(decoded.channels)),
+    timer.time("waveform", () => player.waveform.load(decoded.peaks, decoded.duration)),
   ]);
-  player.transport.load(duration);
+  player.transport.load(decoded.duration);
   // A new file starts fresh: no loop, and default speed, pitch, volume and EQ.
   setLoopRegion(null);
   resetSoundSettings();
@@ -122,20 +183,24 @@ export async function loadMediaFile(file) {
 }
 
 // Runs `task` (loading `name`) with the loading screen or overlay up, one
-// task at a time; its failure is shown as an error.
+// task at a time; its failure is shown as an error, and Cancel (an
+// AbortError) quietly returns to what was there before. `task` gets the
+// AbortSignal that Cancel triggers.
+/** @param {string} name @param {(signal: AbortSignal) => Promise<void>} task */
 export async function withLoading(name, task) {
   if (loading) return;
 
-  loading = true;
+  const controller = new AbortController();
+  loading = controller;
   clearMessage();
   setLoading(name);
 
   try {
-    await task();
+    await task(controller.signal);
   } catch (error) {
-    reportError(error);
+    if (!isAbort(error)) reportError(error);
   } finally {
-    loading = false;
+    loading = null;
     setLoading(null);
     renderTransportState(player.transport.state);
   }
@@ -143,7 +208,14 @@ export async function withLoading(name, task) {
 
 export function openFile(file) {
   if (!file) return;
-  return withLoading(file.name, async () => showNotice((await loadMediaFile(file)).join(" ")));
+  return withLoading(file.name, async (signal) => showNotice((await loadMediaFile(file, signal)).join(" ")));
+}
+
+// The Cancel buttons on the loading screen and overlay, for files and
+// downloads alike.
+export function bindLoadCancel() {
+  onClick(dom.loadingCancel, cancelLoading);
+  onClick(dom.overlayCancel, cancelLoading);
 }
 
 export function bindFileInput() {

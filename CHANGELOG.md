@@ -43,6 +43,59 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-08: Long files open reliably
+
+- **What:**
+  - **Long files open.** Files of an hour or two load, including hour-long YouTube downloads and videos, which failed before with "isn't an audio file".
+  - **Faster, less memory.** A 1-hour MP3 loads in 19 s instead of 26 s, with a peak of 1.7 GB instead of 2.8 GB. A 1-hour WAV takes 6 s instead of 21 s.
+  - **Progress and Cancel.** Loading shows a percentage and a Cancel button; Cancel leaves the current file as it was.
+  - **Honest refusals.** A file whose sound wouldn't fit in the available memory is refused with a message that says so. A file without sound says so too.
+  - **No more blank window.** If the page's process dies anyway, a dialog explains and the page reloads.
+  - **No video size limit.** The 2 GB limit for videos is gone.
+  - **The UI no longer freezes** for 2 s per hour of audio at the end of a load.
+  - **One regression:** Opus files load slower (an hour: 25 s instead of 15 s).
+- **Why:**
+  - the user reported that hour-long files load very slowly or fail;
+  - `docs/diagnostics/long-file-loading.md` measured the cause: one `decodeAudioData` call with a size limit, 2× peak memory and a full resampling pass;
+  - the user approved fixing it along the report's recommendations 1–5.
+- **How:**
+  - **Decoding** (`audio/decoder.js` + `audio/decode-worker.js`):
+    - a module Worker opens the file with Mediabunny (`BlobSource`: read in pieces, never whole) and decodes it with WebCodecs (`AudioSampleSink`);
+    - the samples go into one preallocated `Float32Array` per channel at the file's own rate;
+    - the peaks are computed in one pass at the end (`downsamplePeaks`; per chunk it cost 2–4 s per hour instead of 0.6);
+    - the result is transferred to the page without a copy.
+  - **The protocol** is open → info → (page checks memory, picks the peak factor) → decode → progress → done/error. Errors come in kinds (`no-audio`, `cannot-decode`, `out-of-memory`, `failed`).
+  - **Fallback:** files the worker can't read fall back to `decodeAudioData` on the whole file, at 48 kHz (`CONFIG.audio.fallbackSampleRate`).
+  - **Sample rate:** Signalsmith reads buffers at the context's rate, so `engine.useSampleRate(rate)` rebuilds the `AudioContext` at the file's rate when it differs. The browser converts to the device's rate as it plays, and `transport.load` restarts the timeline on the new clock.
+  - **Memory check:**
+    - the estimate is decoded bytes plus, for video, the proxy at its bitrate (`core/memory.js`);
+    - it's compared with 80 % of what the system has available (`CONFIG.audio.maxMemoryShare`);
+    - the main process answers `system:available-memory` (`electron/system.js`): MemAvailable on Linux, `os.freemem()` on Windows, unknown on macOS (where free memory is unreliable), in which case the check is skipped.
+  - **Cancel:**
+    - `withLoading` gives its task an AbortSignal, which the loading screen's and overlay's Cancel buttons abort (`bindLoadCancel`);
+    - downloads cancel through the same signal;
+    - an AbortError is not an error.
+  - **Crash handler:** `handleRendererCrash` listens to `render-process-gone`, shows a dialog and reloads.
+- **Where:**
+  - **Page:** `src/audio/decoder.js`, `src/audio/decode-worker.js` (new); `src/audio/engine.js` (`useSampleRate`, `sampleRate`; `decode` removed); `src/core/memory.js` (new); `src/core/format.js` (`formatMemory`; `formatGigabytes` removed); `src/config.js` (`audio.fallbackSampleRate`, `audio.maxMemoryShare`; `maxFileBytes` removed); `src/features/open-file.js` (`loadMediaFile`, `withLoading`, `cancelLoading`, `bindLoadCancel`; `computePeaks` removed); `src/features/download.js` (cancels through the signal); `src/app.js` (header, `bindLoadCancel`).
+  - **Main process:** `electron/system.js` (new), `electron/main.js`, `electron/preload.js` (`availableMemory`).
+  - **Config:** `eslint.config.js` (worker globals).
+  - **Tests:** `tests/preload.cjs` (`__workers`; `__slowDecode` also holds back the worker's result; `__nodes.at(-1)`), `tests/e2e/harness.cjs` (the memory handler, `h.memory.available` to fake low memory), `tests/e2e/07-errors.cjs`, `08-video.cjs`, `11-resources.cjs`, `tests/unit/decoding.test.mjs`, `tests/unit/system.test.mjs`.
+  - **Diagnostics and docs:** `tests/diagnostics/run.cjs` (more app runs), `docs/diagnostics/long-file-loading.md` ("After the fix"), `README.md`.
+- **Verified by:**
+  - **Spike:** a module Worker from the `file://` page under the CSP decodes WAV, Opus and AAC; a 44.1 kHz context starts.
+  - **Unit tests:** 58 (new: the memory estimate and formatting; the crash handler: OOM, other crash, clean exit; available memory).
+  - **End-to-end:** 158 (9 new):
+    - the context runs at 44.1 kHz for `tone.wav` and at 48 kHz for the Opus video, and plays at 1×;
+    - loading shows "Loading N %" and Cancel;
+    - Cancel keeps the file and its settings, with no error and no worker left;
+    - a faked low-memory system refuses with the memory message;
+    - a video without sound says so;
+    - no decode worker is left after the run.
+  - **Smoke:** 19.
+  - **Packaged:** the full suite passes against the packaged build (the worker loads from `app.asar`).
+  - **Diagnostics:** `npm run diagnose:loading` before and after, in the report's "After the fix". One smoke run failed once on "saved theme applied on the next start", then passed three times, also on the previous commit: a timing flake, not this change.
+
 ## 2026-10-08: Diagnostic of slow and failing long-file loads
 
 - **What:** a measured report on why opening an hour-long file is slow or fails, with recommendations: `docs/diagnostics/long-file-loading.md`. Also the tools that produced it, so it can be re-run after a fix: `npm run diagnose:loading`. No app behaviour changed.

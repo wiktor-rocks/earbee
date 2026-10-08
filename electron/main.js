@@ -5,6 +5,9 @@
 //              Its Content-Security-Policy is in index.html.
 //   Downloads  Through the page's bridge (preload.js): downloading a link
 //              with yt-dlp, done here in downloader.js.
+//   System     The memory available for a track (system.js); if the page's
+//              process dies, a message and a reload instead of a blank
+//              window.
 //   Theme      The chosen colour theme (theme-store.js): applied by the
 //              preload before the page renders, and the window background.
 //   Window     Remembers its size, position and maximised state between
@@ -14,9 +17,10 @@
 //              rendering if the GPU process keeps crashing.
 //              `npm run start:no-gpu` forces software rendering;
 //              `npm run start:gpu-info` logs what the GPU is doing.
-const { app, BrowserWindow, ipcMain, nativeTheme, net } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, nativeTheme, net } = require("electron");
 const path = require("path");
 const { handleDownloads } = require("./downloader");
+const { handleRendererCrash, handleSystem } = require("./system");
 const { createThemeStore, handleThemes } = require("./theme-store");
 const { loadWindowState, rememberWindowState } = require("./window-state");
 
@@ -73,6 +77,7 @@ function createWindow() {
   win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
 
   rememberWindowState(win);
+  handleRendererCrash(win, dialog);
   win.loadFile(path.join(ROOT, "index.html"));
 }
 
@@ -82,6 +87,7 @@ app.whenReady().then(() => {
     for (const win of BrowserWindow.getAllWindows()) win.setBackgroundColor(themeStore.current().colors.bg);
   };
   handleThemes(ipcMain, themeStore, followTheme);
+  handleSystem(ipcMain);
   nativeTheme.on("updated", followTheme); // "Automatic" follows the system
   handleDownloads(ipcMain, {
     binDir: path.join(app.getPath("userData"), "bin"),

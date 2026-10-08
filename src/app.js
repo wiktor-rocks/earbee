@@ -13,7 +13,13 @@
  *   transport.on("position" | "state" | "jump") ─► waveform, video, UI
  *
  *   engine     Web Audio graph: Signalsmith (speed + pitch) → EQ → volume
- *              → limiter. Knows nothing about the UI or `settings`.
+ *              → limiter, in a context at the open track's sample rate.
+ *              Knows nothing about the UI or `settings`.
+ *   decoder    A file's audio, decoded in chunks in a Worker (Mediabunny +
+ *              WebCodecs) straight into one Float32Array per channel, with
+ *              the waveform peaks; progress and Cancel. Never the whole file
+ *              in memory, so hour-long files open (see
+ *              docs/diagnostics/long-file-loading.md).
  *   transport  Playback state and position. Mirrors Signalsmith's timeline,
  *              so the position of what is being heard is computed exactly.
  *   waveform   WaveSurfer drawing, zoom, minimap and the A–B loop region.
@@ -36,11 +42,12 @@
  * FILES (src/), in layers: a file imports only from layers above it in
  * this list, never below (enforced by `npm run lint`)
  *   core/          Pure helpers, no DOM: format, peaks, timeline (and the
- *                  Segment / Loop / LoopRegion types), emitter, files, errors
+ *                  Segment / Loop / LoopRegion types), emitter, files,
+ *                  errors, memory
  *   themes/        Colour themes: palettes and pure logic; independent of
  *                  everything else (the main process uses it too)
  *   config.js      CONFIG: every tunable number
- *   audio/         engine.js, transport.js
+ *   audio/         engine.js, transport.js, decoder.js (+ decode-worker.js)
  *   video/         view.js (the picture), proxy.js (low-res copy for seeking)
  *   waveform.js    The waveform, zoom, minimap, loop drawing and dragging
  *   context.js     `settings`, and `player`: the components above, once created
@@ -79,6 +86,10 @@
  *   A–B loop                  State and actions in features/loop.js; audio
  *                             looping in audio/transport.js, drawing and
  *                             dragging in waveform.js.
+ *   Opening files             features/open-file.js (loadMediaFile: the order
+ *                             of a load, the memory check, error wording);
+ *                             decoding in audio/decoder.js. Measure long
+ *                             files with `npm run diagnose:loading`.
  *   A new feature             A file in features/ with a bind…() function,
  *                             called from start() below.
  *   Any change                Run `npm run check` and `npm test` (unit tests
@@ -92,7 +103,7 @@ import { createTransport } from "./audio/transport.js";
 import { player, settings, totalSemitones } from "./context.js";
 import { bindDownloads } from "./features/download.js";
 import { setLoopEnd, setLoopRegion, setLoopStart, toggleLoop, clearLoop } from "./features/loop.js";
-import { bindFileDrop, bindFileInput, isLoading } from "./features/open-file.js";
+import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
 import { bindThemePicker, isThemeMenuOpen, loadThemePrefs } from "./features/theme-picker.js";
 import {
   bindPlayback,
@@ -241,6 +252,7 @@ function start() {
   bindTransportButtons();
   bindSettingControls();
   bindPlayback();
+  bindLoadCancel();
   bindFileInput();
   bindFileDrop();
   bindDownloads();

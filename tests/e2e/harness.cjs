@@ -52,6 +52,11 @@ async function createHarness() {
   fs.rmSync(themeFile, { force: true });
   const { createThemeStore, handleThemes } = require(path.join(PROJECT, "electron", "theme-store.js"));
   handleThemes(ipcMain, createThemeStore(themeFile, nativeTheme), () => {});
+  // As main.js does, except that a test can pretend the system has only
+  // `memory.available` bytes left (null: the real figure).
+  const memory = { available: null };
+  const { availableMemory } = require(path.join(PROJECT, "electron", "system.js"));
+  ipcMain.handle("system:available-memory", () => memory.available ?? availableMemory());
   session.defaultSession.registerPreloadScript({
     type: "frame",
     filePath: path.join(PROJECT, "electron", "preload.js"),
@@ -188,6 +193,7 @@ async function createHarness() {
     playing,
     ensurePaused,
     themeFile,
+    memory,
     check,
     sleep,
     PROJECT,

@@ -30,6 +30,23 @@ webFrame.executeJavaScript(`
     window[name].isConfigSupported = Native.isConfigSupported.bind(Native);
   }
 
+  // Decode workers (src/audio/decoder.js): counted, to check none is left
+  // running, and their "done" message is held back by __slowDecode ms, to
+  // observe the loading states.
+  window.__workers = { created: 0, terminated: 0, live: () => __workers.created - __workers.terminated };
+  const NativeWorker = Worker;
+  window.Worker = class extends NativeWorker {
+    constructor(...args) { super(...args); __workers.created++; this.__live = true; }
+    terminate() { if (this.__live) { this.__live = false; __workers.terminated++; } return super.terminate(); }
+    addEventListener(type, listener, options) {
+      if (type !== "message") return super.addEventListener(type, listener, options);
+      return super.addEventListener(type, async (event) => {
+        if (event.data?.type === "done" && window.__slowDecode) await new Promise((r) => setTimeout(r, window.__slowDecode));
+        listener(event);
+      }, options);
+    }
+  };
+
   const nativeDecode = BaseAudioContext.prototype.decodeAudioData;
   BaseAudioContext.prototype.decodeAudioData = async function (...args) {
     if (window.__slowDecode) await new Promise((r) => setTimeout(r, window.__slowDecode));
@@ -53,7 +70,7 @@ webFrame.executeJavaScript(`
       out.push({
         t: performance.now() - t0,
         pos: __parseTime(document.getElementById("trackTime").textContent),
-        input: __nodes[0]?.inputTime,
+        input: __nodes.at(-1)?.inputTime, // the newest: a new sample rate rebuilds the engine
         frame: Number(document.getElementById("videoCanvas").dataset.frameTime),
         cursor: cursor ? parseFloat(cursor.style.left) : NaN,
       });

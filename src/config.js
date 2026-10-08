@@ -35,11 +35,13 @@ export const CONFIG = {
     paramRampSeconds: 0.015,
     // Brick-wall limiter that stops volume > 100% and EQ boosts clipping.
     limiter: { threshold: -1, knee: 0, ratio: 20, attack: 0.002, release: 0.1 },
+    // Rate for files the chunked decoder can't read, which decodeAudioData
+    // resamples to (see audio/decoder.js).
+    fallbackSampleRate: 48000,
+    // A track may use at most this share of the memory the system has
+    // available; a longer one is refused instead of crashing the app.
+    maxMemoryShare: 0.8,
   },
-
-  // Largest file that can be opened: the audio decoder reads the whole
-  // file into memory, video included.
-  maxFileBytes: 2 * 1024 ** 3,
 
   video: {
     // Files treated as video (also anything with a video/* type).

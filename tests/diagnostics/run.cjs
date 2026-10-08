@@ -1,7 +1,8 @@
 // Runs the loading diagnostics: every measurement in PLAN, each in a fresh
 // Electron process (profile-load.cjs), and writes the results to
 // tests/output/diagnostics/results.json plus a summary table on stdout.
-// Linux only. Takes about 15 minutes.
+// Linux only. Takes about half an hour: the two video runs wait about 7
+// minutes each for the video proxy.
 //
 //   bash tests/diagnostics/make-long-media.sh   # once: the long test media
 //   node tests/diagnostics/run.cjs              # everything
@@ -23,8 +24,11 @@ const PLAN = [
   ["app", "mp3-10min.mp3"],
   ["app", "mp3-30min.mp3"],
   ["app", "mp3-60min.mp3"],
+  ["app", "mp3-90min.mp3"],
   ["app", "mp3-120min.mp3"],
-  // The same hour in other formats.
+  // The same hour in other formats, and where AAC used to fail.
+  ["app", "aac-30min.m4a"],
+  ["app", "aac-45min.m4a"],
   ["app", "aac-60min.m4a"],
   ["app", "opus-60min.webm"],
   ["app", "wav-60min.wav"],

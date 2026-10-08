@@ -64,6 +64,11 @@ module.exports = [
     },
   },
   {
+    // The decoder's Worker: a worker's globals, not a page's.
+    files: ["src/audio/decode-worker.js"],
+    languageOptions: { globals: globals.worker },
+  },
+  {
     // Electron main process and preload, config and test runner: CommonJS in Node.
     files: ["electron/**/*.js", "eslint.config.js", "tests/**/*.cjs"],
     languageOptions: { sourceType: "commonjs", globals: globals.node },
