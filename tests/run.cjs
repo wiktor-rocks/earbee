@@ -45,8 +45,9 @@ const TOPICS = [
   "07-errors.cjs",
   "08-video.cjs",
   "09-downloads.cjs",
-  "10-resources.cjs",
-  "11-security.cjs",
+  "10-themes.cjs",
+  "11-resources.cjs",
+  "12-security.cjs",
 ];
 
 prepare();

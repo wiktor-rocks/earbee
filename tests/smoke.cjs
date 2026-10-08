@@ -6,7 +6,8 @@
 //   - the window title, Content-Security-Policy and blocked navigation /
 //     pop-ups, and the download bridge (preload.js);
 //   - the window state: saved on close, restored on the next start, reset
-//     when the saved position is off-screen, and kept above the minimum size.
+//     when the saved position is off-screen, and kept above the minimum size;
+//   - the colour theme: saved, and applied again on the next start.
 //
 // TB_APP_BINARY=<path> tests a packaged build's executable instead of
 // running the project with Electron.
@@ -193,6 +194,22 @@ const near = (a, b) => Math.abs(a - b) <= 40; // window decorations differ betwe
       "{ not json",
       (size) => near(size.width, 1200) && near(size.height, 800),
     );
+
+    // The colour theme: saved through the bridge, applied on the next start
+    // (by the preload, before the page's own code runs).
+    await session(profile, async (page) => {
+      await page.evaluate(`transcribee.theme.save({ choice: "nord" })`);
+    });
+    await session(profile, async (page) => {
+      const applied = await page.evaluate(
+        `({ theme: document.documentElement.dataset.theme, bg: getComputedStyle(document.body).backgroundColor })`,
+      );
+      check(
+        "saved theme applied on the next start",
+        applied?.theme === "nord" && applied?.bg === "rgb(46, 52, 64)",
+        JSON.stringify(applied),
+      );
+    });
   } catch (error) {
     check("smoke test ran", false, error.stack);
   } finally {
