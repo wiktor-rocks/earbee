@@ -532,12 +532,12 @@ app
     // ---------- Arrow-key stepping ----------
     const stepText = () =>
       js(
-        `["skipStep", "skipBack", "skipForward"].map((id) => document.getElementById(id).textContent.trim()).join("|")`,
+        `["stepSize", "stepBack", "stepForward"].map((id) => document.getElementById(id).textContent.trim()).join("|")`,
       );
     check(
       "default step 1 s, arrow buttons",
       (await stepText()) === "Step 1 s||" &&
-        (await js(`!!document.querySelector("#skipBack svg") && !!document.querySelector("#skipForward svg")`)),
+        (await js(`!!document.querySelector("#stepBack svg") && !!document.querySelector("#stepForward svg")`)),
       await stepText(),
     );
     await click(5);
@@ -605,7 +605,7 @@ app
       `${speedBefore} ${p0}→${await pos()}`,
     );
     // Tab-focused slider keeps arrows
-    await js(`document.getElementById("speed").blur(); document.getElementById("skipForward").focus()`);
+    await js(`document.getElementById("speed").blur(); document.getElementById("stepForward").focus()`);
     for (let i = 0; i < 15 && !(await js(`document.activeElement.id === "speed"`)); i++) {
       key("Tab");
       await sleep(30);

@@ -36,7 +36,7 @@
  * COMMON CHANGES
  *   Speed preset or EQ band   Edit CONFIG.speed.presets / CONFIG.eq.bands.
  *                             The buttons and faders are generated.
- *   Step sizes (← / →)        Edit CONFIG.skip (↑ / ↓ cycle through them).
+ *   Step sizes (← / →)        Edit CONFIG.step.sizes (↑ / ↓ cycle through them).
  *   Slider range or default   Edit CONFIG. Sliders get min/max/step from it,
  *                             and the scale labels under them are generated.
  *   New slider setting        Add a range to CONFIG, a value to `settings`,
@@ -88,7 +88,7 @@ const CONFIG = {
 
   // Step sizes (seconds) for ← / → and the step buttons; ↑ / ↓ pick one.
   // Holding ← / → repeats the step, which makes it a rewind / fast-forward.
-  skip: { steps: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10], initial: 1 },
+  step: { sizes: [0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10], initial: 1 },
 
   loop: {
     // Shortest A–B loop; a Shift+drag shorter than this is a plain click.
@@ -156,8 +156,8 @@ const formatSpeed = (speed) => `${speed.toFixed(2)}×`;
 const formatPercent = (percent) => `${Math.round(percent)}%`;
 const formatFrequency = (hz) => (hz >= 1000 ? `${hz / 1000} kHz` : `${hz} Hz`);
 const formatPitchTotal = (semitones) => `${semitones >= 0 ? "+" : ""}${semitones.toFixed(2)} st`;
-// Prints a step exactly as written in CONFIG.skip.steps: 0.25 → "0.25".
-const formatStep = (seconds) => String(seconds);
+// Prints a step size exactly as written in CONFIG.step.sizes: 0.25 → "0.25".
+const formatStepSize = (seconds) => String(seconds);
 
 function formatGain(gain) {
   const digits = Number.isInteger(gain) ? gain : gain.toFixed(1);
@@ -212,11 +212,30 @@ function peaksPerSecondFor(duration, widestPx) {
   return clamp(Math.ceil(needed), minPeaksPerSecond, maxPeaksPerSecond);
 }
 
-// Position in the track at `time` (AudioContext clock), given a timeline of
-// segments { outputTime, input, rate, active, loopStart, loopEnd }, oldest
-// first. This is the same mapping Signalsmith uses internally, including
-// its loop: once the position reaches loopEnd it moves back by the loop
-// length (segments never start at or after loopEnd, see §5).
+/**
+ * One stretch of the playback timeline (Signalsmith's and the transport's
+ * copy of it): from `outputTime` on, the track plays from `input` at
+ * `rate`, or rests at `input` if not active.
+ * @typedef {object} Segment
+ * @property {number} outputTime When it starts, in seconds on the AudioContext clock.
+ * @property {number} input Track position (s) at outputTime.
+ * @property {number} rate Playback speed (1 = normal).
+ * @property {boolean} active Playing (true) or resting (false).
+ * @property {number} [loopStart] A–B loop in track seconds; 0, 0 means no loop.
+ * @property {number} [loopEnd]
+ */
+
+/**
+ * Position in the track at `time` (AudioContext clock), given a timeline of
+ * segments, oldest first. This is the same mapping Signalsmith uses
+ * internally, including its loop: once the position reaches loopEnd it
+ * moves back by the loop length (segments never start at or after loopEnd,
+ * see §5).
+ * @param {Segment[]} segments
+ * @param {number} time
+ * @param {number} duration Track length; the result is clamped to it.
+ * @returns {number}
+ */
 function timelinePositionAt(segments, time, duration) {
   let segment = segments[0];
   for (const candidate of segments) {
@@ -237,6 +256,7 @@ function timelinePositionAt(segments, time, duration) {
 }
 
 // Minimal event emitter: on(event, listener) returns an unsubscribe function.
+/** @returns {{ on(event: string, listener: (...args: any[]) => void): () => void, emit(event: string, ...args: any[]): void }} */
 // A listener that throws is logged and skipped, so one broken view can't
 // stop the others (or the code that emitted the event).
 function createEmitter() {
@@ -269,6 +289,10 @@ const formatGigabytes = (bytes) => `${Math.round(bytes / 1024 ** 3)} GB`;
 // An error whose message is written for the user. Anything else is shown
 // as an unexpected failure.
 class AppError extends Error {
+  /**
+   * @param {string} message Shown to the user as is.
+   * @param {unknown} [cause] The underlying error, for the console.
+   */
   constructor(message, cause) {
     super(message, { cause });
   }
@@ -286,7 +310,7 @@ const settings = {
   semitones: CONFIG.semitones.initial,
   cents: CONFIG.cents.initial,
   eqEnabled: CONFIG.eq.enabledInitially,
-  skipStep: CONFIG.skip.initial, // seconds, one of CONFIG.skip.steps
+  stepSize: CONFIG.step.initial, // seconds, one of CONFIG.step.sizes
   // One gain (dB) per EQ band, keyed by band id: eqLow, eqLowMid, …
   ...Object.fromEntries(CONFIG.eq.bands.map((band) => [band.id, CONFIG.eq.gain.initial])),
 };
@@ -304,6 +328,7 @@ const eqGains = () => Object.fromEntries(CONFIG.eq.bands.map((band) => [band.id,
  * is built, so settings can change before any audio is loaded.
  * ===================================================================== */
 
+/** @param {{ onError: (error: unknown) => void }} options */
 function createAudioEngine({ onError }) {
   const { paramRampSeconds, limiter: limiterConfig } = CONFIG.audio;
 
@@ -427,7 +452,7 @@ function createAudioEngine({ onError }) {
  *     there: it starts at the loop start instead.
  *
  * Exposes: play, pause, stop, seek, retune, load, setLoop, on,
- *          state, playing, position, duration, loop
+ *          state, playing, position, duration
  *   pause(eventTime) pauses at what was being heard at `eventTime` (a
  *   performance.now()-style timestamp, e.g. event.timeStamp), not where
  *   the audio engine already is: that runs ahead of the speakers by the
@@ -440,19 +465,34 @@ function createAudioEngine({ onError }) {
  *                             moved discontinuously)
  * ===================================================================== */
 
+/** @typedef {"empty" | "ready" | "playing" | "paused" | "stopped" | "ended"} TransportState */
+/** @typedef {{ start: number, end: number }} Loop An active A–B loop, in track seconds. */
+
+/**
+ * @param {object} deps
+ * @param {AudioEngine} deps.engine
+ * @param {() => number} deps.getRate Current speed setting.
+ * @param {() => number} deps.getSemitones Current total pitch shift.
+ */
 function createTransport({ engine, getRate, getSemitones }) {
   const events = createEmitter();
   const onPosition = (time) => events.emit("position", time);
 
+  /** @type {TransportState} */
   let state = "empty";
   let duration = 0;
+  /** @type {Segment[]} */
   let segments = []; // oldest first
   // A jump (seek, restart) that isn't audible yet; shown immediately so the
   // cursor doesn't flick back while the audio catches up.
+  /** @type {{ outputTime: number, input: number } | null} */
   let pendingJump = null;
+  /** @type {ReturnType<typeof setTimeout> | null} */
   let endTimer = null;
+  /** @type {number | null} */
   let rafId = null;
-  let loop = null; // { start, end } while looping
+  /** @type {Loop | null} */
+  let loop = null; // while looping
   // Last position drawn while playing; a smaller one means the loop wrapped.
   let lastDrawn = null;
 
@@ -484,8 +524,12 @@ function createTransport({ engine, getRate, getSemitones }) {
     return timelinePositionAt(segments, heardAt, duration);
   }
 
-  // Starts a new segment now. Without `input` it continues seamlessly from
-  // the current position. Returns whether the position jumped.
+  /**
+   * Starts a new segment now. Without `input` it continues seamlessly from
+   * the current position.
+   * @param {{ input?: number, active: boolean }} change
+   * @returns {boolean} Whether the position jumped.
+   */
   function apply({ input, active }) {
     const at = engine.now();
     const continuation = timelinePositionAt(segments, at, duration);
@@ -605,6 +649,7 @@ function createTransport({ engine, getRate, getSemitones }) {
   }
 
   // Sets the A–B loop ({ start, end } in seconds) or removes it (null).
+  /** @param {Loop | null} next */
   // While playing outside the new loop, playback moves to its start, so
   // a loop you just drew or turned on is what you hear.
   function setLoop(next) {
@@ -655,9 +700,6 @@ function createTransport({ engine, getRate, getSemitones }) {
     get duration() {
       return duration;
     },
-    get loop() {
-      return loop && { ...loop };
-    },
   };
 }
 
@@ -677,13 +719,21 @@ function createTransport({ engine, getRate, getSemitones }) {
  * region only changes for good when setLoop() is called with it.
  *
  * The wheel scrolls; Ctrl + wheel zooms, keeping the spot under the mouse
- * in place. After the view is moved by hand (zoom, wheel, minimap), following the playback
- * cursor pauses until the cursor comes back into view or resumeFollow()
- * is called (on every seek), so you can look ahead while it plays.
+ * in place. After the view is moved by hand (zoom, wheel, minimap),
+ * following the playback cursor pauses until the cursor comes back into
+ * view or resumeFollow() is called (on every seek), so you can look ahead
+ * while it plays.
  *
  * Exposes: preload, init, load, setTime, follow, resumeFollow, setLoop
  * ===================================================================== */
 
+/**
+ * @param {object} options
+ * @param {HTMLElement} options.container
+ * @param {HTMLElement} options.minimapContainer
+ * @param {(time: number) => void} options.onSeek A click or drag asks to move the cursor.
+ * @param {(loop: Loop) => void} options.onLoopChange A drag drew or adjusted the loop.
+ */
 function createWaveform({ container, minimapContainer, onSeek, onLoopChange }) {
   const { maxZoomMultiplier } = CONFIG.waveform;
 
@@ -701,11 +751,12 @@ function createWaveform({ container, minimapContainer, onSeek, onLoopChange }) {
   // pointer position reuse the exact time instead of re-reading it from
   // the (whole-pixel) scroll, which would drift a little every step.
   let zoomAnchor = null;
-  let loop = null; // { start, end, enabled } as last set by setLoop()
+  /** @type {LoopRegion | null} */
+  let loop = null; // as last set by setLoop()
   let loopElement = null;
 
-  // Loads the WaveSurfer code without creating anything on screen (the
-  // empty waveform box keeps its hint), so it is safe to call at startup.
+  // Loads the WaveSurfer code without creating anything on screen, so it
+  // is safe to call at startup.
   function preload() {
     modulesPromise ??= Promise.all([
       import("./node_modules/wavesurfer.js/dist/wavesurfer.esm.js"),
@@ -780,26 +831,30 @@ function createWaveform({ container, minimapContainer, onSeek, onLoopChange }) {
 
   /* ---------- Clicking and dragging: seek, draw or adjust the loop ---------- */
 
-  // Track time under a pointer x. The wrapper spans the whole (zoomed)
-  // waveform and moves with scrolling.
+  // Track time under a pointer x, and the pointer x of a track time. The
+  // wrapper spans the whole (zoomed) waveform and moves with scrolling.
   function timeAtClientX(x) {
     const track = waveSurfer.getWrapper().getBoundingClientRect();
     return clamp((x - track.left) / track.width, 0, 1) * duration;
   }
 
+  function clientXAt(time) {
+    const track = waveSurfer.getWrapper().getBoundingClientRect();
+    return track.left + (time / duration) * track.width;
+  }
+
   // "start" or "end" if `x` is close enough to that loop edge to grab it.
   function loopEdgeAt(x) {
     if (!loop || !duration) return null;
-    const track = waveSurfer.getWrapper().getBoundingClientRect();
-    const distanceTo = (time) => Math.abs(x - (track.left + (time / duration) * track.width));
-    const toStart = distanceTo(loop.start);
-    const toEnd = distanceTo(loop.end);
+    const toStart = Math.abs(x - clientXAt(loop.start));
+    const toEnd = Math.abs(x - clientXAt(loop.end));
     if (Math.min(toStart, toEnd) > CONFIG.loop.edgeGrabPx) return null;
     return toStart <= toEnd ? "start" : "end";
   }
 
   // One drag at a time: { mode: "seek" } | { mode: "draw", anchor }
-  // | { mode: "edge", edge, fixed }, plus the draft loop while drawing.
+  // | { mode: "edge", fixed } (`fixed` is the loop end that stays put),
+  // plus `draft`, the loop described so far, while drawing or adjusting.
   function bindPointerSeek() {
     const edgePx = 30; // dragging this close to an edge scrolls a zoomed view
     const { minSeconds } = CONFIG.loop;
@@ -925,9 +980,7 @@ function createWaveform({ container, minimapContainer, onSeek, onLoopChange }) {
     // WaveSurfer re-renders at once, scrolling to keep the playback cursor
     // in place; correct the scroll so the anchor is back under the pointer.
     waveSurfer.zoom(next);
-    const track = waveSurfer.getWrapper().getBoundingClientRect();
-    const anchorX = track.left + (anchorTime / duration) * track.width;
-    waveSurfer.setScroll(waveSurfer.getScroll() + (anchorX - clientX));
+    waveSurfer.setScroll(waveSurfer.getScroll() + (clientXAt(anchorTime) - clientX));
   }
 
   // Wheel scrolls horizontally (a touchpad's sideways swipe too); Ctrl +
@@ -1064,7 +1117,7 @@ function createWaveform({ container, minimapContainer, onSeek, onLoopChange }) {
     follow,
     resumeFollow: () => (followPaused = false),
     setTime: (time) => waveSurfer?.setTime(time),
-    // { start, end, enabled } or null.
+    /** @param {LoopRegion | null} next */
     setLoop(next) {
       loop = next && { ...next };
       renderLoop();
@@ -1102,13 +1155,12 @@ function createWaveform({ container, minimapContainer, onSeek, onLoopChange }) {
  * isn't ready, the proxy frame for exactly that time is drawn instead,
  * at full frame rate, and the sharp frames take over once decoded.
  *
- * Frames are decoded as
- * lightweight VideoSamples; only the ones actually drawn are painted,
- * and every sample is closed as soon as it isn't needed (they hold
- * decoder memory).
+ * Frames are decoded as lightweight VideoSamples; only the ones actually
+ * drawn are painted, and every sample is closed as soon as it isn't
+ * needed (they hold decoder memory).
  *
  * Exposes: preload, prepare, show, clear, discard,
- *          start, advance, showFrameAt, hasVideo, proxyFrameCount
+ *          start, advance, showFrameAt
  *   prepare(file) → { video, reason }: opens a file without touching the
  *   video on screen; `video` is null (with a reason) if it has no
  *   picture this app can decode. Never throws.
@@ -1135,8 +1187,10 @@ function createVideoProxy({ track, sourceSink }) {
     for (const codec of ["vp8", "vp09.00.10.08", "avc1.42001f"]) {
       const config = { codec, width, height, bitrate, framerate: maxFps };
       const [encode, decode] = await Promise.all([
-        VideoEncoder.isConfigSupported(config).catch(() => ({})),
-        VideoDecoder.isConfigSupported({ codec, codedWidth: width, codedHeight: height }).catch(() => ({})),
+        VideoEncoder.isConfigSupported(config).catch(() => ({ supported: false })),
+        VideoDecoder.isConfigSupported({ codec, codedWidth: width, codedHeight: height }).catch(() => ({
+          supported: false,
+        })),
       ]);
       if (encode.supported && decode.supported) return codec;
     }
@@ -1292,12 +1346,15 @@ function createVideoProxy({ track, sourceSink }) {
     build,
     frameAt,
     dispose,
-    get frameCount() {
-      return chunks.length;
-    },
   };
 }
 
+/**
+ * @param {object} options
+ * @param {HTMLElement} options.pane The box the picture sits in (hidden for audio files).
+ * @param {HTMLCanvasElement} options.canvas
+ * @param {(visible: boolean) => void} options.onVisibilityChange Switch the page layout.
+ */
 function createVideoView({ pane, canvas, onVisibilityChange }) {
   const { maxLagSeconds } = CONFIG.video;
   const context2d = canvas.getContext("2d");
@@ -1732,12 +1789,6 @@ function createVideoView({ pane, canvas, onVisibilityChange }) {
     start,
     advance,
     showFrameAt,
-    get hasVideo() {
-      return current !== null;
-    },
-    get proxyFrameCount() {
-      return current?.proxy?.frameCount ?? 0;
-    },
   };
 }
 
@@ -1748,6 +1799,14 @@ function createVideoView({ pane, canvas, onVisibilityChange }) {
  * are ready by then.
  * ===================================================================== */
 
+/** @typedef {ReturnType<typeof createAudioEngine>} AudioEngine */
+/** @typedef {ReturnType<typeof createTransport>} Transport */
+/** @typedef {ReturnType<typeof createWaveform>} Waveform */
+/** @typedef {ReturnType<typeof createVideoView>} VideoView */
+
+/** @param {string} id */
+const $ = (id) => document.getElementById(id);
+
 const engine = createAudioEngine({ onError: reportError });
 
 const transport = createTransport({
@@ -1757,16 +1816,16 @@ const transport = createTransport({
 });
 
 const waveform = createWaveform({
-  container: document.getElementById("waveform"),
-  minimapContainer: document.getElementById("waveform-minimap"),
+  container: $("waveform"),
+  minimapContainer: $("waveform-minimap"),
   onSeek: (time) => transport.seek(time),
   onLoopChange: (loop) => setLoopRegion({ ...loop, enabled: true }),
 });
 
 const videoView = createVideoView({
-  pane: document.getElementById("videoPane"),
-  canvas: document.getElementById("videoCanvas"),
-  onVisibilityChange: (visible) => document.getElementById("stage").classList.toggle("has-video", visible),
+  pane: $("videoPane"),
+  canvas: /** @type {HTMLCanvasElement} */ ($("videoCanvas")),
+  onVisibilityChange: (visible) => $("stage").classList.toggle("has-video", visible),
 });
 
 // Everything that follows playback subscribes here.
@@ -1809,8 +1868,6 @@ const hasAudio = () => transport.duration > 0;
  * only reads state; it never changes it.
  * ===================================================================== */
 
-const $ = (id) => document.getElementById(id);
-
 const dom = {
   welcome: $("welcome"),
   welcomeOpen: $("welcomeOpen"),
@@ -1819,18 +1876,18 @@ const dom = {
   loadingFileName: $("loadingFileName"),
   app: $("app"),
   loadingOverlay: $("loadingOverlay"),
-  fileInput: $("file"),
+  fileInput: /** @type {HTMLInputElement} */ ($("file")),
   fileName: $("fileName"),
   message: $("message"),
   trackTime: $("trackTime"),
   loopInfo: $("loopInfo"),
   speedScale: $("speedScale"),
   volumeScale: $("volumeScale"),
-  playButton: $("play"),
-  stopButton: $("stop"),
-  skipBackButton: $("skipBack"),
-  skipForwardButton: $("skipForward"),
-  skipStep: $("skipStep"),
+  playButton: /** @type {HTMLButtonElement} */ ($("play")),
+  stopButton: /** @type {HTMLButtonElement} */ ($("stop")),
+  stepBackButton: /** @type {HTMLButtonElement} */ ($("stepBack")),
+  stepForwardButton: /** @type {HTMLButtonElement} */ ($("stepForward")),
+  stepSize: $("stepSize"),
   speedChips: $("speedChips"),
   pitchValue: $("pitchValue"),
   resetPitchButton: $("resetPitch"),
@@ -1841,7 +1898,8 @@ const dom = {
   shortcutList: $("shortcutList"),
 };
 
-const transportButtons = () => [dom.playButton, dom.stopButton, dom.skipBackButton, dom.skipForwardButton];
+const speedChips = () => /** @type {HTMLButtonElement[]} */ ([...dom.speedChips.children]);
+const transportButtons = () => [dom.playButton, dom.stopButton, dom.stepBackButton, dom.stepForwardButton];
 
 /* ---------- Errors and notices ---------- */
 
@@ -1885,8 +1943,8 @@ function renderTrackTime(position) {
 }
 
 // The step readout in the transport bar (the step buttons show arrows).
-function renderSkipStep() {
-  dom.skipStep.textContent = `Step ${formatStep(settings.skipStep)} s`;
+function renderStepSize() {
+  dom.stepSize.textContent = `Step ${formatStepSize(settings.stepSize)} s`;
 }
 
 // The loop readout next to the track time; dimmed while the loop is off.
@@ -1898,7 +1956,7 @@ function renderLoopInfo(region) {
 }
 
 function renderSpeedChips() {
-  for (const chip of dom.speedChips.children) {
+  for (const chip of speedChips()) {
     chip.classList.toggle("active", Number(chip.dataset.speed) === settings.speed);
   }
 }
@@ -2002,6 +2060,17 @@ function applyPitch() {
   transport.retune();
 }
 
+/**
+ * A setting controlled by a range input (see SLIDERS).
+ * @typedef {object} SliderSpec
+ * @property {string} inputId The <input type="range">.
+ * @property {string} readoutId The element showing the formatted value.
+ * @property {{ min: number, max: number, step: number }} range From CONFIG.
+ * @property {(value: number) => string} format
+ * @property {() => void} onChange Applies the new value (audio, other UI).
+ */
+
+/** @type {Record<string, SliderSpec>} */
 const SLIDERS = {
   speed: {
     inputId: "speed",
@@ -2043,12 +2112,18 @@ const SLIDERS = {
   ),
 };
 
+const sliderInput = (slider) => /** @type {HTMLInputElement} */ ($(slider.inputId));
+
+/**
+ * @param {string} key A key of SLIDERS (and of `settings`).
+ * @param {number | string} value Clamped to the slider's range.
+ */
 function setSetting(key, value) {
   const slider = SLIDERS[key];
   const { min, max } = slider.range;
 
   settings[key] = clamp(Number(value), min, max);
-  $(slider.inputId).value = settings[key];
+  sliderInput(slider).value = String(settings[key]);
   $(slider.readoutId).textContent = slider.format(settings[key]);
   slider.onChange();
 }
@@ -2064,25 +2139,25 @@ function resetPitch() {
   setSetting("cents", CONFIG.cents.initial);
 }
 
-// ↑ / ↓: the next larger (+1) or smaller (−1) step; stops at either end.
-function changeSkipStep(direction) {
-  const { steps } = CONFIG.skip;
-  const index = steps.indexOf(settings.skipStep);
-  settings.skipStep = steps[clamp(index + direction, 0, steps.length - 1)];
-  renderSkipStep();
-}
-
 function resetEq() {
   for (const band of CONFIG.eq.bands) setSetting(band.id, CONFIG.eq.gain.initial);
+}
+
+// ↑ / ↓: the next larger (+1) or smaller (−1) step size; stops at either end.
+function changeStepSize(direction) {
+  const { sizes } = CONFIG.step;
+  const index = sizes.indexOf(settings.stepSize);
+  settings.stepSize = sizes[clamp(index + direction, 0, sizes.length - 1)];
+  renderStepSize();
 }
 
 // Gives each slider its range from CONFIG, shows the current value and
 // listens for input.
 function initSliders() {
   for (const [key, slider] of Object.entries(SLIDERS)) {
-    const input = $(slider.inputId);
+    const input = sliderInput(slider);
     const { min, max, step } = slider.range;
-    Object.assign(input, { min, max, step });
+    Object.assign(input, { min: String(min), max: String(max), step: String(step) });
 
     setSetting(key, settings[key]);
     input.addEventListener(
@@ -2262,17 +2337,19 @@ const pause = (event) => transport.pause(event?.timeStamp);
 const stop = () => transport.stop();
 // Pause, or resume from where playback is now (comma).
 const togglePlay = (event) => (transport.playing ? pause(event) : play());
-// Moves the cursor one step back (−1) or forward (+1).
-const skip = (direction) => transport.seek(transport.position + direction * settings.skipStep);
+// Moves the cursor one step (settings.stepSize) back or forward.
+const step = (direction) => transport.seek(transport.position + direction * settings.stepSize);
+const stepBack = () => step(-1);
+const stepForward = () => step(1);
 
 // Where you last started listening: where playback last started, or where
-// it was last moved to (click, skip, loop wrap); 0 after Stop. Kept up to
+// it was last moved to (click, step, loop wrap); 0 after Stop. Kept up to
 // date by the transport listeners in §8.
 let returnPoint = null;
 
 // Pause, or play again from where you started listening (Space and the
 // Play button, like Transcribe!). The cursor stays where it paused, so
-// the spot stays visible; a click or skip while paused moves the start.
+// the spot stays visible; a click or step while paused moves the start.
 function replayOrPause(event) {
   if (transport.playing) return pause(event);
   // Read first: the seek below moves returnPoint itself.
@@ -2281,12 +2358,33 @@ function replayOrPause(event) {
   play();
 }
 
+// Play-while-held: keys currently held, and whether playback was already
+// running when the first one went down (then releasing keeps it running).
+const heldKeys = new Set();
+let playingBeforeHold = false;
+
+function holdToPlay(event) {
+  if (heldKeys.size === 0) playingBeforeHold = transport.playing;
+  heldKeys.add(event.code);
+  play();
+}
+
+function releaseHold(event) {
+  if (!heldKeys.delete(event.code)) return;
+  if (heldKeys.size === 0 && !playingBeforeHold) pause(event);
+}
+
 /* ---------- A–B loop ---------- */
 
-// The loop as shown: { start, end, enabled } or null. The transport only
-// knows about it while it is enabled.
+/**
+ * The A–B loop as shown: drawn on the waveform even while turned off. The
+ * transport only knows about it while it is enabled.
+ * @typedef {{ start: number, end: number, enabled: boolean }} LoopRegion
+ */
+/** @type {LoopRegion | null} */
 let loopRegion = null;
 
+/** @param {LoopRegion | null} region Too short (or null) removes the loop. */
 function setLoopRegion(region) {
   const valid = region && region.end - region.start >= CONFIG.loop.minSeconds;
   loopRegion = valid ? { start: region.start, end: region.end, enabled: region.enabled } : null;
@@ -2312,48 +2410,22 @@ function setLoopEnd() {
 const toggleLoop = () => loopRegion && setLoopRegion({ ...loopRegion, enabled: !loopRegion.enabled });
 const clearLoop = () => setLoopRegion(null);
 
-// Play-while-held: keys currently held, and whether playback was already
-// running when the first one went down (then releasing keeps it running).
-const heldKeys = new Set();
-let playingBeforeHold = false;
-
-function holdToPlay(event) {
-  if (heldKeys.size === 0) playingBeforeHold = transport.playing;
-  heldKeys.add(event.code);
-  play();
-}
-
-function releaseHold(event) {
-  if (!heldKeys.delete(event.code)) return;
-  if (heldKeys.size === 0 && !playingBeforeHold) pause(event);
-}
+// A click handler whose failures are shown to the user (see guarded).
+const onClick = (element, handler) => element.addEventListener("click", guarded(handler));
 
 function bindControls() {
-  dom.playButton.addEventListener("click", guarded(replayOrPause));
-  dom.stopButton.addEventListener("click", guarded(stop));
+  onClick(dom.playButton, replayOrPause);
+  onClick(dom.stopButton, stop);
+  onClick(dom.stepBackButton, stepBack);
+  onClick(dom.stepForwardButton, stepForward);
 
-  dom.skipBackButton.addEventListener(
-    "click",
-    guarded(() => skip(-1)),
-  );
-  dom.skipForwardButton.addEventListener(
-    "click",
-    guarded(() => skip(1)),
-  );
-
-  for (const chip of dom.speedChips.children) {
-    chip.addEventListener(
-      "click",
-      guarded(() => setSetting("speed", chip.dataset.speed)),
-    );
+  for (const chip of speedChips()) {
+    onClick(chip, () => setSetting("speed", chip.dataset.speed));
   }
 
-  dom.resetPitchButton.addEventListener("click", guarded(resetPitch));
-  dom.resetEqButton.addEventListener("click", guarded(resetEq));
-  dom.eqToggle.addEventListener(
-    "click",
-    guarded(() => setEqEnabled(!settings.eqEnabled)),
-  );
+  onClick(dom.resetPitchButton, resetPitch);
+  onClick(dom.resetEqButton, resetEq);
+  onClick(dom.eqToggle, () => setEqEnabled(!settings.eqEnabled));
 }
 
 /* =====================================================================
@@ -2370,6 +2442,18 @@ function bindControls() {
  * Shortcuts only fire when a track is loaded and nothing is loading.
  * ===================================================================== */
 
+/**
+ * @typedef {object} Shortcut
+ * @property {string[]} codes
+ * @property {boolean} [shift]
+ * @property {string[]} keys
+ * @property {string} description
+ * @property {(event: KeyboardEvent) => void} down
+ * @property {(event: KeyboardEvent) => void} [up]
+ * @property {boolean} [repeat]
+ */
+
+/** @type {Shortcut[]} */
 const SHORTCUTS = [
   {
     codes: ["Space"],
@@ -2380,16 +2464,16 @@ const SHORTCUTS = [
   { codes: ["Comma"], keys: [","], description: "Pause / resume here", down: togglePlay },
   { codes: ["Period"], keys: ["."], description: "Stop", down: stop },
   { codes: ["KeyZ", "Semicolon"], keys: ["Z", ";"], description: "Play while held", down: holdToPlay, up: releaseHold },
-  { codes: ["ArrowLeft"], keys: ["←"], description: "Step back (hold to rewind)", repeat: true, down: () => skip(-1) },
+  { codes: ["ArrowLeft"], keys: ["←"], description: "Step back (hold to rewind)", repeat: true, down: stepBack },
   {
     codes: ["ArrowRight"],
     keys: ["→"],
     description: "Step forward (hold to fast-forward)",
     repeat: true,
-    down: () => skip(1),
+    down: stepForward,
   },
-  { codes: ["ArrowUp"], keys: ["↑"], description: "Larger step", down: () => changeSkipStep(1) },
-  { codes: ["ArrowDown"], keys: ["↓"], description: "Smaller step", down: () => changeSkipStep(-1) },
+  { codes: ["ArrowUp"], keys: ["↑"], description: "Larger step", down: () => changeStepSize(1) },
+  { codes: ["ArrowDown"], keys: ["↓"], description: "Smaller step", down: () => changeStepSize(-1) },
   { codes: ["BracketLeft"], keys: ["["], description: "Loop start", down: setLoopStart },
   { codes: ["BracketRight"], keys: ["]"], description: "Loop end", down: setLoopEnd },
   { codes: ["KeyL"], keys: ["L"], description: "Loop on / off", down: toggleLoop },
@@ -2484,7 +2568,7 @@ function start() {
   setEqEnabled(settings.eqEnabled);
   renderTransportState(transport.state);
   renderTrackTime(0);
-  renderSkipStep();
+  renderStepSize();
 
   bindControls();
   bindFileInput();

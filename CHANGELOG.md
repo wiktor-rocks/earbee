@@ -72,6 +72,35 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
 - **Where:** `.prettierrc.json`, `.prettierignore`, `eslint.config.js`, `jsconfig.json`, and the new scripts in `package.json`. The dev dependencies are `prettier`, `eslint`, `@eslint/js`, `globals` and `typescript`.
 - **Verified by:** `format:check` and `lint` are clean; `npm test` passes 99/99. Ten type errors in the app's code remain, and Phase 4 fixes them.
 
+### Phase 4: Code audit, consistent naming, JSDoc types
+
+- **What:** `script.js` was read end to end and cleaned up, with no behaviour change. It now type-checks cleanly.
+- **Why:** after many feature rounds some comments had drifted, a few pieces were unused, and names didn't match the UI. Types document the shapes that get passed around and catch mistakes.
+- **How:**
+  - **Naming: "skip" is now "step" everywhere,** matching the UI ("Step 1 s", "Step back"):
+    - `CONFIG.step.sizes`, `settings.stepSize`, `step()` / `stepBack()` / `stepForward()`, `changeStepSize()`, `renderStepSize()`, `formatStepSize()`;
+    - element ids `#stepBack`, `#stepForward`, `#stepSize`, and the class `.step-size`.
+  - **Removed unused API:** `videoView.hasVideo`, `videoView.proxyFrameCount` (with the proxy's `frameCount`), and the `transport.loop` getter.
+  - **Comments fixed:**
+    - a sentence broken across lines in the §7 header;
+    - an oddly wrapped §6 header;
+    - a stale mention of the removed empty-waveform hint;
+    - a drag-state comment that listed a field that doesn't exist.
+  - **Duplication:** converting a track time to a pointer x is now one helper, `clientXAt`, next to `timeAtClientX`. Loop-edge grabbing and zoom anchoring both use it.
+  - **Consistency:**
+    - `$` is defined at the start of §8 and used for the instances too (they had used `document.getElementById`);
+    - `changeStepSize` moved out from between the two reset functions;
+    - the play-while-held code moved ahead of the A–B loop block;
+    - the button bindings use a small `onClick(element, handler)` helper.
+  - **JSDoc types:**
+    - typedefs for `Segment`, `TransportState`, `Loop`, `LoopRegion`, `SliderSpec` and `Shortcut`;
+    - `AudioEngine`, `Transport`, `Waveform` and `VideoView`, defined as the return types of their factories;
+    - parameter types on the factories and the main functions;
+    - element casts where specific element properties are used (inputs, buttons, the canvas).
+  - **Real fix found by the type checker:** the proxy's codec probe fell back to `{}` on error and then read `.supported` from it. It now falls back to `{ supported: false }`. The behaviour was the same, since `undefined` is falsy, but the intent is now explicit.
+- **Where:** `script.js` (every section), `index.html` (step ids), `style.css` (`.step-size`), `tests/run.cjs` (step ids).
+- **Verified by:** `npm run check` is clean (format, lint, 0 type errors); `npm test` passes 99/99.
+
 ---
 
 ## 2026-10-08: Loading screen and stronger aura

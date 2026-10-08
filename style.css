@@ -345,7 +345,7 @@ body.dragging .app {
   visibility: hidden;
 }
 
-.skip-step {
+.step-size {
   color: var(--muted);
   font-size: 13px;
   white-space: nowrap;
