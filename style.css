@@ -1,0 +1,764 @@
+/* ============================================================
+ * TOKENS
+ * ============================================================ */
+
+:root {
+  --bg: #0e1014;
+  --surface: #161920;
+  --surface-2: #1d212a;
+  --surface-hover: #262b36;
+  --border: #2a2f3a;
+  --text: #e6e8ee;
+  --muted: #8b93a7;
+  --accent: #f5b301;
+  --accent-hover: #ffc52e;
+  --accent-ink: #1a1400;
+  --danger: #ff6b6b;
+
+  /* Read by script.js for the waveform drawing */
+  --wave: #3b4252;
+  --wave-progress: #f5b301;
+  --minimap-wave: #343a48;
+  --minimap-progress: #8a6a12;
+  --minimap-overlay: rgba(245, 179, 1, 0.12);
+  --cursor: #ffffff;
+
+  /* A–B loop: its own colour, so it stands out on the amber played part */
+  --loop: #4cc9f0;
+  --loop-fill: rgba(76, 201, 240, 0.2);
+  --loop-edge: var(--loop);
+  --loop-fill-off: rgba(139, 147, 167, 0.08);
+  --loop-edge-off: #8b93a7;
+
+  /* Righteous for the logo and titles, Nunito for everything else */
+  --display: "Righteous", system-ui, sans-serif;
+  --sans: "Nunito Variable", "Nunito", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --num: var(--sans);
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --radius: 10px;
+
+  color-scheme: dark;
+  accent-color: var(--accent);
+}
+
+/* ============================================================
+ * BASE — no animations, except the loading indicator and the loading
+ * screen's pulsing aura
+ * ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  transition: none !important;
+  animation: none !important;
+}
+
+html {
+  scroll-behavior: auto;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.4 var(--sans);
+}
+
+h2 {
+  margin: 0;
+  color: var(--muted);
+  font-family: var(--display);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+output {
+  font-family: var(--num);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ============================================================
+ * CONTROLS
+ * ============================================================ */
+
+button,
+.open-button {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover,
+.open-button:hover {
+  background: var(--surface-hover);
+}
+
+button .icon {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+button.primary {
+  min-width: 112px;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-weight: 700;
+}
+
+button.primary:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+button.small {
+  padding: 3px 10px;
+  font-size: 11px;
+}
+
+button.toggle[aria-pressed="true"] {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+button.toggle[aria-pressed="false"] {
+  color: var(--muted);
+}
+
+input[type="range"] {
+  width: 100%;
+  margin: 0;
+}
+
+kbd {
+  display: inline-block;
+  min-width: 22px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: 700 11px/1.5 var(--sans);
+  text-align: center;
+}
+
+/* ============================================================
+ * LAYOUT
+ * ============================================================ */
+
+.app {
+  display: grid;
+  grid-template-rows: auto minmax(220px, 1fr) auto auto auto;
+  gap: 12px;
+  height: 100vh;
+  min-height: 620px;
+  padding: 12px 16px 14px;
+}
+
+/* Both screens set display: grid, which would override [hidden]. */
+.app[hidden],
+.welcome[hidden] {
+  display: none;
+}
+
+body.dragging .app {
+  outline: 2px dashed var(--accent);
+  outline-offset: -6px;
+}
+
+/* ---------- Top bar ---------- */
+
+.topbar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--display);
+  font-size: 24px;
+  white-space: nowrap;
+}
+
+/* The bee; its glow is part of the image, so it can overhang a little. */
+.brand-logo {
+  width: 40px;
+  height: 40px;
+  margin-block: -6px;
+  object-fit: contain;
+}
+
+.brand b {
+  color: var(--accent);
+  font-weight: inherit;
+}
+
+.open-button input {
+  display: none;
+}
+
+.file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Waveform ---------- */
+
+.stage {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 48px;
+  gap: 8px;
+  min-height: 0;
+}
+
+/* Video files: picture on top, a shorter waveform, then the minimap. */
+.stage.has-video {
+  grid-template-rows: minmax(0, 1fr) minmax(110px, 28%) 48px;
+}
+
+.video-pane {
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #000;
+}
+
+.video-pane[hidden] {
+  display: none;
+}
+
+.video-pane canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.waveform,
+.waveform-minimap {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.waveform {
+  min-height: 0;
+  border-radius: var(--radius);
+}
+
+/* The A–B loop, drawn inside WaveSurfer's shadow DOM (see createWaveform),
+   so it is styled through ::part. Positioned in percent, so it follows
+   zoom and scrolling by itself. */
+.waveform ::part(loop-region) {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 3;
+  border-inline: 2px solid var(--loop-edge);
+  background: var(--loop-fill);
+  pointer-events: none;
+}
+
+.waveform ::part(loop-disabled) {
+  border-inline-style: dashed;
+  border-color: var(--loop-edge-off);
+  background: var(--loop-fill-off);
+}
+
+.waveform.near-loop-edge {
+  cursor: ew-resize;
+}
+
+.waveform-minimap {
+  border-radius: 8px;
+  cursor: grab;
+  touch-action: none;
+}
+
+.waveform-minimap:active {
+  cursor: grabbing;
+}
+
+/* ---------- Transport ---------- */
+
+.transport {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.transport-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* Errors are red; notices (something works only partly) are neutral. */
+.message {
+  flex: 1;
+  min-width: 0;
+  max-height: 3.2em;
+  overflow: auto;
+  color: var(--danger);
+  font: 11px/1.4 var(--mono);
+  white-space: pre-wrap;
+}
+
+.message.notice {
+  color: var(--muted);
+  font: 12px/1.4 var(--sans);
+}
+
+.message:empty {
+  visibility: hidden;
+}
+
+.skip-step {
+  color: var(--muted);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.loop-info {
+  color: var(--loop);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.loop-info.disabled {
+  color: var(--muted);
+}
+
+.loop-info[hidden] {
+  display: none;
+}
+
+.track-time {
+  font-size: 22px;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+/* ---------- Panels ---------- */
+
+.panels {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr 0.8fr 1.5fr;
+  gap: 12px;
+}
+
+@media (max-width: 960px) {
+  .panels {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.readout {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.scale {
+  display: flex;
+  justify-content: space-between;
+  margin-top: -6px;
+  color: var(--muted);
+  font: 600 10px var(--num);
+  font-variant-numeric: tabular-nums;
+}
+
+.chips {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: auto;
+}
+
+.chip {
+  padding: 4px 0;
+  font: 700 12px var(--num);
+  font-variant-numeric: tabular-nums;
+}
+
+.chip.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.slider-row {
+  display: grid;
+  grid-template-columns: 66px minmax(0, 1fr) 46px;
+  align-items: center;
+  gap: 8px;
+}
+
+.slider-row label {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.slider-row output {
+  font-size: 11px;
+  text-align: right;
+}
+
+.panel-footer-button {
+  align-self: flex-end;
+  margin-top: auto;
+}
+
+/* ---------- EQ ---------- */
+
+.eq-faders {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 4px;
+}
+
+.eq.bypassed .eq-faders {
+  opacity: 0.4;
+}
+
+.fader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.fader output {
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.fader input[type="range"] {
+  width: 20px;
+  height: 68px;
+  writing-mode: vertical-lr;
+  direction: rtl;
+}
+
+.fader label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.fader label small {
+  display: block;
+  font-weight: 400;
+  text-transform: none;
+}
+
+/* ---------- Shortcut legend ---------- */
+
+.shortcuts {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 2px;
+}
+
+.shortcut-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.shortcut-list li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* ---------- Welcome screen (until the first file loads) ---------- */
+
+.welcome {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 32px 16px;
+  /* A soft, static glow behind the logo, like the logo's own. */
+  background: radial-gradient(circle at 50% 30%, rgba(245, 179, 1, 0.14), transparent 40%) var(--bg);
+}
+
+/* An amber glow behind the bee, on the welcome and loading screens.
+   The image sits above the ::before glow. */
+.logo-aura {
+  position: relative;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+}
+
+.logo-aura::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(245, 179, 1, 0.35), rgba(245, 179, 1, 0.12) 40%, transparent 70%);
+}
+
+/* Pulses while the first file loads (the second animation in the app). */
+.logo-aura.pulsing::before {
+  animation: aura-pulse 1.8s ease-in-out infinite !important;
+}
+
+@keyframes aura-pulse {
+  0%, 100% { opacity: 0.55; transform: scale(0.92); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
+.welcome-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(560px, 100%);
+  text-align: center;
+}
+
+.welcome-logo {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 18px rgba(245, 179, 1, 0.45));
+}
+
+.welcome-title {
+  margin: 10px 0 0;
+  font-family: var(--display);
+  font-size: 48px;
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+.welcome-title b {
+  color: var(--accent);
+  font-weight: inherit;
+}
+
+.welcome-tagline {
+  margin: 8px 0 32px;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.welcome-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 32px 24px 26px;
+  border: 2px dashed var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+body.dragging .welcome-drop {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.welcome-open {
+  padding: 12px 28px;
+  font-size: 16px;
+}
+
+.welcome-hint,
+.welcome-formats {
+  margin: 0;
+  color: var(--muted);
+}
+
+.welcome-hint {
+  font-size: 14px;
+}
+
+.welcome-formats {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+}
+
+body.dragging .welcome-hint {
+  color: var(--accent);
+}
+
+.welcome-message {
+  min-height: 1.4em;
+  margin-top: 16px;
+  max-height: none;
+  font: 14px/1.4 var(--sans);
+  text-align: center;
+}
+
+/* ---------- Loading screen (first file) ---------- */
+
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 32px 16px;
+  background: radial-gradient(circle at 50% 40%, rgba(245, 179, 1, 0.14), transparent 40%) var(--bg);
+  cursor: wait;
+}
+
+.loading-screen[hidden] {
+  display: none;
+}
+
+.loading-screen-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  max-width: 100%;
+}
+
+.loading-line {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  font-family: var(--display);
+  font-size: 22px;
+  letter-spacing: 0.04em;
+}
+
+.loading-file {
+  max-width: min(480px, 100%);
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Loading overlay (later files, over the player) ---------- */
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: rgba(14, 16, 20, 0.78);
+  cursor: wait;
+}
+
+.loading-overlay[hidden] {
+  display: none;
+}
+
+.loading-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--display);
+  font-size: 18px;
+  letter-spacing: 0.04em;
+}
+
+/* Four equalizer bars; the one animation in the app. */
+.loader {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 22px;
+}
+
+.loader span {
+  width: 4px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transform-origin: bottom;
+  animation: loader-bar 0.9s ease-in-out infinite !important;
+}
+
+.loader span:nth-child(2) { animation-delay: -0.6s !important; }
+.loader span:nth-child(3) { animation-delay: -0.3s !important; }
+.loader span:nth-child(4) { animation-delay: -0.75s !important; }
+
+@keyframes loader-bar {
+  0%, 100% { transform: scaleY(0.25); }
+  50% { transform: scaleY(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader span,
+  .logo-aura.pulsing::before {
+    animation: none !important;
+  }
+}
