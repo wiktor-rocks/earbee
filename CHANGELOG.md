@@ -43,6 +43,18 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-09: TranscriBee Light theme
+
+- **What:** a new light theme, **TranscriBee Light**: the app's own amber on warm honey paper, with the cyan loop of the dark theme in a darker shade. It's listed first among the light themes, and it's now what **Automatic** uses in light mode, unless a light theme was picked before. That makes Automatic TranscriBee in dark mode and TranscriBee Light in light mode out of the box; before, it used Solarized Light.
+- **Why:** the user asked for a TranscriBee light theme.
+- **How:**
+  - **The accent:** the dark theme's amber (`#f5b301`) is too pale on light panels, so the accent is a darker amber (`#b97e00`, 3.4:1 on the panels).
+  - **The hover:** it goes lighter (`#cf9000`) rather than darker, as other light themes do, so the dark text on the accent stays readable (6.7:1).
+  - **Every pair** meets the contrast the unit tests require.
+  - **Saved choices are kept.** A saved Automatic pairing keeps its light theme; only new users and stored prefs without one get the new default.
+- **Where:** `src/themes/palettes/transcribee-light.js` (new); `src/themes/index.js` (`THEMES`, `DEFAULT_PREFS.light`); `README.md`.
+- **Verified by:** `npm run check`; the unit tests (80 pass, including the contrast checks for the new theme); `TB_TOPICS=02,10` (37 pass). A look at its screenshot, `tests/output/theme-transcribee-light.png`.
+
 ## 2026-10-09: Clicking the palette button again closes the theme menu
 
 - **What:** with the theme menu open, clicking the palette button closes it. Before, the menu closed and opened again at once.

@@ -15,6 +15,7 @@ import nord from "./palettes/nord.js";
 import oneDark from "./palettes/one-dark.js";
 import solarizedLight from "./palettes/solarized-light.js";
 import transcribee from "./palettes/transcribee.js";
+import transcribeeLight from "./palettes/transcribee-light.js";
 
 /**
  * @typedef {object} Theme
@@ -39,6 +40,7 @@ export const THEMES = [
   dracula,
   nord,
   oneDark,
+  transcribeeLight,
   solarizedLight,
   catppuccinLatte,
   githubLight,
@@ -47,7 +49,7 @@ export const THEMES = [
 export const DEFAULT_THEME = transcribee;
 
 /** @type {ThemePrefs} */
-export const DEFAULT_PREFS = { choice: DEFAULT_THEME.id, dark: transcribee.id, light: solarizedLight.id };
+export const DEFAULT_PREFS = { choice: DEFAULT_THEME.id, dark: transcribee.id, light: transcribeeLight.id };
 
 // Each role and the CSS variable it sets. Optional roles are derived from
 // the others when a theme leaves them out (see DERIVED).
