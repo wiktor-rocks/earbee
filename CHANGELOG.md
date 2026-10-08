@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-09: Clicking the palette button again closes the theme menu
+
+- **What:** with the theme menu open, clicking the palette button closes it. Before, the menu closed and opened again at once.
+- **Why:** the user asked for it: the button should toggle the menu.
+- **How:** the menu is a popover with light dismiss. Pressing the button counted as a click outside, so the press closed the menu, and the click that followed found it closed and opened it again. Now the button is passed as the popover's `source` (`showPopover({ source: button })`), so presses on it don't light-dismiss the menu, and the click handler's toggle works. Clicks anywhere else still close it.
+- **Where:** `src/features/theme-picker.js` (`openFrom`); `tests/e2e/10-themes.cjs`.
+- **Verified by:** `npm run check`. A new e2e check in `10-themes.cjs` clicks the button with real mouse input (press and release, which light dismiss reacts to; the existing checks used `element.click()`, which it ignores): a second click must close the menu and a third must open it. Not run yet, because the change is small; it runs with the next `npm test`.
+
 ## 2026-10-09: The wheel zooms on the waveform and scrolls on the minimap
 
 - **What:** the mouse wheel over the waveform zooms in and out at the mouse, with no Ctrl needed. The wheel over the minimap scrolls the view. Ctrl + wheel is no longer a separate shortcut (a touchpad pinch, which arrives as Ctrl + wheel, still zooms). A touchpad's sideways swipe on the waveform still scrolls.

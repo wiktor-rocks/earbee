@@ -90,11 +90,14 @@ function renderMenu() {
     .replaceChildren(...pair.map((theme) => element("span", { style: `background: ${theme.colors.bg}` })));
 }
 
-// Opens the menu under (or above) the button that asked for it.
+// Opens the menu under (or above) the button that asked for it, or closes
+// it if it's open. The button is the popover's source, so pressing it
+// doesn't count as a click outside: without that, the press would close the
+// menu (light dismiss) and the click would open it again.
 function openFrom(button) {
   if (isOpen()) return menu.hidePopover();
   renderMenu();
-  menu.showPopover();
+  /** @type {any} */ (menu).showPopover({ source: button });
   const anchor = button.getBoundingClientRect();
   const room = window.innerHeight - anchor.bottom;
   menu.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - menu.offsetWidth - 8))}px`;

@@ -74,6 +74,21 @@ module.exports = async function (h) {
   );
   await shot("theme-menu.png");
 
+  // A real click (press and release) on the button again closes the menu:
+  // the press mustn't light-dismiss it and the click open it again.
+  const button = await js(
+    `(() => { const r = document.getElementById("themeButton").getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`,
+  );
+  const realClick = async () => {
+    wc.sendInputEvent({ type: "mouseDown", ...button, button: "left", clickCount: 1 });
+    wc.sendInputEvent({ type: "mouseUp", ...button, button: "left", clickCount: 1 });
+    await sleep(150);
+  };
+  await realClick();
+  check("clicking the palette button again closes the menu", !(await menuOpen()));
+  await realClick();
+  check("and clicking it once more opens it", await menuOpen());
+
   key("Escape");
   await sleep(150);
   check(
