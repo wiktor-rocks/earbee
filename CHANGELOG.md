@@ -5,6 +5,7 @@ TranscriBee is an Electron app for transcribing music. You open a song or a vide
 **Files**
 
 - `main.js`: the Electron main process (window, security, window state).
+- `downloader.js` and `preload.js`: downloading a link with yt-dlp, and the page's bridge to it.
 - `index.html` and `style.css`: the page and its look.
 - `script.js`: all app logic, in one file split into numbered sections (§1 Config … §14 Startup).
 - `assets/`: the logo and icons; `scripts/make-images.py` makes them from the source image.
@@ -21,6 +22,66 @@ The architecture overview, and a list of where to make common changes, is in the
 - **Verified by:** how it was tested.
 
 ---
+
+## 2026-10-08: Download from YouTube
+
+- **What:**
+  - **Where to start a download:** a **From YouTube…** button on the welcome screen and in the top bar, or pasting a link anywhere outside a text field.
+  - **The dialog:** a field for the link, an **Audio / Video (up to 1080p)** choice, which is remembered for the session, and **Download**.
+  - **While it downloads:** the loading screen (first file) or the overlay (later files) shows the stage and the video's title.
+    - **Stages:** "Setting up the downloader (first time only)… 42 %", "Updating the downloader…", "Downloading… 42 % · 0:12 left" (for video: "the picture", then "the sound"), "Joining picture and sound…".
+    - **Cancel** stops the download and returns to what was open, with no error and no files left behind.
+  - **The result:** saved to `~/Downloads/TranscriBee/` as "Title [video id].m4a" (or `.mp4`, `.ogg`) and opened like any other file. A notice says where it was saved.
+  - **A playlist or search page** downloads only its first video.
+  - **Errors:** no internet connection, a private or unavailable video, YouTube refusing the stream (HTTP 403) and links that aren't videos are explained in the usual red error line. Whatever was open stays open.
+- **Why:** to get a song into TranscriBee straight from its YouTube link.
+- **How:**
+  - **Choosing yt-dlp.** Pure-JS libraries (ytdl-core and its forks) break whenever YouTube changes, and web APIs (Cobalt, RapidAPI) add a third party that can vanish or log downloads. yt-dlp is the standard tool and gets fixes within days.
+  - **The page never touches the network.** It stays sandboxed under its CSP. `preload.js` exposes only `window.transcribee` (`download`, `cancelDownload`, `onDownloadProgress`). `downloader.js`, in the main process, does the work, and the file returns to the page as bytes over IPC.
+  - **yt-dlp itself:**
+    - downloaded on first use from its GitHub releases into `<userData>/bin` (about 40 MB) and checked against the release's `SHA2-256SUMS`;
+    - updated with `yt-dlp -U` at most once a day; a failed update keeps the old copy;
+    - fetches abort on Cancel and after 30 s without data.
+  - **JavaScript runtime.** YouTube now needs yt-dlp to have one. TranscriBee hands it **Electron's own binary** (`--js-runtimes node:<execPath>`, with `ELECTRON_RUN_AS_NODE=1`), so nothing else needs installing. This was confirmed in a spike and in the packaged build.
+  - **No ffmpeg.**
+    - Video is downloaded as two files (`-f "bv[vcodec^=avc1][height<=1080]/…,ba[ext=m4a]/ba"`) and joined by **Mediabunny** in Node, copying packets without re-encoding.
+    - Audio is rewritten the same way, because YouTube's `.m4a` is a fragmented "DASH" file that not every player opens.
+    - `--fixup never` makes the result the same whether or not ffmpeg is installed.
+  - **Safety:**
+    - only `http(s)` links are accepted, and the link goes after `--`, so it can never be read as an option;
+    - `--playlist-items 1`, plus stopping yt-dlp if a second video's title appears;
+    - one download at a time;
+    - yt-dlp runs in its own process group, so Cancel stops all of it (`taskkill /T` on Windows);
+    - work folders in the temp directory are removed afterwards, and ones a killed app left behind are removed after a day.
+  - **HTTP 403.** YouTube sometimes refuses a stream link. The download is retried once with a fresh yt-dlp run, which gets new links.
+  - **Progress.** yt-dlp prints tagged lines (`--print before_dl:[tb-title] …`, `after_move:[tb-file] …`, `--progress-template download:[tb-progress] …`). `downloader.js` parses them into `{ stage, part, parts, fraction, eta, title }`.
+- **Where:**
+  - `downloader.js` (`createDownloader`, `handleDownloads`) and `preload.js`; `main.js` registers the handlers and sets the preload;
+  - `script.js`:
+    - §9: `setLoading(name)`, `setLoadingStatus`, and the new elements in `dom`;
+    - §11: `withLoading` (shared with `openFile`), `downloadLink`, `describeDownload`, `openDownloadDialog`, `bindDownloads`; `loadMediaFile` now returns its notices instead of showing them;
+    - §13: no shortcuts while the dialog is open;
+  - `index.html`: the buttons, `#downloadDialog`, and a status, Cancel and title line on the loading screen and overlay; `style.css` §4: "Download dialog";
+  - `package.json` `build.files`; `eslint.config.js`.
+- **Found by real use (fixed):**
+  - a YouTube search link downloaded every result (fixed with `--playlist-items 1`);
+  - a GitHub fetch that never answered left setup stuck at 0 % with Cancel unable to stop it;
+  - a "no network" message on Linux ("Temporary failure in name resolution") wasn't recognised.
+- **Verified by:**
+  - **Offline tests:** `npm test`, 129 + 16 checks. `tests/fake-yt-dlp.cjs` stands in for yt-dlp and serves two new fixtures shaped like YouTube's (a fragmented AAC `.m4a`, a video-only VP9 `.webm`). `run.cjs` drives the real `preload.js` and `downloader.js` through:
+    - the dialog, refusing a non-link, Escape, and pasting;
+    - audio and video downloads that open, play and show a picture;
+    - the saved files and the "saved as" notice;
+    - private, offline and 403 errors, and a one-off 403 being retried;
+    - Cancel with no files or temp folders left;
+    - the title on the overlay.
+
+    The smoke test checks that the real app exposes the bridge.
+
+  - **Real network:**
+    - first-use setup, the daily update, audio and video downloads, a search link, Cancel during setup and during download, and no stray processes afterwards;
+    - downloaded H.264/AAC files open in the app with picture, waveform and full length;
+    - the packaged Linux build does the same.
 
 ## 2026-10-08: Tidy-up
 

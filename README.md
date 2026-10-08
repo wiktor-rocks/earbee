@@ -11,7 +11,8 @@ A desktop player for transcribing music by ear. Open a song or a video, slow it 
   - Space replays from where you started listening.
 - **Video:** the picture is decoded frame by frame with WebCodecs (via [Mediabunny](https://mediabunny.dev)) and always shows the frame at the audio position, so it stays in sync at any speed.
 - **5-band EQ, volume up to 200 %,** and a limiter.
-- **Works offline.** All libraries and fonts are bundled.
+- **Download from YouTube.** Paste a link, or click **From YouTube…**, to get the audio or the video (up to 1080p). It's saved to `~/Downloads/TranscriBee/` and opened. This uses [yt-dlp](https://github.com/yt-dlp/yt-dlp), which TranscriBee downloads on first use (about 40 MB) and keeps up to date; nothing else needs installing. Only download what you have the rights to.
+- **Works offline.** All libraries and fonts are bundled. Only downloading needs the internet.
 
 The shortcut legend at the bottom of the window lists every key.
 
@@ -46,13 +47,16 @@ TB_APP_BINARY=$PWD/dist/linux-unpacked/transcribee npm test
 
 ```
 main.js            Electron main process: window, security, window state
+downloader.js      Downloading links with yt-dlp (main process)
+preload.js         The page's bridge to downloader.js (window.transcribee)
 index.html         The page: welcome screen, loading screen, player
 style.css          All styles; colour and font tokens at the top
 script.js          All app logic, in numbered sections (§1 Config … §14 Startup)
 assets/            Logo and icons (generated from transcribee-source.png
                    by scripts/make-images.py)
 tests/             run.cjs (end-to-end), smoke.cjs (real app), preload.cjs
-                   (instrumentation), launch.cjs, make-fixtures.sh
+                   (instrumentation), fake-yt-dlp.cjs (offline downloads),
+                   launch.cjs, make-fixtures.sh
 CHANGELOG.md       What changed, why, how and where, newest first
 ```
 
