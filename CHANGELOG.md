@@ -128,6 +128,28 @@ A general clean-up after the feature rounds, done in phases. Each phase leaves t
   - switching to an audio file leaves 0;
   - the whole run produces no unhandled error, rejection or CSP violation.
 
+### Phase 6: Stylesheet tidy, smaller logo, app icon
+
+- **What:**
+  - **The page looks the same.** `style.css` was reorganised: its sections now follow the page, and colours that were written out by hand are tokens.
+  - **Smaller logo:** 33 KB instead of 560 KB.
+  - **App icon:** the bee is now the window and taskbar icon, and the packaged app's icon, instead of Electron's default.
+- **Why:** the stylesheet had grown feature by feature: the screens came last, colour values were repeated, and six separate `[hidden]` overrides existed. The logo file was 865 px wide and shown at 150 px at most.
+- **How:**
+  - **Section order:** tokens → base → controls → screens (welcome, loading screen, overlay, loader bars) → player (top bar, stage, transport, panels, EQ, shortcuts). A table of contents sits at the top of the file.
+  - **Derived colours:** amber glows, loop fills and the overlay background are computed from the base tokens with `color-mix()` (`--screen-glow`, `--aura-core`, `--aura-mid`, `--aura-shadow`, `--overlay-bg`, …). `--wave-progress` and `--loop-edge-off` reference `--accent` and `--muted` instead of repeating their values. Changing `--accent` now recolours every glow.
+  - **One `[hidden] { display: none !important }` rule** in Base replaces the six per-element overrides. They were needed because elements set their own `display`.
+  - **Comments:** the stale "the one animation in the app" comment is fixed; the two animations are labelled "1 of 2" and "2 of 2".
+  - **Images:**
+    - the original moved to `assets/transcribee-source.png` and is kept as the master;
+    - `scripts/make-images.py` (Pillow) generates `assets/logo.webp` (300 px, 33 KB: WebP keeps the soft glow far smaller than PNG), `assets/icon-512.png` and `assets/icon.ico`;
+    - the page uses `logo.webp` for all three logos;
+    - `main.js` sets the window icon; `package.json` sets `build.icon` and `build.win.icon`.
+- **Where:** `style.css`, `index.html` (image paths), `main.js` (`icon`), `package.json` (`build.icon`), `assets/`, `scripts/make-images.py`.
+- **Verified by:**
+  - `npm run check` is clean; `npm test` passes 102/102.
+  - Screenshots compared pixel by pixel before and after (welcome, error, drag, loading, player, loop): the only differences are inside the logo, from the resampled image. The video screenshot differs only by which frame was captured.
+
 ---
 
 ## 2026-10-08: Loading screen and stronger aura

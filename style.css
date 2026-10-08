@@ -1,5 +1,16 @@
 /* ============================================================
- * TOKENS
+ * TranscriBee styles
+ *
+ *   1 Tokens       colours, fonts, sizes (script.js reads some of them)
+ *   2 Base         element defaults; no animations except two
+ *   3 Controls     buttons, sliders, keys
+ *   4 Screens      welcome, loading screen, loading overlay
+ *   5 Player       top bar, stage (video + waveform), transport,
+ *                  panels, EQ, shortcut legend
+ * ============================================================ */
+
+/* ============================================================
+ * 1. TOKENS
  * ============================================================ */
 
 :root {
@@ -14,21 +25,28 @@
   --accent-hover: #ffc52e;
   --accent-ink: #1a1400;
   --danger: #ff6b6b;
+  --overlay-bg: color-mix(in srgb, var(--bg) 78%, transparent);
+
+  /* Amber glow around the bee (welcome and loading screens) */
+  --screen-glow: color-mix(in srgb, var(--accent) 14%, transparent);
+  --aura-core: color-mix(in srgb, var(--accent) 35%, transparent);
+  --aura-mid: color-mix(in srgb, var(--accent) 12%, transparent);
+  --aura-shadow: color-mix(in srgb, var(--accent) 45%, transparent);
 
   /* Read by script.js for the waveform drawing */
   --wave: #3b4252;
-  --wave-progress: #f5b301;
+  --wave-progress: var(--accent);
   --minimap-wave: #343a48;
   --minimap-progress: #8a6a12;
-  --minimap-overlay: rgba(245, 179, 1, 0.12);
+  --minimap-overlay: color-mix(in srgb, var(--accent) 12%, transparent);
   --cursor: #ffffff;
 
   /* A–B loop: its own colour, so it stands out on the amber played part */
   --loop: #4cc9f0;
-  --loop-fill: rgba(76, 201, 240, 0.2);
+  --loop-fill: color-mix(in srgb, var(--loop) 20%, transparent);
   --loop-edge: var(--loop);
-  --loop-fill-off: rgba(139, 147, 167, 0.08);
-  --loop-edge-off: #8b93a7;
+  --loop-fill-off: color-mix(in srgb, var(--muted) 8%, transparent);
+  --loop-edge-off: var(--muted);
 
   /* Righteous for the logo and titles, Nunito for everything else */
   --display: "Righteous", system-ui, sans-serif;
@@ -42,8 +60,9 @@
 }
 
 /* ============================================================
- * BASE — no animations, except the loading indicator and the loading
- * screen's pulsing aura
+ * 2. BASE
+ * No animations, except the loader bars and the loading screen's
+ * pulsing aura (both in section 4).
  * ============================================================ */
 
 *,
@@ -52,6 +71,12 @@
   box-sizing: border-box;
   transition: none !important;
   animation: none !important;
+}
+
+/* Many elements here set their own display (grid, flex), which would
+   otherwise override the hidden attribute. */
+[hidden] {
+  display: none !important;
 }
 
 html {
@@ -87,7 +112,7 @@ output {
 }
 
 /* ============================================================
- * CONTROLS
+ * 3. CONTROLS
  * ============================================================ */
 
 button,
@@ -163,8 +188,278 @@ kbd {
   text-align: center;
 }
 
+/* Errors are red; notices (something works only partly) are neutral.
+   Used in the transport bar and on the welcome screen. */
+.message {
+  flex: 1;
+  min-width: 0;
+  max-height: 3.2em;
+  overflow: auto;
+  color: var(--danger);
+  font: 11px/1.4 var(--mono);
+  white-space: pre-wrap;
+}
+
+.message.notice {
+  color: var(--muted);
+  font: 12px/1.4 var(--sans);
+}
+
+.message:empty {
+  visibility: hidden;
+}
+
 /* ============================================================
- * LAYOUT
+ * 4. SCREENS
+ * Welcome (until the first file loads), the loading screen that
+ * replaces it during that load, and the overlay for later loads.
+ * ============================================================ */
+
+/* ---------- Welcome screen ---------- */
+
+.welcome {
+  display: grid;
+  place-items: center;
+  min-height: 100vh;
+  padding: 32px 16px;
+  /* A soft, static glow behind the logo, like the logo's own. */
+  background: radial-gradient(circle at 50% 30%, var(--screen-glow), transparent 40%) var(--bg);
+}
+
+.welcome-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: min(560px, 100%);
+  text-align: center;
+}
+
+/* The bee, on the welcome and loading screens. */
+.welcome-logo {
+  width: 150px;
+  height: 150px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 18px var(--aura-shadow));
+}
+
+/* An amber glow behind the bee; the image sits above the ::before glow. */
+.logo-aura {
+  position: relative;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+}
+
+.logo-aura::before {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  z-index: -1;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--aura-core), var(--aura-mid) 40%, transparent 70%);
+}
+
+.welcome-title {
+  margin: 10px 0 0;
+  font-family: var(--display);
+  font-size: 48px;
+  font-weight: 400;
+  line-height: 1.1;
+}
+
+.welcome-title b {
+  color: var(--accent);
+  font-weight: inherit;
+}
+
+.welcome-tagline {
+  margin: 8px 0 32px;
+  color: var(--muted);
+  font-size: 16px;
+}
+
+.welcome-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 32px 24px 26px;
+  border: 2px dashed var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+}
+
+body.dragging .welcome-drop {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.welcome-open {
+  padding: 12px 28px;
+  font-size: 16px;
+}
+
+.welcome-hint,
+.welcome-formats {
+  margin: 0;
+  color: var(--muted);
+}
+
+.welcome-hint {
+  font-size: 14px;
+}
+
+body.dragging .welcome-hint {
+  color: var(--accent);
+}
+
+.welcome-formats {
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  opacity: 0.8;
+}
+
+.welcome-message {
+  min-height: 1.4em;
+  margin-top: 16px;
+  max-height: none;
+  font: 14px/1.4 var(--sans);
+  text-align: center;
+}
+
+/* ---------- Loading screen (first file) ---------- */
+
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  padding: 32px 16px;
+  background: radial-gradient(circle at 50% 40%, var(--screen-glow), transparent 40%) var(--bg);
+  cursor: wait;
+}
+
+.loading-screen-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  max-width: 100%;
+}
+
+/* Animation 1 of 2: the aura pulses while the first file loads. */
+.logo-aura.pulsing::before {
+  animation: aura-pulse 1.8s ease-in-out infinite !important;
+}
+
+@keyframes aura-pulse {
+  0%,
+  100% {
+    opacity: 0.55;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.08);
+  }
+}
+
+.loading-line {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 16px;
+  font-family: var(--display);
+  font-size: 22px;
+  letter-spacing: 0.04em;
+}
+
+.loading-file {
+  max-width: min(480px, 100%);
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- Loading overlay (later files, over the player) ---------- */
+
+.loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: grid;
+  place-items: center;
+  background: var(--overlay-bg);
+  cursor: wait;
+}
+
+.loading-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-family: var(--display);
+  font-size: 18px;
+  letter-spacing: 0.04em;
+}
+
+/* ---------- Loader bars (loading screen and overlay) ---------- */
+
+/* Animation 2 of 2: four equalizer bars. */
+.loader {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 22px;
+}
+
+.loader span {
+  width: 4px;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transform-origin: bottom;
+  animation: loader-bar 0.9s ease-in-out infinite !important;
+}
+
+.loader span:nth-child(2) {
+  animation-delay: -0.6s !important;
+}
+
+.loader span:nth-child(3) {
+  animation-delay: -0.3s !important;
+}
+
+.loader span:nth-child(4) {
+  animation-delay: -0.75s !important;
+}
+
+@keyframes loader-bar {
+  0%,
+  100% {
+    transform: scaleY(0.25);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loader span,
+  .logo-aura.pulsing::before {
+    animation: none !important;
+  }
+}
+
+/* ============================================================
+ * 5. PLAYER
  * ============================================================ */
 
 .app {
@@ -174,12 +469,6 @@ kbd {
   height: 100vh;
   min-height: 620px;
   padding: 12px 16px 14px;
-}
-
-/* Both screens set display: grid, which would override [hidden]. */
-.app[hidden],
-.welcome[hidden] {
-  display: none;
 }
 
 body.dragging .app {
@@ -205,17 +494,17 @@ body.dragging .app {
   white-space: nowrap;
 }
 
+.brand b {
+  color: var(--accent);
+  font-weight: inherit;
+}
+
 /* The bee; its glow is part of the image, so it can overhang a little. */
 .brand-logo {
   width: 40px;
   height: 40px;
   margin-block: -6px;
   object-fit: contain;
-}
-
-.brand b {
-  color: var(--accent);
-  font-weight: inherit;
 }
 
 .open-button input {
@@ -231,7 +520,7 @@ body.dragging .app {
   white-space: nowrap;
 }
 
-/* ---------- Waveform ---------- */
+/* ---------- Stage: video + waveform + minimap ---------- */
 
 .stage {
   display: grid;
@@ -253,10 +542,6 @@ body.dragging .app {
   background: #000;
 }
 
-.video-pane[hidden] {
-  display: none;
-}
-
 .video-pane canvas {
   display: block;
   width: 100%;
@@ -273,6 +558,10 @@ body.dragging .app {
 .waveform {
   min-height: 0;
   border-radius: var(--radius);
+}
+
+.waveform.near-loop-edge {
+  cursor: ew-resize;
 }
 
 /* The A–B loop, drawn inside WaveSurfer's shadow DOM (see createWaveform),
@@ -294,10 +583,6 @@ body.dragging .app {
   background: var(--loop-fill-off);
 }
 
-.waveform.near-loop-edge {
-  cursor: ew-resize;
-}
-
 .waveform-minimap {
   border-radius: 8px;
   cursor: grab;
@@ -308,7 +593,7 @@ body.dragging .app {
   cursor: grabbing;
 }
 
-/* ---------- Transport ---------- */
+/* ---------- Transport bar ---------- */
 
 .transport {
   display: flex;
@@ -323,26 +608,6 @@ body.dragging .app {
 .transport-buttons {
   display: flex;
   gap: 8px;
-}
-
-/* Errors are red; notices (something works only partly) are neutral. */
-.message {
-  flex: 1;
-  min-width: 0;
-  max-height: 3.2em;
-  overflow: auto;
-  color: var(--danger);
-  font: 11px/1.4 var(--mono);
-  white-space: pre-wrap;
-}
-
-.message.notice {
-  color: var(--muted);
-  font: 12px/1.4 var(--sans);
-}
-
-.message:empty {
-  visibility: hidden;
 }
 
 .step-size {
@@ -361,17 +626,13 @@ body.dragging .app {
   color: var(--muted);
 }
 
-.loop-info[hidden] {
-  display: none;
-}
-
 .track-time {
   font-size: 22px;
   font-weight: 800;
   white-space: nowrap;
 }
 
-/* ---------- Panels ---------- */
+/* ---------- Panels: speed, pitch, volume, EQ ---------- */
 
 .panels {
   display: grid;
@@ -406,6 +667,11 @@ body.dragging .app {
 .panel-actions {
   display: flex;
   gap: 6px;
+}
+
+.panel-footer-button {
+  align-self: flex-end;
+  margin-top: auto;
 }
 
 .readout {
@@ -455,11 +721,6 @@ body.dragging .app {
 .slider-row output {
   font-size: 11px;
   text-align: right;
-}
-
-.panel-footer-button {
-  align-self: flex-end;
-  margin-top: auto;
 }
 
 /* ---------- EQ ---------- */
@@ -532,251 +793,4 @@ body.dragging .app {
   gap: 6px;
   color: var(--muted);
   font-size: 12px;
-}
-
-/* ---------- Welcome screen (until the first file loads) ---------- */
-
-.welcome {
-  display: grid;
-  place-items: center;
-  min-height: 100vh;
-  padding: 32px 16px;
-  /* A soft, static glow behind the logo, like the logo's own. */
-  background: radial-gradient(circle at 50% 30%, rgba(245, 179, 1, 0.14), transparent 40%) var(--bg);
-}
-
-/* An amber glow behind the bee, on the welcome and loading screens.
-   The image sits above the ::before glow. */
-.logo-aura {
-  position: relative;
-  display: grid;
-  place-items: center;
-  isolation: isolate;
-}
-
-.logo-aura::before {
-  content: "";
-  position: absolute;
-  inset: -40%;
-  z-index: -1;
-  border-radius: 50%;
-  background: radial-gradient(circle, rgba(245, 179, 1, 0.35), rgba(245, 179, 1, 0.12) 40%, transparent 70%);
-}
-
-/* Pulses while the first file loads (the second animation in the app). */
-.logo-aura.pulsing::before {
-  animation: aura-pulse 1.8s ease-in-out infinite !important;
-}
-
-@keyframes aura-pulse {
-  0%,
-  100% {
-    opacity: 0.55;
-    transform: scale(0.92);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1.08);
-  }
-}
-
-.welcome-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: min(560px, 100%);
-  text-align: center;
-}
-
-.welcome-logo {
-  width: 150px;
-  height: 150px;
-  object-fit: contain;
-  filter: drop-shadow(0 0 18px rgba(245, 179, 1, 0.45));
-}
-
-.welcome-title {
-  margin: 10px 0 0;
-  font-family: var(--display);
-  font-size: 48px;
-  font-weight: 400;
-  line-height: 1.1;
-}
-
-.welcome-title b {
-  color: var(--accent);
-  font-weight: inherit;
-}
-
-.welcome-tagline {
-  margin: 8px 0 32px;
-  color: var(--muted);
-  font-size: 16px;
-}
-
-.welcome-drop {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 10px;
-  width: 100%;
-  padding: 32px 24px 26px;
-  border: 2px dashed var(--border);
-  border-radius: 16px;
-  background: var(--surface);
-}
-
-body.dragging .welcome-drop {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.welcome-open {
-  padding: 12px 28px;
-  font-size: 16px;
-}
-
-.welcome-hint,
-.welcome-formats {
-  margin: 0;
-  color: var(--muted);
-}
-
-.welcome-hint {
-  font-size: 14px;
-}
-
-.welcome-formats {
-  font-size: 12px;
-  letter-spacing: 0.02em;
-  opacity: 0.8;
-}
-
-body.dragging .welcome-hint {
-  color: var(--accent);
-}
-
-.welcome-message {
-  min-height: 1.4em;
-  margin-top: 16px;
-  max-height: none;
-  font: 14px/1.4 var(--sans);
-  text-align: center;
-}
-
-/* ---------- Loading screen (first file) ---------- */
-
-.loading-screen {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  display: grid;
-  place-items: center;
-  padding: 32px 16px;
-  background: radial-gradient(circle at 50% 40%, rgba(245, 179, 1, 0.14), transparent 40%) var(--bg);
-  cursor: wait;
-}
-
-.loading-screen[hidden] {
-  display: none;
-}
-
-.loading-screen-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 18px;
-  max-width: 100%;
-}
-
-.loading-line {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-top: 16px;
-  font-family: var(--display);
-  font-size: 22px;
-  letter-spacing: 0.04em;
-}
-
-.loading-file {
-  max-width: min(480px, 100%);
-  overflow: hidden;
-  color: var(--muted);
-  font-size: 14px;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* ---------- Loading overlay (later files, over the player) ---------- */
-
-.loading-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 10;
-  display: grid;
-  place-items: center;
-  background: rgba(14, 16, 20, 0.78);
-  cursor: wait;
-}
-
-.loading-overlay[hidden] {
-  display: none;
-}
-
-.loading-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 16px 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-  font-family: var(--display);
-  font-size: 18px;
-  letter-spacing: 0.04em;
-}
-
-/* Four equalizer bars; the one animation in the app. */
-.loader {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 22px;
-}
-
-.loader span {
-  width: 4px;
-  height: 100%;
-  border-radius: 2px;
-  background: var(--accent);
-  transform-origin: bottom;
-  animation: loader-bar 0.9s ease-in-out infinite !important;
-}
-
-.loader span:nth-child(2) {
-  animation-delay: -0.6s !important;
-}
-.loader span:nth-child(3) {
-  animation-delay: -0.3s !important;
-}
-.loader span:nth-child(4) {
-  animation-delay: -0.75s !important;
-}
-
-@keyframes loader-bar {
-  0%,
-  100% {
-    transform: scaleY(0.25);
-  }
-  50% {
-    transform: scaleY(1);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .loader span,
-  .logo-aura.pulsing::before {
-    animation: none !important;
-  }
 }

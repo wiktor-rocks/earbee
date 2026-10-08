@@ -49,7 +49,9 @@
     "productName": "TranscriBee",
     "win": {
       "signAndEditExecutable": false,
-      "target": "portable"
-    }
+      "target": "portable",
+      "icon": "assets/icon.ico"
+    },
+    "icon": "assets/icon-512.png"
   }
 }
