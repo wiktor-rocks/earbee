@@ -73,7 +73,10 @@ function explainFailure(stderrLines) {
   const line = [...stderrLines].reverse().find((text) => text.startsWith("ERROR:"));
   if (!line) return "The download failed.";
   const message = line.replace(/^ERROR:\s*(\[[^\]]+\]\s*)?([\w-]+:\s)?/, "");
-  if (/getaddrinfo|Name or service not known|Failed to resolve|Network is unreachable|timed out/i.test(message)) {
+  // Linux, Windows and macOS word "no network" differently.
+  const offline =
+    /name resolution|getaddrinfo|Name or service not known|nodename nor servname|Failed to resolve|Network is unreachable|timed out/i;
+  if (offline.test(message)) {
     return "Couldn't reach the site. Check your internet connection.";
   }
   if (/^Unsupported URL/i.test(message)) return "That link isn't a video that can be downloaded.";

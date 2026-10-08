@@ -4,7 +4,7 @@
 // The app is started as a user would start it, with a throwaway profile and
 // a DevTools port, and driven over the Chrome DevTools Protocol:
 //   - the window title, Content-Security-Policy and blocked navigation /
-//     pop-ups;
+//     pop-ups, and the download bridge (preload.js);
 //   - the window state: saved on close, restored on the next start, reset
 //     when the saved position is off-screen, and kept above the minimum size.
 //
@@ -122,6 +122,12 @@ const near = (a, b) => Math.abs(a - b) <= 40; // window decorations differ betwe
     await session(profile, async (page) => {
       check("window title", (await page.evaluate("document.title")) === "TranscriBee");
       check("welcome screen shown", await page.evaluate(`!document.getElementById("welcome").hidden`));
+      check(
+        "download bridge from preload.js, From YouTube shown",
+        await page.evaluate(
+          `typeof window.transcribee?.download === "function" && !document.getElementById("welcomeDownload").hidden`,
+        ),
+      );
 
       // Tiling window managers (i3, sway, …) size every window themselves,
       // so the size the app asks for can't be seen; size checks are skipped.

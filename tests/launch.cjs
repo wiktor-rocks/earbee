@@ -14,7 +14,7 @@ const path = require("path");
 
 const tests = __dirname;
 const fixtures = path.join(tests, "fixtures");
-const needed = ["tone.wav", "counter.webm", "bad.mp3"];
+const needed = ["tone.wav", "counter.webm", "bad.mp3", "dl-audio.m4a", "dl-video.webm"];
 
 if (!needed.every((name) => fs.existsSync(path.join(fixtures, name)))) {
   const made = spawnSync("bash", [path.join(tests, "make-fixtures.sh")], { stdio: "inherit" });
