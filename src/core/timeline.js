@@ -1,6 +1,14 @@
 // The playback timeline: where the track is at a given clock time.
 import { clamp } from "./format.js";
 
+/** @typedef {{ start: number, end: number }} Loop An active A–B loop, in track seconds (the transport's view). */
+
+/**
+ * The A–B loop as shown: drawn on the waveform even while turned off. The
+ * transport only knows about it while it is enabled.
+ * @typedef {{ start: number, end: number, enabled: boolean }} LoopRegion
+ */
+
 /**
  * One stretch of the playback timeline (Signalsmith's and the transport's
  * copy of it): from `outputTime` on, the track plays from `input` at
