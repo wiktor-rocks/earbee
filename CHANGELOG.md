@@ -43,6 +43,20 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-09: No text highlighting anywhere in the app
+
+- **What:** text can't be selected anywhere: labels, times, buttons, dialogs, the marks list, and the welcome and loading screens. Dragging on the page no longer highlights it in blue. Text fields (mark names, the YouTube link) still select normally, since editing needs that. Images (the bee) can't be dragged out either.
+- **Why:** the user found highlighting confusing. It showed up while dragging around the player.
+- **How:**
+  - `body { user-select: none }`, with `input, textarea { user-select: text }` back on;
+  - `img { -webkit-user-drag: none }`;
+  - the rules are in `style.css`, section 2 (Base).
+- **Where:** `style.css`.
+- **Verified by:**
+  - `tests/e2e/01-static-ui.cjs`: the body, the welcome title and the track time have `user-select: none`, and the link field has `text`;
+  - topic 14's renaming checks still select a mark's name in its field;
+  - `TB_TOPICS=01,02,03,04,14` passes 122/122.
+
 ## 2026-10-09: Layout tweaks: no mark lines, a stop-point readout, icon-only Play, sidebar always in view
 
 - **What** (six small changes the user asked for):

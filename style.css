@@ -113,6 +113,20 @@ body {
   background: var(--bg);
   color: var(--text);
   font: 13px/1.4 var(--sans);
+  /* Nothing on the page can be selected (highlighting text, e.g. while
+     dragging on the waveform, only confuses), except text fields, where
+     selecting is part of editing. */
+  user-select: none;
+}
+
+input,
+textarea {
+  user-select: text;
+}
+
+/* Images (the bee) can't be dragged out either. */
+img {
+  -webkit-user-drag: none;
 }
 
 h2 {

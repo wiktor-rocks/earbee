@@ -29,4 +29,13 @@ module.exports = async function (h) {
       "Playback|Moving around|A–B loop|Marks|Help",
   );
   check("the shortcuts dialog starts closed", !(await js(`shortcutsDialog.open`)));
+  // Nothing can be highlighted, except text in fields being edited.
+  check(
+    "no text selection, except in text fields",
+    await js(`(() => {
+      const select = (el) => getComputedStyle(el).userSelect;
+      return [document.body, document.querySelector(".welcome-title"), document.getElementById("trackTime")].every((el) => select(el) === "none") &&
+        select(document.getElementById("downloadUrl")) === "text";
+    })()`),
+  );
 };
