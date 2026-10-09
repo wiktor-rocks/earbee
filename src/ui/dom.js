@@ -33,13 +33,16 @@ export const dom = {
   downloadVideoLabel: $("downloadVideoLabel"),
   downloadFolder: $("downloadFolder"),
   fileInput: /** @type {HTMLInputElement} */ ($("file")),
+  fileInfo: $("fileInfo"),
   fileName: $("fileName"),
+  fileMeta: $("fileMeta"),
   message: $("message"),
   trackTime: $("trackTime"),
   loopInfo: $("loopInfo"),
   speedScale: $("speedScale"),
   volumeScale: $("volumeScale"),
   playButton: /** @type {HTMLButtonElement} */ ($("play")),
+  playLabel: $("playLabel"),
   stopButton: /** @type {HTMLButtonElement} */ ($("stop")),
   stepBackButton: /** @type {HTMLButtonElement} */ ($("stepBack")),
   stepForwardButton: /** @type {HTMLButtonElement} */ ($("stepForward")),
@@ -53,9 +56,17 @@ export const dom = {
   eqToggle: $("eqToggle"),
   resetEqButton: $("resetEq"),
   shortcutList: $("shortcutList"),
+  shortcutsDialog: /** @type {HTMLDialogElement} */ ($("shortcutsDialog")),
+  shortcutsClose: $("shortcutsClose"),
+  helpButton: $("helpButton"),
+  sidebar: $("sidebar"),
+  sidebarToggle: $("sidebarToggle"),
+  sidebarCount: $("sidebarCount"),
   marksList: $("marksList"),
   marksEmpty: $("marksEmpty"),
   marksCount: $("marksCount"),
+  addPointButton: $("addPoint"),
+  addRegionButton: $("addRegion"),
 };
 
 export const speedChips = () => /** @type {HTMLButtonElement[]} */ ([...dom.speedChips.children]);
@@ -93,13 +104,22 @@ export const guarded =
 
 // The one place that turns the transport state into UI.
 export function renderTransportState(state) {
-  dom.playButton.textContent = state === "playing" ? "❚❚ Pause" : "▶ Play";
+  dom.playLabel.textContent = state === "playing" ? "Pause" : "Play";
+  dom.playButton.classList.toggle("playing", state === "playing");
   for (const button of transportButtons()) button.disabled = state === "empty";
 }
 
+// The position large, the duration after it smaller ("1:05.250 / 3:41.000").
+const timeParts = {
+  position: element("span", { className: "time-position" }),
+  total: element("span", { className: "time-total" }),
+};
 export function renderTrackTime(position) {
-  const display = `${formatTrackTime(position)} / ${formatTrackTime(player.transport.duration)}`;
-  if (dom.trackTime.textContent !== display) dom.trackTime.textContent = display;
+  if (!timeParts.position.isConnected) dom.trackTime.replaceChildren(timeParts.position, timeParts.total);
+  const shown = formatTrackTime(position);
+  if (timeParts.position.textContent !== shown) timeParts.position.textContent = shown;
+  const total = ` / ${formatTrackTime(player.transport.duration)}`;
+  if (timeParts.total.textContent !== total) timeParts.total.textContent = total;
 }
 
 // The step readout in the transport bar (the step buttons show arrows).

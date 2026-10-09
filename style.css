@@ -6,8 +6,10 @@
  *   3 Controls     buttons, sliders, keys
  *   4 Screens      welcome, loading screen, loading overlay,
  *                  download dialog
- *   5 Player       top bar, stage (video + waveform), transport,
- *                  panels, EQ, shortcut legend
+ *   5 Player       the layout (top bar; the workspace: stage and
+ *                  transport, marks sidebar; the sound dock), the
+ *                  timeline, EQ bands, the shortcuts dialog, and how
+ *                  it adapts to small windows
  * ============================================================ */
 
 /* ============================================================
@@ -67,7 +69,16 @@
   --sans: "Nunito Variable", "Nunito", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --num: var(--sans);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-  --radius: 10px;
+
+  /* Shape and depth: cards (the timeline, transport, sidebar, dock) are
+     set apart by their surface and a soft shadow rather than strong
+     borders; a hairline keeps their edge on light themes. */
+  --radius: 12px;
+  --radius-sm: 8px;
+  --hairline: color-mix(in srgb, var(--border) 60%, transparent);
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.18), 0 8px 24px rgb(0 0 0 / 0.14);
+  --shadow-lifted: 0 2px 6px rgb(0 0 0 / 0.25), 0 18px 48px rgb(0 0 0 / 0.3);
+  --sidebar-width: 300px;
 
   color-scheme: dark;
   accent-color: var(--accent);
@@ -129,14 +140,21 @@ output {
  * 3. CONTROLS
  * ============================================================ */
 
+/* Buttons are soft: a surface tint, no strong border; the primary one
+   (Play, Open, Download) is the accent. An icon and a label sit side by
+   side. */
 button,
 .open-button {
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  padding: 7px 13px;
   background: var(--surface-2);
   color: var(--text);
-  font: inherit;
+  font: 600 13px/1.2 var(--sans);
   cursor: pointer;
 }
 
@@ -145,10 +163,34 @@ button:hover,
   background: var(--surface-hover);
 }
 
-button .icon {
+.icon {
   display: block;
+  flex: none;
   width: 16px;
   height: 16px;
+}
+
+/* The icon sprite (index.html) is only a source for <use>. */
+.icon-sprite {
+  display: none;
+}
+
+/* Square buttons that only show an icon (the label is aria-label/title). */
+.icon-button,
+.theme-button {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.icon-button:hover,
+.theme-button:hover {
+  background: var(--surface-hover);
+  color: var(--text);
 }
 
 button.primary {
@@ -171,8 +213,36 @@ button:disabled {
 }
 
 button.small {
-  padding: 3px 10px;
-  font-size: 11px;
+  padding: 4px 9px;
+  border-radius: 6px;
+  font-size: 11.5px;
+}
+
+button.small .icon {
+  width: 13px;
+  height: 13px;
+}
+
+.icon-button.small {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+}
+
+/* A count, e.g. of marks. */
+.badge {
+  min-width: 20px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font: 700 11px/16px var(--num);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.badge:empty {
+  display: none;
 }
 
 button.toggle[aria-pressed="true"] {
@@ -586,10 +656,12 @@ body.dragging .welcome-hint {
 }
 
 .settings-tab {
+  justify-content: flex-start;
   padding: 8px 12px;
   border: 0;
   border-radius: 7px;
   background: transparent;
+  font-weight: 500;
   text-align: left;
 }
 
@@ -738,24 +810,20 @@ body.dragging .welcome-hint {
 
 /* ---------- Colour-theme menu ---------- */
 
-.theme-button {
-  display: grid;
-  place-items: center;
-  padding: 8px 10px;
+/* The gear (Settings) and the palette, top right of the welcome screen:
+   there they stand on their own, so they keep a surface. */
+.welcome-corner .theme-button {
+  border-color: var(--hairline);
+  background: var(--surface-2);
+  color: var(--text);
 }
 
-/* The gear (Settings) and the palette, top right of the welcome screen. */
 .welcome-corner {
   position: absolute;
   top: 16px;
   right: 16px;
   display: flex;
   gap: 8px;
-}
-
-/* In the top bar, the gear sits close to the palette. */
-.settings-button {
-  margin-right: -8px;
 }
 
 /* A popover: placed next to its button by features/theme-picker.js. */
@@ -781,12 +849,14 @@ body.dragging .welcome-hint {
 .theme-item {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 10px;
   width: 100%;
   padding: 7px 10px;
   border: 0;
   border-radius: 7px;
   background: transparent;
+  font-weight: 500;
   text-align: left;
 }
 
@@ -882,15 +952,19 @@ body.dragging .welcome-hint {
 
 /* ============================================================
  * 5. PLAYER
+ * The page never scrolls: the top bar, then the workspace (the stage
+ * and transport on the left, the marks sidebar on the right), then the
+ * sound dock. The waveform takes whatever height is left; the marks
+ * list scrolls inside its sidebar.
  * ============================================================ */
 
 .app {
   display: grid;
-  grid-template-rows: auto minmax(220px, 1fr) auto auto auto;
-  gap: 12px;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 10px;
   height: 100vh;
-  min-height: 620px;
-  padding: 12px 16px 14px;
+  padding: 10px 14px 12px;
+  overflow: hidden;
 }
 
 body.dragging .app {
@@ -898,21 +972,50 @@ body.dragging .app {
   outline-offset: -6px;
 }
 
+/* A card: the timeline, the transport, the sidebar, the dock. */
+.timeline,
+.transport,
+.sidebar,
+.dock,
+.video-pane,
+.waveform-minimap {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--sidebar-width);
+  gap: 12px;
+  min-height: 0;
+}
+
+.main {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 10px;
+  min-width: 0;
+  min-height: 0;
+}
+
 /* ---------- Top bar ---------- */
 
 .topbar {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   min-width: 0;
+  height: 40px;
 }
 
 .brand {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   font-family: var(--display);
-  font-size: 24px;
+  font-size: 22px;
   white-space: nowrap;
 }
 
@@ -923,45 +1026,101 @@ body.dragging .app {
 
 /* The bee; its glow is part of the image, so it can overhang a little. */
 .brand-logo {
-  width: 40px;
-  height: 40px;
+  width: 38px;
+  height: 38px;
   margin-block: -6px;
   object-fit: contain;
+}
+
+.topbar-actions,
+.topbar-tools {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .open-button input {
   display: none;
 }
 
-.file-name {
+/* The open file: an icon for audio or video, its name, its length and
+   kind. */
+.file-info {
+  display: flex;
   flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding-left: 12px;
+  border-left: 1px solid var(--hairline);
+  color: var(--muted);
+}
+
+.file-kind {
+  display: none;
+  color: var(--accent);
+}
+
+.file-info.loaded:not(.video) .file-kind-audio,
+.file-info.loaded.video .file-kind-video {
+  display: block;
+}
+
+.file-name {
   min-width: 0;
   overflow: hidden;
-  color: var(--muted);
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* ---------- Stage: video + waveform + minimap ---------- */
+.file-info.loaded .file-name {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.file-meta {
+  flex: none;
+  font: 600 12px var(--num);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Only in a narrow window, where the sidebar becomes a drawer. */
+.sidebar-toggle {
+  display: none;
+}
+
+.sidebar-toggle .badge {
+  position: absolute;
+  top: -3px;
+  right: -5px;
+  min-width: 17px;
+  padding: 0 4px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 10px;
+  line-height: 15px;
+}
+
+/* ---------- Stage: video + timeline + minimap ---------- */
 
 .stage {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 48px;
+  grid-template-rows: minmax(0, 1fr) 44px;
   gap: 8px;
   min-height: 0;
 }
 
-/* Video files: picture on top, a shorter timeline (its lanes take 48 px,
-   so the waveform keeps about 110), then the minimap. */
+/* Video files: the picture on top, then a shorter timeline (its lanes
+   take 48 px), then the minimap. */
 .stage.has-video {
-  grid-template-rows: minmax(0, 1fr) minmax(160px, 32%) 48px;
+  grid-template-rows: minmax(0, 1fr) minmax(170px, 40%) 44px;
 }
 
 .video-pane {
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
   background: #000;
 }
 
@@ -973,8 +1132,6 @@ body.dragging .app {
 
 .waveform-minimap {
   overflow: hidden;
-  border: 1px solid var(--border);
-  background: var(--surface);
 }
 
 /* The waveform's border and corners are the timeline's (below). */
@@ -1019,9 +1176,6 @@ body.dragging .app {
   grid-template-rows: 22px 26px minmax(0, 1fr);
   min-height: 0;
   overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
   isolation: isolate;
 }
 
@@ -1081,7 +1235,9 @@ body.dragging .app {
   filter: drop-shadow(0 0 1px var(--surface));
 }
 
+/* The ▶ drags, so it stays on top where it meets the ■. */
 .ruler-start {
+  z-index: 2;
   width: 0;
   height: 0;
   border-block: 6px solid transparent;
@@ -1190,11 +1346,11 @@ body.dragging .app {
 
 .guide-mark {
   margin-left: -0.5px;
-  border-left: 1px solid color-mix(in srgb, var(--mark-color) 55%, transparent);
+  border-left: 1px solid color-mix(in srgb, var(--mark-color) 38%, transparent);
 }
 
 .guide-region {
-  border-right: 1px solid color-mix(in srgb, var(--mark-color) 55%, transparent);
+  border-right: 1px solid color-mix(in srgb, var(--mark-color) 38%, transparent);
 }
 
 .guide-mark.selected {
@@ -1250,7 +1406,7 @@ body.dragging .app {
 
 .waveform-minimap {
   position: relative;
-  border-radius: 8px;
+  border-radius: var(--radius-sm);
   cursor: grab;
   touch-action: none;
 }
@@ -1305,230 +1461,181 @@ body.dragging .app {
 
 /* ---------- Transport bar ---------- */
 
+/* The buttons, the time (large), any message, then the chips: where Space
+   plays from, the loop, the step size. */
 .transport {
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 8px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
+  min-width: 0;
+  padding: 7px 10px;
 }
 
 .transport-buttons {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 4px;
 }
 
-.step-size {
-  color: var(--muted);
-  font-size: 13px;
-  white-space: nowrap;
+.transport-buttons .icon-button {
+  color: var(--text);
 }
 
-/* Where Space plays from: green, like its line on the waveform. */
-.start-point {
-  color: var(--start);
-  font-family: var(--num);
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
+.play-button {
+  min-width: 104px;
+  height: 36px;
+  margin-inline: 4px;
+  border-radius: 999px;
 }
 
-.loop-info {
-  color: var(--loop);
-  font-size: 13px;
-  white-space: nowrap;
+.play-button .icon-pause,
+.play-button.playing .icon-play {
+  display: none;
 }
 
-.loop-info.disabled {
-  color: var(--muted);
+.play-button.playing .icon-pause {
+  display: block;
 }
 
 .track-time {
   font-size: 22px;
   font-weight: 800;
+  letter-spacing: -0.01em;
   white-space: nowrap;
 }
 
-/* ---------- Panels: speed, pitch, volume, EQ ---------- */
-
-.panels {
-  display: grid;
-  grid-template-columns: 1fr 1.25fr 0.8fr 1.5fr;
-  gap: 12px;
-}
-
-@media (max-width: 960px) {
-  .panels {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
-.panel {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  min-width: 0;
-  padding: 12px 14px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface);
-}
-
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.panel-actions {
-  display: flex;
-  gap: 6px;
-}
-
-.panel-footer-button {
-  align-self: flex-end;
-  margin-top: auto;
-}
-
-.readout {
-  font-size: 18px;
-  font-weight: 800;
-}
-
-.scale {
-  display: flex;
-  justify-content: space-between;
-  margin-top: -6px;
+.time-total {
   color: var(--muted);
-  font: 600 10px var(--num);
-  font-variant-numeric: tabular-nums;
-}
-
-.chips {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 6px;
-  margin-top: auto;
-}
-
-.chip {
-  padding: 4px 0;
-  font: 700 12px var(--num);
-  font-variant-numeric: tabular-nums;
-}
-
-.chip.active {
-  border-color: var(--accent);
-  color: var(--accent);
-}
-
-.slider-row {
-  display: grid;
-  grid-template-columns: 66px minmax(0, 1fr) 46px;
-  align-items: center;
-  gap: 8px;
-}
-
-.slider-row label {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.slider-row output {
-  font-size: 11px;
-  text-align: right;
-}
-
-/* ---------- EQ ---------- */
-
-.eq-faders {
-  display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 4px;
-}
-
-.eq.bypassed .eq-faders {
-  opacity: 0.4;
-}
-
-.fader {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-}
-
-.fader output {
-  font-size: 10px;
-  white-space: nowrap;
-}
-
-.fader input[type="range"] {
-  width: 20px;
-  height: 68px;
-  writing-mode: vertical-lr;
-  direction: rtl;
-}
-
-.fader label {
-  color: var(--muted);
-  font-size: 10px;
+  font-size: 14px;
   font-weight: 600;
-  text-align: center;
-  text-transform: uppercase;
 }
 
-.fader label small {
-  display: block;
-  font-weight: 400;
-  text-transform: none;
+.transport-chips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
 }
 
-/* ---------- Marks list ---------- */
+/* Small rounded readouts; the start point's is a button. */
+.chip-button {
+  padding: 4px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--muted);
+  font: 700 12px/1.3 var(--num);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
 
-/* Across the whole row of panels, under them. */
-.marks-panel {
-  grid-column: 1 / -1;
+/* Where Space plays from: green, like its ▶ on the ruler. */
+.start-point {
+  color: var(--start);
+}
+
+.loop-info {
+  border-color: color-mix(in srgb, var(--loop) 35%, transparent);
+  color: var(--loop);
+}
+
+.loop-info.disabled {
+  border-color: var(--hairline);
+  color: var(--muted);
+}
+
+/* ---------- Marks sidebar ---------- */
+
+.sidebar {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.sidebar-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px 10px 14px;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.sidebar-actions {
+  display: flex;
+  gap: 4px;
+  margin-left: auto;
 }
 
 .marks-empty {
-  margin: 0;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 24px;
   color: var(--muted);
-  font-size: 13px;
+  text-align: center;
 }
 
-/* About six rows, then it scrolls. */
+.marks-empty p {
+  margin: 0;
+  line-height: 1.7;
+}
+
+.marks-empty p:first-of-type {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.marks-empty-icon {
+  width: 30px;
+  height: 30px;
+  margin-bottom: 6px;
+  opacity: 0.5;
+}
+
+/* Fills the sidebar and scrolls; the page never grows with it. */
 .marks-list {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 2px;
-  max-height: 204px;
+  min-height: 0;
   margin: 0;
-  padding: 0;
+  padding: 6px;
   overflow-y: auto;
   list-style: none;
 }
 
+/* A mark: its colour, its name (editable) and × on the first line, its
+   time (a button that goes there) under the name. */
 .mark-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  grid-template-areas:
+    "color name remove"
+    ". time remove";
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
-  min-height: 32px;
-  padding: 2px 6px;
-  border-radius: 6px;
+  column-gap: 8px;
+  padding: 5px 6px 5px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.mark-row:hover {
+  background: color-mix(in srgb, var(--surface-hover) 60%, transparent);
 }
 
 .mark-row.selected {
   background: var(--surface-2);
+  box-shadow: inset 3px 0 0 var(--accent);
 }
 
 .mark-color {
-  width: 16px;
-  height: 16px;
+  grid-area: color;
+  width: 14px;
+  height: 14px;
   padding: 0;
   border: 2px solid var(--surface);
   border-radius: 50%;
@@ -1541,14 +1648,14 @@ body.dragging .app {
 }
 
 .mark-name {
+  grid-area: name;
   min-width: 0;
-  padding: 3px 6px;
+  padding: 2px 5px;
   border: 1px solid transparent;
   border-radius: 5px;
   background: transparent;
   color: var(--text);
-  font: inherit;
-  font-size: 13px;
+  font: 600 13px var(--sans);
 }
 
 .mark-name:hover,
@@ -1558,83 +1665,350 @@ body.dragging .app {
 }
 
 .mark-time {
-  padding: 3px 6px;
-  border-color: transparent;
+  grid-area: time;
+  justify-self: start;
+  padding: 0 5px;
+  border: 0;
   background: transparent;
   color: var(--muted);
-  font: 600 12px var(--num);
+  font: 600 11.5px var(--num);
   font-variant-numeric: tabular-nums;
 }
 
 .mark-time:hover {
+  background: transparent;
   color: var(--text);
+  text-decoration: underline;
 }
 
+/* × shows on the row under the pointer, the selected one, or with focus. */
 .mark-remove {
+  grid-area: remove;
+  width: 26px;
+  height: 26px;
+  padding: 0;
   border-color: transparent;
   background: transparent;
   color: var(--muted);
+  font-size: 15px;
+  visibility: hidden;
+}
+
+.mark-row:hover .mark-remove,
+.mark-row.selected .mark-remove,
+.mark-remove:focus-visible {
+  visibility: visible;
 }
 
 .mark-remove:hover {
+  background: var(--surface-hover);
   color: var(--danger);
 }
 
-/* ---------- Shortcut legend ---------- */
+/* ---------- Sound dock: speed, pitch, volume, EQ ---------- */
 
-/* Closed by default: a <details>, opened by clicking its summary. */
-.shortcuts {
-  padding: 0 2px;
+.dock {
+  display: grid;
+  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1.15fr) minmax(0, 0.8fr) auto;
+  padding: 10px 0;
 }
 
-.shortcuts summary {
-  display: inline-flex;
+.dock-group {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 16px;
+}
+
+.dock-group + .dock-group {
+  border-left: 1px solid var(--hairline);
+}
+
+.dock-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+
+.dock-head h2 {
+  font-size: 12px;
+}
+
+.readout {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.speed-controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.dock-slider {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 90px;
+}
+
+.scale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font: 600 10px var(--num);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The speed presets: one row, or two on a narrower window. */
+.chips {
+  display: grid;
+  grid-template-columns: repeat(8, auto);
+  gap: 4px;
+}
+
+.chip {
+  min-width: 36px;
+  padding: 4px 6px;
+  border-radius: 6px;
+  font: 700 11.5px var(--num);
+  font-variant-numeric: tabular-nums;
+}
+
+.chip.active {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface-2));
+  color: var(--accent);
+}
+
+.slider-row {
+  display: grid;
+  grid-template-columns: 62px minmax(0, 1fr) 42px;
+  align-items: center;
+  gap: 8px;
+}
+
+.slider-row label {
+  color: var(--muted);
+  font-size: 11.5px;
+}
+
+.slider-row output {
+  font-size: 11.5px;
+  text-align: right;
+}
+
+/* ---------- EQ: on/off in the dock, the bands in a popover ---------- */
+
+.eq-open {
+  align-self: flex-start;
+  anchor-name: --eq-open;
+}
+
+.eq-group.bypassed .eq-open {
+  color: var(--muted);
+}
+
+/* Opened by its button (popovertarget), above it, anchored by CSS. */
+.eq-popover {
+  position: fixed;
+  inset: auto;
+  position-anchor: --eq-open;
+  position-area: top span-left;
+  position-try-fallbacks: flip-block;
+  margin: 0 0 8px;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-lifted);
+}
+
+.eq-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 10px;
+}
+
+.eq-faders {
+  display: grid;
+  grid-template-columns: repeat(5, 56px);
+  gap: 4px;
+}
+
+.eq-group.bypassed .eq-faders {
+  opacity: 0.45;
+}
+
+.fader {
+  display: flex;
+  flex-direction: column;
   align-items: center;
   gap: 6px;
+  min-width: 0;
+}
+
+.fader output {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.fader input[type="range"] {
+  width: 22px;
+  height: 120px;
+  writing-mode: vertical-lr;
+  direction: rtl;
+}
+
+.fader label {
   color: var(--muted);
-  font-family: var(--display);
-  font-size: 13px;
-  letter-spacing: 0.06em;
+  font-size: 10.5px;
+  font-weight: 700;
+  text-align: center;
   text-transform: uppercase;
-  list-style: none;
-  cursor: pointer;
-  user-select: none;
 }
 
-.shortcuts summary::-webkit-details-marker {
-  display: none;
+.fader label small {
+  display: block;
+  font-weight: 500;
+  text-transform: none;
 }
 
-.shortcuts summary::before {
-  content: "▸";
-  transition: transform 0.15s;
-}
+/* ---------- Keyboard shortcuts dialog ---------- */
 
-.shortcuts details[open] summary::before {
-  transform: rotate(90deg);
-}
-
-.shortcuts summary:hover {
+.shortcuts-dialog {
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
   color: var(--text);
+  box-shadow: var(--shadow-lifted);
 }
 
-.shortcuts details[open] .shortcut-list {
-  margin-top: 8px;
+.shortcuts-dialog::backdrop {
+  background: var(--overlay-bg);
+}
+
+/* The groups in two columns, each kept whole. */
+.shortcut-groups {
+  padding: 8px 22px 20px;
+  overflow: auto;
+  columns: 2 300px;
+  column-gap: 32px;
+}
+
+.shortcut-group {
+  break-inside: avoid;
+  padding-top: 12px;
+}
+
+.shortcut-group h3 {
+  margin: 0 0 8px;
+  color: var(--accent);
+  font: 700 12px var(--sans);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .shortcut-list {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 18px;
+  flex-direction: column;
+  gap: 6px;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .shortcut-list li {
-  display: flex;
+  display: grid;
+  grid-template-columns: 112px minmax(0, 1fr);
   align-items: center;
-  gap: 6px;
+  gap: 10px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 12.5px;
+}
+
+.shortcut-keys {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+  color: var(--muted);
+}
+
+/* ---------- Smaller windows ----------
+   Narrow: the sidebar becomes a drawer over the timeline, opened from the
+   top bar; the speed presets take two rows. Short: the dock and the
+   minimap get more compact. */
+
+@media (max-width: 1279px) {
+  .chips {
+    grid-template-columns: repeat(4, auto);
+  }
+}
+
+@media (max-width: 1099px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .sidebar-toggle {
+    display: grid;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 58px;
+    right: 14px;
+    bottom: 14px;
+    z-index: 20;
+    width: min(340px, calc(100vw - 28px));
+    box-shadow: var(--shadow-lifted);
+  }
+
+  .app:not(.sidebar-open) .sidebar {
+    display: none;
+  }
+
+  .sidebar-toggle[aria-expanded="true"] {
+    background: var(--surface-2);
+    color: var(--text);
+  }
+
+  .topbar-actions button,
+  .topbar-actions .open-button {
+    padding-inline: 10px;
+  }
+}
+
+@media (max-height: 719px) {
+  .app {
+    gap: 8px;
+    padding-block: 8px 10px;
+  }
+
+  .stage {
+    grid-template-rows: minmax(0, 1fr) 34px;
+  }
+
+  .dock {
+    padding: 6px 0;
+  }
+
+  .dock .scale {
+    display: none;
+  }
+
+  .dock-group {
+    gap: 3px;
+  }
 }

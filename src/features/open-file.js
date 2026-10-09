@@ -14,8 +14,8 @@ import { DecodeFailure, decodeFile } from "../audio/decoder.js";
 import { CONFIG } from "../config.js";
 import { player } from "../context.js";
 import { AppError } from "../core/errors.js";
-import { isVideoFile } from "../core/files.js";
-import { formatMemory } from "../core/format.js";
+import { fileExtension, isVideoFile } from "../core/files.js";
+import { formatDuration, formatMemory } from "../core/format.js";
 import { decodedBytes, fitsInMemory } from "../core/memory.js";
 import { workerCount } from "../core/parts.js";
 import { peaksPerSecondFor } from "../core/peaks.js";
@@ -178,6 +178,12 @@ export async function loadMediaFile(media, signal) {
   resetMarks(decoded.duration);
   resetSoundSettings();
   dom.fileName.textContent = media.name;
+  dom.fileName.title = media.name;
+  // Its length and kind, and an icon for audio or video.
+  const kind = fileExtension(media.name).toUpperCase();
+  dom.fileMeta.textContent = `${formatDuration(decoded.duration)} · ${kind}${isVideo ? " video" : ""}`;
+  dom.fileInfo.classList.toggle("video", isVideo);
+  dom.fileInfo.classList.add("loaded");
   document.title = `TranscriBee — ${media.name}`; // also the window title
   timer.done();
 

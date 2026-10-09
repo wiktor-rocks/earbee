@@ -4,7 +4,7 @@ A desktop player for transcribing music by ear. Open a song or a video, slow it 
 
 - **Speed** from 0.25× to 3× with presets, and **pitch** shift in semitones and cents. Both use [Signalsmith Stretch](https://signalsmith-audio.co.uk/code/stretch/).
 - **A–B loop.** Shift+drag on the waveform, drag the edges to adjust, or use `[` `]` `L`.
-- **Marks:** points and regions on the track, each with a name and a colour, shown in the marks lane above the waveform (with a faint guide line over it). `M` marks a point where you hear it (tap along while it plays); `R` starts a region and `R` again ends it. In the lane, drag a mark to move it, or a region's end to resize it; double-click to rename; Shift+← / Shift+→ go from mark to mark, Delete removes the selected one. The **Marks** list under the controls renames, recolours, deletes and goes to them. For now marks last until another file is opened.
+- **Marks:** points and regions on the track, each with a name and a colour, shown in the marks lane above the waveform (with a faint guide line over it). `M` marks a point where you hear it (tap along while it plays); `R` starts a region and `R` again ends it. In the lane, drag a mark to move it, or a region's end to resize it; double-click to rename; Shift+← / Shift+→ go from mark to mark, Delete removes the selected one. The **Marks** sidebar on the right lists them (it scrolls on its own, so the page never grows), with **Point** and **Region** buttons; there you rename, recolour, delete and go to them. For now marks last until another file is opened.
 - **Waveform** with a minimap, and a **time ruler** above it (click or drag it to seek). The wheel on the waveform or the lanes zooms at the mouse; the wheel on the minimap scrolls. A thin line follows the mouse and shows the time a click goes to; the playback cursor is 1 px wide, for precise placing. Markers never cover the sound: they live on the ruler and the marks lane, which always move with the waveform.
 - **Keyboard stepping:**
   - ← / → step back and forward;
@@ -18,7 +18,9 @@ A desktop player for transcribing music by ear. Open a song or a video, slow it 
 - **Colour themes:** dark (TranscriBee, Monokai, Dracula, Nord, One Dark) and light (TranscriBee Light, Solarized Light, Catppuccin Latte, GitHub Light, Gruvbox Light), or **Automatic**, which follows your system's dark or light mode (TranscriBee or TranscriBee Light unless you pick others). Pick one with the palette button in the top bar, or in Settings; it's remembered.
 - **Works offline.** All libraries and fonts are bundled. Only downloading needs the internet.
 
-**Keyboard shortcuts** at the bottom of the window (click to open) lists every key.
+**The layout.** The waveform takes all the spare height; the marks sidebar is on the right, and speed, pitch, volume and EQ sit in one dock along the bottom (the EQ's bands open in a popover from **Bands**). The page itself never scrolls. In a narrow window (under 1100 px) the sidebar becomes a drawer, opened from the top bar; in a short one (under 720 px) the dock gets more compact. The smallest window is 900 × 640.
+
+**Keyboard shortcuts:** the **?** button in the top bar (or the `?` key) lists every key, by group.
 
 ## Requirements
 
@@ -79,7 +81,7 @@ src/               The page (ES modules, no build step), in layers:
   ui/                dom.js, controls.js, shortcuts.js, theme.js, prefs.js,
                      pref-fields.js
   features/          playback.js, loop.js, marks.js, open-file.js, download.js,
-                     theme-picker.js, settings.js
+                     theme-picker.js, settings.js, layout.js
   app.js             entry point: creates and wires everything
   vendor/            Signalsmith Stretch, patched (see its README.md)
 index.html         The page: welcome screen, loading screen, player

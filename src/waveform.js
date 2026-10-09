@@ -107,6 +107,10 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
         height: "auto",
         ...waveColors(),
         cursorWidth: 1, // thin, for precision (WaveSurfer shifts it by up to this)
+        // Rounded bars with small gaps: lighter than a solid fill.
+        barWidth: 2,
+        barGap: 1,
+        barRadius: 2,
         normalize: true,
         interact: false, // seeking is handled by bindPointerSeek()
         dragToSeek: false,

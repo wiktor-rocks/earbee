@@ -1,8 +1,9 @@
-// Marks on the waveform: the actions on them (their keys are in SHORTCUTS,
-// app.js), the selected mark, the region being marked, and the marks list
-// under the controls. The marks themselves are in the store (`marks`,
-// context.js; src/marks); the waveform draws them and reports drags on
-// them (waveform.js). Every change to the store redraws both views.
+// Marks: the actions on them (their keys are in SHORTCUTS, app.js; the
+// sidebar's Point and Region buttons do M and R), the selected mark, the
+// region being marked, and the marks list in the sidebar. The marks
+// themselves are in the store (`marks`, context.js; src/marks); the
+// timeline draws them in its lane and reports drags on them (timeline.js).
+// Every change to the store redraws both views.
 import { CONFIG } from "../config.js";
 import { marks, player } from "../context.js";
 import { formatTrackTime } from "../core/format.js";
@@ -187,9 +188,15 @@ function renderList() {
   if (order.some((row, i) => dom.marksList.children[i] !== row)) dom.marksList.replaceChildren(...order);
   dom.marksEmpty.hidden = list.length > 0;
   dom.marksCount.textContent = list.length ? String(list.length) : "";
+  // The sidebar's toggle (a narrow window) shows the count too.
+  dom.sidebarCount.textContent = dom.marksCount.textContent;
+  dom.sidebarCount.hidden = !list.length;
 }
 
 export function bindMarks() {
+  // The sidebar's buttons do what M and R do.
+  onClick(dom.addPointButton, markPoint);
+  onClick(dom.addRegionButton, markRegion);
   marks.on("change", () => {
     if (selected && !marks.get(selected)) selected = null;
     show();

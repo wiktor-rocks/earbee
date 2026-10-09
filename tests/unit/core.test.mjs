@@ -14,6 +14,7 @@ import {
   formatSpeed,
   formatStepSize,
   formatTrackTime,
+  formatDuration,
 } from "../../src/core/format.js";
 import { downsamplePeaks, peaksPerSecondFor } from "../../src/core/peaks.js";
 import { timelinePositionAt } from "../../src/core/timeline.js";
@@ -21,6 +22,9 @@ import { timelinePositionAt } from "../../src/core/timeline.js";
 describe("format", () => {
   test("track time: minutes, hours, never negative", () => {
     assert.equal(formatTrackTime(83.456), "1:23.456");
+    assert.equal(formatDuration(83.6), "1:24");
+    assert.equal(formatDuration(3723.4), "1:02:03");
+    assert.equal(formatDuration(0), "0:00");
     assert.equal(formatTrackTime(3723.5), "1:02:03.500");
     assert.equal(formatTrackTime(-2), "0:00.000");
   });

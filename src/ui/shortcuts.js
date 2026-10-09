@@ -1,12 +1,13 @@
 /* =====================================================================
  * KEYBOARD SHORTCUTS
  * How keys reach shortcuts. The table itself (SHORTCUTS) is in app.js,
- * which knows the actions; the legend at the bottom of the window is
- * rendered from it.
+ * which knows the actions; the shortcuts dialog (the ? button or key)
+ * lists it, by group.
  *
+ *   group   the heading it's listed under ("Playback", "Marks", …)
  *   codes   KeyboardEvent.code values (physical keys, any layout)
  *   shift   true if the shortcut is Shift + the key (optional)
- *   keys    labels for the legend, one per code
+ *   keys    labels for the shortcuts dialog, one per code
  *   down    called on key press, with the KeyboardEvent
  *   up      called on key release (optional), with the KeyboardEvent
  *   repeat  whether holding the key keeps firing `down`
@@ -19,6 +20,7 @@ import { dom, element, guarded } from "./dom.js";
 
 /**
  * @typedef {object} Shortcut
+ * @property {string} group
  * @property {string[]} codes
  * @property {boolean} [shift]
  * @property {string[]} keys
@@ -70,16 +72,25 @@ function handleShortcutKey(shortcuts, isBlocked, event) {
   guarded(handler)(event);
 }
 
+// The list in the shortcuts dialog: one section per group, in the order
+// the groups first appear in the table.
 export function renderShortcutLegend(shortcuts) {
+  const lists = new Map();
   for (const shortcut of shortcuts) {
-    const item = element("li");
-    if (shortcut.shift) item.append(element("kbd", {}, "Shift"), "+");
+    if (!lists.has(shortcut.group)) {
+      const list = element("ul", { className: "shortcut-list" });
+      lists.set(shortcut.group, list);
+      dom.shortcutList.append(
+        element("section", { className: "shortcut-group" }, element("h3", {}, shortcut.group), list),
+      );
+    }
+    const keys = element("span", { className: "shortcut-keys" });
+    if (shortcut.shift) keys.append(element("kbd", {}, "Shift"), "+");
     shortcut.keys.forEach((key, i) => {
-      if (i > 0) item.append("/");
-      item.append(element("kbd", {}, key));
+      if (i > 0) keys.append("/");
+      keys.append(element("kbd", {}, key));
     });
-    item.append(shortcut.description);
-    dom.shortcutList.append(item);
+    lists.get(shortcut.group).append(element("li", {}, keys, shortcut.description));
   }
 }
 

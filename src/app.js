@@ -84,7 +84,8 @@
  *                  (one Settings control per field type)
  *   features/      playback.js, loop.js, marks.js (actions, selection, the
  *                  marks list), open-file.js, download.js, theme-picker.js,
- *                  settings.js (the Settings dialog)
+ *                  settings.js (the Settings dialog), layout.js (the
+ *                  shortcuts dialog, the marks drawer in narrow windows)
  *   app.js         This file: creates and wires the components, the
  *                  SHORTCUTS table, start()
  *   vendor/        Signalsmith Stretch, patched to read across several
@@ -100,8 +101,13 @@
  *                             (context.js), an entry to SLIDERS
  *                             (ui/controls.js), and an <input type="range">
  *                             plus readout to index.html.
- *   New keyboard shortcut     Add an entry to SHORTCUTS (below); the legend
- *                             at the bottom of the window updates itself.
+ *   New keyboard shortcut     Add an entry to SHORTCUTS (below), with its
+ *                             group; the shortcuts dialog (?) lists it.
+ *   Layout and look           style.css: the tokens at the top (colours,
+ *                             radii, shadows, --sidebar-width) and section 5
+ *                             (the page's grid, the cards, the dock, and the
+ *                             media queries for narrow and short windows);
+ *                             icons are <symbol>s in index.html's sprite.
  *   Colours and fonts         Tokens at the top of style.css (the waveform
  *                             reads its colours from there too). Colours
  *                             come from the theme (src/themes); the :root
@@ -184,6 +190,7 @@ import {
   renameMark,
   selectMark,
 } from "./features/marks.js";
+import { bindLayout, openShortcuts } from "./features/layout.js";
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
 import { bindSettings, isSettingsOpen } from "./features/settings.js";
 import { bindThemePicker, isThemeMenuOpen } from "./features/theme-picker.js";
@@ -293,48 +300,113 @@ transport.on("jump", (time) => {
 
 /* =====================================================================
  * KEYBOARD SHORTCUTS
- * Modelled on the defaults of Seventh String's Transcribe!. The legend at
- * the bottom of the window is rendered from this table; how keys reach
+ * Modelled on the defaults of Seventh String's Transcribe!. The shortcuts
+ * dialog (the ? button or key) is rendered from this table; how keys reach
  * it is in ui/shortcuts.js.
  * ===================================================================== */
 
 /** @type {Shortcut[]} */
 const SHORTCUTS = [
   {
+    group: "Playback",
     codes: ["Space"],
     keys: ["Space"],
     description: "Play / pause (replays from where you started)",
     down: replayOrPause,
   },
-  { codes: ["Comma"], keys: [","], description: "Pause / resume here", down: togglePlay },
-  { codes: ["KeyS"], keys: ["S"], description: "Space plays from here next time", down: startHere },
-  { codes: ["Period"], keys: ["."], description: "Stop", down: stop },
-  { codes: ["KeyZ", "Semicolon"], keys: ["Z", ";"], description: "Play while held", down: holdToPlay, up: releaseHold },
-  { codes: ["ArrowLeft"], keys: ["←"], description: "Step back (hold to rewind)", repeat: true, down: stepBack },
+  { group: "Playback", codes: ["Comma"], keys: [","], description: "Pause / resume here", down: togglePlay },
+  { group: "Playback", codes: ["KeyS"], keys: ["S"], description: "Space plays from here next time", down: startHere },
+  { group: "Playback", codes: ["Period"], keys: ["."], description: "Stop", down: stop },
   {
+    group: "Playback",
+    codes: ["KeyZ", "Semicolon"],
+    keys: ["Z", ";"],
+    description: "Play while held",
+    down: holdToPlay,
+    up: releaseHold,
+  },
+  {
+    group: "Moving around",
+    codes: ["ArrowLeft"],
+    keys: ["←"],
+    description: "Step back (hold to rewind)",
+    repeat: true,
+    down: stepBack,
+  },
+  {
+    group: "Moving around",
     codes: ["ArrowRight"],
     keys: ["→"],
     description: "Step forward (hold to fast-forward)",
     repeat: true,
     down: stepForward,
   },
-  { codes: ["ArrowUp"], keys: ["↑"], description: "Larger step", down: () => changeStepSize(1) },
-  { codes: ["ArrowDown"], keys: ["↓"], description: "Smaller step", down: () => changeStepSize(-1) },
-  { codes: ["BracketLeft"], keys: ["["], description: "Loop start", down: setLoopStart },
-  { codes: ["BracketRight"], keys: ["]"], description: "Loop end", down: setLoopEnd },
-  { codes: ["KeyL"], keys: ["L"], description: "Loop on / off", down: toggleLoop },
-  { codes: ["KeyL"], shift: true, keys: ["L"], description: "Clear loop", down: clearLoop },
-  { codes: ["KeyM"], keys: ["M"], description: "Mark a point", down: markPoint },
-  { codes: ["KeyR"], keys: ["R"], description: "Mark a region (press at its start, then its end)", down: markRegion },
-  { codes: ["ArrowLeft"], shift: true, keys: ["←"], description: "Previous mark", repeat: true, down: previousMark },
-  { codes: ["ArrowRight"], shift: true, keys: ["→"], description: "Next mark", repeat: true, down: nextMark },
   {
+    group: "Moving around",
+    codes: ["ArrowUp"],
+    keys: ["↑"],
+    description: "Larger step",
+    down: () => changeStepSize(1),
+  },
+  {
+    group: "Moving around",
+    codes: ["ArrowDown"],
+    keys: ["↓"],
+    description: "Smaller step",
+    down: () => changeStepSize(-1),
+  },
+  { group: "A–B loop", codes: ["BracketLeft"], keys: ["["], description: "Loop start", down: setLoopStart },
+  { group: "A–B loop", codes: ["BracketRight"], keys: ["]"], description: "Loop end", down: setLoopEnd },
+  { group: "A–B loop", codes: ["KeyL"], keys: ["L"], description: "Loop on / off", down: toggleLoop },
+  { group: "A–B loop", codes: ["KeyL"], shift: true, keys: ["L"], description: "Clear loop", down: clearLoop },
+  { group: "Marks", codes: ["KeyM"], keys: ["M"], description: "Mark a point", down: markPoint },
+  {
+    group: "Marks",
+    codes: ["KeyR"],
+    keys: ["R"],
+    description: "Mark a region (press at its start, then its end)",
+    down: markRegion,
+  },
+  {
+    group: "Marks",
+    codes: ["ArrowLeft"],
+    shift: true,
+    keys: ["←"],
+    description: "Previous mark",
+    repeat: true,
+    down: previousMark,
+  },
+  {
+    group: "Marks",
+    codes: ["ArrowRight"],
+    shift: true,
+    keys: ["→"],
+    description: "Next mark",
+    repeat: true,
+    down: nextMark,
+  },
+  {
+    group: "Marks",
     codes: ["Delete", "Backspace"],
     keys: ["Delete", "Backspace"],
     description: "Delete the selected mark",
     down: deleteSelectedMark,
   },
-  { codes: ["Escape"], keys: ["Esc"], description: "Stop marking a region / deselect the mark", down: cancelMarking },
+  {
+    group: "Marks",
+    codes: ["Escape"],
+    keys: ["Esc"],
+    description: "Stop marking a region / deselect the mark",
+    down: cancelMarking,
+  },
+  {
+    group: "Help",
+    codes: ["Slash"],
+    shift: true,
+    keys: ["?"],
+    description: "Show these shortcuts",
+    down: openShortcuts,
+  },
 ];
 
 /* =====================================================================
@@ -370,7 +442,11 @@ function start() {
   bindThemePicker();
   bindSettings();
   bindMarks();
-  bindShortcuts(SHORTCUTS, () => isLoading() || dom.downloadDialog.open || isThemeMenuOpen() || isSettingsOpen());
+  bindLayout();
+  bindShortcuts(
+    SHORTCUTS,
+    () => isLoading() || dom.downloadDialog.open || isThemeMenuOpen() || isSettingsOpen() || dom.shortcutsDialog.open,
+  );
   dom.welcomeOpen.focus();
 }
 

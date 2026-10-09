@@ -43,6 +43,75 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-09: A new look and layout: marks sidebar, sound dock, no page scrolling
+
+- **What:**
+  - **Layout:**
+    - **The page never scrolls.** It's the top bar, then the workspace, then the dock.
+    - **The workspace** has the stage (video, timeline, minimap) and the transport on the left, and the **marks sidebar** on the right.
+    - **The sound dock** along the bottom holds speed, pitch, volume and EQ in one row. The EQ's on/off switch is in the dock, and its bands open in a popover from **Bands**.
+    - **The waveform takes all the spare height:** about 450 px at 1200×800, where it was about 115.
+  - **Marks sidebar:**
+    - the list scrolls inside it, so marks no longer push the page down;
+    - each row shows the colour and the name on one line and the time under it, with × on hover or selection;
+    - **Point** and **Region** buttons do what M and R do;
+    - an empty state explains how to start.
+  - **Look ("refined and calm"):**
+    - the cards (timeline, transport, sidebar, dock) are set apart by surface and a soft shadow, with a hairline instead of strong borders;
+    - one radius and spacing scale throughout;
+    - soft buttons with the accent kept for the primary actions (Play, Open, Download);
+    - the waveform is drawn as rounded bars with gaps (`barWidth 2, barGap 1, barRadius 2`) instead of a solid slab;
+    - guide lines are fainter (38 %).
+  - **One icon set:** an SVG sprite in `index.html` (`<symbol id="i-…">`) with play, pause, stop, step, gear, palette, help, sidebar, reset, open, download, point, region, sliders, note and film. The Play button swaps play and pause icons, and tooltips name each button's key.
+  - **Top bar:** Open… and YouTube… with icons; the open file shown with an audio or video icon, its name, and its length and kind (`1:30 · M4A`); then the tools (?, Settings, theme).
+  - **Transport:** the position is large and the duration small (`0:15.003 / 1:30.023`), and the start point, loop and step size are rounded chips on the right.
+  - **The shortcut legend became a "?" dialog,** grouped by Playback, Moving around, A–B loop, Marks and Help, in two columns. It opens from the ? button or the `?` key.
+  - **Small windows:**
+    - under 1280 px wide, the speed presets take two rows;
+    - under 1100 px wide, the sidebar becomes a drawer over the timeline, opened from a top-bar button that shows the marks count. Esc or a click outside closes it;
+    - under 720 px tall, the dock and minimap get more compact;
+    - at the 900×640 minimum, the waveform still gets about 300 px.
+- **Why:** the user asked for a modern, inviting, clear look, and for the space problems to be fixed: the marks section grew with every mark and pushed the page into scrolling. An audit with screenshots at 1000×700, 1200×800, 1440×900 and 1920×1080, with 13 marks and with a video, also found:
+  - the waveform squeezed to about 115 px;
+  - mostly empty control panels;
+  - very long sparse rows on wide screens;
+  - borders around everything;
+  - a dominant solid amber waveform;
+  - scattered readouts, and mixed text symbols and icons.
+
+  The user chose the layout (sidebar plus dock), the style, all four extras (bars, icons, the ? overlay, the top bar and readouts) and adaptive small windows.
+
+- **How:**
+  - **Markup:** `index.html` is restructured. Every element id the code and tests use is kept: `#speed`, `#speedChips`, `#eqFaders`, `#marksList`, `#trackTime` and the rest.
+  - **Styles:** `style.css` gains tokens (`--radius`, `--radius-sm`, `--hairline`, `--shadow`, `--shadow-lifted`, `--sidebar-width`) and a rewritten section 5 (layout, cards, top bar, transport, sidebar, dock, EQ popover, shortcuts dialog, media queries). The EQ popover is placed with CSS anchor positioning (`anchor-name` and `position-area`), with no script.
+  - **Behaviour:**
+    - `src/features/layout.js` (new) handles the shortcuts dialog and the sidebar drawer;
+    - each `SHORTCUTS` entry (`app.js`) has a `group`, and `renderShortcutLegend` (`ui/shortcuts.js`) renders sections;
+    - `ui/dom.js` renders the play label and icon state (`.playing`) and the time as two spans. Its text is unchanged, so `textContent` still reads `pos / dur`;
+    - `features/open-file.js` fills `#fileMeta` with `formatDuration` (new in `core/format.js`) and the extension;
+    - `features/marks.js` wires the Point and Region buttons and the drawer button's count.
+  - **The ▶ now sits above the ■ on the ruler.** With the narrower waveform, a start and stop point a few pixels apart overlapped, and the ■ took the press meant for dragging the ▶. The e2e test caught it.
+- **Where:**
+  - `index.html`, `style.css`;
+  - `src/features/layout.js` (new), `src/app.js`, `src/ui/dom.js`, `src/ui/shortcuts.js`;
+  - `src/features/marks.js`, `src/features/open-file.js`, `src/core/format.js`, `src/waveform.js`;
+  - `README.md`.
+- **Verified by:**
+  - **Unit:** `formatDuration` in `tests/unit/core.test.mjs`.
+  - **E2E, topic 01:** the shortcuts are grouped, and the dialog starts closed.
+  - **E2E, topic 14:**
+    - ? (button and key) opens the shortcuts and Esc closes them;
+    - with 25 marks the list scrolls inside the sidebar and the page height stays the window's;
+    - the Point button adds a mark;
+    - in a 1000 px window the sidebar is hidden, opens as a fixed drawer from the top bar, closes on Esc, and the button shows the count.
+  - **E2E, topic 04:** the click tolerance is now 0.03 s, since a pixel is 0.023 s on the narrower waveform.
+  - **Runs:** the full `npm test` passes: unit 120, e2e 256, smoke 20. `npm run check` is clean.
+  - **Screenshots,** looked at:
+    - 1000×700, 1200×800, 1920×1080 and 900×640 (with the drawer open);
+    - a video;
+    - TranscriBee Light;
+    - the EQ popover, the shortcuts dialog, the theme menu and Settings.
+
 ## 2026-10-09: Markers on their own lanes above the waveform (the timeline)
 
 - **What:**

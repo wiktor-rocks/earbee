@@ -49,12 +49,20 @@ module.exports = async function (h) {
     "the legend lists the mark keys",
     (await js(`document.getElementById("shortcutList").textContent`)).includes("Shift+→Next mark"),
   );
-  const legendShown = () => js(`document.querySelector("#shortcutList li").checkVisibility()`);
-  const legendClosed = !(await legendShown());
-  await js(`shortcutsTitle.click()`);
-  const legendOpened = await legendShown();
-  await js(`shortcutsTitle.click()`);
-  check("the legend's keys show only once it's opened", legendClosed && legendOpened && !(await legendShown()));
+  // The shortcuts dialog: the ? button and the ? key open it, Esc closes it.
+  await js(`helpButton.click()`);
+  await sleep(100);
+  const helpShown = await js(`shortcutsDialog.open && document.querySelector("#shortcutList li").checkVisibility()`);
+  key("Escape");
+  await sleep(100);
+  const helpClosed = !(await js(`shortcutsDialog.open`));
+  key("/", ["shift"]);
+  await sleep(100);
+  check(
+    "? (button or key) shows the shortcuts; Esc closes them",
+    helpShown && helpClosed && (await js(`shortcutsDialog.open`)),
+  );
+  await js(`shortcutsDialog.close()`);
 
   // M: a point at the cursor, drawn, listed, selected.
   await click(3);
@@ -245,6 +253,50 @@ module.exports = async function (h) {
     (await rect()).width > zoomed && Math.abs(flagX - (await xAt(remaining.start))) <= 2,
     `${flagX} vs ${await xAt(remaining.start)}`,
   );
+
+  // Many marks: the list scrolls inside the sidebar; the page never grows.
+  wc.sendInputEvent({ type: "mouseWheel", x: await xAt(7), y: Math.round((await rect()).y), deltaX: 0, deltaY: -6000 });
+  await sleep(300); // back to the whole track (zoomed in above)
+  for (let i = 0; i < 24; i++) {
+    await click(0.4 + i * 0.75);
+    key("M");
+  }
+  await sleep(200);
+  check(
+    "many marks scroll in the sidebar, and the page doesn't grow",
+    (await listed()).length >= 24 &&
+      (await js(`marksList.scrollHeight > marksList.clientHeight`)) &&
+      (await js(`document.scrollingElement.scrollHeight <= window.innerHeight`)),
+    [
+      (await listed()).length,
+      ...(await js(
+        `[marksList.scrollHeight, marksList.clientHeight, document.scrollingElement.scrollHeight, innerHeight]`,
+      )),
+    ],
+  );
+  const countBefore = (await listed()).length;
+  await js(`addPoint.click()`);
+  await sleep(100);
+  check("the sidebar's Point button marks a point", (await listed()).length === countBefore + 1);
+
+  // A narrow window: the sidebar is a drawer, opened from the top bar.
+  const [width, height] = h.win.getSize();
+  h.win.setSize(1000, height);
+  await sleep(400);
+  const hiddenWhenNarrow = !(await js(`sidebar.checkVisibility()`));
+  await js(`sidebarToggle.click()`);
+  await sleep(100);
+  const openedAsDrawer = await js(`sidebar.checkVisibility() && getComputedStyle(sidebar).position === "fixed"`);
+  key("Escape");
+  await sleep(100);
+  check(
+    "narrow: the sidebar is a drawer from the top bar, closed by Esc",
+    hiddenWhenNarrow && openedAsDrawer && !(await js(`sidebar.checkVisibility()`)),
+    JSON.stringify({ hiddenWhenNarrow, openedAsDrawer }),
+  );
+  check("…its button shows the count", (await js(`sidebarCount.textContent`)) === String(countBefore + 1));
+  h.win.setSize(width, height);
+  await sleep(400);
 
   // Another file: no marks.
   await openFile(path.join(FIXTURES, "long-chirp.m4a"));

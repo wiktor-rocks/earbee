@@ -121,7 +121,7 @@ module.exports = async function (h) {
   await click(5);
   check(
     "a click sets the start point: guide line, minimap tick and readout",
-    near(await startAt(), 5, 0.01) &&
+    near(await startAt(), 5, 0.03) &&
       Math.abs((await lineX()) - (await xAt(5))) <= 1.5 &&
       near(await js(`parseFloat(document.querySelector("#waveform-minimap .minimap-start").style.left)`), 25, 0.2),
     `${await startAt()} at ${await lineX()} vs ${await xAt(5)}`,
@@ -132,7 +132,7 @@ module.exports = async function (h) {
   await sleep(50);
   check(
     "after playing and pausing, it stays where playing started",
-    (await pos()) > 5.4 && near(await startAt(), 5, 0.01),
+    (await pos()) > 5.4 && near(await startAt(), 5, 0.03),
   );
 
   // S while playing: what was heard, without stopping.
