@@ -1,6 +1,7 @@
 // Space replays from where you started; comma resumes in place. The start
 // point shows where Space plays from: a green line (dragged by its handle),
-// a minimap tick and a readout; S sets it.
+// a minimap tick and a readout; S sets it. The stop point, in red, shows
+// where playback last stopped.
 // Part of the end-to-end run (see run.cjs); `h` is the harness.
 
 module.exports = async function (h) {
@@ -146,10 +147,11 @@ module.exports = async function (h) {
   await sleep(50);
   const fromS = await startAt();
   check("S sets the start point to what was heard", near(fromS, heard, 0.1), `${heard} → ${fromS}`);
+  let before = await pos(); // the first sample can come before the key is handled
   key("Space");
   s = await sample(300);
   await ensurePaused();
-  check("…and Space plays from there", near(firstMoved(s, -1), fromS), firstMoved(s, -1));
+  check("…and Space plays from there", near(firstMoved(s, before), fromS), firstMoved(s, before));
   await shot("start-point.png");
 
   // Dragging the handle moves the start point, not the cursor.
@@ -179,14 +181,62 @@ module.exports = async function (h) {
   await drag(14, 16, ["shift"]);
   await click(5);
   check("outside an active loop, it shows the loop start", near(await startAt(), 14, 0.05), await startAt());
+  before = await pos();
   key("Space");
   s = await sample(300);
   await ensurePaused();
-  check("…where Space starts", near(firstMoved(s, -1), 14, 0.08), firstMoved(s, -1));
+  check("…where Space starts", near(firstMoved(s, before), 14, 0.08), firstMoved(s, before));
   key("L", ["shift"]);
   await sleep(100);
 
   key(".");
   await sleep(100);
   check("Stop moves it to 0", (await startAt()) === 0);
+
+  // The stop point: where playback last stopped, in red.
+  const stopAt = async () => {
+    const left = await js(`(() => { const line = ${shadow}.querySelector('[part~="stop-point"]');
+      return line && !line.hidden ? parseFloat(line.style.left) : null; })()`);
+    return left === null ? null : (left / 100) * d;
+  };
+  await click(3);
+  key("Space");
+  await sleep(700);
+  key("Space");
+  await sleep(50);
+  const pausedHere = await pos();
+  check("pausing marks where it stopped", near(await stopAt(), pausedHere, 0.01), `${pausedHere} vs ${await stopAt()}`);
+  check(
+    "…on the minimap too",
+    near(
+      await js(`parseFloat(document.querySelector("#waveform-minimap .minimap-stop").style.left)`),
+      (pausedHere / d) * 100,
+      0.2,
+    ),
+  );
+  key("Space"); // replays from 3: the stop point stays until the next stop
+  await sleep(300);
+  check("it stays while playing again", near(await stopAt(), pausedHere, 0.01));
+  await sleep(300);
+  const beforeStop = await pos();
+  key(".");
+  await sleep(100);
+  const stoppedAt = await stopAt();
+  check(
+    "Stop marks where it was stopped, not 0",
+    (await pos()) === 0 && near(stoppedAt, beforeStop, 0.1),
+    `${beforeStop} vs ${stoppedAt}`,
+  );
+  const square = await js(
+    `(() => { const r = ${shadow}.querySelector('[part~="stop-handle"]').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`,
+  );
+  wc.sendInputEvent({ type: "mouseDown", x: square.x, y: square.y, button: "left", clickCount: 1 });
+  wc.sendInputEvent({ type: "mouseUp", x: square.x, y: square.y, button: "left", clickCount: 1 });
+  await sleep(150);
+  check("clicking its ■ goes there", near(await pos(), stoppedAt, 0.002), await pos());
+  await shot("stop-point.png");
+  await click(19);
+  key("Space");
+  await sleep(1600);
+  check("reaching the end marks the end", near(await stopAt(), d, 0.01), await stopAt());
 };

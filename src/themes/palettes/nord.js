@@ -1,5 +1,6 @@
 // Nord: Polar Night backgrounds, Frost accent, Aurora yellow loop (green
-// is too close to Frost) and a lightened Aurora red for errors. https://www.nordtheme.com/docs/colors-and-palettes
+// is too close to Frost) and a lightened Aurora red for errors. The stop
+// point gets a stronger red than the errors' (too close to the yellow loop). https://www.nordtheme.com/docs/colors-and-palettes
 /** @type {import("../index.js").Theme} */
 export default {
   id: "nord",
@@ -18,5 +19,6 @@ export default {
     loop: "#ebcb8b",
     wave: "#5b6680",
     cursor: "#eceff4",
+    stop: "#ff7b85",
   },
 };

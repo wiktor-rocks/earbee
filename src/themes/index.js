@@ -71,6 +71,7 @@ export const ROLES = {
   wave: "--wave", // the waveform not yet played
   cursor: "--cursor", // the playback cursor
   start: "--start", // optional; where Space plays from (green, apart from the loop and accent)
+  stop: "--stop", // optional; where playback last stopped (red, apart from the loop, accent and start)
   surfaceHover: "--surface-hover", // optional
   accentHover: "--accent-hover", // optional
   minimapWave: "--minimap-wave", // optional
@@ -85,6 +86,8 @@ const DERIVED = {
   minimapProgress: (c) => mix(c.accent, c.surface, 0.45),
   // The marks' green, in the shade for the scheme.
   start: (c, scheme) => MARK_COLORS.find((color) => color.id === "green")[scheme],
+  // The error red.
+  stop: (c) => c.danger,
 };
 
 export const REQUIRED_ROLES = Object.keys(ROLES).filter((role) => !(role in DERIVED));

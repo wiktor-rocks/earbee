@@ -55,14 +55,22 @@ describe("every theme", () => {
       atLeast(3, "--accent", "--surface");
       atLeast(3, "--loop", "--surface");
       atLeast(3, "--start", "--surface");
+      atLeast(3, "--stop", "--surface");
       atLeast(1.5, "--wave", "--surface");
       for (const color of MARK_COLORS) atLeast(3, `--mark-${color.id}`, "--bg", "--surface");
       const apart = distance(v["--loop"], v["--accent"]);
       assert.ok(apart >= 90, `loop and accent too alike (${apart.toFixed(0)})`);
-      for (const other of ["--loop", "--accent"]) {
-        const fromStart = distance(v["--start"], v[other]);
-        assert.ok(fromStart >= 70, `start point and ${other} too alike (${fromStart.toFixed(0)})`);
-      }
+      // The start and stop points: apart from each other and from the loop
+      // and accent they're drawn over. (Gruvbox's accent is itself a red-orange.)
+      const apartFrom = (variable, others, minimum) => {
+        for (const other of others) {
+          const away = distance(v[variable], v[other]);
+          assert.ok(away >= minimum, `${variable} and ${other} too alike (${away.toFixed(0)})`);
+        }
+      };
+      apartFrom("--start", ["--loop", "--accent", "--stop"], 70);
+      apartFrom("--stop", ["--loop"], 70);
+      apartFrom("--stop", ["--accent"], 60);
     });
   }
 });

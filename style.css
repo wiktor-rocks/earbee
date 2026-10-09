@@ -43,6 +43,8 @@
   --cursor: #ffffff;
   /* Where Space plays from (the start point): green */
   --start: #5fd38d;
+  /* Where playback last stopped (the stop point): red */
+  --stop: #ff6b6b;
 
   /* A–B loop: its own colour, so it stands out on the amber played part */
   --loop: #4cc9f0;
@@ -1106,6 +1108,35 @@ body.dragging .app {
   cursor: grab;
 }
 
+/* The stop point: where playback last stopped, drawn like the start
+   point in red, with a ■ handle to the left of the line (the start
+   point's ▶ is to the right, so both show when they meet). */
+.waveform ::part(stop-point) {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 4;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--stop);
+  box-shadow:
+    -1px 0 color-mix(in srgb, var(--surface) 35%, transparent),
+    1px 0 color-mix(in srgb, var(--surface) 35%, transparent);
+  pointer-events: none;
+}
+
+.waveform ::part(stop-handle) {
+  position: absolute;
+  right: 0;
+  bottom: 1px;
+  width: 11px;
+  height: 11px;
+  background: var(--stop);
+  filter: drop-shadow(0 0 1px var(--surface));
+  pointer-events: auto;
+  cursor: pointer;
+}
+
 /* The hover line: where a click would seek to (waveform.js), with its
    time at the bottom. Fainter than the playback cursor, above the marks. */
 .waveform ::part(hover-line) {
@@ -1159,6 +1190,17 @@ body.dragging .app {
   z-index: 3;
   width: 0;
   border-left: 2px solid var(--start);
+  margin-left: -1px;
+  pointer-events: none;
+}
+
+.minimap-stop {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 3;
+  width: 0;
+  border-left: 2px solid var(--stop);
   margin-left: -1px;
   pointer-events: none;
 }

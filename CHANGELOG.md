@@ -43,6 +43,41 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-09: The stop point: a red marker for where playback last stopped
+
+- **What:**
+  - **Where it shows:** where playback last stopped is now drawn in red. On the waveform it's a 2 px line with a ■ handle at its bottom; on the minimap it's a tick.
+  - **What counts as stopping:** a pause (Space, comma, releasing Z), Stop, and reaching the end. For Stop it's where you stopped, not 0, where the cursor goes.
+  - **Clicking the ■** goes there. It can't be dragged.
+  - **When it moves:** it stays put while playing again until the next stop, and a new file clears it.
+- **Why:** the user wanted to see where they last stopped, next to the green start point. It's the same kind of line, in red.
+- **How:**
+  - **Drawing:** in `src/waveform.js`, the start point's drawing became two shared helpers. `pointElements(kind, title)` makes `<div part="<kind>-point">` with `<span part="<kind>-handle" data-handle="<kind>">` and a `.minimap-<kind>` tick; `placePoint` positions them in percent. `setStopPoint(time)` draws the red one.
+  - **Handles:** `handleOf(event)` (which was `onStartHandle`) returns `"start"`, `"stop"` or null. A press on the ■ is the drag mode `"stop"`, which seeks on release.
+  - **Recording:** in `src/features/playback.js`, the `"paused"` and `"ended"` states set the stop point to the position, and `"ready"` (a new file) clears it. `stop(event)` records `transport.positionAt(event.timeStamp)` itself before the cursor goes back to 0.
+  - **The handles don't overlap:** the ■ sits left of its line and the ▶ right of its own, so both show when the two points meet.
+  - **The colour:** a new optional theme role, `stop` → `--stop`. By default it's the theme's error red. Nord's error red, a pale pink, was too close to its yellow loop, so Nord gets `#ff7b85`.
+- **Where:**
+  - `src/waveform.js`, `src/features/playback.js`;
+  - `src/themes/index.js`, `src/themes/palettes/nord.js`;
+  - `style.css` (`::part(stop-point)`, `::part(stop-handle)`, `.minimap-stop`, `--stop`);
+  - `src/app.js` (COMMON CHANGES), `README.md`.
+- **Verified by:**
+  - **Unit,** `tests/unit/themes.test.mjs`, in every theme:
+    - `--stop` has at least 3:1 contrast on `--surface`;
+    - `--stop` is at least 70 from `--loop` and 60 from `--accent` (Gruvbox Light's accent is an orange-red);
+    - `--start` is at least 70 from `--stop`;
+    - 116 unit tests pass.
+  - **E2E,** in `tests/e2e/04-space-replay.cjs`, 7 new checks:
+    - a pause marks the spot, and it's on the minimap too;
+    - it stays while playing again;
+    - Stop marks where it was stopped, not 0;
+    - clicking the ■ goes there;
+    - reaching the end marks the end.
+  - **Test fix:** two of the start-point checks were racy, because they read the first sample after Space, which can come before the key is handled. They now compare with the position before the key.
+  - **Runs:** `TB_TOPICS=01,02,03,04` passed twice, `TB_TOPICS=01,02,03,04,05,06,10,13,14` passes 191/191, and `npm run check` is clean.
+  - **Screenshot:** `tests/output/stop-point.png`.
+
 ## 2026-10-09: The start point: a green marker for where Space plays from
 
 - **What:**

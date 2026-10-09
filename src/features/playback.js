@@ -18,7 +18,13 @@ export function play() {
 // `event` (optional) is the key or click that asked for it: pausing uses its
 // timestamp to stop exactly at what was being heard at that moment.
 export const pause = (event) => player.transport.pause(event?.timeStamp);
-export const stop = () => player.transport.stop();
+// Stop also marks where it was stopped (the stop point), from what was
+// being heard at the key press, before the cursor goes back to 0.
+export function stop(event) {
+  const { transport } = player;
+  if (transport.playing) setStopPoint(transport.positionAt(event?.timeStamp ?? performance.now()));
+  transport.stop();
+}
 // Pause, or resume from where playback is now (comma).
 export const togglePlay = (event) => (player.transport.playing ? pause(event) : play());
 // Moves the cursor one step (settings.stepSize) back or forward.
@@ -45,6 +51,13 @@ function showStartPoint() {
   player.waveform.setStartPoint(time);
   dom.startPointButton.hidden = !loaded;
   if (loaded) dom.startPointButton.textContent = `▶ ${formatTrackTime(time)}`;
+}
+
+// The stop point: where playback last stopped (paused, stopped or reached
+// the end), shown as the red line; null before the first stop.
+/** @param {number | null} time */
+function setStopPoint(time) {
+  player.waveform.setStopPoint(time);
 }
 
 /** Space plays from `time` next (dragging the start point). @param {number} time */
@@ -103,6 +116,9 @@ export function bindPlayback() {
     if (state === "playing") returnPoint = player.transport.position;
     else if (state === "stopped" || state === "ready") returnPoint = 0;
     showStartPoint();
+    // Where it stopped (Stop marks it itself, before going back to 0).
+    if (state === "paused" || state === "ended") setStopPoint(player.transport.position);
+    else if (state === "ready") setStopPoint(null);
   });
   player.transport.on("jump", (time) => {
     returnPoint = time;

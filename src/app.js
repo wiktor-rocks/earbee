@@ -125,6 +125,9 @@
  *                             line, its handle, the ▶ readout and S) in
  *                             features/playback.js; the rule that keeps
  *                             it inside the loop is transport.playStartFor.
+ *                             The red stop point (where playback last
+ *                             stopped) is set there too, in stop() and on
+ *                             the "paused"/"ended" states.
  *   A–B loop                  State and actions in features/loop.js; audio
  *                             looping in audio/transport.js, drawing and
  *                             dragging in waveform.js.
