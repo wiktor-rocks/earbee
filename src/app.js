@@ -217,6 +217,7 @@ import {
   setEqEnabled,
 } from "./ui/controls.js";
 import { $, dom, renderStepSize, renderTrackTime, renderTransportState, reportError, showNotice } from "./ui/dom.js";
+import { bindFocus } from "./ui/focus.js";
 import { bindShortcuts, renderShortcutLegend } from "./ui/shortcuts.js";
 import { followThemePrefs, onThemeChange } from "./ui/theme.js";
 import { createVideoView } from "./video/view.js";
@@ -443,6 +444,7 @@ function start() {
   bindSettings();
   bindMarks();
   bindLayout();
+  bindFocus();
   bindShortcuts(
     SHORTCUTS,
     () => isLoading() || dom.downloadDialog.open || isThemeMenuOpen() || isSettingsOpen() || dom.shortcutsDialog.open,

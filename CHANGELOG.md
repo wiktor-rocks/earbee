@@ -43,6 +43,26 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-09: Keys never focus or ring buttons
+
+- **What:** a button, slider, chip or menu item clicked with the mouse gives its focus back at once. So later keys (Space, the arrows, any shortcut) go to the shortcuts and never draw a focus ring on what was clicked. When a dialog or menu (Settings, the shortcuts, From YouTube, the theme menu, the EQ bands) closes, focus isn't left on the button that opened it. Text fields keep their focus, and so do controls inside an open dialog or menu. **Keyboard navigation is unchanged:** after a Tab, focus is left alone until the next mouse press, so Tab, Enter and Esc still bring you back to the button. The welcome screen's Open button is still focused on purpose, so Enter opens a file.
+- **Why:** the user found buttons and sections lighting up after key presses confusing. Chromium shows `:focus-visible` on the focused element as soon as a key is pressed, so a clicked Play button got a ring when Space was pressed.
+- **How:**
+  - **`src/ui/focus.js` (new):** `bindFocus()`, called from `app.js`, works like this:
+    - on `pointerup`, and on every dialog's `close` and every popover's closing `toggle`, it blurs the focused element after a `setTimeout`, unless that element is a text field (`isTextField`), sits inside an open dialog or popover, or the user is navigating with Tab;
+    - a Tab key sets the "navigating with Tab" state, and a pointer press clears it.
+  - The theme menu's and Settings' own "focus back to the opener" stays for keyboard use, and runs first.
+- **Where:** `src/ui/focus.js`, `src/app.js`.
+- **Verified by:**
+  - **`14-marks.cjs`:** after a real mouse click on Play and then Space, nothing is focused and nothing matches `:focus-visible`. After clicking ? and then Esc, the same holds.
+  - **`05-stepping.cjs`:** a clicked slider gives its focus back (was: it kept it).
+  - **`10-themes.cjs`:**
+    - the menu opened by mouse and closed with Esc leaves nothing focused;
+    - new: Tab to the palette button, Enter (sent with its `char` event, which activates buttons), then Esc puts focus back on the button.
+  - **`13-settings.cjs`:** Esc leaves no focus on the gear when Settings was opened by a click.
+  - **Runs:** the full `npm test` gave unit 120 and e2e 260, all passing.
+  - **Smoke:** a theme-at-startup check failed once in ten runs (`saved theme applied on the next start`, once also `theme.json … is imported`); the other nine passed. It concerns the main process saving and applying the theme, which this change doesn't touch, so it looks like an existing timing flake to look into.
+
 ## 2026-10-09: No text highlighting anywhere in the app
 
 - **What:** text can't be selected anywhere: labels, times, buttons, dialogs, the marks list, and the welcome and loading screens. Dragging on the page no longer highlights it in blue. Text fields (mark names, the YouTube link) still select normally, since editing needs that. Images (the bee) can't be dragged out either.

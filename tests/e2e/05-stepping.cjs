@@ -68,7 +68,7 @@ module.exports = async function (h) {
   await sleep(100);
   const speedBefore = await js(`document.getElementById("speed").value`);
   p0 = await pos();
-  check("slider has focus after click", await js(`document.activeElement.id === "speed"`));
+  check("a clicked slider gives its focus back", await js(`document.activeElement === document.body`));
   key("Right");
   await sleep(100);
   check(

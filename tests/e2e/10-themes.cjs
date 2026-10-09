@@ -91,10 +91,35 @@ module.exports = async function (h) {
 
   key("Escape");
   await sleep(150);
+  // Opened with the mouse: nothing is left focused (no ring on the button).
   check(
-    "Escape closes the menu, focus back on its button",
-    !(await menuOpen()) && (await js(`document.activeElement.id`)) === "themeButton",
+    "Escape closes the menu; opened by mouse, no focus is left on its button",
+    !(await menuOpen()) && (await js(`document.activeElement === document.body`)),
   );
+  // Reached with Tab and opened with Enter: focus goes back to the button.
+  await js(`document.getElementById("settingsButton").focus()`);
+  key("Tab");
+  await sleep(50);
+  const tabbedTo = await js(`document.activeElement.id`);
+  // Enter activates a button through its "char" event, which key() doesn't send.
+  for (const type of ["keyDown", "char", "keyUp"])
+    wc.sendInputEvent({ type, keyCode: type === "char" ? "\r" : "Enter" });
+  await sleep(150);
+  const openedByKey = await menuOpen();
+  key("Escape");
+  await sleep(150);
+  check(
+    "with the keyboard (Tab, Enter, Esc), focus goes back to its button",
+    tabbedTo === "themeButton" && openedByKey && (await js(`document.activeElement.id`)) === "themeButton",
+    `${tabbedTo} ${openedByKey} ${await js(`document.activeElement.id`)}`,
+  );
+  // A mouse press ends keyboard navigation (back to the mouse rules).
+  const corner = await js(
+    `(() => { const r = document.querySelector(".file-info").getBoundingClientRect(); return { x: Math.round(r.right - 4), y: Math.round(r.top + r.height / 2) }; })()`,
+  );
+  wc.sendInputEvent({ type: "mouseDown", ...corner, button: "left", clickCount: 1 });
+  wc.sendInputEvent({ type: "mouseUp", ...corner, button: "left", clickCount: 1 });
+  await sleep(100);
 
   // Every theme, for a look (tests/output/theme-*.png).
   const ids = await js(`[...document.querySelectorAll("#themeMenu .theme-item")].map((item) => item.dataset.choice)`);

@@ -293,6 +293,34 @@ module.exports = async function (h) {
     ),
   );
 
+  // Keys never light up buttons: one clicked with the mouse gives its focus
+  // back, so Space plays rather than ringing it; nor does closing a
+  // dialog with Esc leave a ring on its button.
+  const ringed = () => js(`document.activeElement !== document.body || !!document.querySelector(":focus-visible")`);
+  const playBox = await js(
+    `(() => { const r = play.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`,
+  );
+  wc.sendInputEvent({ type: "mouseDown", x: playBox.x, y: playBox.y, button: "left", clickCount: 1 });
+  wc.sendInputEvent({ type: "mouseUp", x: playBox.x, y: playBox.y, button: "left", clickCount: 1 });
+  await sleep(150);
+  key("Space");
+  await sleep(150);
+  const afterPlay = !(await ringed());
+  await ensurePaused();
+  const helpBox = await js(
+    `(() => { const r = helpButton.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`,
+  );
+  wc.sendInputEvent({ type: "mouseDown", x: helpBox.x, y: helpBox.y, button: "left", clickCount: 1 });
+  wc.sendInputEvent({ type: "mouseUp", x: helpBox.x, y: helpBox.y, button: "left", clickCount: 1 });
+  await sleep(150);
+  key("Escape");
+  await sleep(150);
+  check(
+    "keys don't focus or ring buttons (after clicking Play, after Esc on a dialog)",
+    afterPlay && !(await js(`shortcutsDialog.open`)) && !(await ringed()),
+    await js(`document.activeElement.id || document.activeElement.tagName`),
+  );
+
   // Half a screen (960 px wide): the sidebar stays in view beside the
   // timeline, and nothing spills sideways.
   const [width, height] = h.win.getSize();

@@ -71,12 +71,13 @@ module.exports = async function (h) {
       (await js(`document.documentElement.dataset.theme`)) === "nord",
   );
 
-  // Escape closes it, focus back on the gear; the palette menu agrees.
+  // Escape closes it (opened with a click, so no focus is left on the
+  // gear); the palette menu agrees.
   key("Escape");
   await sleep(200);
   check(
-    "Escape closes Settings, focus back on the gear",
-    !(await isOpen()) && (await js(`document.activeElement.id`)) === "settingsButton",
+    "Escape closes Settings, no focus left on the gear",
+    !(await isOpen()) && (await js(`document.activeElement === document.body`)),
   );
   await js(`document.getElementById("themeButton").click()`);
   await sleep(150);
