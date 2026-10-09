@@ -54,10 +54,15 @@ describe("every theme", () => {
       atLeast(4.5, "--cursor", "--surface");
       atLeast(3, "--accent", "--surface");
       atLeast(3, "--loop", "--surface");
+      atLeast(3, "--start", "--surface");
       atLeast(1.5, "--wave", "--surface");
       for (const color of MARK_COLORS) atLeast(3, `--mark-${color.id}`, "--bg", "--surface");
       const apart = distance(v["--loop"], v["--accent"]);
       assert.ok(apart >= 90, `loop and accent too alike (${apart.toFixed(0)})`);
+      for (const other of ["--loop", "--accent"]) {
+        const fromStart = distance(v["--start"], v[other]);
+        assert.ok(fromStart >= 70, `start point and ${other} too alike (${fromStart.toFixed(0)})`);
+      }
     });
   }
 });

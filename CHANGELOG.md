@@ -43,6 +43,51 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-09: The start point: a green marker for where Space plays from
+
+- **What:**
+  - Space replays from where you last started listening. That spot (the **start point**) is now shown in green:
+    - **on the waveform:** a 2 px line with a ▶ handle at its bottom;
+    - **on the minimap:** a tick;
+    - **in the transport bar:** a readout, `▶ 0:05.000`.
+  - **Dragging the handle** moves the start point without moving the cursor; a click on the handle goes there.
+  - **Clicking the readout** goes there.
+  - **New key, S:** "Space plays from here next time". While playing it takes what is being heard, without stopping; while paused, the cursor.
+- **Why:** after a pause the cursor stays where it paused, so where Space would go was invisible and had to be remembered. The user asked for a green indicator, plus dragging it, the minimap tick, the readout and the key.
+- **How:**
+  - **One rule:** `transport.playStartFor(from)` holds the rule `play()` uses: from the top after the end, the loop start outside an active loop. `play()` and the marker both use it, so the marker always shows where playback really starts. `setLoop` now emits a `"loop"` event, so the marker follows loop changes.
+  - **The owner:** `returnPoint` stays in `features/playback.js`.
+    - `startPoint()` is `playStartFor(returnPoint ?? position)`;
+    - `showStartPoint()` redraws the three views on `state`, `jump` and `loop`;
+    - `setStartPoint(time)` is called by the drag;
+    - `startHere(event)` is S, and uses `transport.positionAt(event.timeStamp)`.
+  - **The waveform:** `waveform.setStartPoint(time)` draws `<div part="start-point">` with `<span part="start-handle" data-start-handle>` inside WaveSurfer's wrapper, positioned in percent like the loop and marks, plus `.minimap-start`.
+    - **Pointer priority:** the handle now comes first. A drag draws a draft, and its end calls the new option `onStartPointChange`; a click without moving seeks.
+    - **Hovering:** over the handle the hover line hides, and the pointer is `grab`.
+    - **The handle sits at the bottom**, because mark flags are at the top and Space often starts at a mark.
+    - **The line has a faint `--surface` outline**, so it reads over the played waveform (green in Monokai).
+  - **The colour:** a new optional theme role, `start` → `--start`. By default it's derived from the marks' green for the scheme. One Dark, whose loop is green, gets `#3ddc84`.
+- **Where:**
+  - `src/audio/transport.js`, `src/features/playback.js`, `src/waveform.js`;
+  - `src/app.js` (the S shortcut, the option, COMMON CHANGES);
+  - `src/themes/index.js`, `src/themes/palettes/one-dark.js`;
+  - `src/ui/dom.js`, `index.html` (`#startPoint`), `style.css`, `README.md`.
+- **Verified by:**
+  - **Unit:**
+    - `tests/unit/transport.test.mjs`: `playStartFor` and the `"loop"` event;
+    - `tests/unit/themes.test.mjs`: `--start` has at least 3:1 contrast on `--surface` in every theme, and is at least 70 away from `--loop` and `--accent`;
+    - 116 unit tests pass.
+  - **E2E,** in `tests/e2e/04-space-replay.cjs`, 10 new checks:
+    - a click puts the line, the tick and the readout there;
+    - it stays after playing and pausing;
+    - S takes what's heard without stopping, and Space plays from there;
+    - dragging the handle moves it but not the cursor;
+    - the readout seeks;
+    - with a loop on, it shows the loop start, which is where Space starts;
+    - Stop moves it to 0.
+  - **Runs:** `TB_TOPICS=01,02,03,04,05,06,10,13,14` passes 185/185, and `npm run check` is clean.
+  - **Screenshots:** `tests/output/start-point.png`, plus Monokai and GitHub Light, looked at.
+
 ## 2026-10-09: A 1 px playback cursor and a hover line, for precise placing
 
 - **What:**

@@ -28,7 +28,10 @@ import { timelinePositionAt } from "../core/timeline.js";
  *     there: it starts at the loop start instead.
  *
  * Exposes: play, pause, stop, seek, retune, load, setLoop, on,
- *          state, playing, position, duration
+ *          playStartFor, state, playing, position, duration
+ *   playStartFor(from) is where play() would start with the cursor at
+ *   `from` (the start of the track after its end; the loop start outside
+ *   an active loop), so a view can show where playback will start.
  *   pause(eventTime) pauses at what was being heard at `eventTime` (a
  *   performance.now()-style timestamp, e.g. event.timeStamp), not where
  *   the audio engine already is: that runs ahead of the speakers by the
@@ -39,6 +42,7 @@ import { timelinePositionAt } from "../core/timeline.js";
  *          on("state", s)     whenever the state changes
  *          on("jump", t)      after a seek or a loop wrap-around (position
  *                             moved discontinuously)
+ *          on("loop", loop)   after setLoop (the active loop, or null)
  * ===================================================================== */
 
 /** @typedef {"empty" | "ready" | "playing" | "paused" | "stopped" | "ended"} TransportState */
@@ -175,14 +179,18 @@ export function createTransport({ engine, getRate, getSemitones }) {
     rafId = null;
   }
 
+  // Where playback starts with the cursor at `from`: past the end, from
+  // the top; with a loop on, inside it.
+  function playStartFor(from) {
+    if (from >= duration) return 0;
+    if (loop && !inLoop(from)) return loop.start;
+    return from;
+  }
+
   function play() {
     if (!duration || isPlaying()) return;
 
-    let from = currentPosition();
-    if (from >= duration) from = 0;
-    // With a loop on, playback starts inside it.
-    if (loop && !inLoop(from)) from = loop.start;
-    apply({ input: from, active: true });
+    apply({ input: playStartFor(currentPosition()), active: true });
     setState("playing");
     stopDrawing();
     draw();
@@ -237,6 +245,7 @@ export function createTransport({ engine, getRate, getSemitones }) {
       onPosition(position);
       events.emit("jump", position);
     }
+    events.emit("loop", loop);
   }
 
   // Resets for a new track (or none, with a duration of 0).
@@ -262,6 +271,7 @@ export function createTransport({ engine, getRate, getSemitones }) {
     retune,
     load,
     setLoop,
+    playStartFor,
     on: events.on,
     get state() {
       return state;

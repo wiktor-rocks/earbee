@@ -9,7 +9,7 @@ A desktop player for transcribing music by ear. Open a song or a video, slow it 
 - **Keyboard stepping:**
   - ← / → step back and forward;
   - ↑ / ↓ change the step (0.01–10 s);
-  - Space replays from where you started listening.
+  - Space replays from where you started listening. That spot, the **start point**, is shown in green: a line with a ▶ handle on the waveform (drag it to move it), a tick on the minimap, and `▶ 0:05.000` in the transport bar (click it to go there). `S` sets it to what you're hearing now, without stopping.
 - **Video:** the picture is decoded frame by frame with WebCodecs (via [Mediabunny](https://mediabunny.dev)) and always shows the frame at the audio position, so it stays in sync at any speed.
 - **5-band EQ, volume up to 200 %,** and a limiter.
 - **Long files:** songs and videos of an hour or two open reliably and fast (an hour of MP3 in about 7 s on a mid-range laptop: long tracks are decoded in parallel parts), with progress and a Cancel button. A file whose sound wouldn't fit in the available memory is refused with a message (about 1.2 GB per hour of stereo audio).

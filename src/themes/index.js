@@ -70,6 +70,7 @@ export const ROLES = {
   loop: "--loop", // the A–B loop; must stand out from the accent
   wave: "--wave", // the waveform not yet played
   cursor: "--cursor", // the playback cursor
+  start: "--start", // optional; where Space plays from (green, apart from the loop and accent)
   surfaceHover: "--surface-hover", // optional
   accentHover: "--accent-hover", // optional
   minimapWave: "--minimap-wave", // optional
@@ -82,6 +83,8 @@ const DERIVED = {
   accentHover: (c, scheme) => mix(c.accent, scheme === "dark" ? "#ffffff" : "#000000", 0.15),
   minimapWave: (c) => mix(c.wave, c.surface, 0.15),
   minimapProgress: (c) => mix(c.accent, c.surface, 0.45),
+  // The marks' green, in the shade for the scheme.
+  start: (c, scheme) => MARK_COLORS.find((color) => color.id === "green")[scheme],
 };
 
 export const REQUIRED_ROLES = Object.keys(ROLES).filter((role) => !(role in DERIVED));

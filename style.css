@@ -41,6 +41,8 @@
   --minimap-progress: #8a6a12;
   --minimap-overlay: color-mix(in srgb, var(--accent) 12%, transparent);
   --cursor: #ffffff;
+  /* Where Space plays from (the start point): green */
+  --start: #5fd38d;
 
   /* A–B loop: its own colour, so it stands out on the amber played part */
   --loop: #4cc9f0;
@@ -1073,6 +1075,37 @@ body.dragging .app {
   background: color-mix(in srgb, var(--mark-color) 30%, var(--surface-2));
 }
 
+/* The start point: where Space plays from (features/playback.js). A
+   green line, outlined so it reads over the played waveform, with a ▶
+   handle at the bottom (mark flags are at the top) that drags it. Above
+   the marks, below the playback cursor (WaveSurfer's, z-index 5). */
+.waveform ::part(start-point) {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 4;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--start);
+  box-shadow:
+    -1px 0 color-mix(in srgb, var(--surface) 35%, transparent),
+    1px 0 color-mix(in srgb, var(--surface) 35%, transparent);
+  pointer-events: none;
+}
+
+.waveform ::part(start-handle) {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 0;
+  height: 0;
+  border-block: 8px solid transparent;
+  border-left: 13px solid var(--start);
+  filter: drop-shadow(0 0 1px var(--surface));
+  pointer-events: auto;
+  cursor: grab;
+}
+
 /* The hover line: where a click would seek to (waveform.js), with its
    time at the bottom. Fainter than the playback cursor, above the marks. */
 .waveform ::part(hover-line) {
@@ -1119,6 +1152,17 @@ body.dragging .app {
   pointer-events: none;
 }
 
+.minimap-start {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 3;
+  width: 0;
+  border-left: 2px solid var(--start);
+  margin-left: -1px;
+  pointer-events: none;
+}
+
 .minimap-mark {
   position: absolute;
   top: 0;
@@ -1156,6 +1200,14 @@ body.dragging .app {
 .step-size {
   color: var(--muted);
   font-size: 13px;
+  white-space: nowrap;
+}
+
+/* Where Space plays from: green, like its line on the waveform. */
+.start-point {
+  color: var(--start);
+  font-family: var(--num);
+  font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 

@@ -215,6 +215,21 @@ describe("A–B loop", () => {
     near(scheduled.at(-1).input, 1);
   });
 
+  test("playStartFor says where play() would start, and setLoop reports the loop", () => {
+    const { transport } = setup();
+    const loops = [];
+    transport.on("loop", (loop) => loops.push(loop));
+    near(transport.playStartFor(4), 4);
+    near(transport.playStartFor(10), 0); // after the end: from the top
+    transport.setLoop({ start: 1, end: 3 });
+    assert.deepEqual(loops, [{ start: 1, end: 3 }]);
+    near(transport.playStartFor(2), 2); // inside the loop
+    near(transport.playStartFor(5), 1); // outside: its start
+    transport.seek(5);
+    transport.play();
+    near(transport.position, transport.playStartFor(5));
+  });
+
   test("an empty or reversed loop is no loop", () => {
     const { transport } = setup();
     transport.setLoop({ start: 3, end: 3 });

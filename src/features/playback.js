@@ -5,6 +5,7 @@
  * ===================================================================== */
 
 import { player, settings } from "../context.js";
+import { formatTrackTime } from "../core/format.js";
 import { dom, guarded, onClick, reportError } from "../ui/dom.js";
 
 export function play() {
@@ -26,9 +27,36 @@ export const stepBack = () => step(-1);
 export const stepForward = () => step(1);
 
 // Where you last started listening: where playback last started, or where
-// it was last moved to (click, step, loop wrap); 0 after Stop. Kept up to
-// date by the transport listeners in bindPlayback().
+// it was last moved to (click, step, loop wrap) or set to (S, dragging the
+// green start point); 0 after Stop. Kept up to date by the transport
+// listeners in bindPlayback().
 let returnPoint = null;
+
+// The start point: where Space plays from next. The transport has the
+// last word (from the top after the end, inside an active loop), so this
+// is always where playback really starts.
+const startPoint = () => player.transport.playStartFor(returnPoint ?? player.transport.position);
+
+// Shows the start point: the green line on the waveform and the minimap,
+// and the readout in the transport bar.
+function showStartPoint() {
+  const loaded = player.transport.duration > 0;
+  const time = loaded ? startPoint() : null;
+  player.waveform.setStartPoint(time);
+  dom.startPointButton.hidden = !loaded;
+  if (loaded) dom.startPointButton.textContent = `▶ ${formatTrackTime(time)}`;
+}
+
+/** Space plays from `time` next (dragging the start point). @param {number} time */
+export function setStartPoint(time) {
+  returnPoint = time;
+  showStartPoint();
+}
+
+// S: Space plays from here next time: what is being heard while playing
+// (without stopping), or the cursor while paused.
+/** @param {KeyboardEvent} event */
+export const startHere = (event) => setStartPoint(player.transport.positionAt(event.timeStamp));
 
 // Pause, or play again from where you started listening (Space and the
 // Play button, like Transcribe!). The cursor stays where it paused, so
@@ -63,6 +91,7 @@ export function bindTransportButtons() {
   onClick(dom.stopButton, stop);
   onClick(dom.stepBackButton, stepBack);
   onClick(dom.stepForwardButton, stepForward);
+  onClick(dom.startPointButton, () => player.transport.seek(startPoint()));
 }
 
 // Keeps returnPoint up to date, and releases held keys when the window
@@ -73,10 +102,15 @@ export function bindPlayback() {
   player.transport.on("state", (state) => {
     if (state === "playing") returnPoint = player.transport.position;
     else if (state === "stopped" || state === "ready") returnPoint = 0;
+    showStartPoint();
   });
   player.transport.on("jump", (time) => {
     returnPoint = time;
+    showStartPoint();
   });
+  // With a loop on, Space starts inside it.
+  player.transport.on("loop", showStartPoint);
+  showStartPoint();
 
   window.addEventListener("blur", () => {
     for (const code of [...heldKeys]) guarded(releaseHold)({ code, timeStamp: performance.now() });

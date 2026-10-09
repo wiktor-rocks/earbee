@@ -1,5 +1,5 @@
 // One Dark (Atom): blue accent, green loop, red errors (lightened for
-// contrast as text).
+// contrast as text). The start point gets a brighter green than the loop's.
 // https://github.com/atom/atom/tree/master/packages/one-dark-syntax
 /** @type {import("../index.js").Theme} */
 export default {
@@ -19,5 +19,6 @@ export default {
     loop: "#98c379",
     wave: "#4b5263",
     cursor: "#d7dae0",
+    start: "#3ddc84",
   },
 };

@@ -44,6 +44,7 @@ export const dom = {
   stepBackButton: /** @type {HTMLButtonElement} */ ($("stepBack")),
   stepForwardButton: /** @type {HTMLButtonElement} */ ($("stepForward")),
   stepSize: $("stepSize"),
+  startPointButton: $("startPoint"),
   speedChips: $("speedChips"),
   pitchValue: $("pitchValue"),
   resetPitchButton: $("resetPitch"),

@@ -120,7 +120,11 @@
  *                             video/* type). Codecs are whatever WebCodecs
  *                             decodes: H.264, VP8/VP9, AV1; not HEVC here.
  *   A new view that follows   Subscribe to transport.on("position"/"state"/
- *   playback                  "jump") below, like the waveform and video.
+ *   playback                  "jump"/"loop") below, like the waveform and video.
+ *   Where Space plays from    returnPoint and the start point (the green
+ *                             line, its handle, the ▶ readout and S) in
+ *                             features/playback.js; the rule that keeps
+ *                             it inside the loop is transport.playStartFor.
  *   A–B loop                  State and actions in features/loop.js; audio
  *                             looping in audio/transport.js, drawing and
  *                             dragging in waveform.js.
@@ -178,6 +182,8 @@ import {
   holdToPlay,
   releaseHold,
   replayOrPause,
+  setStartPoint,
+  startHere,
   stepBack,
   stepForward,
   stop,
@@ -226,6 +232,7 @@ const waveform = createWaveform({
   onMarkSelect: selectMark,
   onMarkChange: moveMark,
   onMarkRename: renameMark,
+  onStartPointChange: setStartPoint,
 });
 
 const videoView = createVideoView({
@@ -278,6 +285,7 @@ const SHORTCUTS = [
     down: replayOrPause,
   },
   { codes: ["Comma"], keys: [","], description: "Pause / resume here", down: togglePlay },
+  { codes: ["KeyS"], keys: ["S"], description: "Space plays from here next time", down: startHere },
   { codes: ["Period"], keys: ["."], description: "Stop", down: stop },
   { codes: ["KeyZ", "Semicolon"], keys: ["Z", ";"], description: "Play while held", down: holdToPlay, up: releaseHold },
   { codes: ["ArrowLeft"], keys: ["←"], description: "Step back (hold to rewind)", repeat: true, down: stepBack },
