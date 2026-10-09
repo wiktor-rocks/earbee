@@ -5,7 +5,9 @@ const path = require("path");
 module.exports = async function (h) {
   const {
     blocked,
+    wc,
     js,
+    rect,
     openFile,
     key,
     xAt,
@@ -182,4 +184,40 @@ module.exports = async function (h) {
     `(() => { const e = document.querySelector("#waveform > div").shadowRoot.querySelector('[part~="loop-region"]'); return !e || e.hidden; })()`,
   );
   check("region removed from waveform", regionHidden);
+
+  // A slim playback cursor, and a hover line where a click would land.
+  const shadow = `document.querySelector("#waveform > div").shadowRoot`;
+  check(
+    "the playback cursor is 1 px wide",
+    (await js(`${shadow}.querySelector('[part~="cursor"]').style.width`)) === "1px",
+  );
+  const hover = () =>
+    js(`(() => { const line = ${shadow}.querySelector('[part~="hover-line"]');
+      return line && !line.hidden ? { x: line.getBoundingClientRect().left, time: line.textContent } : null; })()`);
+  const y = Math.round((await rect()).y);
+  const x = await xAt(5);
+  wc.sendInputEvent({ type: "mouseMove", x, y });
+  await sleep(150);
+  const shown = await hover();
+  check(
+    "the hover line follows the mouse, with its time",
+    shown && Math.abs(shown.x - x) <= 1 && shown.time.startsWith("0:05."),
+    JSON.stringify(shown),
+  );
+  await shot("hover-line.png");
+  await click(5);
+  check(
+    "a click goes to the time the hover line showed",
+    Math.abs((await pos()) - parseTime(shown.time)) <= 0.01,
+    await pos(),
+  );
+  wc.sendInputEvent({ type: "mouseMove", x, y: 2 });
+  await sleep(150);
+  check("the hover line goes when the mouse leaves", (await hover()) === null);
 };
+
+// "0:05.012" → 5.012
+function parseTime(text) {
+  const [minutes, seconds] = text.split(":");
+  return Number(minutes) * 60 + Number(seconds);
+}

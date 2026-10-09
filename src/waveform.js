@@ -1,5 +1,5 @@
 import { CONFIG } from "./config.js";
-import { clamp } from "./core/format.js";
+import { clamp, formatTrackTime } from "./core/format.js";
 
 /** @typedef {import("./core/timeline.js").Loop} Loop */
 /** @typedef {import("./core/timeline.js").LoopRegion} LoopRegion */
@@ -29,6 +29,10 @@ import { clamp } from "./core/format.js";
  * (onMarkRename); dragging a point or a region's edge moves just that
  * (onMarkChange, at the end of the drag). Elsewhere, even inside a region,
  * a click still seeks.
+ *
+ * A thin hover line (<div part="hover-line">, with the time) follows the
+ * mouse over the waveform while nothing is dragged: it sits exactly where
+ * a click would seek to.
  *
  * The wheel on the waveform zooms, keeping the spot under the mouse in
  * place; the wheel on the minimap scrolls the view. After the view is
@@ -89,6 +93,7 @@ export function createWaveform({
   let markDraft = null; // { id, start, end } while a mark is dragged
   let marksLayer = null;
   let minimapMarksLayer = null;
+  let hoverLine = null; // { line, label }
   // The elements drawing each mark, by id, reused between renders (so a
   // double-click on a flag isn't split across two elements).
   /** @type {Map<string, { body: HTMLElement, flag: HTMLElement, tick: HTMLElement }>} */
@@ -124,7 +129,7 @@ export function createWaveform({
         container,
         height: "auto",
         ...waveColors(),
-        cursorWidth: 2,
+        cursorWidth: 1, // thin, for precision (WaveSurfer shifts it by up to this)
         normalize: true,
         interact: false, // seeking is handled by bindPointerSeek()
         dragToSeek: false,
@@ -332,15 +337,18 @@ export function createWaveform({
 
       pointerId = event.pointerId;
       container.setPointerCapture(pointerId);
+      renderHoverLine(null); // the drag shows the spot itself
       scrubbing = true;
       pendingX = event.clientX;
       applyPointer(); // a click seeks at once
     });
 
-    // Moves are applied once per frame. Without a drag, hovering near a
-    // loop edge or a mark's edge shows the resize cursor (a flag has its own).
+    // Moves are applied once per frame. Without a drag, the hover line
+    // follows the mouse, and hovering near a loop edge or a mark's edge
+    // shows the resize cursor (a flag has its own).
     container.addEventListener("pointermove", (event) => {
       if (event.pointerId !== pointerId) {
+        if (pointerId === null) renderHoverLine(event.clientX);
         const idle = pointerId === null && !flagOf(event);
         const nearLoop = idle && loopEdgeAt(event.clientX) !== null;
         container.classList.toggle("near-loop-edge", nearLoop);
@@ -376,6 +384,7 @@ export function createWaveform({
     };
     container.addEventListener("pointerup", endDrag);
     container.addEventListener("pointercancel", endDrag);
+    container.addEventListener("pointerleave", () => renderHoverLine(null));
 
     // The pointer is captured by the container while pressed, so the
     // double-click lands on it rather than on the flag: the flag is the
@@ -401,6 +410,35 @@ export function createWaveform({
     loopElement.setAttribute("part", shown.enabled ? "loop-region" : "loop-region loop-disabled");
     loopElement.style.left = `${(shown.start / duration) * 100}%`;
     loopElement.style.width = `${((shown.end - shown.start) / duration) * 100}%`;
+  }
+
+  /* ---------- Hover line ---------- */
+
+  // Shows where a click at pointer `x` would seek to, with its time, or
+  // hides the line (null). Positioned in percent, like the loop.
+  function renderHoverLine(x) {
+    if (!waveSurfer) return;
+    const wrapper = waveSurfer.getWrapper();
+    if (!hoverLine || hoverLine.line.parentNode !== wrapper) {
+      const label = document.createElement("span");
+      label.setAttribute("part", "hover-time");
+      const line = document.createElement("div");
+      line.setAttribute("part", "hover-line");
+      line.ariaHidden = "true";
+      line.append(label);
+      wrapper.append(line);
+      hoverLine = { line, label };
+    }
+
+    const { line, label } = hoverLine;
+    line.hidden = x === null || !duration;
+    if (line.hidden) return;
+    const time = timeAtClientX(x);
+    line.style.left = `${(time / duration) * 100}%`;
+    label.textContent = formatTrackTime(time);
+    // Near the right edge the time goes on the line's left, so it isn't cut off.
+    const nearRight = x > container.getBoundingClientRect().right - 90;
+    label.setAttribute("part", nearRight ? "hover-time hover-time-flip" : "hover-time");
   }
 
   /* ---------- Marks ---------- */
@@ -635,6 +673,7 @@ export function createWaveform({
     marks = [];
     selectedMark = pendingRegion = markDraft = null;
     renderMarks();
+    renderHoverLine(null);
     if (!waveSurfer) return;
 
     await waveSurfer.load("", peaks, trackDuration);

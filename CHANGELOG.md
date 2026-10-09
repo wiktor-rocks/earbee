@@ -43,6 +43,29 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-09: A 1 px playback cursor and a hover line, for precise placing
+
+- **What:**
+  - the playback cursor on the waveform is now 1 px wide instead of 2;
+  - a faint 1 px line follows the mouse over the waveform, with the time at its bottom (for example "0:05.008"). It's exactly where a click would seek to;
+  - the mouse pointer over the waveform is a crosshair (the resize and grab pointers over loop edges, mark edges and flags are unchanged).
+- **Why:** the user wanted more precise placing. A 2 px cursor covers two pixels, and WaveSurfer shifts it left by `progress × cursorWidth` (`translateX` in its `renderProgress`), so it was off its time by up to 2 px. Before clicking, there was no sign of where a click would land.
+- **How:**
+  - `cursorWidth: 1` in `WaveSurfer.create` (the minimap already used 1);
+  - `renderHoverLine(x)` in `src/waveform.js` draws a `<div part="hover-line">` with a `<span part="hover-time">` inside WaveSurfer's wrapper, positioned in percent like the loop and the marks. It's styled from `style.css` with `::part()`;
+  - its time is `timeAtClientX(x)`, the same function a click uses, and the text is `formatTrackTime`;
+  - it's updated on `pointermove` while nothing is pressed, and hidden during a drag (the cursor or draft shows the spot), on `pointerleave` and on `load()`;
+  - near the right edge the time moves to the line's left (`hover-time-flip`), so it isn't cut off.
+- **Where:** `src/waveform.js` (the option, `renderHoverLine` and the pointer handlers), `style.css` (`.waveform` crosshair, `::part(hover-line)`, `::part(hover-time)`, `::part(hover-time-flip)`), `README.md`.
+- **Verified by:**
+  - `tests/e2e/03-audio-and-loop.cjs`, four new checks:
+    - the cursor is 1 px;
+    - the hover line is within 1 px of the mouse and shows its time;
+    - a click there seeks to that time (±0.01 s);
+    - the line goes when the mouse leaves;
+  - `TB_TOPICS=01,02,03,04,05,06,14` passes 132/132, and `npm run check` is clean;
+  - the screenshot `tests/output/hover-line.png`.
+
 ## 2026-10-09: The shortcut legend is collapsible, closed by default
 
 - **What:** the legend at the bottom of the player is now a "▸ Keyboard shortcuts" heading. Clicking it (or Enter on it when focused) opens the list of keys, and clicking again closes it. It starts closed on every launch.
