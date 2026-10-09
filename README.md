@@ -4,12 +4,12 @@ A desktop player for transcribing music by ear. Open a song or a video, slow it 
 
 - **Speed** from 0.25× to 3× with presets, and **pitch** shift in semitones and cents. Both use [Signalsmith Stretch](https://signalsmith-audio.co.uk/code/stretch/).
 - **A–B loop.** Shift+drag on the waveform, drag the edges to adjust, or use `[` `]` `L`.
-- **Marks:** points and regions on the waveform, each with a name and a colour. `M` marks a point where you hear it (tap along while it plays); `R` starts a region and `R` again ends it. Drag a mark's flag to move it, or a region's edge to resize it; Shift+← / Shift+→ go from mark to mark, Delete removes the selected one. The **Marks** list under the controls renames, recolours, deletes and goes to them. For now marks last until another file is opened.
-- **Waveform** with a minimap. The wheel on the waveform zooms at the mouse; the wheel on the minimap scrolls. A thin line follows the mouse and shows the time a click goes to; the playback cursor is 1 px wide, for precise placing.
+- **Marks:** points and regions on the track, each with a name and a colour, shown in the marks lane above the waveform (with a faint guide line over it). `M` marks a point where you hear it (tap along while it plays); `R` starts a region and `R` again ends it. In the lane, drag a mark to move it, or a region's end to resize it; double-click to rename; Shift+← / Shift+→ go from mark to mark, Delete removes the selected one. The **Marks** list under the controls renames, recolours, deletes and goes to them. For now marks last until another file is opened.
+- **Waveform** with a minimap, and a **time ruler** above it (click or drag it to seek). The wheel on the waveform or the lanes zooms at the mouse; the wheel on the minimap scrolls. A thin line follows the mouse and shows the time a click goes to; the playback cursor is 1 px wide, for precise placing. Markers never cover the sound: they live on the ruler and the marks lane, which always move with the waveform.
 - **Keyboard stepping:**
   - ← / → step back and forward;
   - ↑ / ↓ change the step (0.01–10 s);
-  - Space replays from where you started listening. That spot, the **start point**, is shown in green: a line with a ▶ handle on the waveform (drag it to move it), a tick on the minimap, and `▶ 0:05.000` in the transport bar (click it to go there). `S` sets it to what you're hearing now, without stopping. Where playback last stopped (paused, stopped or reached the end) is shown the same way in red, with a ■ you can click to go back there.
+  - Space replays from where you started listening. That spot, the **start point**, is shown in green: a ▶ on the ruler (drag it to move it) with a guide line over the waveform, a tick on the minimap, and `▶ 0:05.000` in the transport bar (click it to go there). `S` sets it to what you're hearing now, without stopping. Where playback last stopped (paused, stopped or reached the end) is shown the same way in red, with a ■ on the ruler you can click to go back there.
 - **Video:** the picture is decoded frame by frame with WebCodecs (via [Mediabunny](https://mediabunny.dev)) and always shows the frame at the audio position, so it stays in sync at any speed.
 - **5-band EQ, volume up to 200 %,** and a limiter.
 - **Long files:** songs and videos of an hour or two open reliably and fast (an hour of MP3 in about 7 s on a mid-range laptop: long tracks are decoded in parallel parts), with progress and a Cancel button. A file whose sound wouldn't fit in the available memory is refused with a message (about 1.2 GB per hour of stereo audio).
@@ -71,7 +71,10 @@ src/               The page (ES modules, no build step), in layers:
   audio/             engine.js (Web Audio + Signalsmith), transport.js,
                      decoder.js + decode-worker.js (parallel decoding)
   video/             view.js, proxy.js
-  waveform.js        WaveSurfer drawing, zoom, the loop region and the marks
+  waveform.js        WaveSurfer drawing, zoom, the loop region; its view (zoom,
+                     scroll) for the lanes
+  timeline.js        the lanes above the waveform: ruler (start/stop points),
+                     marks lane, guide lines; follows the waveform's view
   context.js         settings, the track's marks, the shared components (`player`)
   ui/                dom.js, controls.js, shortcuts.js, theme.js, prefs.js,
                      pref-fields.js
@@ -97,7 +100,7 @@ CHANGELOG.md       What changed, why, how and where, newest first
 
 **Start with the comment at the top of `src/app.js`.** It maps how the parts fit together (engine, transport, waveform, video, UI), lists the files and their layers, and says where to make common changes: speed presets, EQ bands, step sizes, shortcuts, colours, new features.
 
-**Layers.** In `src/`, a file only imports from the layers above it: `core` → `config` → `audio` / `video` / `waveform` → `context` → `ui` → `features` → `app.js`. `npm run lint` fails on an import that goes the other way, or on an import cycle. So `core/`, `audio/transport.js` and the rest of the lower layers stay free of the UI, and can be unit-tested in plain Node.
+**Layers.** In `src/`, a file only imports from the layers above it: `core` → `config` → `audio` / `video` / `waveform` / `timeline` → `context` → `ui` → `features` → `app.js`. `npm run lint` fails on an import that goes the other way, or on an import cycle. So `core/`, `audio/transport.js` and the rest of the lower layers stay free of the UI, and can be unit-tested in plain Node.
 
 **Adding a setting.** Settings are declared in `src/prefs/sections/`, one file per section (a tab in the dialog). Add a field there: its `key`, `type` (`choice`, `boolean`, `number` or `folder`), `label`, optional `help` and `default`. The Settings dialog shows it, and the main process checks and saves it in `prefs.json`. The page reads it with `getPrefs("section")` and follows changes with `onPrefsChange` (`src/ui/prefs.js`); the main process uses `store.get` and `store.onChange` (`electron/prefs-store.js`). A new section is a new file listed in `SECTIONS` (`src/prefs/index.js`). The formats are described at the top of `src/prefs/fields.js`.
 

@@ -166,7 +166,14 @@
           <canvas id="videoCanvas" aria-label="Video"></canvas>
         </div>
 
-        <div id="waveform" class="waveform"></div>
+        <div class="timeline">
+          <div id="ruler" class="ruler" aria-hidden="true"></div>
+          <div id="marksLane" class="marks-lane" aria-hidden="true"></div>
+          <div class="timeline-wave">
+            <div id="waveform" class="waveform"></div>
+            <div id="timelineGuides" class="timeline-guides" aria-hidden="true"></div>
+          </div>
+        </div>
 
         <div id="waveform-minimap" class="waveform-minimap" aria-label="Full track overview"></div>
       </div>

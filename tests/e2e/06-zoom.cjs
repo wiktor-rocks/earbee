@@ -1,9 +1,10 @@
 // Zooming at the mouse (the wheel on the waveform), scrolling (the wheel on
-// the minimap), following the cursor.
+// the minimap), following the cursor; the lanes above the waveform (ruler,
+// marks, guide lines) staying in sync with it.
 // Part of the end-to-end run (see run.cjs); `h` is the harness.
 
 module.exports = async function (h) {
-  const { wc, js, key, duration, click, shot, pos, sample, ensurePaused, check, sleep } = h;
+  const { win, wc, js, key, duration, click, shot, pos, sample, ensurePaused, check, sleep } = h;
 
   {
     const view = () =>
@@ -159,6 +160,75 @@ module.exports = async function (h) {
     check("minimap wheel pauses following", c0 === c1, `${c0} → ${c1}`);
     for (let i = 0; i < 20; i++) wheel(ax, ay, -300 * zoomSign);
     await sleep(200);
+  }
+
+  // The lanes stay in sync: every ruler tick, marker and guide line in view
+  // sits where the waveform has its time (within 1 px), measured in the
+  // same frame as the change. `then` runs in the page first (e.g. a scroll).
+  {
+    const measure = `(() => {
+      const wave = document.querySelector("#waveform > div").shadowRoot.querySelector(".wrapper").getBoundingClientRect();
+      const lane = document.getElementById("ruler").getBoundingClientRect();
+      let worst = 0, count = 0;
+      for (const el of document.querySelectorAll("#ruler .ruler-tick.major, #ruler .ruler-start, #timelineGuides > * > *, #marksLane .lane-mark")) {
+        if (el.hidden || el.classList.contains("guide-stop")) continue;
+        const guide = el.parentElement.parentElement.id === "timelineGuides";
+        const x = el.getBoundingClientRect().left + (guide ? 0.5 : 0);
+        if (x < lane.left || x > lane.right) continue;
+        worst = Math.max(worst, Math.abs(x - (wave.left + (parseFloat(el.style.left) / 100) * wave.width)));
+        count++;
+      }
+      return { worst: Math.round(worst * 100) / 100, count };
+    })()`;
+    const inSync = (then = "") =>
+      js(`new Promise((done) => { ${then}; requestAnimationFrame(() => done(${measure})); })`);
+    const scroller = `document.querySelector("#waveform > div").shadowRoot.querySelector(".scroll")`;
+    const wheelAt = async (time, deltaY) => {
+      const r = await h.rect();
+      const x = await h.xAt(time);
+      for (let i = 0; i < 4; i++) wc.sendInputEvent({ type: "mouseWheel", x, y: Math.round(r.y), deltaX: 0, deltaY });
+      await sleep(200);
+    };
+
+    await click(3);
+    key("M");
+    await click(6);
+    key("R");
+    await click(9);
+    key("R");
+    await sleep(100);
+    let sync = await inSync();
+    check("lanes in sync at fit", sync.worst <= 1 && sync.count > 5, JSON.stringify(sync));
+    await wheelAt(6, 600);
+    await wheelAt(6, -300);
+    sync = await inSync();
+    check("lanes in sync after a wheel zoom", sync.worst <= 1 && sync.count > 3, JSON.stringify(sync));
+    sync = await inSync(`${scroller}.scrollLeft += 137`);
+    check("lanes in sync in the frame of a scroll", sync.worst <= 1 && sync.count > 3, JSON.stringify(sync));
+    // Every frame while playing zoomed in, with following paging the view.
+    await click(2);
+    key("Space");
+    const frames = await js(`new Promise((done) => {
+      const worst = []; const until = performance.now() + 2500;
+      const frame = () => { worst.push(${measure}.worst); if (performance.now() < until) requestAnimationFrame(frame); else done(worst); };
+      requestAnimationFrame(frame);
+    })`);
+    await ensurePaused();
+    check(
+      "lanes in sync in every frame while playing and following",
+      frames.length > 60 && Math.max(...frames) <= 1,
+      `${frames.length} frames, worst ${Math.max(...frames)} px`,
+    );
+    const [width, height] = win.getSize();
+    win.setSize(width - 240, height);
+    await sleep(400);
+    sync = await inSync();
+    win.setSize(width, height);
+    await sleep(400);
+    check("lanes in sync after a resize", sync.worst <= 1 && sync.count > 3, JSON.stringify(sync));
+    await shot("timeline-zoomed.png");
+    await wheelAt(6, -3000);
+    await js(`document.querySelectorAll("#marksList .mark-remove").forEach((button) => button.click())`);
   }
 
   // Screenshot with loop

@@ -951,9 +951,10 @@ body.dragging .app {
   min-height: 0;
 }
 
-/* Video files: picture on top, a shorter waveform, then the minimap. */
+/* Video files: picture on top, a shorter timeline (its lanes take 48 px,
+   so the waveform keeps about 110), then the minimap. */
 .stage.has-video {
-  grid-template-rows: minmax(0, 1fr) minmax(110px, 28%) 48px;
+  grid-template-rows: minmax(0, 1fr) minmax(160px, 32%) 48px;
 }
 
 .video-pane {
@@ -970,16 +971,16 @@ body.dragging .app {
   height: 100%;
 }
 
-.waveform,
 .waveform-minimap {
   overflow: hidden;
   border: 1px solid var(--border);
   background: var(--surface);
 }
 
+/* The waveform's border and corners are the timeline's (below). */
 .waveform {
   min-height: 0;
-  border-radius: var(--radius);
+  overflow: hidden;
   cursor: crosshair;
 }
 
@@ -1006,135 +1007,215 @@ body.dragging .app {
   background: var(--loop-fill-off);
 }
 
-.waveform.near-mark-edge {
-  cursor: ew-resize;
+/* ---------- Timeline: the lanes above the waveform ----------
+   The ruler and the marks lane sit above the waveform in one column with
+   one border, so x = 0 is the same pixel in all of them. Each lane holds
+   a .timeline-track as wide as the zoomed waveform and moved by its
+   scroll (timeline.js); markers are placed in percent of it. */
+
+.timeline {
+  position: relative;
+  display: grid;
+  grid-template-rows: 22px 26px minmax(0, 1fr);
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  isolation: isolate;
 }
 
-/* Marks (src/marks), also inside the shadow DOM: a point is a line, a
-   region a tinted band with its edges; both have a flag at the top with
-   the label, the only part that takes the pointer. --mark-color is set
-   per mark (one of the --mark-* tokens). Above the loop, below the
-   playback cursor. */
-.waveform ::part(marks) {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  pointer-events: none;
+.timeline-wave {
+  position: relative;
+  display: grid;
+  min-height: 0;
 }
 
-.waveform ::part(mark) {
+.timeline-track {
   position: absolute;
   top: 0;
   bottom: 0;
+  left: 0;
 }
 
-.waveform ::part(mark-point) {
-  width: 0;
-  border-left: 2px solid var(--mark-color);
-  margin-left: -1px;
+.ruler,
+.marks-lane {
+  position: relative;
+  overflow: hidden;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  touch-action: none;
+  user-select: none;
 }
 
-.waveform ::part(mark-region) {
-  border-inline: 1px solid var(--mark-color);
-  background: color-mix(in srgb, var(--mark-color) 12%, transparent);
+/* The ruler: ticks (taller and labelled on whole steps); a click or drag
+   seeks. */
+.ruler {
+  cursor: col-resize;
 }
 
-.waveform ::part(mark-selected) {
+.ruler-tick {
+  position: absolute;
+  bottom: 0;
+  height: 4px;
+  border-left: 1px solid var(--border);
+}
+
+.ruler-tick.major {
+  height: 100%;
+  padding: 2px 0 0 3px;
+  border-left-color: color-mix(in srgb, var(--muted) 60%, transparent);
+  color: var(--muted);
+  font: 10px/1 var(--num);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* The start point's ▶ (right of its time; drags) and the stop point's ■
+   (left of its time; a click goes there), at the bottom of the ruler. */
+.ruler-start,
+.ruler-stop {
+  position: absolute;
+  bottom: 0;
   z-index: 1;
-  border-width: 2px;
+  filter: drop-shadow(0 0 1px var(--surface));
 }
 
-.waveform ::part(mark-pending) {
-  border-inline-style: dashed;
-  background: color-mix(in srgb, var(--mark-color) 6%, transparent);
+.ruler-start {
+  width: 0;
+  height: 0;
+  border-block: 6px solid transparent;
+  border-left: 10px solid var(--start);
+  cursor: grab;
 }
 
-.waveform ::part(mark-flag) {
+.ruler-stop {
+  width: 10px;
+  height: 10px;
+  margin-left: -10px;
+  background: var(--stop);
+  cursor: pointer;
+}
+
+/* The marks lane: a point is a line with a flag holding its label (its
+   box reaches the next mark, but only the flag takes the pointer); a
+   region is a bar with its label. --mark-color is set per mark. */
+.marks-lane.near-edge {
+  cursor: ew-resize;
+}
+
+.lane-mark {
   position: absolute;
   top: 0;
-  left: 0;
-  max-width: 160px;
-  min-width: 14px;
-  min-height: 18px;
-  padding: 1px 6px 1px 5px;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.lane-point {
+  pointer-events: none;
+}
+
+.lane-point::before {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -1px;
+  border-left: 2px solid var(--mark-color);
+  content: "";
+}
+
+.lane-label {
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
-  border-left: 3px solid var(--mark-color);
-  border-radius: 0 4px 4px 0;
-  background: var(--surface-2);
   color: var(--text);
   font: 600 11px/16px var(--sans);
   white-space: nowrap;
   text-overflow: ellipsis;
-  pointer-events: auto;
   cursor: grab;
 }
 
-.waveform ::part(mark-flag):hover {
-  background: var(--surface-hover);
-}
-
-.waveform ::part(mark-flag-selected) {
-  background: color-mix(in srgb, var(--mark-color) 30%, var(--surface-2));
-}
-
-/* The start point: where Space plays from (features/playback.js). A
-   green line, outlined so it reads over the played waveform, with a ▶
-   handle at the bottom (mark flags are at the top) that drags it. Above
-   the marks, below the playback cursor (WaveSurfer's, z-index 5). */
-.waveform ::part(start-point) {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  z-index: 4;
-  width: 2px;
-  margin-left: -1px;
-  background: var(--start);
-  box-shadow:
-    -1px 0 color-mix(in srgb, var(--surface) 35%, transparent),
-    1px 0 color-mix(in srgb, var(--surface) 35%, transparent);
-  pointer-events: none;
-}
-
-.waveform ::part(start-handle) {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  width: 0;
-  height: 0;
-  border-block: 8px solid transparent;
-  border-left: 13px solid var(--start);
-  filter: drop-shadow(0 0 1px var(--surface));
+.lane-point .lane-label {
+  margin-left: 2px;
+  padding: 1px 6px 1px 4px;
+  border-radius: 0 4px 4px 0;
+  background: var(--surface);
   pointer-events: auto;
+}
+
+.lane-point .lane-label:empty {
+  display: none;
+}
+
+.lane-region {
+  margin-block: 3px;
+  padding-inline: 5px;
+  border-inline: 2px solid var(--mark-color);
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--mark-color) 28%, var(--surface-2));
   cursor: grab;
 }
 
-/* The stop point: where playback last stopped, drawn like the start
-   point in red, with a ■ handle to the left of the line (the start
-   point's ▶ is to the right, so both show when they meet). */
-.waveform ::part(stop-point) {
+.lane-region.pending {
+  border-inline-style: dashed;
+  background: color-mix(in srgb, var(--mark-color) 8%, transparent);
+}
+
+.lane-point.selected .lane-label,
+.lane-region.selected {
+  outline: 1px solid var(--mark-color);
+  background: color-mix(in srgb, var(--mark-color) 40%, var(--surface-2));
+}
+
+/* Guide lines: each marker continued faintly over the waveform, in a
+   layer of ours above it (below the playback cursor and the hover line,
+   which WaveSurfer draws at z-index 5). */
+.timeline-guides {
   position: absolute;
-  top: 0;
-  bottom: 0;
+  inset: 0;
   z-index: 4;
-  width: 2px;
-  margin-left: -1px;
-  background: var(--stop);
-  box-shadow:
-    -1px 0 color-mix(in srgb, var(--surface) 35%, transparent),
-    1px 0 color-mix(in srgb, var(--surface) 35%, transparent);
+  overflow: hidden;
   pointer-events: none;
 }
 
-.waveform ::part(stop-handle) {
+.guide-mark,
+.guide-start,
+.guide-stop {
   position: absolute;
-  right: 0;
-  bottom: 1px;
-  width: 11px;
-  height: 11px;
-  background: var(--stop);
-  filter: drop-shadow(0 0 1px var(--surface));
-  pointer-events: auto;
-  cursor: pointer;
+  top: 0;
+  bottom: 0;
+}
+
+.guide-mark {
+  margin-left: -0.5px;
+  border-left: 1px solid color-mix(in srgb, var(--mark-color) 55%, transparent);
+}
+
+.guide-region {
+  border-right: 1px solid color-mix(in srgb, var(--mark-color) 55%, transparent);
+}
+
+.guide-mark.selected {
+  border-color: var(--mark-color);
+}
+
+.guide-mark.pending {
+  border-inline-style: dashed;
+}
+
+.guide-start,
+.guide-stop {
+  margin-left: -0.5px;
+}
+
+.guide-start {
+  border-left: 1px solid color-mix(in srgb, var(--start) 70%, transparent);
+}
+
+.guide-stop {
+  border-left: 1px solid color-mix(in srgb, var(--stop) 70%, transparent);
 }
 
 /* The hover line: where a click would seek to (waveform.js), with its

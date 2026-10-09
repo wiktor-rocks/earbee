@@ -30,6 +30,7 @@ export const eqGains = () => Object.fromEntries(CONFIG.eq.bands.map((band) => [b
  * @property {import("./audio/engine.js").AudioEngine} engine
  * @property {import("./audio/transport.js").Transport} transport
  * @property {import("./waveform.js").Waveform} waveform
+ * @property {import("./timeline.js").Timeline} timeline The lanes above the waveform (markers).
  * @property {import("./video/view.js").VideoView} videoView
  */
 

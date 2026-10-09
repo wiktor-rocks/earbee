@@ -114,14 +114,13 @@ module.exports = async function (h) {
   check("after end, Space replays from where it started", Math.abs(firstMoved(s, d) - 19) < 0.06, firstMoved(s, d));
 
   // The start point: where Space plays from.
-  const shadow = `document.querySelector("#waveform > div").shadowRoot`;
   const startAt = () => js(`__parseTime(document.getElementById("startPoint").textContent.replace("▶", "").trim())`);
-  const lineX = () => js(`${shadow}.querySelector('[part~="start-point"]').getBoundingClientRect().left`);
+  const lineX = () => js(`document.querySelector("#timelineGuides .guide-start").getBoundingClientRect().left + 0.5`);
   const near = (a, b, within = 0.06) => Math.abs(a - b) <= within;
 
   await click(5);
   check(
-    "a click sets the start point: line, minimap tick and readout",
+    "a click sets the start point: guide line, minimap tick and readout",
     near(await startAt(), 5, 0.01) &&
       Math.abs((await lineX()) - (await xAt(5))) <= 1.5 &&
       near(await js(`parseFloat(document.querySelector("#waveform-minimap .minimap-start").style.left)`), 25, 0.2),
@@ -156,7 +155,7 @@ module.exports = async function (h) {
 
   // Dragging the handle moves the start point, not the cursor.
   const handle = await js(
-    `(() => { const r = ${shadow}.querySelector('[part~="start-handle"]').getBoundingClientRect(); return { x: Math.round(r.left + 3), y: Math.round(r.top + r.height / 2) }; })()`,
+    `(() => { const r = document.querySelector("#ruler .ruler-start").getBoundingClientRect(); return { x: Math.round(r.left + 3), y: Math.round(r.top + r.height / 2) }; })()`,
   );
   const cursorBefore = await pos();
   const target = await xAt(12);
@@ -195,7 +194,7 @@ module.exports = async function (h) {
 
   // The stop point: where playback last stopped, in red.
   const stopAt = async () => {
-    const left = await js(`(() => { const line = ${shadow}.querySelector('[part~="stop-point"]');
+    const left = await js(`(() => { const line = document.querySelector("#timelineGuides .guide-stop");
       return line && !line.hidden ? parseFloat(line.style.left) : null; })()`);
     return left === null ? null : (left / 100) * d;
   };
@@ -228,7 +227,7 @@ module.exports = async function (h) {
     `${beforeStop} vs ${stoppedAt}`,
   );
   const square = await js(
-    `(() => { const r = ${shadow}.querySelector('[part~="stop-handle"]').getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`,
+    `(() => { const r = document.querySelector("#ruler .ruler-stop").getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`,
   );
   wc.sendInputEvent({ type: "mouseDown", x: square.x, y: square.y, button: "left", clickCount: 1 });
   wc.sendInputEvent({ type: "mouseUp", x: square.x, y: square.y, button: "left", clickCount: 1 });

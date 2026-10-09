@@ -23,7 +23,7 @@ const rows = new Map();
 
 function drawWaveform() {
   const pending = pendingStart === null ? null : { start: pendingStart, end: player.transport.position };
-  player.waveform.setMarks(marks.list(), { selected, pending });
+  player.timeline.setMarks(marks.list(), { selected, pending });
 }
 
 function show() {

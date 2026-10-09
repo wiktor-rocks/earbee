@@ -1,11 +1,12 @@
-// Marks: points and regions made with the keys, drawn on the waveform and
-// the minimap, listed under the controls, dragged, renamed, recoloured,
-// jumped between and deleted; a new file starts without them.
+// Marks: points and regions made with the keys, drawn in the marks lane
+// above the waveform (with guide lines over it) and on the minimap, listed
+// under the controls, dragged, renamed, recoloured, jumped between and
+// deleted; a new file starts without them. The waveform itself stays clean.
 // Part of the end-to-end run (see run.cjs); `h` is the harness.
 const path = require("path");
 
 module.exports = async function (h) {
-  const { wc, js, openFile, key, xAt, rect, click, drag, shot, pos, ensurePaused, check, sleep, FIXTURES } = h;
+  const { wc, js, openFile, key, xAt, rect, click, shot, pos, ensurePaused, check, sleep, FIXTURES } = h;
   const shadow = `document.querySelector("#waveform > div").shadowRoot`;
   const near = (a, b, within = 0.06) => Math.abs(a - b) <= within;
 
@@ -17,11 +18,16 @@ module.exports = async function (h) {
         selected: row.classList.contains("selected") };
     })`);
   const byName = async (name) => (await listed()).find((mark) => mark.name === name);
-  const drawn = (selector) => js(`${shadow}.querySelectorAll('${selector}').length`);
+  // Marks drawn in the lane (`selector` within #marksLane).
+  const drawn = (selector) => js(`document.querySelectorAll('#marksLane ${selector}').length`);
+  const item = (id) => `document.querySelector('#marksLane [data-mark-id="${id}"]')`;
+  // A point on its flag, a region on its bar: where to press to move it.
   const flagBox = (id) =>
     js(
-      `(() => { const r = ${shadow}.querySelector('[data-mark-flag="${id}"]').getBoundingClientRect(); return { x: Math.round(r.left + 6), y: Math.round(r.top + r.height / 2) }; })()`,
+      `(() => { const r = ${item(id)}.querySelector(".lane-label").getBoundingClientRect(); return { x: Math.round(r.left + 6), y: Math.round(r.top + r.height / 2) }; })()`,
     );
+  const laneY = () =>
+    js(`(() => { const r = marksLane.getBoundingClientRect(); return Math.round(r.top + r.height / 2); })()`);
   // A press (and optional drag) at a given point, e.g. on a flag.
   async function pressAt(x1, y, x2 = x1, clickCount = 1) {
     wc.sendInputEvent({ type: "mouseDown", x: x1, y, button: "left", clickCount });
@@ -61,9 +67,10 @@ module.exports = async function (h) {
     JSON.stringify(marks),
   );
   check(
-    "…drawn on the waveform with its flag, and on the minimap",
-    (await drawn('[part~="mark-point"]')) === 1 &&
-      (await js(`${shadow}.querySelector('[part~="mark-flag"]').textContent`)) === "Mark 1" &&
+    "…drawn in the lane with its flag, as a guide line over the waveform, and on the minimap",
+    (await drawn(".lane-point")) === 1 &&
+      (await js(`document.querySelector("#marksLane .lane-label").textContent`)) === "Mark 1" &&
+      (await js(`document.querySelectorAll("#timelineGuides .guide-mark").length`)) === 1 &&
       (await js(`document.querySelectorAll("#waveform-minimap .minimap-mark").length`)) === 1,
   );
   check("the empty hint is gone", await js(`document.getElementById("marksEmpty").hidden`));
@@ -87,7 +94,7 @@ module.exports = async function (h) {
   await click(6);
   key("R");
   await sleep(100);
-  check("R starts a region, drawn while it's marked", (await drawn('[part~="mark-pending"]')) === 1);
+  check("R starts a region, drawn while it's marked", (await drawn(".pending")) === 1);
   await click(9);
   key("R");
   await sleep(150);
@@ -98,9 +105,9 @@ module.exports = async function (h) {
     JSON.stringify(region),
   );
   check(
-    "…a region on the waveform and the minimap, nothing pending",
-    (await drawn('[part~="mark-region"]')) === 1 &&
-      (await drawn('[part~="mark-pending"]')) === 0 &&
+    "…a region in the lane and on the minimap, nothing pending",
+    (await drawn(".lane-region")) === 1 &&
+      (await drawn(".pending")) === 0 &&
       (await js(`document.querySelectorAll("#waveform-minimap .minimap-region").length`)) === 1,
   );
 
@@ -109,7 +116,7 @@ module.exports = async function (h) {
   await sleep(100);
   key("Escape");
   await sleep(100);
-  check("Esc stops marking a region", (await drawn('[part~="mark-pending"]')) === 0 && (await listed()).length === 3);
+  check("Esc stops marking a region", (await drawn(".pending")) === 0 && (await listed()).length === 3);
   key("Escape");
   await sleep(100);
   check(
@@ -126,7 +133,7 @@ module.exports = async function (h) {
   let flag = await flagBox(mark1.id);
   await pressAt(flag.x, flag.y, flag.x + ((await xAt(4)) - (await xAt(3))));
   check("dragging a flag moves the mark", near((await byName("Mark 1")).start, 4), (await byName("Mark 1")).start);
-  await drag(null, 10, [], await xAt(9));
+  await pressAt(await xAt(9), await laneY(), await xAt(10));
   region = await byName("Region 1");
   check(
     "dragging a region's edge moves that edge",
@@ -182,13 +189,10 @@ module.exports = async function (h) {
   await sleep(150);
   check(
     "renaming in the list renames the flag",
-    (await js(`${shadow}.querySelector('[data-mark-flag="${region.id}"]').textContent`)) === "Chorus",
-    await js(`${shadow}.querySelector('[data-mark-flag="${region.id}"]').textContent`),
+    (await js(`${item(region.id)}.textContent`)) === "Chorus",
+    await js(`${item(region.id)}.textContent`),
   );
-  const colorOf = () =>
-    js(
-      `${shadow}.querySelector('[data-mark-flag="${region.id}"]').parentElement.style.getPropertyValue("--mark-color")`,
-    );
+  const colorOf = () => js(`${item(region.id)}.style.getPropertyValue("--mark-color")`);
   const colorBefore = await colorOf();
   await js(`document.querySelector('#marksList [data-id="${region.id}"] .mark-color').click()`);
   await sleep(100);
@@ -212,6 +216,10 @@ module.exports = async function (h) {
   key("Escape");
   await sleep(100);
   await shot("marks.png");
+  check(
+    "the waveform itself holds no markers (only the loop and the hover line)",
+    (await js(`${shadow}.querySelectorAll('[part~="mark"], [part~="mark-flag"], [part~="start-point"]').length`)) === 0,
+  );
 
   // Delete / Backspace: the selected mark.
   flag = await flagBox(mark1.id);
@@ -220,7 +228,7 @@ module.exports = async function (h) {
   await sleep(150);
   check(
     "Delete deletes the selected mark",
-    !(await byName("Mark 1")) && (await listed()).length === 2 && (await drawn('[part~="mark-point"]')) === 1,
+    !(await byName("Mark 1")) && (await listed()).length === 2 && (await drawn(".lane-point")) === 1,
   );
   await js(`document.querySelector('#marksList .mark-remove').click()`);
   await sleep(150);
@@ -231,7 +239,7 @@ module.exports = async function (h) {
   wc.sendInputEvent({ type: "mouseWheel", x: await xAt(7), y: Math.round((await rect()).y), deltaX: 0, deltaY: 600 });
   await sleep(300);
   const remaining = (await listed())[0];
-  const flagX = (await flagBox(remaining.id)).x - 6;
+  const flagX = await js(`${item(remaining.id)}.getBoundingClientRect().left`);
   check(
     "marks follow the zoom",
     (await rect()).width > zoomed && Math.abs(flagX - (await xAt(remaining.start))) <= 2,
@@ -243,7 +251,8 @@ module.exports = async function (h) {
   check(
     "a new file starts without marks",
     (await listed()).length === 0 &&
-      (await drawn('[part~="mark"]')) === 0 &&
+      (await drawn(".lane-mark")) === 0 &&
+      (await js(`document.querySelectorAll("#timelineGuides .guide-mark").length`)) === 0 &&
       (await js(`document.querySelectorAll("#waveform-minimap .minimap-mark").length`)) === 0,
   );
 };

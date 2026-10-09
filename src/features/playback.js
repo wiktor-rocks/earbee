@@ -48,7 +48,7 @@ const startPoint = () => player.transport.playStartFor(returnPoint ?? player.tra
 function showStartPoint() {
   const loaded = player.transport.duration > 0;
   const time = loaded ? startPoint() : null;
-  player.waveform.setStartPoint(time);
+  player.timeline.setStartPoint(time);
   dom.startPointButton.hidden = !loaded;
   if (loaded) dom.startPointButton.textContent = `▶ ${formatTrackTime(time)}`;
 }
@@ -57,7 +57,7 @@ function showStartPoint() {
 // the end), shown as the red line; null before the first stop.
 /** @param {number | null} time */
 function setStopPoint(time) {
-  player.waveform.setStopPoint(time);
+  player.timeline.setStopPoint(time);
 }
 
 /** Space plays from `time` next (dragging the start point). @param {number} time */

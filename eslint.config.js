@@ -4,7 +4,7 @@ const globals = require("globals");
 const { importX } = require("eslint-plugin-import-x");
 
 // The page's layers (src/). Imports only go downward:
-//   core, themes → prefs, marks → config → audio, video, waveform → context → ui → features → app.js
+//   core, themes → prefs, marks → config → audio, video, waveform, timeline → context → ui → features → app.js
 // Each zone lists what a layer may not import.
 const below = (target, ...from) => from.map((path) => ({ target, from: path }));
 const layering = [
@@ -18,6 +18,7 @@ const layering = [
     "./src/audio",
     "./src/video",
     "./src/waveform.js",
+    "./src/timeline.js",
     "./src/context.js",
     "./src/ui",
     "./src/features",
@@ -31,6 +32,7 @@ const layering = [
     "./src/audio",
     "./src/video",
     "./src/waveform.js",
+    "./src/timeline.js",
     "./src/context.js",
     "./src/ui",
     "./src/features",
@@ -45,6 +47,7 @@ const layering = [
     "./src/audio",
     "./src/video",
     "./src/waveform.js",
+    "./src/timeline.js",
     "./src/context.js",
     "./src/ui",
     "./src/features",
@@ -58,6 +61,7 @@ const layering = [
     "./src/audio",
     "./src/video",
     "./src/waveform.js",
+    "./src/timeline.js",
     "./src/context.js",
     "./src/ui",
     "./src/features",
@@ -68,12 +72,13 @@ const layering = [
     "./src/audio",
     "./src/video",
     "./src/waveform.js",
+    "./src/timeline.js",
     "./src/context.js",
     "./src/ui",
     "./src/features",
     "./src/app.js",
   ),
-  ...["./src/audio", "./src/video", "./src/waveform.js"].flatMap((component) =>
+  ...["./src/audio", "./src/video", "./src/waveform.js", "./src/timeline.js"].flatMap((component) =>
     below(component, "./src/context.js", "./src/ui", "./src/features", "./src/app.js"),
   ),
   ...below("./src/context.js", "./src/ui", "./src/features", "./src/app.js"),

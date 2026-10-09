@@ -50,10 +50,9 @@ module.exports = async function (h) {
   await sleep(100);
   check("holding ↑ changes step once", (await stepText()).startsWith("Step 1 s"), await stepText());
   p0 = await pos();
-  key("R");
-  key("C");
+  key("C"); // R used to skip back with C; R now marks regions (14-marks)
   await sleep(100);
-  check("R / C do nothing", (await pos()) === p0);
+  check("C does nothing", (await pos()) === p0);
   const legend = await js(`document.getElementById("shortcutList").textContent`);
   check(
     "legend shows arrows, no R/C",

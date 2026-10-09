@@ -5,7 +5,7 @@ TranscriBee is an Electron app for transcribing music. You open a song or a vide
 **Files**
 
 - `electron/`: the Electron main process: `main.js` (window, security), `window-state.js`, `theme-store.js`, `downloader.js` (yt-dlp), `media-files.js` (serving downloads to the page), `system.js` and `preload.js` (the page's bridge to them).
-- `src/`: the page, as ES modules in layers. `core/`, `themes/` → `prefs/`, `marks/` → `config.js` → `audio/`, `video/`, `waveform.js` → `context.js` → `ui/` → `features/` → `app.js`.
+- `src/`: the page, as ES modules in layers. `core/`, `themes/` → `prefs/`, `marks/` → `config.js` → `audio/`, `video/`, `waveform.js`, `timeline.js` → `context.js` → `ui/` → `features/` → `app.js`.
 - `index.html` and `style.css`: the page and its look.
 - `assets/`: the logo and icons; `scripts/make-images.py` makes them from the source image.
 - `tests/`: unit tests (`unit/`), end-to-end tests (`run.cjs` + `e2e/`) and the smoke test; all run with `npm test`.
@@ -42,6 +42,58 @@ The architecture overview, the file map and a list of where to make common chang
 | `tests/run.cjs` (one sequence)           | `tests/run.cjs` + `tests/e2e/`                                                              |
 
 ---
+
+## 2026-10-09: Markers on their own lanes above the waveform (the timeline)
+
+- **What:**
+  - **The markers moved off the waveform.** They now sit on lanes above it, in one column with it:
+    - **a new time ruler,** whose ticks and labels adapt to the zoom (`0:05`, `0:05.5`, `0:05.25`). A click or drag on it seeks. It carries the green start point's ▶ (drag to move, click to go there) and the red stop point's ■ (click to go there);
+    - **a marks lane:**
+      - a point is a line with a flag holding its name, and a region is a coloured bar with its name;
+      - dragging moves a mark, and dragging a region's end resizes it;
+      - a click selects it and goes there, and a double-click renames it;
+      - an empty spot seeks.
+  - **Guide lines:** each marker continues as a faint line over the waveform: marks in their colour (stronger when selected, dashed while a region is being marked), start in green, stop in red.
+  - **What the waveform keeps:** the sound, the playback cursor, the hover line and the A–B loop.
+  - **The wheel over the lanes** zooms and scrolls as it does over the waveform.
+- **Why:**
+  - **For the user:** the user wanted markers on a separate substrate, not painted on the waveform, but always in sync with it. Flags covered the top of the sound, handles its bottom, and region tints coloured it.
+  - **In the code:** waveform.js mixed drawing the sound with drawing and dragging every kind of marker. Its pointer code had five priorities, styling went through `::part()`, and tests reached into WaveSurfer's shadow DOM.
+- **How:**
+  - **The view:** `waveform.js` publishes its view with `onView(fn)`: `{ duration, width, offset }`, the whole zoomed waveform's width and its left edge, which is the scroll.
+    - It's sent on WaveSurfer's `scroll`, `zoom`, `redraw` and `resize` events, from a `ResizeObserver`, on `load()`, and **synchronously by every scroll the waveform makes** (`setScroll` / `scrollTo`).
+    - That last part matters. Following playback scrolls from inside an animation frame, after that frame's scroll events, so WaveSurfer's event arrives a frame late. For that one painted frame, the waveform had paged and the lanes hadn't. The new every-frame check caught it, at up to 1167 px.
+  - **`src/timeline.js` (new, at the waveform's layer):**
+    - Each lane, and the guides layer, holds one `.timeline-track` as wide as the zoomed waveform and moved by `translateX(offset)`. Markers are placed in percent of it, so a zoom changes only the track widths and a scroll only their transforms, whatever the number of marks.
+    - The ruler's ticks (`rulerTicks` and `formatRulerTime` in the new `src/core/ruler.js`, pure) are rendered for the visible range plus one screen either side, and redrawn only when the view leaves that range or the zoom changes.
+    - The marks' drag logic (`draftAt`, the minimum region length, `markEdgeAt`), the start point's drag and the minimap ticks moved here from `waveform.js`.
+  - **Alignment:** `index.html` wraps `#waveform` in `.timeline` (ruler, marks lane, then `.timeline-wave` holding the waveform and the `#timelineGuides` layer). The column has the border and the children have no side borders, so x = 0 is the same pixel in all of them.
+  - **`waveform.js` slimmed down:** it lost the marks, start/stop and minimap-tick drawing, the mark, flag and handle pointer modes, and four options. Its pointer code is back to seek, draw-loop and loop-edge. It gained `view`, `onView`, `timeAtClientX`, `clientXAt`, `wheel`, `scrollNearEdge` and `holdFollow`, for the lanes.
+  - **Wiring:**
+    - `player.timeline` (`context.js`, created in `app.js`) takes the mark and start-point callbacks;
+    - `features/marks.js` and `features/playback.js` draw through it;
+    - `eslint.config.js` puts `timeline.js` at the waveform's layer.
+  - **Video layout:** with a video, the timeline row is now at least 160 px (from 110), so the waveform keeps about 110 px under the 48 px of lanes.
+- **Where:**
+  - `src/timeline.js` and `src/core/ruler.js` (new);
+  - `src/waveform.js`, `src/app.js` (the wiring and header), `src/context.js`, `src/features/marks.js`, `src/features/playback.js`;
+  - `index.html`, `style.css` (the "Timeline" section replaces the `::part(mark…)`, `::part(start-…)` and `::part(stop-…)` rules);
+  - `eslint.config.js`, `README.md`.
+- **Verified by:**
+  - **Unit:** `tests/unit/core.test.mjs` has 4 new ruler tests: the step leaves room for labels at any zoom, ticks stay in range with labels on whole steps, minor ticks are at least 6 px apart, and labels are as precise as the step.
+  - **E2E, `tests/e2e/06-zoom.cjs`:** 5 new sync checks. Every ruler tick, marker and guide line in view is within 1 px of where the waveform has its time, measured in the same frame:
+    - at fit;
+    - after a wheel zoom;
+    - in the frame of a scroll;
+    - in **every frame for 2.5 s while playing and following**;
+    - after a window resize.
+
+    All were 0.02 px or less.
+
+  - **E2E, `14-marks.cjs` and `04-space-replay.cjs`:** these now use the lanes instead of the shadow DOM. Topic 14 also checks that the waveform's shadow DOM holds no markers, and that guide lines are drawn.
+  - **Stale test fixed:** `05-stepping.cjs` still pressed R in a check from before marks ("R / C do nothing"), which left a half-marked region for later topics. It now presses only C.
+  - **Runs:** the full `npm test` passes: unit 120, e2e 254, smoke 20. `npm run check` is clean.
+  - **Screenshots:** `marks.png`, `timeline-zoomed.png`, the light themes and the video layout, looked at.
 
 ## 2026-10-09: The stop point: a red marker for where playback last stopped
 

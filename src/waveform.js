@@ -3,8 +3,7 @@ import { clamp, formatTrackTime } from "./core/format.js";
 
 /** @typedef {import("./core/timeline.js").Loop} Loop */
 /** @typedef {import("./core/timeline.js").LoopRegion} LoopRegion */
-/** @typedef {import("./marks/index.js").Mark} Mark */
-/** @typedef {{ start: number, end: number | null }} MarkTimes */
+/** @typedef {{ duration: number, width: number, offset: number }} View */
 
 /* =====================================================================
  * WAVEFORM
@@ -21,22 +20,11 @@ import { clamp, formatTrackTime } from "./core/format.js";
  * an edge moves that edge; the result goes to onLoopChange, and the
  * region only changes for good when setLoop() is called with it.
  *
- * Marks (points and regions; src/marks) are drawn the same way, with a
- * flag at the top showing the label, and as ticks and bands on the
- * minimap. The waveform only draws them and reports what the pointer did:
- * a mark's flag selects it (onMarkSelect), seeks to it on a click, moves
- * the whole mark when dragged, and asks for a rename on a double-click
- * (onMarkRename); dragging a point or a region's edge moves just that
- * (onMarkChange, at the end of the drag). Elsewhere, even inside a region,
- * a click still seeks.
- *
- * The start point (where Space plays from; features/playback.js) is a
- * green line (<div part="start-point">) with a ▶ handle at its bottom,
- * and a tick on the minimap. Dragging the handle reports the new spot
- * (onStartPointChange, at the end of the drag) without moving the
- * cursor; a click on it seeks there. The stop point (where playback last
- * stopped) is drawn the same way in red (<div part="stop-point">), with a
- * ■ handle that goes there on a click; it can't be dragged.
+ * Markers (marks, the start and stop points) are not drawn here: they
+ * live on their own lanes above the waveform (timeline.js), which follow
+ * the view this publishes: onView(fn) is called with { duration, width,
+ * offset } (the whole zoomed waveform's width in px, and its left edge
+ * relative to the container: the scroll) whenever it changes.
  *
  * A thin hover line (<div part="hover-line">, with the time) follows the
  * mouse over the waveform while nothing is dragged: it sits exactly where
@@ -50,8 +38,9 @@ import { clamp, formatTrackTime } from "./core/format.js";
  * while it plays.
  *
  * Exposes: preload, init, load, setTime, follow, resumeFollow, setLoop,
- *          setMarks, setStartPoint, setStopPoint, refreshColors (after the colour variables changed,
- *          e.g. a theme)
+ *          refreshColors (after the colour variables changed, e.g. a
+ *          theme), and for the lanes: view, onView, timeAtClientX,
+ *          clientXAt, wheel (an event handler), scrollNearEdge, holdFollow
  * ===================================================================== */
 
 /**
@@ -60,21 +49,8 @@ import { clamp, formatTrackTime } from "./core/format.js";
  * @param {HTMLElement} options.minimapContainer
  * @param {(time: number) => void} options.onSeek A click or drag asks to move the cursor.
  * @param {(loop: Loop) => void} options.onLoopChange A drag drew or adjusted the loop.
- * @param {(id: string) => void} options.onMarkSelect A mark was pressed.
- * @param {(id: string, times: MarkTimes) => void} options.onMarkChange A drag moved a mark.
- * @param {(id: string) => void} options.onMarkRename A mark's flag was double-clicked.
- * @param {(time: number) => void} options.onStartPointChange The start point's handle was dragged.
  */
-export function createWaveform({
-  container,
-  minimapContainer,
-  onSeek,
-  onLoopChange,
-  onMarkSelect,
-  onMarkChange,
-  onMarkRename,
-  onStartPointChange,
-}) {
+export function createWaveform({ container, minimapContainer, onSeek, onLoopChange }) {
   const { maxZoomMultiplier } = CONFIG.waveform;
 
   let waveSurfer = null;
@@ -96,23 +72,9 @@ export function createWaveform({
   /** @type {LoopRegion | null} */
   let loop = null; // as last set by setLoop()
   let loopElement = null;
-  /** @type {Mark[]} */
-  let marks = []; // as last set by setMarks()
-  let selectedMark = null; // its id
-  let pendingRegion = null; // { start, end }: a region being marked
-  let markDraft = null; // { id, start, end } while a mark is dragged
-  let marksLayer = null;
-  let minimapMarksLayer = null;
   let hoverLine = null; // { line, label }
-  let startPoint = null; // as last set by setStartPoint()
-  let startDraft = null; // while its handle is dragged
-  let startElements = null; // { line, tick }
-  let stopPoint = null; // as last set by setStopPoint()
-  let stopElements = null; // { line, tick }
-  // The elements drawing each mark, by id, reused between renders (so a
-  // double-click on a flag isn't split across two elements).
-  /** @type {Map<string, { body: HTMLElement, flag: HTMLElement, tick: HTMLElement }>} */
-  const markElements = new Map();
+  /** @type {Set<(view: View) => void>} */
+  const viewListeners = new Set();
 
   // Loads the WaveSurfer code without creating anything on screen, so it
   // is safe to call at startup.
@@ -156,6 +118,8 @@ export function createWaveform({
         plugins: [minimap],
       });
 
+      // The lanes follow every change of zoom, scroll or size.
+      for (const event of ["scroll", "zoom", "redraw", "resize"]) waveSurfer.on(event, emitView);
       bindPointerSeek();
       bindWheelZoom();
       bindMinimapScrubbing();
@@ -202,7 +166,7 @@ export function createWaveform({
     waveSurfer.unregisterPlugin(minimap);
     minimap = waveSurfer.registerPlugin(createMinimap());
     // The new minimap places its visible-range overlay on the next scroll.
-    waveSurfer.setScroll(waveSurfer.getScroll());
+    setScroll(waveSurfer.getScroll());
   }
 
   // Resolves to whether the waveform is available.
@@ -234,53 +198,15 @@ export function createWaveform({
     return toStart <= toEnd ? "start" : "end";
   }
 
-  // The mark edge nearest to `x` within grabbing distance, or null:
-  // { id, edge }, where `edge` is "point", or a region's "start" or "end".
-  function markEdgeAt(x) {
-    if (!duration) return null;
-    let nearest = null;
-    for (const mark of marks) {
-      const edges = mark.end === null ? { point: mark.start } : { start: mark.start, end: mark.end };
-      for (const [edge, time] of Object.entries(edges)) {
-        const distance = Math.abs(x - clientXAt(time));
-        if (distance <= CONFIG.loop.edgeGrabPx && !(nearest?.distance <= distance))
-          nearest = { id: mark.id, edge, distance };
-      }
-    }
-    return nearest;
-  }
-
-  // The id of the mark whose flag the event happened on, or null. The
-  // flags are the only part of a mark that takes the pointer.
-  const flagOf = (event) =>
-    event
-      .composedPath()
-      .map((node) => /** @type {HTMLElement} */ (node).dataset?.markFlag)
-      .find(Boolean) ?? null;
-
-  // Which point's handle the event happened on: "start", "stop" or null.
-  const handleOf = (event) =>
-    event
-      .composedPath()
-      .map((node) => /** @type {HTMLElement} */ (node).dataset?.handle)
-      .find(Boolean) ?? null;
-
   // One drag at a time: { mode: "seek" } | { mode: "draw", anchor }
   // | { mode: "edge", fixed } (`fixed` is the loop end that stays put),
-  // plus `draft`, the loop described so far, while drawing or adjusting;
-  // or { mode: "mark", id, edge, origin, grabTime, startX, moved, draft }
-  // for a mark (`edge`: "point", "start", "end", or "whole" from its flag);
-  // or { mode: "start", startX, moved, draft } for the start point's
-  // handle; or { mode: "stop" } for a click on the stop point's.
+  // plus `draft`, the loop described so far, while drawing or adjusting.
   function bindPointerSeek() {
-    const edgePx = 30; // dragging this close to an edge scrolls a zoomed view
-    const clickSlopPx = 3; // a press on a mark that moves less is a click
     const { minSeconds } = CONFIG.loop;
     let pointerId = null;
     let drag = null;
     let pendingX = null;
     let frame = 0;
-    let pressedFlag = null; // the mark whose flag the last press was on
 
     // The loop described by the current drag, or null if it is too short.
     function draftLoop(time) {
@@ -290,49 +216,17 @@ export function createWaveform({
       return end - start >= minSeconds ? { start, end, enabled: true } : null;
     }
 
-    // Where the dragged mark would be with the pointer at `time`. A region
-    // can't get shorter than CONFIG.marks.minSeconds; it stays as it was.
-    function draftMark(time) {
-      const { origin, edge } = drag;
-      if (edge === "point") return { start: time, end: null };
-      if (edge === "whole") {
-        const length = (origin.end ?? origin.start) - origin.start;
-        const start = clamp(origin.start + time - drag.grabTime, 0, duration - length);
-        return { start, end: origin.end === null ? null : start + length };
-      }
-      const other = edge === "start" ? origin.end : origin.start;
-      const [start, end] = [Math.min(time, other), Math.max(time, other)];
-      if (end - start >= CONFIG.marks.minSeconds) return { start, end };
-      return drag.draft ?? { start: origin.start, end: origin.end };
-    }
-
     function applyPointer() {
       frame = 0;
       if (pendingX === null || !duration) return;
       const x = pendingX;
       pendingX = null;
 
-      if (pointerId !== null) {
-        const view = container.getBoundingClientRect();
-        if (x > view.right - edgePx) waveSurfer.setScroll(waveSurfer.getScroll() + edgePx);
-        else if (x < view.left + edgePx) waveSurfer.setScroll(waveSurfer.getScroll() - edgePx);
-      }
+      if (pointerId !== null) scrollNearEdge(x);
 
       const time = timeAtClientX(x);
-      if (drag.mode === "stop") return; // only a click
       if (drag.mode === "seek") onSeek(time);
-      else if (drag.mode === "start") {
-        drag.moved ||= Math.abs(x - drag.startX) >= clickSlopPx;
-        if (!drag.moved) return;
-        drag.draft = startDraft = time;
-        renderStartPoint();
-      } else if (drag.mode === "mark") {
-        drag.moved ||= Math.abs(x - drag.startX) >= clickSlopPx;
-        if (!drag.moved) return;
-        drag.draft = draftMark(time);
-        markDraft = { id: drag.id, ...drag.draft };
-        renderMarks();
-      } else {
+      else {
         drag.draft = draftLoop(time);
         renderLoop(drag.draft ?? (drag.mode === "edge" ? loop : null));
       }
@@ -342,30 +236,10 @@ export function createWaveform({
       if (event.button !== 0 || !duration) return;
       event.preventDefault();
 
-      // Shift draws a loop anywhere; otherwise the start and stop points'
-      // handles come first, then a mark's flag, then a loop edge, then a
-      // mark's edge, and anywhere else seeks.
-      const handle = event.shiftKey ? null : handleOf(event);
-      const flag = event.shiftKey || handle ? null : flagOf(event);
-      pressedFlag = flag;
-      const edge = event.shiftKey || handle || flag ? null : loopEdgeAt(event.clientX);
-      const markEdge = event.shiftKey || handle || flag || edge ? null : markEdgeAt(event.clientX);
-      if (handle === "start") drag = { mode: "start", startX: event.clientX, moved: false, draft: null };
-      else if (handle === "stop") drag = { mode: "stop" };
-      else if (flag || markEdge) {
-        const id = flag ?? markEdge.id;
-        drag = {
-          mode: "mark",
-          id,
-          edge: flag ? "whole" : markEdge.edge,
-          origin: marks.find((mark) => mark.id === id),
-          grabTime: timeAtClientX(event.clientX),
-          startX: event.clientX,
-          moved: false,
-          draft: null,
-        };
-        onMarkSelect(id);
-      } else if (edge) drag = { mode: "edge", fixed: edge === "start" ? loop.end : loop.start };
+      // Shift draws a loop anywhere; otherwise a loop edge is moved, and
+      // anywhere else seeks.
+      const edge = event.shiftKey ? null : loopEdgeAt(event.clientX);
+      if (edge) drag = { mode: "edge", fixed: edge === "start" ? loop.end : loop.start };
       else if (event.shiftKey) drag = { mode: "draw", anchor: timeAtClientX(event.clientX) };
       else drag = { mode: "seek" };
 
@@ -378,16 +252,13 @@ export function createWaveform({
     });
 
     // Moves are applied once per frame. Without a drag, the hover line
-    // follows the mouse, and hovering near a loop edge or a mark's edge
-    // shows the resize cursor (a flag has its own).
+    // follows the mouse, and hovering near a loop edge shows the resize
+    // cursor.
     container.addEventListener("pointermove", (event) => {
       if (event.pointerId !== pointerId) {
-        const overHandle = handleOf(event) !== null;
-        if (pointerId === null) renderHoverLine(overHandle ? null : event.clientX);
-        const idle = pointerId === null && !overHandle && !flagOf(event);
-        const nearLoop = idle && loopEdgeAt(event.clientX) !== null;
-        container.classList.toggle("near-loop-edge", nearLoop);
-        container.classList.toggle("near-mark-edge", idle && !nearLoop && markEdgeAt(event.clientX) !== null);
+        if (pointerId !== null) return;
+        renderHoverLine(event.clientX);
+        container.classList.toggle("near-loop-edge", loopEdgeAt(event.clientX) !== null);
         return;
       }
       pendingX = event.clientX;
@@ -404,26 +275,6 @@ export function createWaveform({
       scrubbing = false;
 
       if (finished.mode === "seek") return;
-      if (finished.mode === "stop") {
-        if (stopPoint !== null) onSeek(stopPoint);
-        return;
-      }
-      if (finished.mode === "start") {
-        startDraft = null;
-        // A click goes there; a drag moves it.
-        if (finished.moved) onStartPointChange(finished.draft);
-        else if (startPoint !== null) onSeek(startPoint);
-        renderStartPoint(); // back to the start point as last set
-        return;
-      }
-      if (finished.mode === "mark") {
-        markDraft = null;
-        if (finished.moved) onMarkChange(finished.id, finished.draft);
-        // A click: a flag seeks to its mark, a mark's edge to the click.
-        else onSeek(finished.edge === "whole" ? finished.origin.start : timeAtClientX(event.clientX));
-        renderMarks(); // back to the marks as last set
-        return;
-      }
       if (finished.draft) onLoopChange({ start: finished.draft.start, end: finished.draft.end });
       // A Shift+click (too short to be a loop) is a plain click.
       else if (finished.mode === "draw") onSeek(finished.anchor);
@@ -432,13 +283,15 @@ export function createWaveform({
     container.addEventListener("pointerup", endDrag);
     container.addEventListener("pointercancel", endDrag);
     container.addEventListener("pointerleave", () => renderHoverLine(null));
+  }
 
-    // The pointer is captured by the container while pressed, so the
-    // double-click lands on it rather than on the flag: the flag is the
-    // one the last press was on.
-    container.addEventListener("dblclick", () => {
-      if (pressedFlag) onMarkRename(pressedFlag);
-    });
+  // While dragging, this close to an edge of a zoomed view scrolls it (on
+  // the lanes too).
+  function scrollNearEdge(x) {
+    const edgePx = 30;
+    const view = container.getBoundingClientRect();
+    if (x > view.right - edgePx) setScroll(waveSurfer.getScroll() + edgePx);
+    else if (x < view.left + edgePx) setScroll(waveSurfer.getScroll() - edgePx);
   }
 
   /* ---------- Loop region ---------- */
@@ -459,46 +312,30 @@ export function createWaveform({
     loopElement.style.width = `${((shown.end - shown.start) / duration) * 100}%`;
   }
 
-  /* ---------- Start and stop points ---------- */
+  /* ---------- The view, for the lanes ---------- */
 
-  // The elements of a point: a line with a handle on the waveform
-  // (<div part="<kind>-point"> holding <span part="<kind>-handle">) and a
-  // tick on the minimap (.minimap-<kind>).
-  function pointElements(kind, title) {
-    const line = document.createElement("div");
-    line.setAttribute("part", `${kind}-point`);
-    const handle = document.createElement("span");
-    handle.setAttribute("part", `${kind}-handle`);
-    handle.dataset.handle = kind;
-    handle.title = title;
-    line.append(handle);
-    const tick = document.createElement("div");
-    tick.className = `minimap-${kind}`;
-    tick.ariaHidden = "true";
-    minimapContainer.append(tick);
-    return { line, tick };
+  // The whole (zoomed) waveform's width and left edge, relative to the
+  // container; null before the waveform exists.
+  /** @returns {View | null} */
+  function view() {
+    if (!waveSurfer) return null;
+    const track = waveSurfer.getWrapper().getBoundingClientRect();
+    return { duration, width: track.width, offset: track.left - container.getBoundingClientRect().left };
   }
 
-  // Puts a point's line and tick at `time`, or hides them (null).
-  function placePoint({ line, tick }, time) {
-    const wrapper = waveSurfer.getWrapper();
-    if (line.parentNode !== wrapper) wrapper.append(line);
-    line.hidden = tick.hidden = time === null || !duration;
-    if (!line.hidden) line.style.left = tick.style.left = `${(time / duration) * 100}%`;
+  function emitView() {
+    const current = view();
+    if (current) for (const listener of viewListeners) listener(current);
   }
 
-  // The start point, as last set or where its handle is dragged to.
-  function renderStartPoint() {
-    if (!waveSurfer) return;
-    startElements ??= pointElements("start", "Space plays from here (drag to move it)");
-    placePoint(startElements, startDraft ?? startPoint);
+  // Every scroll made here goes through these, which tell the lanes at
+  // once: a scroll from an animation frame (following playback) would
+  // otherwise reach them through WaveSurfer's scroll event a frame late.
+  function scrollTo(scroll) {
+    scroll();
+    emitView();
   }
-
-  function renderStopPoint() {
-    if (!waveSurfer) return;
-    stopElements ??= pointElements("stop", "Playback last stopped here (click to go there)");
-    placePoint(stopElements, stopPoint);
-  }
+  const setScroll = (px) => scrollTo(() => waveSurfer.setScroll(px));
 
   /* ---------- Hover line ---------- */
 
@@ -529,93 +366,6 @@ export function createWaveform({
     label.setAttribute("part", nearRight ? "hover-time hover-time-flip" : "hover-time");
   }
 
-  /* ---------- Marks ---------- */
-
-  const percent = (time) => `${(time / duration) * 100}%`;
-
-  // Draws the marks (as last set, with the one being dragged where it's
-  // dragged to) and the region being marked, on the waveform and the
-  // minimap. Each mark keeps its elements (markElements).
-  function renderMarks() {
-    if (!waveSurfer) return;
-    const wrapper = waveSurfer.getWrapper();
-    if (!marksLayer || marksLayer.parentNode !== wrapper) {
-      marksLayer = document.createElement("div");
-      marksLayer.setAttribute("part", "marks");
-      marksLayer.ariaHidden = "true"; // the marks list is the accessible way to them
-      wrapper.append(marksLayer);
-      for (const { body } of markElements.values()) marksLayer.append(body);
-    }
-    if (!minimapMarksLayer) {
-      minimapMarksLayer = document.createElement("div");
-      minimapMarksLayer.className = "minimap-marks";
-      minimapMarksLayer.ariaHidden = "true";
-      minimapContainer.append(minimapMarksLayer);
-    }
-
-    const shown = duration ? marks.map((mark) => (mark.id === markDraft?.id ? { ...mark, ...markDraft } : mark)) : [];
-    if (pendingRegion && duration) {
-      const { start, end } = pendingRegion;
-      shown.push({
-        id: "",
-        start: Math.min(start, end),
-        end: Math.max(start, end),
-        label: "",
-        color: "",
-        pending: true,
-      });
-    }
-
-    const kept = new Set();
-    for (const mark of shown) {
-      kept.add(mark.id);
-      let elements = markElements.get(mark.id);
-      if (!elements) {
-        const flag = document.createElement("span");
-        flag.setAttribute("part", "mark-flag");
-        const body = document.createElement("div");
-        body.append(flag);
-        elements = { body, flag, tick: document.createElement("div") };
-        markElements.set(mark.id, elements);
-        marksLayer.append(body);
-        minimapMarksLayer.append(elements.tick);
-      }
-      const { body, flag, tick } = elements;
-      const region = mark.end !== null;
-      const pending = "pending" in mark;
-      body.setAttribute(
-        "part",
-        [
-          "mark",
-          region ? "mark-region" : "mark-point",
-          mark.id === selectedMark && "mark-selected",
-          pending && "mark-pending",
-        ]
-          .filter(Boolean)
-          .join(" "),
-      );
-      const color = pending ? "var(--text)" : `var(--mark-${mark.color})`;
-      for (const element of [body, tick]) {
-        element.style.left = percent(mark.start);
-        element.style.width = region ? percent(mark.end - mark.start) : "";
-        element.style.setProperty("--mark-color", color);
-      }
-      flag.setAttribute("part", mark.id === selectedMark ? "mark-flag mark-flag-selected" : "mark-flag");
-      flag.hidden = pending;
-      flag.textContent = mark.label;
-      flag.title = mark.label;
-      if (pending) delete flag.dataset.markFlag;
-      else flag.dataset.markFlag = mark.id;
-      tick.className = region ? "minimap-mark minimap-region" : "minimap-mark";
-    }
-    for (const [id, { body, tick }] of markElements) {
-      if (kept.has(id)) continue;
-      body.remove();
-      tick.remove();
-      markElements.delete(id);
-    }
-  }
-
   /* ---------- Zoom / scroll ---------- */
 
   function fitZoom() {
@@ -641,30 +391,31 @@ export function createWaveform({
     // WaveSurfer re-renders at once, scrolling to keep the playback cursor
     // in place; correct the scroll so the anchor is back under the pointer.
     waveSurfer.zoom(next);
-    waveSurfer.setScroll(waveSurfer.getScroll() + (clientXAt(anchorTime) - clientX));
+    setScroll(waveSurfer.getScroll() + (clientXAt(anchorTime) - clientX));
   }
 
   // The wheel zooms at the pointer (a touchpad pinch arrives as a wheel
   // with ctrlKey, and zooms the same way); a touchpad's sideways swipe
   // scrolls.
-  function bindWheelZoom() {
-    container.addEventListener(
-      "wheel",
-      (event) => {
-        if (!duration || (event.deltaY === 0 && event.deltaX === 0)) return;
-        event.preventDefault();
+  // The lanes above the waveform use the same handler.
+  /** @param {WheelEvent} event */
+  function wheel(event) {
+    if (!duration || (event.deltaY === 0 && event.deltaX === 0)) return;
+    event.preventDefault();
 
-        followPaused = true;
-        if (Math.abs(event.deltaY) >= Math.abs(event.deltaX)) zoomBy(Math.exp(-event.deltaY * 0.001), event.clientX);
-        else waveSurfer.setScroll(waveSurfer.getScroll() + event.deltaX);
-      },
-      { passive: false },
-    );
+    followPaused = true;
+    if (Math.abs(event.deltaY) >= Math.abs(event.deltaX)) zoomBy(Math.exp(-event.deltaY * 0.001), event.clientX);
+    else setScroll(waveSurfer.getScroll() + event.deltaX);
+  }
+
+  function bindWheelZoom() {
+    container.addEventListener("wheel", wheel, { passive: false });
   }
 
   // A wider window raises the fit-to-width zoom; never stay zoomed out past it.
   function bindResizeClamp() {
     new ResizeObserver(() => {
+      emitView();
       if (!duration || zoomLevel === null || zoomLevel >= fitZoom()) return;
       zoomLevel = null;
       waveSurfer.zoom(0);
@@ -687,7 +438,7 @@ export function createWaveform({
 
       const trackRect = drag.track.getBoundingClientRect();
       const trackOffset = clamp(clientX - trackRect.left - drag.grabOffset, 0, maxTrackOffset);
-      waveSurfer.setScroll((maxScroll * trackOffset) / maxTrackOffset);
+      setScroll((maxScroll * trackOffset) / maxTrackOffset);
     }
 
     minimapContainer.addEventListener("pointerdown", (event) => {
@@ -742,7 +493,7 @@ export function createWaveform({
         if (!duration || delta === 0) return;
         event.preventDefault();
         followPaused = true;
-        waveSurfer.setScroll(waveSurfer.getScroll() + delta);
+        setScroll(waveSurfer.getScroll() + delta);
       },
       { passive: false },
     );
@@ -758,20 +509,15 @@ export function createWaveform({
     zoomAnchor = null;
     loop = null;
     renderLoop();
-    marks = [];
-    selectedMark = pendingRegion = markDraft = null;
-    renderMarks();
     renderHoverLine(null);
-    startPoint = startDraft = stopPoint = null;
-    renderStartPoint();
-    renderStopPoint();
+    emitView();
     if (!waveSurfer) return;
 
     await waveSurfer.load("", peaks, trackDuration);
     waveSurfer.zoom(0);
     waveSurfer.setTime(0);
     duration = trackDuration;
-    renderMarks();
+    emitView();
   }
 
   // Keeps the cursor in view when zoomed in: once it leaves the visible
@@ -788,7 +534,7 @@ export function createWaveform({
       if (inView) followPaused = false;
       return;
     }
-    if (!inView) waveSurfer.setScrollTime(time);
+    if (!inView) scrollTo(() => waveSurfer.setScrollTime(time));
   }
 
   return {
@@ -804,27 +550,18 @@ export function createWaveform({
       loop = next && { ...next };
       renderLoop();
     },
-    /**
-     * Draws `list`, with `selected` (an id) picked out and `pending` (a
-     * region being marked: { start, end }, either order) drawn dashed.
-     * @param {Mark[]} list
-     * @param {{ selected?: string | null, pending?: { start: number, end: number } | null }} [options]
-     */
-    setMarks(list, { selected = null, pending = null } = {}) {
-      marks = list;
-      selectedMark = selected;
-      pendingRegion = pending;
-      renderMarks();
+    view,
+    /** Calls `listener` with the view whenever it changes. @param {(view: View) => void} listener */
+    onView(listener) {
+      viewListeners.add(listener);
     },
-    /** Where Space plays from (seconds), or null to hide it. @param {number | null} time */
-    setStartPoint(time) {
-      startPoint = time;
-      renderStartPoint();
-    },
-    /** Where playback last stopped (seconds), or null to hide it. @param {number | null} time */
-    setStopPoint(time) {
-      stopPoint = time;
-      renderStopPoint();
+    timeAtClientX: (x) => (duration ? timeAtClientX(x) : 0),
+    clientXAt,
+    wheel,
+    scrollNearEdge: (x) => waveSurfer && scrollNearEdge(x),
+    /** While a lane is dragged, following playback waits. @param {boolean} on */
+    holdFollow(on) {
+      scrubbing = on;
     },
   };
 }

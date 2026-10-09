@@ -25,8 +25,13 @@
  *              hour-long files open (see docs/diagnostics/long-file-loading.md).
  *   transport  Playback state and position. Mirrors Signalsmith's timeline,
  *              so the position of what is being heard is computed exactly.
- *   waveform   WaveSurfer drawing, zoom, minimap, the A–B loop region and
- *              the marks. Never plays audio.
+ *   waveform   WaveSurfer drawing, zoom, minimap and the A–B loop region.
+ *              Never plays audio. Publishes its view (zoom, scroll) for
+ *              the timeline.
+ *   timeline   The lanes above the waveform, where the markers live: a time
+ *              ruler with the start ▶ and stop ■ points, and the marks lane;
+ *              faint guide lines over the waveform, ticks on the minimap.
+ *              Follows the waveform's view, so it never drifts from it.
  *   video      Frame-exact picture for video files: decodes frames itself
  *              (Mediabunny + WebCodecs) and draws the frame at the transport
  *              position. No second clock, so it can't drift from the audio.
@@ -34,7 +39,7 @@
  *              plain values for this session, in context.js.
  *   marks      Points and regions on the open track, with a label and a
  *              colour: the store (src/marks, kept in context.js) is changed
- *              by features/marks.js, which redraws the waveform and the
+ *              by features/marks.js, which redraws the timeline and the
  *              marks list. Session-only for now; versioned, so a TranscriBee
  *              file can save and restore them (see COMMON CHANGES).
  *   prefs      The user's Settings (theme, downloads), kept between runs by
@@ -55,7 +60,7 @@
  *
  * FILES (src/), in layers: a file imports only from layers above it in
  * this list, never below (enforced by `npm run lint`)
- *   core/          Pure helpers, no DOM: format, peaks, timeline (and the
+ *   core/          Pure helpers, no DOM: format, peaks, ruler, timeline (and the
  *                  Segment / Loop / LoopRegion types), emitter, files (and
  *                  the Media type), errors, memory, parts (splitting and
  *                  joining a parallel decode)
@@ -68,8 +73,8 @@
  *   config.js      CONFIG: every tunable number
  *   audio/         engine.js, transport.js, decoder.js (+ decode-worker.js)
  *   video/         view.js (the picture), proxy.js (low-res copy for seeking)
- *   waveform.js    The waveform, zoom, minimap, loop and marks drawing and
- *                  dragging
+ *   waveform.js    The waveform, zoom, minimap, loop; its view for the lanes
+ *   timeline.js    The lanes: ruler, start/stop points, marks; guide lines
  *   context.js     `settings`, `marks` (the open track's), and `player`: the
  *                  components above, once created
  *   ui/            dom.js (elements, messages, rendering, loading screens),
@@ -135,8 +140,11 @@
  *                             normalizeMark and serializeMarks; bump
  *                             MARKS_VERSION if old saves read differently);
  *                             actions, keys and the list in features/marks.js;
- *                             drawing and dragging in waveform.js (renderMarks,
- *                             bindPointerSeek); sizes in CONFIG.marks.
+ *                             drawing and dragging in timeline.js (renderMarks,
+ *                             the marks lane's drags); sizes in CONFIG.marks.
+ *   A new lane / marker       In timeline.js: a track element per lane
+ *                             (moved by applyView), markers placed in
+ *                             percent of it; a .timeline row in index.html.
  *   Mark colours              MARK_COLORS (src/themes/mark-colors.js), and the
  *                             --mark-* defaults in style.css; the unit tests
  *                             check each is visible on every theme.
@@ -205,6 +213,7 @@ import { $, dom, renderStepSize, renderTrackTime, renderTransportState, reportEr
 import { bindShortcuts, renderShortcutLegend } from "./ui/shortcuts.js";
 import { followThemePrefs, onThemeChange } from "./ui/theme.js";
 import { createVideoView } from "./video/view.js";
+import { createTimeline } from "./timeline.js";
 import { createWaveform } from "./waveform.js";
 
 /** @typedef {import("./ui/shortcuts.js").Shortcut} Shortcut */
@@ -232,6 +241,16 @@ const waveform = createWaveform({
   minimapContainer: $("waveform-minimap"),
   onSeek: (time) => transport.seek(time),
   onLoopChange: (loop) => setLoopRegion({ ...loop, enabled: true }),
+});
+
+// The markers' lanes above the waveform, following its zoom and scroll.
+const timeline = createTimeline({
+  ruler: $("ruler"),
+  marksLane: $("marksLane"),
+  guides: $("timelineGuides"),
+  minimapContainer: $("waveform-minimap"),
+  waveform,
+  onSeek: (time) => transport.seek(time),
   onMarkSelect: selectMark,
   onMarkChange: moveMark,
   onMarkRename: renameMark,
@@ -245,7 +264,7 @@ const videoView = createVideoView({
   onProblem: (message) => showNotice(message),
 });
 
-Object.assign(player, { engine, transport, waveform, videoView });
+Object.assign(player, { engine, transport, waveform, timeline, videoView });
 
 // The waveform draws on canvases, which don't follow the CSS colours.
 onThemeChange(() => waveform.refreshColors());

@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { describe, mock, test } from "node:test";
 import { createEmitter } from "../../src/core/emitter.js";
 import { fileExtension, isVideoFile, mediaSource } from "../../src/core/files.js";
+import { formatRulerTime, rulerTicks } from "../../src/core/ruler.js";
 import {
   clamp,
   formatEta,
@@ -117,6 +118,46 @@ describe("timeline", () => {
     assert.equal(timelinePositionAt([looping], 1.5, 60), 2.5);
     assert.equal(timelinePositionAt([looping], 2.5, 60), 1.5);
     assert.equal(timelinePositionAt([looping], 4.5, 60), 1.5);
+  });
+});
+
+describe("ruler", () => {
+  test("labels a step that leaves enough room, at any zoom", () => {
+    assert.equal(rulerTicks(0, 20, 50).step, 2); // 1 s is 50 px: too close
+    assert.equal(rulerTicks(0, 20, 70).step, 1);
+    assert.equal(rulerTicks(0, 1, 2000).step, 0.05);
+    assert.equal(rulerTicks(0, 7200, 0.1).step, 1800);
+    for (const pxPerSecond of [0.05, 1, 13, 140, 900, 9000]) {
+      const { step } = rulerTicks(0, 1, pxPerSecond);
+      assert.ok(step * pxPerSecond >= 70 || step === 3600, `${pxPerSecond} px/s: ${step}`);
+    }
+  });
+
+  test("ticks only in the range, labelled ones on whole steps", () => {
+    const { ticks } = rulerTicks(3.3, 7.9, 100); // step 1, minor 0.2
+    assert.ok(ticks.every((tick) => tick.time >= 3.3 && tick.time <= 7.9));
+    assert.deepEqual(
+      ticks.filter((tick) => tick.major).map((tick) => tick.time),
+      [4, 5, 6, 7],
+    );
+    assert.equal(ticks.length, 23); // 3.4 … 7.8
+    assert.ok(Math.abs(ticks[0].time - 3.4) < 1e-9);
+  });
+
+  test("minor ticks stay at least 6 px apart", () => {
+    for (const pxPerSecond of [7, 30, 71, 500]) {
+      const { ticks } = rulerTicks(0, 60, pxPerSecond);
+      const gap = (ticks[1].time - ticks[0].time) * pxPerSecond;
+      assert.ok(gap >= 6, `${pxPerSecond} px/s: ${gap}`);
+    }
+  });
+
+  test("labels are as precise as the step", () => {
+    assert.equal(formatRulerTime(65, 5), "1:05");
+    assert.equal(formatRulerTime(65.5, 0.5), "1:05.5");
+    assert.equal(formatRulerTime(5.25, 0.05), "0:05.25");
+    assert.equal(formatRulerTime(59.99999, 1), "1:00");
+    assert.equal(formatRulerTime(3600, 600), "60:00");
   });
 });
 
