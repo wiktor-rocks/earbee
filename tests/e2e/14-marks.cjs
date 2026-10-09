@@ -75,10 +75,10 @@ module.exports = async function (h) {
     JSON.stringify(marks),
   );
   check(
-    "…drawn in the lane with its flag, as a guide line over the waveform, and on the minimap",
+    "…drawn in the lane with its flag and on the minimap, with no line over the waveform",
     (await drawn(".lane-point")) === 1 &&
       (await js(`document.querySelector("#marksLane .lane-label").textContent`)) === "Mark 1" &&
-      (await js(`document.querySelectorAll("#timelineGuides .guide-mark").length`)) === 1 &&
+      (await js(`document.querySelectorAll("#timelineGuides .guide-mark").length`)) === 0 &&
       (await js(`document.querySelectorAll("#waveform-minimap .minimap-mark").length`)) === 1,
   );
   check("the empty hint is gone", await js(`document.getElementById("marksEmpty").hidden`));
@@ -279,22 +279,35 @@ module.exports = async function (h) {
   await sleep(100);
   check("the sidebar's Point button marks a point", (await listed()).length === countBefore + 1);
 
-  // A narrow window: the sidebar is a drawer, opened from the top bar.
-  const [width, height] = h.win.getSize();
-  h.win.setSize(1000, height);
-  await sleep(400);
-  const hiddenWhenNarrow = !(await js(`sidebar.checkVisibility()`));
-  await js(`sidebarToggle.click()`);
-  await sleep(100);
-  const openedAsDrawer = await js(`sidebar.checkVisibility() && getComputedStyle(sidebar).position === "fixed"`);
-  key("Escape");
-  await sleep(100);
+  // The transport: Play shows only its icon (its label is for screen
+  // readers); the step size sits between the step arrows.
   check(
-    "narrow: the sidebar is a drawer from the top bar, closed by Esc",
-    hiddenWhenNarrow && openedAsDrawer && !(await js(`sidebar.checkVisibility()`)),
-    JSON.stringify({ hiddenWhenNarrow, openedAsDrawer }),
+    "Play is just an icon; the step size is between its arrows",
+    await js(`(() => {
+      const box = (id) => document.getElementById(id).getBoundingClientRect();
+      return play.offsetWidth <= 44 && playLabel.getBoundingClientRect().width <= 1 &&
+        box("stepBack").right <= box("stepSize").left && box("stepSize").right <= box("stepForward").left;
+    })()`),
+    await js(
+      `[play.offsetWidth, playLabel.getBoundingClientRect().width, ...["stepBack", "stepSize", "stepForward"].map((id) => { const r = document.getElementById(id).getBoundingClientRect(); return [r.left, r.right]; })]`,
+    ),
   );
-  check("…its button shows the count", (await js(`sidebarCount.textContent`)) === String(countBefore + 1));
+
+  // Half a screen (960 px wide): the sidebar stays in view beside the
+  // timeline, and nothing spills sideways.
+  const [width, height] = h.win.getSize();
+  h.win.setSize(960, height);
+  await sleep(400);
+  const half = await js(`(() => {
+    const side = sidebar.getBoundingClientRect(), wave = document.getElementById("waveform").getBoundingClientRect();
+    return { visible: sidebar.checkVisibility(), beside: side.left >= wave.right, inside: side.right <= innerWidth,
+      noSpill: document.scrollingElement.scrollWidth <= innerWidth, width: Math.round(side.width) };
+  })()`);
+  check(
+    "half a screen: the sidebar stays in view beside the timeline",
+    half.visible && half.beside && half.inside && half.noSpill,
+    JSON.stringify(half),
+  );
   h.win.setSize(width, height);
   await sleep(400);
 

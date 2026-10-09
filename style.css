@@ -170,6 +170,16 @@ button:hover,
   height: 16px;
 }
 
+/* Read by screen readers, not shown (e.g. the Play button's label). */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* The icon sprite (index.html) is only a source for <use>. */
 .icon-sprite {
   display: none;
@@ -1086,23 +1096,6 @@ body.dragging .app {
   white-space: nowrap;
 }
 
-/* Only in a narrow window, where the sidebar becomes a drawer. */
-.sidebar-toggle {
-  display: none;
-}
-
-.sidebar-toggle .badge {
-  position: absolute;
-  top: -3px;
-  right: -5px;
-  min-width: 17px;
-  padding: 0 4px;
-  background: var(--accent);
-  color: var(--accent-ink);
-  font-size: 10px;
-  line-height: 15px;
-}
-
 /* ---------- Stage: video + timeline + minimap ---------- */
 
 .stage {
@@ -1325,8 +1318,8 @@ body.dragging .app {
   background: color-mix(in srgb, var(--mark-color) 40%, var(--surface-2));
 }
 
-/* Guide lines: each marker continued faintly over the waveform, in a
-   layer of ours above it (below the playback cursor and the hover line,
+/* Guide lines: the start and stop points continued faintly over the
+   waveform (marks stay in their lane), in a layer of ours above it (below the playback cursor and the hover line,
    which WaveSurfer draws at z-index 5). */
 .timeline-guides {
   position: absolute;
@@ -1336,33 +1329,11 @@ body.dragging .app {
   pointer-events: none;
 }
 
-.guide-mark,
 .guide-start,
 .guide-stop {
   position: absolute;
   top: 0;
   bottom: 0;
-}
-
-.guide-mark {
-  margin-left: -0.5px;
-  border-left: 1px solid color-mix(in srgb, var(--mark-color) 38%, transparent);
-}
-
-.guide-region {
-  border-right: 1px solid color-mix(in srgb, var(--mark-color) 38%, transparent);
-}
-
-.guide-mark.selected {
-  border-color: var(--mark-color);
-}
-
-.guide-mark.pending {
-  border-inline-style: dashed;
-}
-
-.guide-start,
-.guide-stop {
   margin-left: -0.5px;
 }
 
@@ -1465,8 +1436,9 @@ body.dragging .app {
    plays from, the loop, the step size. */
 .transport {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 16px;
+  gap: 6px 16px;
   min-width: 0;
   padding: 7px 10px;
 }
@@ -1481,11 +1453,45 @@ body.dragging .app {
   color: var(--text);
 }
 
-.play-button {
-  min-width: 104px;
-  height: 36px;
-  margin-inline: 4px;
+/* Just the icon (the label is for screen readers), round. (button.
+   to outweigh button.primary's minimum width.) */
+button.play-button {
+  width: 40px;
+  min-width: 0;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+}
+
+.play-button .icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* The step arrows with the step size between them, as one control. */
+.step-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
   border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.step-group .icon-button {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  color: var(--text);
+}
+
+.step-size {
+  min-width: 58px;
+  color: var(--muted);
+  font: 700 12px var(--num);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .play-button .icon-pause,
@@ -1532,6 +1538,11 @@ body.dragging .app {
 /* Where Space plays from: green, like its ▶ on the ruler. */
 .start-point {
   color: var(--start);
+}
+
+/* Where playback last stopped: red, like its ■ on the ruler. */
+.stop-point {
+  color: var(--stop);
 }
 
 .loop-info {
@@ -1710,7 +1721,7 @@ body.dragging .app {
 .dock {
   display: grid;
   grid-template-columns: minmax(0, 1.8fr) minmax(0, 1.15fr) minmax(0, 0.8fr) auto;
-  padding: 10px 0;
+  padding: 12px 0 18px;
 }
 
 .dock-group {
@@ -1946,9 +1957,11 @@ body.dragging .app {
 }
 
 /* ---------- Smaller windows ----------
-   Narrow: the sidebar becomes a drawer over the timeline, opened from the
-   top bar; the speed presets take two rows. Short: the dock and the
-   minimap get more compact. */
+   The marks sidebar always stays in view, so half a screen (about 960 px
+   wide) still shows everything: under 1100 px it gets narrower and its
+   buttons show only their icons; under 1280 px the speed presets take two
+   rows; the transport's chips wrap to a second row when they don't fit.
+   Short windows: the dock and the minimap get more compact. */
 
 @media (max-width: 1279px) {
   .chips {
@@ -1957,31 +1970,12 @@ body.dragging .app {
 }
 
 @media (max-width: 1099px) {
-  .workspace {
-    grid-template-columns: minmax(0, 1fr);
+  :root {
+    --sidebar-width: 240px;
   }
 
-  .sidebar-toggle {
-    display: grid;
-  }
-
-  .sidebar {
-    position: fixed;
-    top: 58px;
-    right: 14px;
-    bottom: 14px;
-    z-index: 20;
-    width: min(340px, calc(100vw - 28px));
-    box-shadow: var(--shadow-lifted);
-  }
-
-  .app:not(.sidebar-open) .sidebar {
+  .sidebar-actions .label {
     display: none;
-  }
-
-  .sidebar-toggle[aria-expanded="true"] {
-    background: var(--surface-2);
-    color: var(--text);
   }
 
   .topbar-actions button,
@@ -2001,7 +1995,7 @@ body.dragging .app {
   }
 
   .dock {
-    padding: 6px 0;
+    padding: 8px 0 12px;
   }
 
   .dock .scale {

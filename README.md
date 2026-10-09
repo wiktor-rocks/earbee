@@ -18,7 +18,7 @@ A desktop player for transcribing music by ear. Open a song or a video, slow it 
 - **Colour themes:** dark (TranscriBee, Monokai, Dracula, Nord, One Dark) and light (TranscriBee Light, Solarized Light, Catppuccin Latte, GitHub Light, Gruvbox Light), or **Automatic**, which follows your system's dark or light mode (TranscriBee or TranscriBee Light unless you pick others). Pick one with the palette button in the top bar, or in Settings; it's remembered.
 - **Works offline.** All libraries and fonts are bundled. Only downloading needs the internet.
 
-**The layout.** The waveform takes all the spare height; the marks sidebar is on the right, and speed, pitch, volume and EQ sit in one dock along the bottom (the EQ's bands open in a popover from **Bands**). The page itself never scrolls. In a narrow window (under 1100 px) the sidebar becomes a drawer, opened from the top bar; in a short one (under 720 px) the dock gets more compact. The smallest window is 900 × 640.
+**The layout.** The waveform takes all the spare height; the marks sidebar is on the right, and speed, pitch, volume and EQ sit in one dock along the bottom (the EQ's bands open in a popover from **Bands**). The page itself never scrolls. The sidebar always stays in view, so the window can take half a screen (about 960 px wide) and still show everything: under 1100 px it gets narrower. In a short window (under 720 px) the dock gets more compact. The smallest window is 900 × 640.
 
 **Keyboard shortcuts:** the **?** button in the top bar (or the `?` key) lists every key, by group.
 

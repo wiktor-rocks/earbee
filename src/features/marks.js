@@ -188,9 +188,6 @@ function renderList() {
   if (order.some((row, i) => dom.marksList.children[i] !== row)) dom.marksList.replaceChildren(...order);
   dom.marksEmpty.hidden = list.length > 0;
   dom.marksCount.textContent = list.length ? String(list.length) : "";
-  // The sidebar's toggle (a narrow window) shows the count too.
-  dom.sidebarCount.textContent = dom.marksCount.textContent;
-  dom.sidebarCount.hidden = !list.length;
 }
 
 export function bindMarks() {

@@ -43,6 +43,32 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-09: Layout tweaks: no mark lines, a stop-point readout, icon-only Play, sidebar always in view
+
+- **What** (six small changes the user asked for):
+  1. **Marks no longer draw lines over the waveform.** They stay in their lane and on the minimap. The start and stop points keep their faint guide lines.
+  2. **A red `■ 0:20.784` readout** for where playback last stopped sits beside the green start point's in the transport. A click goes there.
+  3. **The Play button shows only its icon:** a 40 px round button. "Play"/"Pause" stays as a visually hidden label for screen readers, and the e2e `playing()` helper still reads it.
+  4. **The step size sits between the step arrows** (`← Step 1 s →`, one rounded control), after Play and Stop.
+  5. **The marks sidebar stays in view at half a screen.** The drawer for narrow windows is gone. Under 1100 px the sidebar is 240 px wide (from 300) and its Point/Region buttons show only their icons (with `aria-label`s). The transport wraps its chips to a second row when they don't fit.
+  6. **The dock has more bottom padding:** 18 px, from 10 (12 px in short windows).
+- **Why:** the user's requests. They want to put the app on one half of the screen and still see the marks.
+- **How:**
+  - **Mark lines:** `timeline.js` no longer creates `.guide-mark` elements, and the CSS for them is gone.
+  - **The stop readout:** `features/playback.js` keeps `stopPoint` and renders `#stopPoint` in `setStopPoint`.
+  - **The transport:** `index.html` rearranges it into Play and Stop, then `.step-group`, then the time and the chips.
+  - **The Play button:** `button.play-button` (it needs the element selector to outweigh `button.primary`'s minimum width) and a `.visually-hidden` utility.
+  - **The drawer:** its toggle, badge, CSS and `layout.js` code are removed. `layout.js` now only handles the shortcuts dialog.
+- **Where:** `src/timeline.js`, `src/features/playback.js`, `src/features/layout.js`, `src/features/marks.js`, `src/ui/dom.js`, `index.html`, `style.css`, `src/app.js` (header), `README.md`.
+- **Verified by:**
+  - **E2E, `04-space-replay.cjs`:** the ■ readout shows the stop point, and a click on it goes there.
+  - **E2E, `14-marks.cjs`:**
+    - a mark draws no line over the waveform;
+    - Play is 40 px with a 1 px hidden label, and the step size lies between the arrows. This check caught `button.primary` keeping Play 112 px wide;
+    - at 960 px wide the sidebar is visible beside the timeline, inside the window, with nothing spilling sideways. This replaces the drawer check.
+  - **Runs:** `TB_TOPICS=01,02,03,04,14` passes 121/121, the full e2e run passed with one failure (the Play-width check above), which is now fixed, and `npm run check` is clean.
+  - **Screenshots:** 1200×800 and 960×1000, looked at.
+
 ## 2026-10-09: A new look and layout: marks sidebar, sound dock, no page scrolling
 
 - **What:**

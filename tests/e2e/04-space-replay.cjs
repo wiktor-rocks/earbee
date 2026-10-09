@@ -233,6 +233,16 @@ module.exports = async function (h) {
   wc.sendInputEvent({ type: "mouseUp", x: square.x, y: square.y, button: "left", clickCount: 1 });
   await sleep(150);
   check("clicking its ■ goes there", near(await pos(), stoppedAt, 0.002), await pos());
+  // The red readout beside the start point's: the same spot, and a click goes there.
+  const readout = await js(`stopPoint.hidden ? null : __parseTime(stopPoint.textContent.replace("■", "").trim())`);
+  await click(2);
+  await js(`stopPoint.click()`);
+  await sleep(100);
+  check(
+    "the ■ readout shows where it stopped, and a click goes there",
+    near(readout, stoppedAt, 0.002) && near(await pos(), stoppedAt, 0.002),
+    `${readout} vs ${stoppedAt}, cursor ${await pos()}`,
+  );
   await shot("stop-point.png");
   await click(19);
   key("Space");

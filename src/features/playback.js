@@ -54,10 +54,16 @@ function showStartPoint() {
 }
 
 // The stop point: where playback last stopped (paused, stopped or reached
-// the end), shown as the red line; null before the first stop.
+// the end), shown as the red ■ on the ruler and line, and as the red
+// readout next to the start point's; null before the first stop.
+let stopPoint = null;
+
 /** @param {number | null} time */
 function setStopPoint(time) {
+  stopPoint = time;
   player.timeline.setStopPoint(time);
+  dom.stopPointButton.hidden = time === null;
+  if (time !== null) dom.stopPointButton.textContent = `■ ${formatTrackTime(time)}`;
 }
 
 /** Space plays from `time` next (dragging the start point). @param {number} time */
@@ -105,6 +111,7 @@ export function bindTransportButtons() {
   onClick(dom.stepBackButton, stepBack);
   onClick(dom.stepForwardButton, stepForward);
   onClick(dom.startPointButton, () => player.transport.seek(startPoint()));
+  onClick(dom.stopPointButton, () => stopPoint !== null && player.transport.seek(stopPoint));
 }
 
 // Keeps returnPoint up to date, and releases held keys when the window

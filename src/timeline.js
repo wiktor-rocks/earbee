@@ -19,9 +19,10 @@ import { formatRulerTime, rulerTicks } from "./core/ruler.js";
  *     regions (a bar with the label). Dragging one moves it, dragging a
  *     region's end resizes it, a click selects it and goes there, a
  *     double-click asks for a rename; an empty spot seeks.
- * Faint guide lines continue each marker over the waveform (a layer of
- * ours over it, not inside WaveSurfer), and the minimap gets a tick for
- * each.
+ * The start and stop points continue as faint guide lines over the
+ * waveform (a layer of ours over it, not inside WaveSurfer); marks stay in
+ * their lane, so the sound isn't crossed by lines. The minimap gets a
+ * tick for each marker.
  *
  * Staying in sync: every lane (and the guides) holds one track element
  * as wide as the whole zoomed waveform and moved by its scroll, both
@@ -162,12 +163,12 @@ export function createTimeline({
 
   // The elements drawing each mark, by id, kept between renders (so a
   // double-click isn't split across two elements).
-  /** @type {Map<string, { item: HTMLElement, label: HTMLElement, guide: HTMLElement, tick: HTMLElement }>} */
+  /** @type {Map<string, { item: HTMLElement, label: HTMLElement, tick: HTMLElement }>} */
   const markElements = new Map();
 
   // Draws the marks (as last set, with the one being dragged where it's
-  // dragged to) and the region being marked, in the lane, as guides over
-  // the waveform, and on the minimap.
+  // dragged to) and the region being marked, in the lane and on the
+  // minimap.
   function renderMarks() {
     const shown = view.duration
       ? marks.map((mark) => (mark.id === markDraft?.id ? { ...mark, ...markDraft } : mark))
@@ -194,12 +195,11 @@ export function createTimeline({
         elements = {
           item,
           label: element("lane-label", item),
-          guide: element("guide-mark", guidesTrack),
           tick: element("minimap-mark", minimapLayer),
         };
         markElements.set(mark.id, elements);
       }
-      const { item, label, guide, tick } = elements;
+      const { item, label, tick } = elements;
       const region = mark.end !== null;
       const pending = "pending" in mark;
       const selected = mark.id === selectedMark;
@@ -215,26 +215,22 @@ export function createTimeline({
       ]
         .filter(Boolean)
         .join(" ");
-      guide.className = ["guide-mark", region && "guide-region", selected && "selected", pending && "pending"]
-        .filter(Boolean)
-        .join(" ");
       tick.className = region ? "minimap-mark minimap-region" : "minimap-mark";
       const color = pending ? "var(--text)" : `var(--mark-${mark.color})`;
-      for (const each of [item, guide, tick]) {
+      for (const each of [item, tick]) {
         each.style.left = percent(mark.start);
         each.style.setProperty("--mark-color", color);
       }
       item.style.width = percent(end - mark.start);
-      guide.style.width = tick.style.width = region ? percent(mark.end - mark.start) : "";
+      tick.style.width = region ? percent(mark.end - mark.start) : "";
       label.textContent = mark.label;
       label.title = mark.label;
       if (pending) delete item.dataset.markId;
       else item.dataset.markId = mark.id;
     }
-    for (const [id, { item, guide, tick }] of markElements) {
+    for (const [id, { item, tick }] of markElements) {
       if (kept.has(id)) continue;
       item.remove();
-      guide.remove();
       tick.remove();
       markElements.delete(id);
     }

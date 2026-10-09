@@ -85,7 +85,7 @@
  *   features/      playback.js, loop.js, marks.js (actions, selection, the
  *                  marks list), open-file.js, download.js, theme-picker.js,
  *                  settings.js (the Settings dialog), layout.js (the
- *                  shortcuts dialog, the marks drawer in narrow windows)
+ *                  shortcuts dialog)
  *   app.js         This file: creates and wires the components, the
  *                  SHORTCUTS table, start()
  *   vendor/        Signalsmith Stretch, patched to read across several

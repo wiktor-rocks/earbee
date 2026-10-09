@@ -274,18 +274,6 @@
 
         <div class="topbar-tools">
           <button
-            id="sidebarToggle"
-            class="icon-button sidebar-toggle"
-            type="button"
-            title="Marks"
-            aria-label="Marks"
-            aria-controls="sidebar"
-            aria-expanded="false"
-          >
-            <svg class="icon" aria-hidden="true"><use href="#i-sidebar" /></svg>
-            <span id="sidebarCount" class="badge" hidden></span>
-          </button>
-          <button
             id="helpButton"
             class="icon-button"
             type="button"
@@ -340,9 +328,6 @@
 
           <section class="transport" aria-label="Transport">
             <div class="transport-buttons">
-              <button id="stepBack" class="icon-button" type="button" title="Step back (←)" aria-label="Step back">
-                <svg class="icon" aria-hidden="true"><use href="#i-step-back" /></svg>
-              </button>
               <button
                 id="play"
                 class="primary play-button"
@@ -351,11 +336,19 @@
               >
                 <svg class="icon icon-play" aria-hidden="true"><use href="#i-play" /></svg>
                 <svg class="icon icon-pause" aria-hidden="true"><use href="#i-pause" /></svg>
-                <span id="playLabel">Play</span>
+                <span id="playLabel" class="visually-hidden">Play</span>
               </button>
               <button id="stop" class="icon-button" type="button" title="Stop (.)" aria-label="Stop">
                 <svg class="icon" aria-hidden="true"><use href="#i-stop" /></svg>
               </button>
+            </div>
+
+            <!-- Stepping: the arrows with the step size between them. -->
+            <div class="step-group">
+              <button id="stepBack" class="icon-button" type="button" title="Step back (←)" aria-label="Step back">
+                <svg class="icon" aria-hidden="true"><use href="#i-step-back" /></svg>
+              </button>
+              <output id="stepSize" class="step-size" title="Step size: change with ↑ / ↓">Step 1 s</output>
               <button
                 id="stepForward"
                 class="icon-button"
@@ -383,8 +376,16 @@
               >
                 ▶ 0:00.000
               </button>
+              <button
+                id="stopPoint"
+                type="button"
+                class="chip-button stop-point"
+                title="Playback last stopped here (click to go there)"
+                hidden
+              >
+                ■ 0:00.000
+              </button>
               <output id="loopInfo" class="chip-button loop-info" aria-label="Loop" hidden></output>
-              <output id="stepSize" class="chip-button step-size" title="Step size: change with ↑ / ↓">Step 1 s</output>
             </div>
           </section>
         </div>
@@ -394,13 +395,25 @@
             <h2 id="marksTitle">Marks</h2>
             <output id="marksCount" class="badge" aria-label="Number of marks"></output>
             <div class="sidebar-actions">
-              <button id="addPoint" class="small" type="button" title="Mark a point where you are (M)">
+              <button
+                id="addPoint"
+                class="small"
+                type="button"
+                title="Mark a point where you are (M)"
+                aria-label="Mark a point"
+              >
                 <svg class="icon" aria-hidden="true"><use href="#i-point" /></svg>
-                Point
+                <span class="label">Point</span>
               </button>
-              <button id="addRegion" class="small" type="button" title="Start, then end, a region where you are (R)">
+              <button
+                id="addRegion"
+                class="small"
+                type="button"
+                title="Start, then end, a region where you are (R)"
+                aria-label="Mark a region"
+              >
                 <svg class="icon" aria-hidden="true"><use href="#i-region" /></svg>
-                Region
+                <span class="label">Region</span>
               </button>
             </div>
           </header>
