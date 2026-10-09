@@ -1001,10 +1001,104 @@ body.dragging .app {
   background: var(--loop-fill-off);
 }
 
+.waveform.near-mark-edge {
+  cursor: ew-resize;
+}
+
+/* Marks (src/marks), also inside the shadow DOM: a point is a line, a
+   region a tinted band with its edges; both have a flag at the top with
+   the label, the only part that takes the pointer. --mark-color is set
+   per mark (one of the --mark-* tokens). Above the loop, below the
+   playback cursor. */
+.waveform ::part(marks) {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+}
+
+.waveform ::part(mark) {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+}
+
+.waveform ::part(mark-point) {
+  width: 0;
+  border-left: 2px solid var(--mark-color);
+  margin-left: -1px;
+}
+
+.waveform ::part(mark-region) {
+  border-inline: 1px solid var(--mark-color);
+  background: color-mix(in srgb, var(--mark-color) 12%, transparent);
+}
+
+.waveform ::part(mark-selected) {
+  z-index: 1;
+  border-width: 2px;
+}
+
+.waveform ::part(mark-pending) {
+  border-inline-style: dashed;
+  background: color-mix(in srgb, var(--mark-color) 6%, transparent);
+}
+
+.waveform ::part(mark-flag) {
+  position: absolute;
+  top: 0;
+  left: 0;
+  max-width: 160px;
+  min-width: 14px;
+  min-height: 18px;
+  padding: 1px 6px 1px 5px;
+  overflow: hidden;
+  border-left: 3px solid var(--mark-color);
+  border-radius: 0 4px 4px 0;
+  background: var(--surface-2);
+  color: var(--text);
+  font: 600 11px/16px var(--sans);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  pointer-events: auto;
+  cursor: grab;
+}
+
+.waveform ::part(mark-flag):hover {
+  background: var(--surface-hover);
+}
+
+.waveform ::part(mark-flag-selected) {
+  background: color-mix(in srgb, var(--mark-color) 30%, var(--surface-2));
+}
+
 .waveform-minimap {
+  position: relative;
   border-radius: 8px;
   cursor: grab;
   touch-action: none;
+}
+
+/* The marks on the minimap: thin ticks and light bands, under the pointer's
+   dragging (they don't take it). */
+.minimap-marks {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.minimap-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  border-left: 1px solid var(--mark-color);
+}
+
+.minimap-region {
+  border-right: 1px solid var(--mark-color);
+  background: color-mix(in srgb, var(--mark-color) 18%, transparent);
 }
 
 .waveform-minimap:active {
@@ -1185,6 +1279,99 @@ body.dragging .app {
   display: block;
   font-weight: 400;
   text-transform: none;
+}
+
+/* ---------- Marks list ---------- */
+
+/* Across the whole row of panels, under them. */
+.marks-panel {
+  grid-column: 1 / -1;
+}
+
+.marks-empty {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* About six rows, then it scrolls. */
+.marks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 204px;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.mark-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.mark-row.selected {
+  background: var(--surface-2);
+}
+
+.mark-color {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  outline: 1px solid var(--mark-color);
+  background: var(--mark-color);
+}
+
+.mark-color:hover {
+  background: var(--mark-color);
+}
+
+.mark-name {
+  min-width: 0;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+
+.mark-name:hover,
+.mark-name:focus {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.mark-time {
+  padding: 3px 6px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font: 600 12px var(--num);
+  font-variant-numeric: tabular-nums;
+}
+
+.mark-time:hover {
+  color: var(--text);
+}
+
+.mark-remove {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.mark-remove:hover {
+  color: var(--danger);
 }
 
 /* ---------- Shortcut legend ---------- */

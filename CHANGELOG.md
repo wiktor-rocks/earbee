@@ -5,7 +5,7 @@ TranscriBee is an Electron app for transcribing music. You open a song or a vide
 **Files**
 
 - `electron/`: the Electron main process: `main.js` (window, security), `window-state.js`, `theme-store.js`, `downloader.js` (yt-dlp), `media-files.js` (serving downloads to the page), `system.js` and `preload.js` (the page's bridge to them).
-- `src/`: the page, as ES modules in layers. `core/`, `themes/` → `config.js` → `audio/`, `video/`, `waveform.js` → `context.js` → `ui/` → `features/` → `app.js`.
+- `src/`: the page, as ES modules in layers. `core/`, `themes/` → `prefs/`, `marks/` → `config.js` → `audio/`, `video/`, `waveform.js` → `context.js` → `ui/` → `features/` → `app.js`.
 - `index.html` and `style.css`: the page and its look.
 - `assets/`: the logo and icons; `scripts/make-images.py` makes them from the source image.
 - `tests/`: unit tests (`unit/`), end-to-end tests (`run.cjs` + `e2e/`) and the smoke test; all run with `npm test`.
@@ -45,16 +45,30 @@ The architecture overview, the file map and a list of where to make common chang
 
 ## 2026-10-09: Marks: points and regions on the waveform
 
-- **What (so far):** the data behind marks; nothing on screen yet. A mark is a point or a region on the track, with a label and one of six colours.
-- **Why:** the user wants to mark points and regions on the waveform (beats, sections, hard bits). Marks last for the session for now, but must be easy to connect to future TranscriBee files that save them.
+- **What:**
+  - **Making marks:** `M` marks a **point** where you hear it (tap along while it plays); `R` starts a **region** (drawn dashed, growing with the cursor) and `R` again ends it. Esc stops marking a region, or deselects.
+  - **On the waveform:** a point is a line, a region a tinted band, each with a **flag** at the top showing its name; the minimap shows them as ticks and bands. Dragging a flag moves the whole mark; dragging a point or a region's edge moves just that; clicking a flag selects the mark and goes to it; double-clicking it edits its name. A plain click anywhere else (even inside a region) still seeks, and Shift+drag still draws the loop.
+  - **Keys:** Shift+← / Shift+→ go to the previous / next mark (while playing, "previous" skips the mark just passed, so pressing it twice goes back two). Delete or Backspace deletes the selected mark. The legend lists them.
+  - **The Marks list,** under the controls: each mark's colour (click for the next of six), its name (edit in place; Enter keeps it, Esc puts the old one back), its time (click to go there) and × to delete it. Empty, it says how to make marks.
+  - Marks last until another file is opened.
+- **Why:** the user wants to mark points and regions on the waveform. They chose labelled points and regions with colours, made with keys at the cursor, edited on the waveform and in a list; session-only for now, but **easy to connect to future TranscriBee files** that save them.
 - **How:**
   - **`src/marks/`**, a new pure layer beside `prefs/` (it may use `core` and `themes`; added to the ESLint layer zones).
     - `format.js`: the `Mark` type `{ id, start, end, label, color }` (`end: null` for a point); `normalizeMark` (times clamped to the track, region ends ordered, a too-short region becomes a point, labels trimmed and capped at 200, unknown colours become the default); the versioned saved form, `serializeMarks` → `{ version: 1, marks }` and `parseMarks` (drops bad entries and duplicate ids, refuses newer versions with `MarksFormatError`).
     - `index.js`: `createMarks({ minSeconds })`, the store: `reset(duration, saved?)`, `list`, `get`, `addPoint`, `addRegion` (null if too short), `update` (null if it would make a region too short), `remove`, `previous(time, tolerance)`, `next(time)`, `toJSON`, and one `"change"` event per edit. Default labels count up ("Mark 3", "Region 2"). Marks are frozen objects.
-    - **Where TranscriBee files plug in:** `toJSON()` is what to save, `reset(duration, saved)` brings marks back with their track, and `"change"` says when to save.
-  - **Colours:** `src/themes/mark-colors.js` (`MARK_COLORS`: rose, orange, green, blue, violet, grey, each with a dark and a light shade). `cssVariables()` sets them as `--mark-<id>` in the theme's scheme, so the preload and theme switching apply them with everything else; the `style.css` `:root` defaults have the dark shades.
-  - **`CONFIG.marks`:** `minSeconds` (shortest region) and `jumpBackSeconds`.
-- **Verified by:** `tests/unit/marks.test.mjs` (12 tests: the store, ordering, clamping, labels, updates, events, previous/next, the saved form round trip, bad and newer data); `tests/unit/themes.test.mjs` checks every mark colour at 3:1 against every theme's background and surface, and that the shade follows the scheme. `npm run check` clean.
+    - **Where TranscriBee files plug in:** `marks.toJSON()` is what to save; `marks.reset(duration, saved)` brings marks back with their track (called from `resetMarks` in `features/marks.js`, which `loadMediaFile` calls); `marks.on("change")` says when to save. `src/marks` is pure, so the main process can `parseMarks` a file it reads.
+  - **Colours:** `src/themes/mark-colors.js` (`MARK_COLORS`: rose, orange, green, blue, violet, grey, each with a dark and a light shade). `cssVariables()` sets them as `--mark-<id>` in the theme's scheme, so the preload and theme switching apply them with everything else; the `style.css` `:root` defaults have the dark shades. Flags show the name in `--text` on `--surface-2` with a coloured edge, so names stay readable on every theme.
+  - **The store's home:** `marks` in `context.js`, next to `settings`.
+  - **Heard position:** `transport.positionAt(eventTime)` exposes `positionHeardAt` (the resting position when paused); M, R and the jumps pass the key's `timeStamp`.
+  - **Waveform (`waveform.js`):** `setMarks(list, { selected, pending })` and `renderMarks()`, drawing into a `part="marks"` layer in WaveSurfer's wrapper (z-index 4: above the loop, below the playback cursor) and a `.minimap-marks` layer in `#waveform-minimap` (ours, so replacing the minimap plugin for a theme keeps it). Each mark's elements are kept by id between renders. In `bindPointerSeek`, a press goes to (in order) a mark's flag (found with `composedPath()`; the shadow root is open), a loop edge, a mark's edge (`markEdgeAt`, within `CONFIG.loop.edgeGrabPx`), or seeks; the new drag mode `"mark"` draws a draft and reports `onMarkChange` at the end, `onMarkSelect` on press, `onMarkRename` on a double-click. **Gotcha:** while pressed, the pointer is captured by the container, so `dblclick` lands on the container, not the flag; the flag is remembered from the last press (`pressedFlag`).
+  - **Feature (`features/marks.js`):** the selection, the region being marked, the actions (`markPoint`, `markRegion`, `previousMark`, `nextMark`, `deleteSelectedMark`, `cancelMarking`, `moveMark`, `renameMark`, `selectMark`, `resetMarks`) and the list (`renderList`, rows kept by id and only reordered when the order changes, so typing in a name isn't interrupted). It redraws on every store change, and the waveform on each position while a region is pending. Keys in `SHORTCUTS` (`app.js`). Name fields are text inputs, so shortcuts are off while typing (`isTextField`).
+  - **Page:** a full-width "Marks" panel in `.panels` (`index.html`; `dom.marksList`, `marksEmpty`, `marksCount`); styles under "Marks list" and the `::part(mark…)` rules in `style.css`.
+  - **`CONFIG.marks`:** `minSeconds` (shortest region) and `jumpBackSeconds` (0.5 s).
+- **Where:** `src/marks/format.js`, `src/marks/index.js`, `src/themes/mark-colors.js`, `src/themes/index.js` (`cssVariables`), `src/config.js`, `src/context.js`, `src/audio/transport.js` (`positionAt`), `src/waveform.js`, `src/features/marks.js`, `src/features/open-file.js` (`loadMediaFile`), `src/app.js`, `src/ui/dom.js`, `index.html`, `style.css`, `eslint.config.js`; docs in `src/app.js` (header) and `README.md`.
+- **Verified by:**
+  - `tests/unit/marks.test.mjs` (12 tests: the store, ordering, clamping, labels, updates, events, previous/next, the saved form round trip, bad and newer data); `tests/unit/themes.test.mjs` checks every mark colour at 3:1 against every theme's background and surface, and that the shade follows the scheme.
+  - New e2e topic `tests/e2e/14-marks.cjs` (28 checks): M at the cursor and while playing; R…R with the pending region; Esc; too short; dragging a flag, an edge and a whole region; a click inside a region still seeks; clicking and double-clicking a flag; Shift+← / →; renaming (and keys typed there aren't shortcuts), colour and time in the list; Delete and ×; marks follow the zoom; a new file clears them. Screenshot `tests/output/marks.png` checked by eye. `14-security` became `15-security` (it must stay last).
+  - `npm run check` clean; full `npm test`: unit 115, e2e 223, smoke 20, all passing.
 
 ## 2026-10-09: Settings: a modular preferences system, with a Settings dialog
 

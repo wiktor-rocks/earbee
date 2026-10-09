@@ -32,6 +32,7 @@ import {
   showPlayer,
 } from "../ui/dom.js";
 import { setLoopRegion } from "./loop.js";
+import { resetMarks } from "./marks.js";
 
 // The current load, while one runs; the UI is locked, so loads never
 // overlap. Cancel aborts it.
@@ -171,8 +172,10 @@ export async function loadMediaFile(media, signal) {
     timer.time("waveform", () => player.waveform.load(decoded.peaks, decoded.duration)),
   ]);
   player.transport.load(decoded.duration);
-  // A new file starts fresh: no loop, and default speed, pitch, volume and EQ.
+  // A new file starts fresh: no loop or marks, and default speed, pitch,
+  // volume and EQ.
   setLoopRegion(null);
+  resetMarks(decoded.duration);
   resetSoundSettings();
   dom.fileName.textContent = media.name;
   document.title = `TranscriBee — ${media.name}`; // also the window title

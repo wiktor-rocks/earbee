@@ -3,6 +3,8 @@ import { clamp } from "./core/format.js";
 
 /** @typedef {import("./core/timeline.js").Loop} Loop */
 /** @typedef {import("./core/timeline.js").LoopRegion} LoopRegion */
+/** @typedef {import("./marks/index.js").Mark} Mark */
+/** @typedef {{ start: number, end: number | null }} MarkTimes */
 
 /* =====================================================================
  * WAVEFORM
@@ -19,6 +21,15 @@ import { clamp } from "./core/format.js";
  * an edge moves that edge; the result goes to onLoopChange, and the
  * region only changes for good when setLoop() is called with it.
  *
+ * Marks (points and regions; src/marks) are drawn the same way, with a
+ * flag at the top showing the label, and as ticks and bands on the
+ * minimap. The waveform only draws them and reports what the pointer did:
+ * a mark's flag selects it (onMarkSelect), seeks to it on a click, moves
+ * the whole mark when dragged, and asks for a rename on a double-click
+ * (onMarkRename); dragging a point or a region's edge moves just that
+ * (onMarkChange, at the end of the drag). Elsewhere, even inside a region,
+ * a click still seeks.
+ *
  * The wheel on the waveform zooms, keeping the spot under the mouse in
  * place; the wheel on the minimap scrolls the view. After the view is
  * moved by hand (zoom, wheel, minimap),
@@ -27,7 +38,8 @@ import { clamp } from "./core/format.js";
  * while it plays.
  *
  * Exposes: preload, init, load, setTime, follow, resumeFollow, setLoop,
- *          refreshColors (after the colour variables changed, e.g. a theme)
+ *          setMarks, refreshColors (after the colour variables changed,
+ *          e.g. a theme)
  * ===================================================================== */
 
 /**
@@ -36,8 +48,19 @@ import { clamp } from "./core/format.js";
  * @param {HTMLElement} options.minimapContainer
  * @param {(time: number) => void} options.onSeek A click or drag asks to move the cursor.
  * @param {(loop: Loop) => void} options.onLoopChange A drag drew or adjusted the loop.
+ * @param {(id: string) => void} options.onMarkSelect A mark was pressed.
+ * @param {(id: string, times: MarkTimes) => void} options.onMarkChange A drag moved a mark.
+ * @param {(id: string) => void} options.onMarkRename A mark's flag was double-clicked.
  */
-export function createWaveform({ container, minimapContainer, onSeek, onLoopChange }) {
+export function createWaveform({
+  container,
+  minimapContainer,
+  onSeek,
+  onLoopChange,
+  onMarkSelect,
+  onMarkChange,
+  onMarkRename,
+}) {
   const { maxZoomMultiplier } = CONFIG.waveform;
 
   let waveSurfer = null;
@@ -59,6 +82,17 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   /** @type {LoopRegion | null} */
   let loop = null; // as last set by setLoop()
   let loopElement = null;
+  /** @type {Mark[]} */
+  let marks = []; // as last set by setMarks()
+  let selectedMark = null; // its id
+  let pendingRegion = null; // { start, end }: a region being marked
+  let markDraft = null; // { id, start, end } while a mark is dragged
+  let marksLayer = null;
+  let minimapMarksLayer = null;
+  // The elements drawing each mark, by id, reused between renders (so a
+  // double-click on a flag isn't split across two elements).
+  /** @type {Map<string, { body: HTMLElement, flag: HTMLElement, tick: HTMLElement }>} */
+  const markElements = new Map();
 
   // Loads the WaveSurfer code without creating anything on screen, so it
   // is safe to call at startup.
@@ -180,16 +214,44 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     return toStart <= toEnd ? "start" : "end";
   }
 
+  // The mark edge nearest to `x` within grabbing distance, or null:
+  // { id, edge }, where `edge` is "point", or a region's "start" or "end".
+  function markEdgeAt(x) {
+    if (!duration) return null;
+    let nearest = null;
+    for (const mark of marks) {
+      const edges = mark.end === null ? { point: mark.start } : { start: mark.start, end: mark.end };
+      for (const [edge, time] of Object.entries(edges)) {
+        const distance = Math.abs(x - clientXAt(time));
+        if (distance <= CONFIG.loop.edgeGrabPx && !(nearest?.distance <= distance))
+          nearest = { id: mark.id, edge, distance };
+      }
+    }
+    return nearest;
+  }
+
+  // The id of the mark whose flag the event happened on, or null. The
+  // flags are the only part of a mark that takes the pointer.
+  const flagOf = (event) =>
+    event
+      .composedPath()
+      .map((node) => /** @type {HTMLElement} */ (node).dataset?.markFlag)
+      .find(Boolean) ?? null;
+
   // One drag at a time: { mode: "seek" } | { mode: "draw", anchor }
   // | { mode: "edge", fixed } (`fixed` is the loop end that stays put),
-  // plus `draft`, the loop described so far, while drawing or adjusting.
+  // plus `draft`, the loop described so far, while drawing or adjusting;
+  // or { mode: "mark", id, edge, origin, grabTime, startX, moved, draft }
+  // for a mark (`edge`: "point", "start", "end", or "whole" from its flag).
   function bindPointerSeek() {
     const edgePx = 30; // dragging this close to an edge scrolls a zoomed view
+    const clickSlopPx = 3; // a press on a mark that moves less is a click
     const { minSeconds } = CONFIG.loop;
     let pointerId = null;
     let drag = null;
     let pendingX = null;
     let frame = 0;
+    let pressedFlag = null; // the mark whose flag the last press was on
 
     // The loop described by the current drag, or null if it is too short.
     function draftLoop(time) {
@@ -197,6 +259,22 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       const start = Math.min(time, other);
       const end = Math.max(time, other);
       return end - start >= minSeconds ? { start, end, enabled: true } : null;
+    }
+
+    // Where the dragged mark would be with the pointer at `time`. A region
+    // can't get shorter than CONFIG.marks.minSeconds; it stays as it was.
+    function draftMark(time) {
+      const { origin, edge } = drag;
+      if (edge === "point") return { start: time, end: null };
+      if (edge === "whole") {
+        const length = (origin.end ?? origin.start) - origin.start;
+        const start = clamp(origin.start + time - drag.grabTime, 0, duration - length);
+        return { start, end: origin.end === null ? null : start + length };
+      }
+      const other = edge === "start" ? origin.end : origin.start;
+      const [start, end] = [Math.min(time, other), Math.max(time, other)];
+      if (end - start >= CONFIG.marks.minSeconds) return { start, end };
+      return drag.draft ?? { start: origin.start, end: origin.end };
     }
 
     function applyPointer() {
@@ -213,7 +291,13 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
 
       const time = timeAtClientX(x);
       if (drag.mode === "seek") onSeek(time);
-      else {
+      else if (drag.mode === "mark") {
+        drag.moved ||= Math.abs(x - drag.startX) >= clickSlopPx;
+        if (!drag.moved) return;
+        drag.draft = draftMark(time);
+        markDraft = { id: drag.id, ...drag.draft };
+        renderMarks();
+      } else {
         drag.draft = draftLoop(time);
         renderLoop(drag.draft ?? (drag.mode === "edge" ? loop : null));
       }
@@ -223,8 +307,26 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       if (event.button !== 0 || !duration) return;
       event.preventDefault();
 
-      const edge = event.shiftKey ? null : loopEdgeAt(event.clientX);
-      if (edge) drag = { mode: "edge", fixed: edge === "start" ? loop.end : loop.start };
+      // Shift draws a loop anywhere; otherwise a mark's flag comes first,
+      // then a loop edge, then a mark's edge, and anywhere else seeks.
+      const flag = event.shiftKey ? null : flagOf(event);
+      pressedFlag = flag;
+      const edge = event.shiftKey || flag ? null : loopEdgeAt(event.clientX);
+      const markEdge = event.shiftKey || flag || edge ? null : markEdgeAt(event.clientX);
+      if (flag || markEdge) {
+        const id = flag ?? markEdge.id;
+        drag = {
+          mode: "mark",
+          id,
+          edge: flag ? "whole" : markEdge.edge,
+          origin: marks.find((mark) => mark.id === id),
+          grabTime: timeAtClientX(event.clientX),
+          startX: event.clientX,
+          moved: false,
+          draft: null,
+        };
+        onMarkSelect(id);
+      } else if (edge) drag = { mode: "edge", fixed: edge === "start" ? loop.end : loop.start };
       else if (event.shiftKey) drag = { mode: "draw", anchor: timeAtClientX(event.clientX) };
       else drag = { mode: "seek" };
 
@@ -236,10 +338,13 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     });
 
     // Moves are applied once per frame. Without a drag, hovering near a
-    // loop edge shows the resize cursor.
+    // loop edge or a mark's edge shows the resize cursor (a flag has its own).
     container.addEventListener("pointermove", (event) => {
       if (event.pointerId !== pointerId) {
-        container.classList.toggle("near-loop-edge", pointerId === null && loopEdgeAt(event.clientX) !== null);
+        const idle = pointerId === null && !flagOf(event);
+        const nearLoop = idle && loopEdgeAt(event.clientX) !== null;
+        container.classList.toggle("near-loop-edge", nearLoop);
+        container.classList.toggle("near-mark-edge", idle && !nearLoop && markEdgeAt(event.clientX) !== null);
         return;
       }
       pendingX = event.clientX;
@@ -256,6 +361,14 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       scrubbing = false;
 
       if (finished.mode === "seek") return;
+      if (finished.mode === "mark") {
+        markDraft = null;
+        if (finished.moved) onMarkChange(finished.id, finished.draft);
+        // A click: a flag seeks to its mark, a mark's edge to the click.
+        else onSeek(finished.edge === "whole" ? finished.origin.start : timeAtClientX(event.clientX));
+        renderMarks(); // back to the marks as last set
+        return;
+      }
       if (finished.draft) onLoopChange({ start: finished.draft.start, end: finished.draft.end });
       // A Shift+click (too short to be a loop) is a plain click.
       else if (finished.mode === "draw") onSeek(finished.anchor);
@@ -263,6 +376,13 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     };
     container.addEventListener("pointerup", endDrag);
     container.addEventListener("pointercancel", endDrag);
+
+    // The pointer is captured by the container while pressed, so the
+    // double-click lands on it rather than on the flag: the flag is the
+    // one the last press was on.
+    container.addEventListener("dblclick", () => {
+      if (pressedFlag) onMarkRename(pressedFlag);
+    });
   }
 
   /* ---------- Loop region ---------- */
@@ -281,6 +401,93 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     loopElement.setAttribute("part", shown.enabled ? "loop-region" : "loop-region loop-disabled");
     loopElement.style.left = `${(shown.start / duration) * 100}%`;
     loopElement.style.width = `${((shown.end - shown.start) / duration) * 100}%`;
+  }
+
+  /* ---------- Marks ---------- */
+
+  const percent = (time) => `${(time / duration) * 100}%`;
+
+  // Draws the marks (as last set, with the one being dragged where it's
+  // dragged to) and the region being marked, on the waveform and the
+  // minimap. Each mark keeps its elements (markElements).
+  function renderMarks() {
+    if (!waveSurfer) return;
+    const wrapper = waveSurfer.getWrapper();
+    if (!marksLayer || marksLayer.parentNode !== wrapper) {
+      marksLayer = document.createElement("div");
+      marksLayer.setAttribute("part", "marks");
+      marksLayer.ariaHidden = "true"; // the marks list is the accessible way to them
+      wrapper.append(marksLayer);
+      for (const { body } of markElements.values()) marksLayer.append(body);
+    }
+    if (!minimapMarksLayer) {
+      minimapMarksLayer = document.createElement("div");
+      minimapMarksLayer.className = "minimap-marks";
+      minimapMarksLayer.ariaHidden = "true";
+      minimapContainer.append(minimapMarksLayer);
+    }
+
+    const shown = duration ? marks.map((mark) => (mark.id === markDraft?.id ? { ...mark, ...markDraft } : mark)) : [];
+    if (pendingRegion && duration) {
+      const { start, end } = pendingRegion;
+      shown.push({
+        id: "",
+        start: Math.min(start, end),
+        end: Math.max(start, end),
+        label: "",
+        color: "",
+        pending: true,
+      });
+    }
+
+    const kept = new Set();
+    for (const mark of shown) {
+      kept.add(mark.id);
+      let elements = markElements.get(mark.id);
+      if (!elements) {
+        const flag = document.createElement("span");
+        flag.setAttribute("part", "mark-flag");
+        const body = document.createElement("div");
+        body.append(flag);
+        elements = { body, flag, tick: document.createElement("div") };
+        markElements.set(mark.id, elements);
+        marksLayer.append(body);
+        minimapMarksLayer.append(elements.tick);
+      }
+      const { body, flag, tick } = elements;
+      const region = mark.end !== null;
+      const pending = "pending" in mark;
+      body.setAttribute(
+        "part",
+        [
+          "mark",
+          region ? "mark-region" : "mark-point",
+          mark.id === selectedMark && "mark-selected",
+          pending && "mark-pending",
+        ]
+          .filter(Boolean)
+          .join(" "),
+      );
+      const color = pending ? "var(--text)" : `var(--mark-${mark.color})`;
+      for (const element of [body, tick]) {
+        element.style.left = percent(mark.start);
+        element.style.width = region ? percent(mark.end - mark.start) : "";
+        element.style.setProperty("--mark-color", color);
+      }
+      flag.setAttribute("part", mark.id === selectedMark ? "mark-flag mark-flag-selected" : "mark-flag");
+      flag.hidden = pending;
+      flag.textContent = mark.label;
+      flag.title = mark.label;
+      if (pending) delete flag.dataset.markFlag;
+      else flag.dataset.markFlag = mark.id;
+      tick.className = region ? "minimap-mark minimap-region" : "minimap-mark";
+    }
+    for (const [id, { body, tick }] of markElements) {
+      if (kept.has(id)) continue;
+      body.remove();
+      tick.remove();
+      markElements.delete(id);
+    }
   }
 
   /* ---------- Zoom / scroll ---------- */
@@ -425,12 +632,16 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     zoomAnchor = null;
     loop = null;
     renderLoop();
+    marks = [];
+    selectedMark = pendingRegion = markDraft = null;
+    renderMarks();
     if (!waveSurfer) return;
 
     await waveSurfer.load("", peaks, trackDuration);
     waveSurfer.zoom(0);
     waveSurfer.setTime(0);
     duration = trackDuration;
+    renderMarks();
   }
 
   // Keeps the cursor in view when zoomed in: once it leaves the visible
@@ -462,6 +673,18 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     setLoop(next) {
       loop = next && { ...next };
       renderLoop();
+    },
+    /**
+     * Draws `list`, with `selected` (an id) picked out and `pending` (a
+     * region being marked: { start, end }, either order) drawn dashed.
+     * @param {Mark[]} list
+     * @param {{ selected?: string | null, pending?: { start: number, end: number } | null }} [options]
+     */
+    setMarks(list, { selected = null, pending = null } = {}) {
+      marks = list;
+      selectedMark = selected;
+      pendingRegion = pending;
+      renderMarks();
     },
   };
 }

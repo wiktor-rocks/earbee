@@ -106,7 +106,7 @@ module.exports = async function (h) {
     );
     await js(`document.getElementById("downloadButton").click()`);
     // It starts on Settings › Downloads › Download (Audio), not on the last
-    // choice (see 14-settings for changing it).
+    // choice (see 13-settings for changing it).
     check(
       "the dialog starts on the kind set in Settings",
       await js(`document.querySelector('input[name="downloadKind"][value="audio"]').checked`),

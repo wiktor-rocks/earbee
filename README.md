@@ -4,6 +4,7 @@ A desktop player for transcribing music by ear. Open a song or a video, slow it 
 
 - **Speed** from 0.25× to 3× with presets, and **pitch** shift in semitones and cents. Both use [Signalsmith Stretch](https://signalsmith-audio.co.uk/code/stretch/).
 - **A–B loop.** Shift+drag on the waveform, drag the edges to adjust, or use `[` `]` `L`.
+- **Marks:** points and regions on the waveform, each with a name and a colour. `M` marks a point where you hear it (tap along while it plays); `R` starts a region and `R` again ends it. Drag a mark's flag to move it, or a region's edge to resize it; Shift+← / Shift+→ go from mark to mark, Delete removes the selected one. The **Marks** list under the controls renames, recolours, deletes and goes to them. For now marks last until another file is opened.
 - **Waveform** with a minimap. The wheel on the waveform zooms at the mouse; the wheel on the minimap scrolls.
 - **Keyboard stepping:**
   - ← / → step back and forward;
@@ -65,15 +66,16 @@ src/               The page (ES modules, no build step), in layers:
   core/              pure helpers, no DOM (unit-tested)
   themes/            colour themes: palettes/ (one file each) and the logic
   prefs/             settings: sections/ (one file each) and the field types
+  marks/             marks: what one is, the saved form, the store
   config.js          every tunable number
   audio/             engine.js (Web Audio + Signalsmith), transport.js,
                      decoder.js + decode-worker.js (parallel decoding)
   video/             view.js, proxy.js
-  waveform.js        WaveSurfer drawing, zoom, the loop region
-  context.js         settings, and the shared components (`player`)
+  waveform.js        WaveSurfer drawing, zoom, the loop region and the marks
+  context.js         settings, the track's marks, the shared components (`player`)
   ui/                dom.js, controls.js, shortcuts.js, theme.js, prefs.js,
                      pref-fields.js
-  features/          playback.js, loop.js, open-file.js, download.js,
+  features/          playback.js, loop.js, marks.js, open-file.js, download.js,
                      theme-picker.js, settings.js
   app.js             entry point: creates and wires everything
   vendor/            Signalsmith Stretch, patched (see its README.md)
@@ -83,9 +85,9 @@ assets/            Logo and icons (generated from transcribee-source.png
                    by scripts/make-images.py)
 tests/
   unit/              node:test unit tests (core, transport, decoding parts,
-                     downloader, media files, system, themes, prefs)
+                     downloader, media files, system, themes, prefs, marks)
   run.cjs            end-to-end runner: e2e/harness.cjs plus topic files
-  e2e/               01-static-ui.cjs … 14-security.cjs
+  e2e/               01-static-ui.cjs … 15-security.cjs
   smoke.cjs          the real app: security, window state, the bridge
   preload.cjs        page instrumentation for the e2e tests
   fake-yt-dlp.cjs    stands in for yt-dlp, so downloads test offline
@@ -98,6 +100,8 @@ CHANGELOG.md       What changed, why, how and where, newest first
 **Layers.** In `src/`, a file only imports from the layers above it: `core` → `config` → `audio` / `video` / `waveform` → `context` → `ui` → `features` → `app.js`. `npm run lint` fails on an import that goes the other way, or on an import cycle. So `core/`, `audio/transport.js` and the rest of the lower layers stay free of the UI, and can be unit-tested in plain Node.
 
 **Adding a setting.** Settings are declared in `src/prefs/sections/`, one file per section (a tab in the dialog). Add a field there: its `key`, `type` (`choice`, `boolean`, `number` or `folder`), `label`, optional `help` and `default`. The Settings dialog shows it, and the main process checks and saves it in `prefs.json`. The page reads it with `getPrefs("section")` and follows changes with `onPrefsChange` (`src/ui/prefs.js`); the main process uses `store.get` and `store.onChange` (`electron/prefs-store.js`). A new section is a new file listed in `SECTIONS` (`src/prefs/index.js`). The formats are described at the top of `src/prefs/fields.js`.
+
+**Marks and TranscriBee files.** A mark is `{ id, start, end, label, color }` (`end: null` for a point), described in `src/marks/format.js` along with its saved form, `{ version: 1, marks: [...] }`. The store (`createMarks`, `src/marks/index.js`) lives in `context.js` and is changed through the actions in `src/features/marks.js`. Saving marks with a song will plug in at three places: `marks.toJSON()` is what to save, `marks.reset(duration, saved)` brings them back when the song opens (called from `resetMarks` in `features/marks.js`), and `marks.on("change")` fires once per edit. `src/marks/` is pure, so the main process can use `parseMarks` to check a file it reads.
 
 **Adding a colour theme.** Copy a file in `src/themes/palettes/` (for example `nord.js`), give it a new `id`, `name`, `scheme` (`"dark"` or `"light"`) and colours for each role, then add it to `THEMES` in `src/themes/index.js`. The roles are listed, with what each colours, in `ROLES` in that file. `npm run test:unit` checks that the theme defines every role and that its text, accent, loop and error colours have enough contrast. It names any pair that fails.
 

@@ -272,6 +272,13 @@ export function createTransport({ engine, getRate, getSemitones }) {
     get position() {
       return currentPosition();
     },
+    /**
+     * The position that was being heard at `eventTime` (the performance
+     * clock, e.g. a key press's timeStamp) while playing, so something
+     * marked "now" lands where it was heard; the resting position otherwise.
+     * @param {number} eventTime
+     */
+    positionAt: (eventTime) => (isPlaying() ? positionHeardAt(eventTime) : currentPosition()),
     get duration() {
       return duration;
     },

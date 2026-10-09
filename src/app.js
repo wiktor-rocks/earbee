@@ -3,7 +3,8 @@
  * TranscriBee: the page's entry point. Read this first.
  *
  * A music-transcription player: open a song or a video, slow it down,
- * shift its pitch, EQ it, and step through it with the keyboard.
+ * shift its pitch, EQ it, mark points and regions on it, and step through
+ * it with the keyboard.
  *
  * HOW IT FITS TOGETHER
  *
@@ -24,13 +25,18 @@
  *              hour-long files open (see docs/diagnostics/long-file-loading.md).
  *   transport  Playback state and position. Mirrors Signalsmith's timeline,
  *              so the position of what is being heard is computed exactly.
- *   waveform   WaveSurfer drawing, zoom, minimap and the A–B loop region.
- *              Never plays audio.
+ *   waveform   WaveSurfer drawing, zoom, minimap, the A–B loop region and
+ *              the marks. Never plays audio.
  *   video      Frame-exact picture for video files: decodes frames itself
  *              (Mediabunny + WebCodecs) and draws the frame at the transport
  *              position. No second clock, so it can't drift from the audio.
  *   settings   The player's controls (speed, pitch, volume, EQ, step):
  *              plain values for this session, in context.js.
+ *   marks      Points and regions on the open track, with a label and a
+ *              colour: the store (src/marks, kept in context.js) is changed
+ *              by features/marks.js, which redraws the waveform and the
+ *              marks list. Session-only for now; versioned, so a TranscriBee
+ *              file can save and restore them (see COMMON CHANGES).
  *   prefs      The user's Settings (theme, downloads), kept between runs by
  *              the main process (electron/prefs-store.js) and changed in the
  *              Settings dialog. Declared per section in src/prefs; the
@@ -57,18 +63,23 @@
  *                  everything else (the main process uses it too)
  *   prefs/         Settings sections (sections/: theme, downloads) and the
  *                  field types; pure, shared with the main process
+ *   marks/         What a mark is and its saved form (format.js), and the
+ *                  store (index.js); pure
  *   config.js      CONFIG: every tunable number
  *   audio/         engine.js, transport.js, decoder.js (+ decode-worker.js)
  *   video/         view.js (the picture), proxy.js (low-res copy for seeking)
- *   waveform.js    The waveform, zoom, minimap, loop drawing and dragging
- *   context.js     `settings`, and `player`: the components above, once created
+ *   waveform.js    The waveform, zoom, minimap, loop and marks drawing and
+ *                  dragging
+ *   context.js     `settings`, `marks` (the open track's), and `player`: the
+ *                  components above, once created
  *   ui/            dom.js (elements, messages, rendering, loading screens),
  *                  controls.js (sliders, chips, EQ), shortcuts.js (key
  *                  handling), theme.js (applying a theme), prefs.js (the
  *                  settings: values, changes, listeners), pref-fields.js
  *                  (one Settings control per field type)
- *   features/      playback.js, loop.js, open-file.js, download.js,
- *                  theme-picker.js, settings.js (the Settings dialog)
+ *   features/      playback.js, loop.js, marks.js (actions, selection, the
+ *                  marks list), open-file.js, download.js, theme-picker.js,
+ *                  settings.js (the Settings dialog)
  *   app.js         This file: creates and wires the components, the
  *                  SHORTCUTS table, start()
  *   vendor/        Signalsmith Stretch, patched to read across several
@@ -113,6 +124,19 @@
  *   A–B loop                  State and actions in features/loop.js; audio
  *                             looping in audio/transport.js, drawing and
  *                             dragging in waveform.js.
+ *   Marks                     The data in src/marks (a field: format.js's
+ *                             normalizeMark and serializeMarks; bump
+ *                             MARKS_VERSION if old saves read differently);
+ *                             actions, keys and the list in features/marks.js;
+ *                             drawing and dragging in waveform.js (renderMarks,
+ *                             bindPointerSeek); sizes in CONFIG.marks.
+ *   Mark colours              MARK_COLORS (src/themes/mark-colors.js), and the
+ *                             --mark-* defaults in style.css; the unit tests
+ *                             check each is visible on every theme.
+ *   TranscriBee files         Where saving marks plugs in: marks.toJSON() to
+ *   (saving marks)            save, marks.reset(duration, saved) on opening
+ *                             (resetMarks, features/marks.js), and
+ *                             marks.on("change") to know when to save.
  *   Opening files             features/open-file.js (loadMediaFile: the order
  *                             of a load, the memory check, error wording);
  *                             decoding in audio/decoder.js; how many parts
@@ -133,6 +157,18 @@ import { createTransport } from "./audio/transport.js";
 import { player, settings, totalSemitones } from "./context.js";
 import { bindDownloads } from "./features/download.js";
 import { setLoopEnd, setLoopRegion, setLoopStart, toggleLoop, clearLoop } from "./features/loop.js";
+import {
+  bindMarks,
+  cancelMarking,
+  deleteSelectedMark,
+  markPoint,
+  markRegion,
+  moveMark,
+  nextMark,
+  previousMark,
+  renameMark,
+  selectMark,
+} from "./features/marks.js";
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
 import { bindSettings, isSettingsOpen } from "./features/settings.js";
 import { bindThemePicker, isThemeMenuOpen } from "./features/theme-picker.js";
@@ -187,6 +223,9 @@ const waveform = createWaveform({
   minimapContainer: $("waveform-minimap"),
   onSeek: (time) => transport.seek(time),
   onLoopChange: (loop) => setLoopRegion({ ...loop, enabled: true }),
+  onMarkSelect: selectMark,
+  onMarkChange: moveMark,
+  onMarkRename: renameMark,
 });
 
 const videoView = createVideoView({
@@ -255,6 +294,17 @@ const SHORTCUTS = [
   { codes: ["BracketRight"], keys: ["]"], description: "Loop end", down: setLoopEnd },
   { codes: ["KeyL"], keys: ["L"], description: "Loop on / off", down: toggleLoop },
   { codes: ["KeyL"], shift: true, keys: ["L"], description: "Clear loop", down: clearLoop },
+  { codes: ["KeyM"], keys: ["M"], description: "Mark a point", down: markPoint },
+  { codes: ["KeyR"], keys: ["R"], description: "Mark a region (press at its start, then its end)", down: markRegion },
+  { codes: ["ArrowLeft"], shift: true, keys: ["←"], description: "Previous mark", repeat: true, down: previousMark },
+  { codes: ["ArrowRight"], shift: true, keys: ["→"], description: "Next mark", repeat: true, down: nextMark },
+  {
+    codes: ["Delete", "Backspace"],
+    keys: ["Delete", "Backspace"],
+    description: "Delete the selected mark",
+    down: deleteSelectedMark,
+  },
+  { codes: ["Escape"], keys: ["Esc"], description: "Stop marking a region / deselect the mark", down: cancelMarking },
 ];
 
 /* =====================================================================
@@ -289,6 +339,7 @@ function start() {
   bindDownloads();
   bindThemePicker();
   bindSettings();
+  bindMarks();
   bindShortcuts(SHORTCUTS, () => isLoading() || dom.downloadDialog.open || isThemeMenuOpen() || isSettingsOpen());
   dom.welcomeOpen.focus();
 }

@@ -52,6 +52,9 @@ export const dom = {
   eqToggle: $("eqToggle"),
   resetEqButton: $("resetEq"),
   shortcutList: $("shortcutList"),
+  marksList: $("marksList"),
+  marksEmpty: $("marksEmpty"),
+  marksCount: $("marksCount"),
 };
 
 export const speedChips = () => /** @type {HTMLButtonElement[]} */ ([...dom.speedChips.children]);
