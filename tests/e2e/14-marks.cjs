@@ -43,6 +43,12 @@ module.exports = async function (h) {
     "the legend lists the mark keys",
     (await js(`document.getElementById("shortcutList").textContent`)).includes("Shift+→Next mark"),
   );
+  const legendShown = () => js(`document.querySelector("#shortcutList li").checkVisibility()`);
+  const legendClosed = !(await legendShown());
+  await js(`shortcutsTitle.click()`);
+  const legendOpened = await legendShown();
+  await js(`shortcutsTitle.click()`);
+  check("the legend's keys show only once it's opened", legendClosed && legendOpened && !(await legendShown()));
 
   // M: a point at the cursor, drawn, listed, selected.
   await click(3);

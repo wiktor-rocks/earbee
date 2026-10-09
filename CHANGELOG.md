@@ -43,6 +43,22 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-09: The shortcut legend is collapsible, closed by default
+
+- **What:** the legend at the bottom of the player is now a "▸ Keyboard shortcuts" heading. Clicking it (or Enter on it when focused) opens the list of keys, and clicking again closes it. It starts closed on every launch.
+- **Why:** the marks keys made the legend long, and the page scrolled at small window heights. Most of the time the keys don't need to be on screen.
+- **How:**
+  - a native `<details>`/`<summary>`, so no script is needed and keyboard and screen-reader support come with it;
+  - the summary is styled like the panel headings, with a ▸ marker that turns when open (the browser's own marker is hidden);
+  - `renderShortcutLegend` still fills `#shortcutList`, which stays in the DOM while closed;
+  - Space on the focused summary stays the play shortcut and doesn't toggle it, because the shortcut handler already calls `preventDefault`.
+- **Where:** `index.html` (the footer), `style.css` ("Shortcut legend"), `README.md`.
+- **Verified by:**
+  - `tests/e2e/01-static-ui.cjs`: starts closed, a click opens it, a second click closes it, and Space on the summary doesn't toggle it;
+  - `14-marks.cjs`: the keys show only while it's open. This uses `checkVisibility()`, because Chromium keeps `offsetParent` set inside a closed `<details>`;
+  - `TB_TOPICS=01,14` passes 38/38, and `npm run check` is clean;
+  - the screenshot `tests/output/marks.png`: the player fits at 800 px again.
+
 ## 2026-10-09: Marks: points and regions on the waveform
 
 - **What:**

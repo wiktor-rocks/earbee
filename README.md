@@ -18,7 +18,7 @@ A desktop player for transcribing music by ear. Open a song or a video, slow it 
 - **Colour themes:** dark (TranscriBee, Monokai, Dracula, Nord, One Dark) and light (TranscriBee Light, Solarized Light, Catppuccin Latte, GitHub Light, Gruvbox Light), or **Automatic**, which follows your system's dark or light mode (TranscriBee or TranscriBee Light unless you pick others). Pick one with the palette button in the top bar, or in Settings; it's remembered.
 - **Works offline.** All libraries and fonts are bundled. Only downloading needs the internet.
 
-The shortcut legend at the bottom of the window lists every key.
+**Keyboard shortcuts** at the bottom of the window (click to open) lists every key.
 
 ## Requirements
 
