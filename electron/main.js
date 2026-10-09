@@ -9,8 +9,12 @@
 //   System     The memory available for a track (system.js); if the page's
 //              process dies, a message and a reload instead of a blank
 //              window.
-//   Theme      The chosen colour theme (theme-store.js): applied by the
-//              preload before the page renders, and the window background.
+//   Settings   The user's preferences (prefs-store.js, prefs.json): read
+//              and changed by the page's Settings dialog through the
+//              preload; the folder picker is here. The colour theme
+//              (theme-store.js) is one section: applied by the preload
+//              before the page renders, and the window background.
+//              Downloads read theirs for each download.
 //   Window     Remembers its size, position and maximised state between
 //              runs (window-state.js). The title follows the page's
 //              <title>, which names the open file.
@@ -23,7 +27,8 @@ const path = require("path");
 const { handleDownloads } = require("./downloader");
 const { createMediaFiles, registerMediaScheme } = require("./media-files");
 const { handleRendererCrash, handleSystem } = require("./system");
-const { createThemeStore, handleThemes } = require("./theme-store");
+const { createPrefsStore, handlePrefs } = require("./prefs-store");
+const { createThemeView } = require("./theme-store");
 const { loadWindowState, rememberWindowState } = require("./window-state");
 
 const ROOT = path.join(__dirname, ".."); // the app's files: index.html, src/, assets/
@@ -55,7 +60,7 @@ if (!app.isPackaged) {
 
 /* ---------- Window ---------- */
 
-let themeStore = null; // set once the app is ready
+let themeView = null; // set once the app is ready
 
 function createWindow() {
   const { maximized, ...bounds } = loadWindowState(MIN_SIZE, DEFAULT_BOUNDS);
@@ -65,7 +70,7 @@ function createWindow() {
     minHeight: MIN_SIZE.height,
     title: "TranscriBee",
     icon: path.join(ROOT, "assets", "icon-512.png"),
-    backgroundColor: themeStore.current().colors.bg, // the page background, so opening doesn't flash
+    backgroundColor: themeView.current().colors.bg, // the page background, so opening doesn't flash
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       sandbox: true,
@@ -86,18 +91,37 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  themeStore = createThemeStore(path.join(app.getPath("userData"), "theme.json"), nativeTheme);
+  const userData = app.getPath("userData");
+  const downloadsFolder = path.join(app.getPath("downloads"), "TranscriBee");
+  const prefsStore = createPrefsStore(path.join(userData, "prefs.json"), {
+    legacyThemeFile: path.join(userData, "theme.json"),
+  });
+  themeView = createThemeView(prefsStore, nativeTheme);
   const followTheme = () => {
-    for (const win of BrowserWindow.getAllWindows()) win.setBackgroundColor(themeStore.current().colors.bg);
+    for (const win of BrowserWindow.getAllWindows()) win.setBackgroundColor(themeView.current().colors.bg);
   };
-  handleThemes(ipcMain, themeStore, followTheme);
+  handlePrefs(ipcMain, prefsStore, {
+    initialTheme: themeView.initial,
+    defaultPaths: { "downloads.folder": downloadsFolder },
+    async chooseFolder(sender, defaultPath) {
+      const owner = BrowserWindow.fromWebContents(sender);
+      const options = { defaultPath, properties: /** @type {const} */ (["openDirectory", "createDirectory"]) };
+      const { canceled, filePaths } = owner
+        ? await dialog.showOpenDialog(owner, options)
+        : await dialog.showOpenDialog(options);
+      return canceled || !filePaths.length ? null : filePaths[0];
+    },
+    pages: () => BrowserWindow.getAllWindows().map((win) => win.webContents),
+  });
+  prefsStore.onChange((section) => section === "theme" && followTheme());
   handleSystem(ipcMain);
   nativeTheme.on("updated", followTheme); // "Automatic" follows the system
   const mediaFiles = createMediaFiles();
   mediaFiles.handle(protocol);
   handleDownloads(ipcMain, {
-    binDir: path.join(app.getPath("userData"), "bin"),
-    saveDir: path.join(app.getPath("downloads"), "TranscriBee"),
+    binDir: path.join(userData, "bin"),
+    saveDir: downloadsFolder,
+    prefs: () => prefsStore.get("downloads"),
     fetch: net.fetch, // follows the system's proxy settings
     share: mediaFiles.share,
   });

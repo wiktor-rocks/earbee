@@ -11,7 +11,6 @@ import {
   contrast,
   cssVariables,
   getTheme,
-  normalizePrefs,
   parseHex,
   resolveTheme,
 } from "../../src/themes/index.js";
@@ -91,15 +90,6 @@ describe("picking a theme", () => {
     assert.equal(resolveTheme({ choice: "gone" }, true).id, DEFAULT_PREFS.choice);
     assert.equal(resolveTheme({ choice: "auto", dark: "solarized-light" }, true).id, DEFAULT_PREFS.dark);
     assert.equal(resolveTheme(null, true).id, DEFAULT_PREFS.choice);
-  });
-
-  test("stored prefs are cleaned up", () => {
-    assert.deepEqual(normalizePrefs("junk"), DEFAULT_PREFS);
-    assert.deepEqual(normalizePrefs({ choice: "auto", dark: "nord", light: "monokai" }), {
-      choice: "auto",
-      dark: "nord",
-      light: DEFAULT_PREFS.light,
-    });
   });
 });
 

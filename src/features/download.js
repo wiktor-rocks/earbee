@@ -5,6 +5,7 @@
 import { AppError } from "../core/errors.js";
 import { formatEta } from "../core/format.js";
 import { dom, guarded, onClick, setLoadingStatus, showNotice } from "../ui/dom.js";
+import { defaultPaths, getPrefs } from "../ui/prefs.js";
 import { isTextField } from "../ui/shortcuts.js";
 import { isLoading, loadMediaFile, withLoading } from "./open-file.js";
 
@@ -28,8 +29,6 @@ import { isLoading, loadMediaFile, withLoading } from "./open-file.js";
  * @property {(callback: (progress: DownloadProgress) => void) => () => void} onDownloadProgress
  */
 const downloads = /** @type {DownloadBridge | undefined} */ (/** @type {any} */ (window).transcribee);
-
-let downloadKind = "audio"; // the dialog's last choice, for this session
 
 /**
  * @param {DownloadProgress} progress
@@ -76,11 +75,17 @@ function downloadLink(url, kind) {
   });
 }
 
+// Starts on the kind set in Settings › Downloads, and says where the file
+// will go and the best video quality, from there too.
 export function openDownloadDialog(url = "") {
-  if (!downloads || isLoading() || dom.downloadDialog.open) return;
+  // Not over another dialog (Settings) or while something loads.
+  if (!downloads || isLoading() || document.querySelector("dialog[open]")) return;
+  const { kind, folder, maxHeight } = getPrefs("downloads");
   dom.downloadUrl.value = url;
-  const kind = /** @type {HTMLInputElement} */ (dom.downloadForm.elements.namedItem("downloadKind"));
-  /** @type {RadioNodeList} */ (/** @type {unknown} */ (kind)).value = downloadKind;
+  const radios = /** @type {RadioNodeList} */ (dom.downloadForm.elements.namedItem("downloadKind"));
+  radios.value = kind;
+  dom.downloadVideoLabel.textContent = `Video (up to ${maxHeight}p)`;
+  dom.downloadFolder.textContent = folder ?? defaultPaths["downloads.folder"] ?? "your Downloads folder";
   dom.downloadDialog.showModal();
   dom.downloadUrl.focus();
   dom.downloadUrl.select();
@@ -98,10 +103,9 @@ export function bindDownloads() {
 
   dom.downloadForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    const kind = new FormData(dom.downloadForm).get("downloadKind");
-    downloadKind = kind === "video" ? "video" : "audio";
+    const kind = new FormData(dom.downloadForm).get("downloadKind") === "video" ? "video" : "audio";
     dom.downloadDialog.close();
-    guarded(downloadLink)(dom.downloadUrl.value.trim(), downloadKind);
+    guarded(downloadLink)(dom.downloadUrl.value.trim(), kind);
   });
 
   // Pasting a link anywhere but a text field opens the dialog with it.

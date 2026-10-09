@@ -105,9 +105,11 @@ module.exports = async function (h) {
       JSON.stringify(savedFiles()),
     );
     await js(`document.getElementById("downloadButton").click()`);
+    // It starts on Settings › Downloads › Download (Audio), not on the last
+    // choice (see 14-settings for changing it).
     check(
-      "the dialog remembers Audio / Video",
-      await js(`document.querySelector('input[name="downloadKind"][value="video"]').checked`),
+      "the dialog starts on the kind set in Settings",
+      await js(`document.querySelector('input[name="downloadKind"][value="audio"]').checked`),
     );
     key("Escape");
     await sleep(200);

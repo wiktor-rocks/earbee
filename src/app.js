@@ -29,7 +29,12 @@
  *   video      Frame-exact picture for video files: decodes frames itself
  *              (Mediabunny + WebCodecs) and draws the frame at the transport
  *              position. No second clock, so it can't drift from the audio.
- *   settings   The single copy of every user setting (plain values).
+ *   settings   The player's controls (speed, pitch, volume, EQ, step):
+ *              plain values for this session, in context.js.
+ *   prefs      The user's Settings (theme, downloads), kept between runs by
+ *              the main process (electron/prefs-store.js) and changed in the
+ *              Settings dialog. Declared per section in src/prefs; the
+ *              dialog and every check are generated from the declarations.
  *
  *   Until the first file loads, a welcome screen (#welcome) stands in for
  *   the player (#app); showPlayer() swaps them once. The first load shows a
@@ -50,6 +55,8 @@
  *                  joining a parallel decode)
  *   themes/        Colour themes: palettes and pure logic; independent of
  *                  everything else (the main process uses it too)
+ *   prefs/         Settings sections (sections/: theme, downloads) and the
+ *                  field types; pure, shared with the main process
  *   config.js      CONFIG: every tunable number
  *   audio/         engine.js, transport.js, decoder.js (+ decode-worker.js)
  *   video/         view.js (the picture), proxy.js (low-res copy for seeking)
@@ -57,9 +64,11 @@
  *   context.js     `settings`, and `player`: the components above, once created
  *   ui/            dom.js (elements, messages, rendering, loading screens),
  *                  controls.js (sliders, chips, EQ), shortcuts.js (key
- *                  handling), theme.js (applying a theme)
+ *                  handling), theme.js (applying a theme), prefs.js (the
+ *                  settings: values, changes, listeners), pref-fields.js
+ *                  (one Settings control per field type)
  *   features/      playback.js, loop.js, open-file.js, download.js,
- *                  theme-picker.js
+ *                  theme-picker.js, settings.js (the Settings dialog)
  *   app.js         This file: creates and wires the components, the
  *                  SHORTCUTS table, start()
  *   vendor/        Signalsmith Stretch, patched to read across several
@@ -81,6 +90,18 @@
  *                             reads its colours from there too). Colours
  *                             come from the theme (src/themes); the :root
  *                             values are the default theme's.
+ *   New setting               Add a field to its section in src/prefs/sections/
+ *                             (type, label, default; see src/prefs/fields.js).
+ *                             The dialog shows it and the main process checks
+ *                             and saves it; read it with getPrefs(section)
+ *                             and follow it with onPrefsChange (ui/prefs.js),
+ *                             or in the main process with store.get /
+ *                             store.onChange (electron/prefs-store.js).
+ *   New settings section      A file in src/prefs/sections/ (defineSection),
+ *                             listed in SECTIONS (src/prefs/index.js); the
+ *                             dialog gets a tab for it.
+ *   New kind of setting       An entry in TYPES (src/prefs/fields.js) and a
+ *                             renderer in ui/pref-fields.js.
  *   New colour theme          Add a file in src/themes/palettes/ and list it
  *                             in THEMES (src/themes/index.js); the unit tests
  *                             check it's complete and readable.
@@ -113,7 +134,8 @@ import { player, settings, totalSemitones } from "./context.js";
 import { bindDownloads } from "./features/download.js";
 import { setLoopEnd, setLoopRegion, setLoopStart, toggleLoop, clearLoop } from "./features/loop.js";
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
-import { bindThemePicker, isThemeMenuOpen, loadThemePrefs } from "./features/theme-picker.js";
+import { bindSettings, isSettingsOpen } from "./features/settings.js";
+import { bindThemePicker, isThemeMenuOpen } from "./features/theme-picker.js";
 import {
   bindPlayback,
   bindTransportButtons,
@@ -136,7 +158,7 @@ import {
 } from "./ui/controls.js";
 import { $, dom, renderStepSize, renderTrackTime, renderTransportState, reportError, showNotice } from "./ui/dom.js";
 import { bindShortcuts, renderShortcutLegend } from "./ui/shortcuts.js";
-import { onThemeChange, setThemePrefs } from "./ui/theme.js";
+import { followThemePrefs, onThemeChange } from "./ui/theme.js";
 import { createVideoView } from "./video/view.js";
 import { createWaveform } from "./waveform.js";
 
@@ -144,7 +166,7 @@ import { createWaveform } from "./waveform.js";
 
 // The colour theme first, before anything is drawn (the preload has
 // normally applied it already; see ui/theme.js).
-setThemePrefs(loadThemePrefs());
+followThemePrefs();
 
 /* =====================================================================
  * COMPONENTS
@@ -266,7 +288,8 @@ function start() {
   bindFileDrop();
   bindDownloads();
   bindThemePicker();
-  bindShortcuts(SHORTCUTS, () => isLoading() || dom.downloadDialog.open || isThemeMenuOpen());
+  bindSettings();
+  bindShortcuts(SHORTCUTS, () => isLoading() || dom.downloadDialog.open || isThemeMenuOpen() || isSettingsOpen());
   dom.welcomeOpen.focus();
 }
 

@@ -515,6 +515,214 @@ body.dragging .welcome-hint {
   gap: 10px;
 }
 
+.download-folder {
+  color: var(--text);
+  word-break: break-all;
+}
+
+/* ---------- Settings dialog ---------- */
+
+/* Tabs on the left (one per section in src/prefs), the section's fields on
+   the right; one column on narrow windows. */
+.settings-dialog {
+  width: min(680px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.settings-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-dialog::backdrop {
+  background: var(--overlay-bg);
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 22px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-head h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.settings-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+
+.settings-tabs {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 2px;
+  width: 150px;
+  padding: 12px 8px;
+  border-right: 1px solid var(--border);
+}
+
+.settings-tab {
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  text-align: left;
+}
+
+.settings-tab:hover {
+  background: var(--surface-hover);
+}
+
+.settings-tab[aria-selected="true"] {
+  background: var(--surface-2);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.settings-panels {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+  padding: 8px 22px 18px;
+}
+
+.settings-message {
+  margin: 0;
+  padding: 0 22px 14px;
+  color: var(--danger);
+  font-size: 13px;
+}
+
+.settings-message:empty {
+  display: none;
+}
+
+.pref-field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.pref-field:last-child {
+  border-bottom: 0;
+}
+
+.pref-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 28px;
+}
+
+.pref-label {
+  font-weight: 700;
+}
+
+.pref-help {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.pref-options {
+  display: flex;
+  gap: 4px 18px;
+}
+
+.pref-options-row {
+  flex-wrap: wrap;
+}
+
+/* Many options with details (themes): two columns of rows. */
+.pref-options-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 2px 8px;
+}
+
+.pref-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.pref-options-list .pref-option {
+  padding: 5px 8px;
+  border-radius: 7px;
+}
+
+.pref-options-list .pref-option:hover {
+  background: var(--surface-hover);
+}
+
+.pref-option input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.pref-option-text {
+  display: flex;
+  flex-direction: column;
+}
+
+.pref-option-text small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.pref-folder {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.pref-path {
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--bg);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.pref-folder small {
+  color: var(--muted);
+}
+
+.pref-range {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+@media (max-width: 560px) {
+  .settings-body {
+    flex-direction: column;
+  }
+
+  .settings-tabs {
+    flex-direction: row;
+    width: auto;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+}
+
 /* ---------- Colour-theme menu ---------- */
 
 .theme-button {
@@ -523,10 +731,18 @@ body.dragging .welcome-hint {
   padding: 8px 10px;
 }
 
-.welcome-theme {
+/* The gear (Settings) and the palette, top right of the welcome screen. */
+.welcome-corner {
   position: absolute;
   top: 16px;
   right: 16px;
+  display: flex;
+  gap: 8px;
+}
+
+/* In the top bar, the gear sits close to the palette. */
+.settings-button {
+  margin-right: -8px;
 }
 
 /* A popover: placed next to its button by features/theme-picker.js. */

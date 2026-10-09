@@ -7,7 +7,8 @@
 //     pop-ups, and the download bridge (preload.js);
 //   - the window state: saved on close, restored on the next start, reset
 //     when the saved position is off-screen, and kept above the minimum size;
-//   - the colour theme: saved, and applied again on the next start.
+//   - the settings: a theme.json from before them is imported; a theme
+//     saved through the bridge is applied again on the next start.
 //
 // TB_APP_BINARY=<path> tests a packaged build's executable instead of
 // running the project with Electron.
@@ -196,9 +197,14 @@ const near = (a, b) => Math.abs(a - b) <= 40; // window decorations differ betwe
     );
 
     // The colour theme: saved through the bridge, applied on the next start
-    // (by the preload, before the page's own code runs).
+    // (by the preload, before the page's own code runs). First, a profile
+    // from before Settings: its theme.json is imported into prefs.json.
+    fs.rmSync(path.join(profile, "prefs.json"), { force: true });
+    fs.writeFileSync(path.join(profile, "theme.json"), JSON.stringify({ choice: "dracula" }));
     await session(profile, async (page) => {
-      await page.evaluate(`transcribee.theme.save({ choice: "nord" })`);
+      const imported = await page.evaluate(`document.documentElement.dataset.theme`);
+      check("theme.json from before Settings is imported", imported === "dracula", imported);
+      await page.evaluate(`transcribee.prefs.set("theme", "choice", "nord")`);
     });
     await session(profile, async (page) => {
       const applied = await page.evaluate(

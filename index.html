@@ -29,27 +29,48 @@
   <body>
     <!-- Shown until the first file loads; then the player (#app) replaces it. -->
     <main id="welcome" class="welcome">
-      <button
-        id="welcomeThemeButton"
-        class="theme-button welcome-theme"
-        type="button"
-        title="Colour theme"
-        aria-label="Colour theme"
-        aria-haspopup="menu"
-        aria-expanded="false"
-      >
-        <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
-          <path
-            d="M8 1.5a6.5 6.5 0 0 0 0 13c1 0 1.5-.6 1.5-1.3 0-.9-.8-1.2-.8-2 0-.7.6-1.2 1.4-1.2h1.4a3 3 0 0 0 3-3C14.5 3.9 11.6 1.5 8 1.5Z"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="1.4"
-          />
-          <circle cx="4.8" cy="7.4" r="1" fill="currentColor" />
-          <circle cx="7" cy="4.6" r="1" fill="currentColor" />
-          <circle cx="10.4" cy="4.9" r="1" fill="currentColor" />
-        </svg>
-      </button>
+      <div class="welcome-corner">
+        <button
+          id="welcomeSettingsButton"
+          class="theme-button"
+          type="button"
+          title="Settings"
+          aria-label="Settings"
+          aria-haspopup="dialog"
+        >
+          <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+            <path
+              d="M6.9 1.5h2.2l.4 1.8 1.2.7 1.8-.6 1.1 1.9-1.4 1.2v1.4l1.4 1.2-1.1 1.9-1.8-.6-1.2.7-.4 1.8H6.9l-.4-1.8-1.2-.7-1.8.6-1.1-1.9L3.8 8.7V7.3L2.4 6.1l1.1-1.9 1.8.6 1.2-.7Z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.3"
+              stroke-linejoin="round"
+            />
+            <circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.3" />
+          </svg>
+        </button>
+        <button
+          id="welcomeThemeButton"
+          class="theme-button"
+          type="button"
+          title="Colour theme"
+          aria-label="Colour theme"
+          aria-haspopup="menu"
+          aria-expanded="false"
+        >
+          <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+            <path
+              d="M8 1.5a6.5 6.5 0 0 0 0 13c1 0 1.5-.6 1.5-1.3 0-.9-.8-1.2-.8-2 0-.7.6-1.2 1.4-1.2h1.4a3 3 0 0 0 3-3C14.5 3.9 11.6 1.5 8 1.5Z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.4"
+            />
+            <circle cx="4.8" cy="7.4" r="1" fill="currentColor" />
+            <circle cx="7" cy="4.6" r="1" fill="currentColor" />
+            <circle cx="10.4" cy="4.9" r="1" fill="currentColor" />
+          </svg>
+        </button>
+      </div>
       <div class="welcome-content">
         <div class="logo-aura">
           <img class="welcome-logo" src="assets/logo.webp" alt="" />
@@ -98,6 +119,25 @@
         </label>
         <button id="downloadButton" type="button" hidden>From YouTube…</button>
         <div id="fileName" class="file-name">No file loaded</div>
+        <button
+          id="settingsButton"
+          class="theme-button settings-button"
+          type="button"
+          title="Settings"
+          aria-label="Settings"
+          aria-haspopup="dialog"
+        >
+          <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
+            <path
+              d="M6.9 1.5h2.2l.4 1.8 1.2.7 1.8-.6 1.1 1.9-1.4 1.2v1.4l1.4 1.2-1.1 1.9-1.8-.6-1.2.7-.4 1.8H6.9l-.4-1.8-1.2-.7-1.8.6-1.1-1.9L3.8 8.7V7.3L2.4 6.1l1.1-1.9 1.8.6 1.2-.7Z"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.3"
+              stroke-linejoin="round"
+            />
+            <circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.3" />
+          </svg>
+        </button>
         <button
           id="themeButton"
           class="theme-button"
@@ -281,16 +321,34 @@
         <fieldset class="download-kind">
           <legend>Get</legend>
           <label><input type="radio" name="downloadKind" value="audio" checked /> Audio</label>
-          <label><input type="radio" name="downloadKind" value="video" /> Video (up to 1080p)</label>
+          <label
+            ><input type="radio" name="downloadKind" value="video" />
+            <span id="downloadVideoLabel">Video (up to 1080p)</span></label
+          >
         </fieldset>
         <p class="download-note">
-          Saved in your Downloads folder, under TranscriBee. Only download what you have the rights to.
+          Saved in <span id="downloadFolder" class="download-folder">your Downloads folder</span> (change it in
+          Settings). Only download what you have the rights to.
         </p>
         <div class="download-buttons">
           <button id="downloadClose" type="button">Cancel</button>
           <button class="primary" type="submit">Download</button>
         </div>
       </form>
+    </dialog>
+
+    <!-- Settings (see features/settings.js); opened by the gear buttons. Its
+         tabs and controls are generated from the sections in src/prefs. -->
+    <dialog id="settingsDialog" class="settings-dialog" aria-labelledby="settingsTitle">
+      <div class="settings-head">
+        <h2 id="settingsTitle">Settings</h2>
+        <button id="settingsClose" class="small" type="button" aria-label="Close settings">Close</button>
+      </div>
+      <div class="settings-body">
+        <div id="settingsTabs" class="settings-tabs" role="tablist" aria-orientation="vertical"></div>
+        <div id="settingsPanels" class="settings-panels"></div>
+      </div>
+      <p id="settingsMessage" class="settings-message" role="alert"></p>
     </dialog>
 
     <script type="module" src="src/app.js"></script>

@@ -5,7 +5,7 @@ const fs = require("fs");
 const path = require("path");
 
 module.exports = async function (h) {
-  const { wc, js, dbg, key, shot, playing, ensurePaused, check, sleep, themeFile, PROJECT } = h;
+  const { wc, js, dbg, key, shot, playing, ensurePaused, check, sleep, prefsFile, PROJECT } = h;
   const variable = (name) => js(`getComputedStyle(document.documentElement).getPropertyValue("${name}").trim()`);
   const themeId = () => js(`document.documentElement.dataset.theme`);
   const menuOpen = () => js(`document.getElementById("themeMenu").matches(":popover-open")`);
@@ -70,7 +70,7 @@ module.exports = async function (h) {
   check(
     "the choice is checked and saved",
     (await js(`document.querySelector('#themeMenu [aria-checked="true"]').dataset.choice`)) === "nord" &&
-      JSON.parse(fs.readFileSync(themeFile, "utf8")).choice === "nord",
+      JSON.parse(fs.readFileSync(prefsFile, "utf8")).theme.choice === "nord",
   );
   await shot("theme-menu.png");
 

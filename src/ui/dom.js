@@ -30,6 +30,8 @@ export const dom = {
   downloadForm: /** @type {HTMLFormElement} */ ($("downloadForm")),
   downloadUrl: /** @type {HTMLInputElement} */ ($("downloadUrl")),
   downloadClose: $("downloadClose"),
+  downloadVideoLabel: $("downloadVideoLabel"),
+  downloadFolder: $("downloadFolder"),
   fileInput: /** @type {HTMLInputElement} */ ($("file")),
   fileName: $("fileName"),
   message: $("message"),

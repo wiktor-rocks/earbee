@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 // Stands in for yt-dlp in the tests (run.cjs hands it to downloader.js), so
 // downloads are tested offline. It reads what downloader.js passes (-f, -o,
-// and the link after "--"), prints the same tagged lines the real yt-dlp
-// prints with those options, and acts on the link:
+// and the link after "--"), records it in output/fake-yt-dlp-args.json,
+// prints the same tagged lines the real yt-dlp prints with those options,
+// and acts on the link:
 //   https://fake.test/song      downloads the fixtures: dl-audio.m4a, plus
 //                               dl-video.webm when -f asks for video too
 //   https://fake.test/slow      the same, slowly (to test Cancel)
@@ -24,6 +25,8 @@ const fail = (message, code = 1) => {
 const dashes = args.indexOf("--");
 if (dashes === -1 || dashes !== args.length - 2) fail("fake-yt-dlp: the link must be the last argument, after --", 2);
 const url = new URL(args.at(-1));
+// What it was asked for, for the tests to check (e.g. the -f format).
+fs.writeFileSync(path.join(__dirname, "output", "fake-yt-dlp-args.json"), JSON.stringify(args));
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 (async () => {

@@ -49,7 +49,8 @@ const TOPICS = [
   "10-themes.cjs",
   "11-parallel.cjs",
   "12-resources.cjs",
-  "13-security.cjs",
+  "13-settings.cjs",
+  "14-security.cjs",
 ];
 
 prepare();

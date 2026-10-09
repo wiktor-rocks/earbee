@@ -2,18 +2,20 @@
 //   - downloading a link (see downloader.js); the page hides its download
 //     buttons when this is missing (e.g. opened in a plain browser);
 //   - the memory available for a track (see system.js);
-//   - the colour theme (see theme-store.js): the saved one is applied here,
+//   - the settings (see prefs-store.js): read at startup, changed one at a
+//     time, and every change heard; the saved colour theme is applied here,
 //     before the page renders, so it never flashes the default colours.
 const { contextBridge, ipcRenderer } = require("electron");
 
-/* ---------- Theme ---------- */
+/* ---------- Settings, and the theme ---------- */
 
-let initialTheme = null;
+let initial = null; // { values, defaultPaths, theme: { scheme, variables } }
 try {
-  initialTheme = ipcRenderer.sendSync("theme:initial");
+  initial = ipcRenderer.sendSync("prefs:initial");
 } catch (error) {
-  console.warn("No saved theme:", error);
+  console.warn("No saved settings:", error);
 }
+const initialTheme = initial?.theme;
 
 // <html> doesn't exist yet when the preload runs; set the variables the
 // moment it appears, before anything inside it is parsed.
@@ -50,8 +52,19 @@ contextBridge.exposeInMainWorld("transcribee", {
   // Bytes the system can still give programs, or null if unknown.
   availableMemory: () => ipcRenderer.invoke("system:available-memory"),
 
-  theme: {
-    saved: initialTheme?.prefs ?? null, // { choice, dark, light }
-    save: (prefs) => ipcRenderer.invoke("theme:save", prefs),
+  // See src/ui/prefs.js. set, reset and chooseFolder resolve to
+  // { ok: true, values } (the section's values after it) or { ok: false, error }.
+  prefs: {
+    values: initial?.values ?? null, // { [section]: { [key]: value } }
+    defaultPaths: initial?.defaultPaths ?? {}, // what a folder's null means, by "section.key"
+    set: (section, key, value) => ipcRenderer.invoke("prefs:set", String(section), String(key), value),
+    reset: (section, key) => ipcRenderer.invoke("prefs:reset", String(section), key == null ? undefined : String(key)),
+    chooseFolder: (section, key) => ipcRenderer.invoke("prefs:choose-folder", String(section), String(key)),
+    // Calls `callback` with { section, values } after every change; returns a function that stops it.
+    onChanged(callback) {
+      const listener = (_event, change) => callback(change);
+      ipcRenderer.on("prefs:changed", listener);
+      return () => ipcRenderer.removeListener("prefs:changed", listener);
+    },
   },
 });

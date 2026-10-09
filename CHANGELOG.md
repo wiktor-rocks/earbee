@@ -43,6 +43,72 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-09: Settings: a modular preferences system, with a Settings dialog
+
+- **What:**
+  - **A gear button** next to the palette (in the top bar and on the welcome screen) opens **Settings**: a dialog with one tab per section. Changes apply at once and are saved; each setting has a **Reset** that shows when it isn't at its default. Esc, Close or a click outside closes it.
+  - **Theme:** the colour theme (the palette menu stays as a shortcut to it; the two always agree), and for Automatic which theme dark and light mode use (shown only when Automatic is chosen).
+  - **Downloads:**
+    - **Save downloads in:** a folder, chosen with the system's folder picker (by default `~/Downloads/TranscriBee`);
+    - **Download:** whether From YouTube starts on audio or video. Before, the dialog remembered its last choice for the session; now it starts on this setting.
+    - **Best video quality:** 480p to 2160p (default 1080p).
+      The From YouTube dialog shows the folder and the quality it will use.
+- **Why:** the user asked for a basic, extendable and modular settings system. They chose a preferences screen (the player's controls still reset each run), a modal dialog, changes that apply instantly, and Theme and Downloads as the first sections.
+- **How:**
+  - **Declared, not hand-built.**
+    - **Sections:** each section is one file in `src/prefs/sections/`, declared with `defineSection({ id, title, fields, onSet? })`, and listed in `SECTIONS` (`src/prefs/index.js`).
+    - **Fields:** a field has a `type` (`choice`, `boolean`, `number`, `folder`), a label, help, a default and optional `visibleWhen`.
+    - **What's generated from them:** the dialog's tabs and controls, the checks and the defaults. Nothing about a particular setting is written anywhere else.
+    - **New field types:** one entry in `TYPES` (`src/prefs/fields.js`) and a renderer in `ui/pref-fields.js`.
+    - **Shared:** `src/prefs/` is pure, with no DOM, so the main process uses the same declarations. It's a new layer in the ESLint layering, between `themes` and `config`.
+  - **The main process keeps the copy that counts** (`electron/prefs-store.js`):
+    - **The file:** `prefs.json` in the user-data folder, `{ version: 1, theme, downloads }`, checked on load and on every change, and written atomically (a temporary file, then a rename).
+    - **Unreadable files:** an unreadable file gives the defaults.
+    - **The old theme file:** on the first run, the old `theme.json` is imported, and left in place.
+    - **IPC:** `prefs:initial` (synchronous, for the preload, which still applies the theme before the first paint), `prefs:set`, `prefs:reset` and `prefs:choose-folder`; every change is broadcast as `prefs:changed`.
+    - **Reading per download:** `downloader.js` reads the folder and the quality at the start of each download (`videoFormat(maxHeight)`). A folder it can't create gives a message that says so and points to Settings.
+  - **Security:**
+    - **Checks:** the main process checks every value the page sends against the declarations: unknown sections and keys and invalid values are refused.
+    - **Folders:** a folder can't be sent by the page at all (`fromPage: false`), only reset; it's set only through the native folder picker. So the page can't point downloads at an arbitrary path.
+  - **The page side** (`src/ui/prefs.js`):
+    - **The API:** `getPrefs`, `onPrefsChange`, `setPref`, `resetPref` and `chooseFolder`.
+    - **Updates:** a change shows at once and is put back if the main process refuses it.
+    - **Who listens:** `ui/theme.js` applies the theme from it, the palette menu sets it, and the dialog listens, so a change from anywhere (including another window) shows everywhere.
+    - **Outside Electron:** the values go to localStorage, and the Downloads section is hidden.
+  - **Naming:** in the code these are "prefs", so they aren't confused with `settings` in `context.js`, the player's controls.
+  - **Removed:**
+    - `theme:initial` and `theme:save`; `transcribee.theme` in the preload is now `transcribee.prefs`.
+    - `normalizePrefs` in `src/themes/index.js`: the theme section does that job now.
+    - The download dialog's session memory (`downloadKind`).
+- **Where:**
+  - **New:** `src/prefs/` (`fields.js`, `index.js`, `sections/theme.js`, `sections/downloads.js`); `electron/prefs-store.js`; `src/ui/prefs.js`; `src/ui/pref-fields.js`; `src/features/settings.js`.
+  - **Changed:**
+    - the main process: `electron/theme-store.js` (now `createThemeView`, a view on the store), `electron/main.js`, `electron/preload.js`, `electron/downloader.js`;
+    - the page: `src/ui/theme.js` (`followThemePrefs`), `src/features/theme-picker.js`, `src/features/download.js`, `src/ui/dom.js`, `src/app.js`, `index.html` (the gear buttons, `#settingsDialog`, the download dialog's folder and quality), `style.css` (`.settings-*`, `.pref-*`, `.welcome-corner`);
+    - the tooling: `eslint.config.js`.
+  - **Tests:**
+    - `tests/e2e/13-settings.cjs` (new);
+    - `13-security` renamed `14-security`, so it stays last;
+    - `tests/e2e/harness.cjs` (the prefs store, a stand-in folder picker: `folderChoice`);
+    - `tests/fake-yt-dlp.cjs` (records its arguments);
+    - `09-downloads.cjs` and `10-themes.cjs`;
+    - `tests/smoke.cjs` (the `theme.json` import);
+    - `tests/diagnostics/profile-load.cjs`;
+    - `tests/unit/prefs.test.mjs` and `prefs-store.test.mjs` (new), and `themes.test.mjs`.
+  - **Docs:** README ("Adding a setting", the file map), the `src/app.js` header (prefs, COMMON CHANGES: new setting, section or kind of setting) and the `electron/main.js` header.
+- **Verified by:**
+  - `npm run check`; the full `npm test` (unit 102, e2e 195, smoke 20); the same on the packaged build (`npm run build:dir`, `TB_APP_PATH`/`TB_APP_BINARY`).
+  - **The new e2e topic** checks:
+    - the gear and the tabs, with shortcuts held off while the dialog is open;
+    - choosing, saving and Reset; the Automatic pairings showing and hiding;
+    - the palette menu and the dialog agreeing both ways, and a change made in the main process showing in the open dialog;
+    - Escape returning focus to the gear;
+    - the folder picker, both canceled and chosen;
+    - the From YouTube dialog starting on the kind, quality and folder from Settings, yt-dlp being asked for `height<=720`, and the file landing in the chosen folder;
+    - the main process refusing a folder path, an invalid value, an unknown key or section, and a folder picker for a non-folder setting, with `prefs.json` unchanged;
+    - the values being kept over a reload.
+  - **Screenshots:** `tests/output/settings-theme.png` and `settings-downloads.png`.
+
 ## 2026-10-09: TranscriBee Light theme
 
 - **What:** a new light theme, **TranscriBee Light**: the app's own amber on warm honey paper, with the cyan loop of the dark theme in a darker shade. It's listed first among the light themes, and it's now what **Automatic** uses in light mode, unless a light theme was picked before. That makes Automatic TranscriBee in dark mode and TranscriBee Light in light mode out of the box; before, it used Solarized Light.

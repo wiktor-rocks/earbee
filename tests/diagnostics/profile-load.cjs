@@ -293,9 +293,16 @@ app.whenReady().then(async () => {
 
   // As main.js does, so the app's preload finds its handlers.
   nativeTheme.themeSource = "dark";
-  const themeFile = path.join(app.getPath("userData"), "theme.json");
-  const { createThemeStore, handleThemes } = require(path.join(PROJECT, "electron", "theme-store.js"));
-  handleThemes(ipcMain, createThemeStore(themeFile, nativeTheme), () => {});
+  const prefsStore = require(path.join(PROJECT, "electron", "prefs-store.js")).createPrefsStore(
+    path.join(app.getPath("userData"), "prefs.json"),
+  );
+  const { createThemeView } = require(path.join(PROJECT, "electron", "theme-store.js"));
+  require(path.join(PROJECT, "electron", "prefs-store.js")).handlePrefs(ipcMain, prefsStore, {
+    initialTheme: createThemeView(prefsStore, nativeTheme).initial,
+    defaultPaths: {},
+    chooseFolder: async () => null,
+    pages: () => [],
+  });
   session.defaultSession.registerPreloadScript({
     type: "frame",
     filePath: path.join(PROJECT, "electron", "preload.js"),

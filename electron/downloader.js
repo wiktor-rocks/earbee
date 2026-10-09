@@ -10,10 +10,12 @@
 //             it needs a JavaScript runtime: Electron's own binary, run as
 //             Node (ELECTRON_RUN_AS_NODE).
 //   Formats   Audio: the best audio stream (AAC if there is one). Video: the
-//             best H.264 picture up to 1080p plus the best audio, as two
+//             best picture up to the height set in Settings (1080p unless
+//             changed; H.264 where there is one) plus the best audio, as two
 //             files; joining them in yt-dlp would need ffmpeg.
 //   Joining   Mediabunny copies the streams, without re-encoding, into one
-//             ordinary file in ~/Downloads/TranscriBee: .mp4 for video, .m4a
+//             ordinary file in the folder set in Settings (by default
+//             ~/Downloads/TranscriBee): .mp4 for video, .m4a
 //             (or .ogg) for audio. Audio is rewritten too, because YouTube's
 //             .m4a is a "DASH" file that not every player opens.
 //   One link, one video: a playlist or search page gets its first video
@@ -32,10 +34,11 @@ const UPDATE_EVERY_MS = 24 * 60 * 60 * 1000;
 const STALL_MS = 30_000; // give up on GitHub after this long without data
 
 // yt-dlp format selectors: "a/b" means a, else b; "x,y" downloads both.
-const FORMATS = {
-  audio: "ba[ext=m4a]/ba",
-  video: "bv[vcodec^=avc1][height<=1080]/bv[height<=1080]/bv,ba[ext=m4a]/ba",
-};
+const AUDIO_FORMAT = "ba[ext=m4a]/ba";
+// The best picture at most `maxHeight` tall, H.264 if there is one (the
+// lightest to decode; YouTube has it up to 1080p), plus the best audio.
+const videoFormat = (maxHeight) => `bv[vcodec^=avc1][height<=${maxHeight}]/bv[height<=${maxHeight}]/bv,${AUDIO_FORMAT}`;
+const formatFor = (kind, maxHeight) => (kind === "video" ? videoFormat(maxHeight) : AUDIO_FORMAT);
 const PARTS = { audio: 1, video: 2 };
 
 // A failure whose message is written for the user.
@@ -118,12 +121,14 @@ function removeStaleWorkFolders() {
 /**
  * @param {object} options
  * @param {string} options.binDir      Where yt-dlp is kept.
- * @param {string} options.saveDir     Where finished files go.
+ * @param {string} options.saveDir     Where finished files go, unless the settings say otherwise.
+ * @param {() => { folder: string | null, maxHeight: number }} [options.prefs]
+ *   The Downloads settings (prefs-store.js), read at the start of each download.
  * @param {string} [options.ytDlp]     A yt-dlp to use as is (no setup or updates); the tests pass a fake.
  * @param {string} [options.jsRuntime] The Node-compatible runtime yt-dlp uses (default: this Electron).
  * @param {typeof fetch} [options.fetch]
  */
-function createDownloader({ binDir, saveDir, ytDlp, jsRuntime = process.execPath, fetch = globalThis.fetch }) {
+function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.execPath, fetch = globalThis.fetch }) {
   const managed = !ytDlp;
   const asset = releaseAsset();
   const binary = ytDlp ?? (asset && path.join(binDir, asset.endsWith(".exe") ? "yt-dlp.exe" : "yt-dlp"));
@@ -265,7 +270,7 @@ function createDownloader({ binDir, saveDir, ytDlp, jsRuntime = process.execPath
   /* ---------- Joining ---------- */
 
   // Copies every track of `inputs` into one file, without re-encoding.
-  async function join(inputs, title, id, isVideo) {
+  async function join(inputs, title, id, isVideo, folder) {
     const mb = require("mediabunny");
     const opened = inputs.map((file) => new mb.Input({ source: new mb.FilePathSource(file), formats: mb.ALL_FORMATS }));
     try {
@@ -280,8 +285,12 @@ function createDownloader({ binDir, saveDir, ytDlp, jsRuntime = process.execPath
             ? [new mb.Mp3OutputFormat(), "mp3"]
             : [new mb.Mp4OutputFormat({ fastStart: "in-memory" }), "m4a"];
 
-      fs.mkdirSync(saveDir, { recursive: true });
-      const target = path.join(saveDir, fileNameFor(title, id, extension));
+      try {
+        fs.mkdirSync(folder, { recursive: true });
+      } catch (error) {
+        throw new DownloadError(`Couldn't save in ${folder}: ${error.message}. Choose another folder in Settings.`);
+      }
+      const target = path.join(folder, fileNameFor(title, id, extension));
       const partial = `${target}.part`;
       const output = new mb.Output({ format, target: new mb.FilePathTarget(partial) });
       const copies = [];
@@ -325,7 +334,7 @@ function createDownloader({ binDir, saveDir, ytDlp, jsRuntime = process.execPath
   /* ---------- A download ---------- */
 
   // One run of yt-dlp: downloads the link's parts into `work`.
-  async function fetchParts(link, kind, work, job, onProgress) {
+  async function fetchParts(link, kind, format, work, job, onProgress) {
     const parts = PARTS[kind];
     let part = 0;
     let title = "";
@@ -354,7 +363,7 @@ function createDownloader({ binDir, saveDir, ytDlp, jsRuntime = process.execPath
         "--progress-template",
         "download:[tb-progress] %(progress.downloaded_bytes)s %(progress.total_bytes)s %(progress.total_bytes_estimate)s %(progress.eta)s",
         "-f",
-        FORMATS[kind],
+        format,
         "-o",
         path.join(work, "part-%(format_id)s.%(ext)s"),
         "--",
@@ -392,14 +401,16 @@ function createDownloader({ binDir, saveDir, ytDlp, jsRuntime = process.execPath
   }
 
   /**
-   * Downloads `url` as audio or video into saveDir and returns the file's path.
+   * Downloads `url` as audio or video into the download folder and returns the file's path.
    * @param {string} url
    * @param {"audio" | "video"} kind
    * @param {(progress: object) => void} onProgress
    */
   async function download(url, kind, onProgress) {
     if (current) throw new DownloadError("A download is already running.");
-    if (!(kind in FORMATS)) throw new DownloadError(`Unknown download kind: ${kind}`);
+    if (!(kind in PARTS)) throw new DownloadError(`Unknown download kind: ${kind}`);
+    const { folder = null, maxHeight = 1080 } = prefs?.() ?? {};
+    const format = formatFor(kind, maxHeight);
     const link = checkUrl(url);
     const job = { child: null, canceled: false, abort: new AbortController() };
     current = job;
@@ -412,7 +423,7 @@ function createDownloader({ binDir, saveDir, ytDlp, jsRuntime = process.execPath
       // gets new links, so try once more before giving up.
       let result;
       for (let attempt = 1; attempt <= 2; attempt++) {
-        result = await fetchParts(link, kind, work, job, onProgress);
+        result = await fetchParts(link, kind, format, work, job, onProgress);
         if (job.canceled) throw new DownloadCanceled();
         if (result.ok || !result.stderr.some((line) => line.includes("HTTP Error 403"))) break;
         fs.rmSync(work, { recursive: true, force: true });
@@ -423,7 +434,7 @@ function createDownloader({ binDir, saveDir, ytDlp, jsRuntime = process.execPath
       if (!files.length) throw new DownloadError("The download produced no file.");
 
       onProgress({ stage: "join" });
-      return await join(files, title, id, kind === "video");
+      return await join(files, title, id, kind === "video", folder ?? saveDir);
     } finally {
       current = null;
       fs.rmSync(work, { recursive: true, force: true });
@@ -478,4 +489,5 @@ module.exports = {
   checkUrl,
   explainFailure,
   fileNameFor,
+  videoFormat,
 };

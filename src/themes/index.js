@@ -100,21 +100,6 @@ export function resolveTheme(prefs, prefersDark) {
 }
 
 /**
- * Cleans up stored prefs: unknown ids and wrong schemes become the defaults.
- * @param {unknown} value
- * @returns {ThemePrefs}
- */
-export function normalizePrefs(value) {
-  const prefs = /** @type {Partial<ThemePrefs>} */ (value && typeof value === "object" ? value : {});
-  const known = (id, scheme) => THEMES.some((theme) => theme.id === id && (!scheme || theme.scheme === scheme));
-  return {
-    choice: prefs.choice === "auto" || known(prefs.choice) ? prefs.choice : DEFAULT_PREFS.choice,
-    dark: known(prefs.dark, "dark") ? prefs.dark : DEFAULT_PREFS.dark,
-    light: known(prefs.light, "light") ? prefs.light : DEFAULT_PREFS.light,
-  };
-}
-
-/**
  * Every CSS variable the theme sets, as literal colours (the waveform
  * draws on a canvas, which can't resolve var() or color-mix()).
  * @param {Theme} theme

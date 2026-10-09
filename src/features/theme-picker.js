@@ -1,45 +1,14 @@
 // The colour-theme menu (the palette button in the top bar and on the
-// welcome screen), and remembering the choice: through the main process
-// (window.transcribee.theme, saved in theme.json) or, outside Electron, in
-// localStorage. Applying a theme is ui/theme.js's job.
+// welcome screen): a shortcut to Settings › Theme. Choosing here sets the
+// same setting (ui/prefs.js), so the menu, the dialog and the theme on
+// screen (ui/theme.js) always agree.
 import { THEMES } from "../themes/index.js";
-import { $, element, onClick, reportError } from "../ui/dom.js";
-import { getThemePrefs, onThemeChange, setThemePrefs } from "../ui/theme.js";
-
-/** @typedef {import("../themes/index.js").ThemePrefs} ThemePrefs */
-
-const bridge = /** @type {any} */ (window).transcribee?.theme;
-const STORAGE_KEY = "transcribee.theme";
-
-/** The saved choice (null if none). */
-export function loadThemePrefs() {
-  if (bridge) return bridge.saved;
-  try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
-  } catch {
-    return null;
-  }
-}
-
-/** @param {ThemePrefs} prefs */
-function saveThemePrefs(prefs) {
-  if (bridge) return bridge.save(prefs).catch(reportError);
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs));
-  } catch {
-    // storage unavailable: the choice lasts for this session
-  }
-}
+import { $, element, onClick } from "../ui/dom.js";
+import { swatch } from "../ui/pref-fields.js";
+import { getPrefs, onPrefsChange, setPref } from "../ui/prefs.js";
 
 /** @param {string} choice A theme id, or "auto". */
-function choose(choice) {
-  const prefs = { ...getThemePrefs(), choice };
-  const theme = THEMES.find((candidate) => candidate.id === choice);
-  // Choosing a theme also makes it Automatic's pick for its scheme.
-  if (theme) prefs[theme.scheme] = theme.id;
-  setThemePrefs(prefs);
-  saveThemePrefs(getThemePrefs());
-}
+const choose = (choice) => setPref("theme", "choice", choice);
 
 /* ---------- The menu ---------- */
 
@@ -47,16 +16,6 @@ const menu = $("themeMenu");
 const isOpen = () => menu.matches(":popover-open");
 let opener = null; // the button that opened the menu
 export const isThemeMenuOpen = isOpen;
-
-/** @param {import("../themes/index.js").Theme} theme */
-const swatch = (theme) =>
-  element(
-    "span",
-    { className: "theme-swatch", ariaHidden: "true" },
-    ...["bg", "surface", "accent", "loop"].map((role) =>
-      element("span", { style: `background: ${theme.colors[role]}` }),
-    ),
-  );
 
 function item(choice, label, detail, preview) {
   const button = element("button", { type: "button", className: "theme-item", role: "menuitemradio" });
@@ -71,13 +30,20 @@ function buildMenu() {
   menu.append(
     item("auto", "Automatic", "follows the system's dark or light mode"),
     element("hr"),
-    ...THEMES.map((theme) => item(theme.id, theme.name, theme.scheme === "light" ? "light" : "", swatch(theme))),
+    ...THEMES.map((theme) =>
+      item(
+        theme.id,
+        theme.name,
+        theme.scheme === "light" ? "light" : "",
+        swatch(["bg", "surface", "accent", "loop"].map((role) => theme.colors[role])),
+      ),
+    ),
   );
 }
 
 // Check marks: the current choice, and for Automatic which themes it uses.
 function renderMenu() {
-  const prefs = getThemePrefs();
+  const prefs = getPrefs("theme");
   for (const button of menu.querySelectorAll(".theme-item")) {
     const choice = /** @type {HTMLElement} */ (button).dataset.choice;
     button.setAttribute("aria-checked", String(choice === prefs.choice));
@@ -138,5 +104,5 @@ export function bindThemePicker() {
     if (menu.contains(document.activeElement) || document.activeElement === document.body) opener.focus();
     opener = null;
   });
-  onThemeChange(() => isOpen() && renderMenu());
+  onPrefsChange("theme", () => isOpen() && renderMenu());
 }

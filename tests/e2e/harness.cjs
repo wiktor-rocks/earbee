@@ -50,19 +50,31 @@ async function createHarness() {
     mediaReads.count++;
     return mediaFiles.respond(request);
   });
+  // The settings as main.js keeps them, in a fresh file each run; the
+  // system is treated as dark, so "Automatic" is predictable. The folder
+  // picker is a stand-in: it answers `folderChoice.path` (null = canceled)
+  // and counts how often it was asked.
+  nativeTheme.themeSource = "dark";
+  const prefsFile = path.join(OUTPUT, "prefs.json");
+  fs.rmSync(prefsFile, { force: true });
+  const { createPrefsStore, handlePrefs } = require(path.join(PROJECT, "electron", "prefs-store.js"));
+  const { createThemeView } = require(path.join(PROJECT, "electron", "theme-store.js"));
+  const prefsStore = createPrefsStore(prefsFile);
+  const folderChoice = { path: null, asked: 0 };
+  handlePrefs(ipcMain, prefsStore, {
+    initialTheme: createThemeView(prefsStore, nativeTheme).initial,
+    defaultPaths: { "downloads.folder": DOWNLOADS },
+    chooseFolder: async () => (folderChoice.asked++, folderChoice.path),
+    pages: () => BrowserWindow.getAllWindows().map((win) => win.webContents),
+  });
+  // Downloads as main.js does them, but with the fake yt-dlp.
   require(path.join(PROJECT, "electron", "downloader.js")).handleDownloads(ipcMain, {
     binDir: path.join(OUTPUT, "unused-bin"),
     saveDir: DOWNLOADS,
+    prefs: () => prefsStore.get("downloads"),
     ytDlp: path.join(TESTS, "fake-yt-dlp.cjs"),
     share: mediaFiles.share,
   });
-  // As main.js does, with a fresh theme file each run; the system is
-  // treated as dark, so "Automatic" is predictable.
-  nativeTheme.themeSource = "dark";
-  const themeFile = path.join(OUTPUT, "theme.json");
-  fs.rmSync(themeFile, { force: true });
-  const { createThemeStore, handleThemes } = require(path.join(PROJECT, "electron", "theme-store.js"));
-  handleThemes(ipcMain, createThemeStore(themeFile, nativeTheme), () => {});
   // As main.js does, except that a test can pretend the system has only
   // `memory.available` bytes left (null: the real figure).
   const memory = { available: null };
@@ -205,7 +217,9 @@ async function createHarness() {
     firstMoved,
     playing,
     ensurePaused,
-    themeFile,
+    prefsFile,
+    prefsStore,
+    folderChoice,
     memory,
     check,
     sleep,

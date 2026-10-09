@@ -12,8 +12,9 @@ A desktop player for transcribing music by ear. Open a song or a video, slow it 
 - **Video:** the picture is decoded frame by frame with WebCodecs (via [Mediabunny](https://mediabunny.dev)) and always shows the frame at the audio position, so it stays in sync at any speed.
 - **5-band EQ, volume up to 200 %,** and a limiter.
 - **Long files:** songs and videos of an hour or two open reliably and fast (an hour of MP3 in about 7 s on a mid-range laptop: long tracks are decoded in parallel parts), with progress and a Cancel button. A file whose sound wouldn't fit in the available memory is refused with a message (about 1.2 GB per hour of stereo audio).
-- **Download from YouTube.** Paste a link, or click **From YouTube…**, to get the audio or the video (up to 1080p). It's saved to `~/Downloads/TranscriBee/` and opened. This uses [yt-dlp](https://github.com/yt-dlp/yt-dlp), which TranscriBee downloads on first use (about 40 MB) and keeps up to date; nothing else needs installing. Only download what you have the rights to.
-- **Colour themes:** dark (TranscriBee, Monokai, Dracula, Nord, One Dark) and light (TranscriBee Light, Solarized Light, Catppuccin Latte, GitHub Light, Gruvbox Light), or **Automatic**, which follows your system's dark or light mode (TranscriBee or TranscriBee Light unless you pick others). Pick one with the palette button in the top bar; it's remembered.
+- **Download from YouTube.** Paste a link, or click **From YouTube…**, to get the audio or the video (up to 1080p). It's saved to `~/Downloads/TranscriBee/` and opened. You can choose another folder and the best video quality in Settings. This uses [yt-dlp](https://github.com/yt-dlp/yt-dlp), which TranscriBee downloads on first use (about 40 MB) and keeps up to date; nothing else needs installing. Only download what you have the rights to.
+- **Settings:** the gear button opens them: the colour theme, and where downloads are saved, whether From YouTube starts on audio or video, and the best video quality (480p to 2160p). Changes apply at once and are remembered.
+- **Colour themes:** dark (TranscriBee, Monokai, Dracula, Nord, One Dark) and light (TranscriBee Light, Solarized Light, Catppuccin Latte, GitHub Light, Gruvbox Light), or **Automatic**, which follows your system's dark or light mode (TranscriBee or TranscriBee Light unless you pick others). Pick one with the palette button in the top bar, or in Settings; it's remembered.
 - **Works offline.** All libraries and fonts are bundled. Only downloading needs the internet.
 
 The shortcut legend at the bottom of the window lists every key.
@@ -54,23 +55,26 @@ TB_APP_BINARY=$PWD/dist/linux-unpacked/transcribee npm test
 electron/          The main process (CommonJS, Node)
   main.js            window, security, wiring
   window-state.js    remembers the window's size and position
-  theme-store.js     remembers the colour theme; applies it before the page shows
+  prefs-store.js     keeps the settings (prefs.json): checks, saves, the folder picker
+  theme-store.js     the colour theme from the settings; applied before the page shows
   downloader.js      downloading links with yt-dlp
   media-files.js     serves downloaded files to the page by private URL
   system.js          available memory; recovering from a crashed page
-  preload.js         the page's bridge to downloader.js (window.transcribee)
+  preload.js         the page's bridge to the main process (window.transcribee)
 src/               The page (ES modules, no build step), in layers:
   core/              pure helpers, no DOM (unit-tested)
   themes/            colour themes: palettes/ (one file each) and the logic
+  prefs/             settings: sections/ (one file each) and the field types
   config.js          every tunable number
   audio/             engine.js (Web Audio + Signalsmith), transport.js,
                      decoder.js + decode-worker.js (parallel decoding)
   video/             view.js, proxy.js
   waveform.js        WaveSurfer drawing, zoom, the loop region
   context.js         settings, and the shared components (`player`)
-  ui/                dom.js, controls.js, shortcuts.js, theme.js
+  ui/                dom.js, controls.js, shortcuts.js, theme.js, prefs.js,
+                     pref-fields.js
   features/          playback.js, loop.js, open-file.js, download.js,
-                     theme-picker.js
+                     theme-picker.js, settings.js
   app.js             entry point: creates and wires everything
   vendor/            Signalsmith Stretch, patched (see its README.md)
 index.html         The page: welcome screen, loading screen, player
@@ -79,9 +83,9 @@ assets/            Logo and icons (generated from transcribee-source.png
                    by scripts/make-images.py)
 tests/
   unit/              node:test unit tests (core, transport, decoding parts,
-                     downloader, media files, system, themes)
+                     downloader, media files, system, themes, prefs)
   run.cjs            end-to-end runner: e2e/harness.cjs plus topic files
-  e2e/               01-static-ui.cjs … 13-security.cjs
+  e2e/               01-static-ui.cjs … 14-security.cjs
   smoke.cjs          the real app: security, window state, the bridge
   preload.cjs        page instrumentation for the e2e tests
   fake-yt-dlp.cjs    stands in for yt-dlp, so downloads test offline
@@ -92,6 +96,8 @@ CHANGELOG.md       What changed, why, how and where, newest first
 **Start with the comment at the top of `src/app.js`.** It maps how the parts fit together (engine, transport, waveform, video, UI), lists the files and their layers, and says where to make common changes: speed presets, EQ bands, step sizes, shortcuts, colours, new features.
 
 **Layers.** In `src/`, a file only imports from the layers above it: `core` → `config` → `audio` / `video` / `waveform` → `context` → `ui` → `features` → `app.js`. `npm run lint` fails on an import that goes the other way, or on an import cycle. So `core/`, `audio/transport.js` and the rest of the lower layers stay free of the UI, and can be unit-tested in plain Node.
+
+**Adding a setting.** Settings are declared in `src/prefs/sections/`, one file per section (a tab in the dialog). Add a field there: its `key`, `type` (`choice`, `boolean`, `number` or `folder`), `label`, optional `help` and `default`. The Settings dialog shows it, and the main process checks and saves it in `prefs.json`. The page reads it with `getPrefs("section")` and follows changes with `onPrefsChange` (`src/ui/prefs.js`); the main process uses `store.get` and `store.onChange` (`electron/prefs-store.js`). A new section is a new file listed in `SECTIONS` (`src/prefs/index.js`). The formats are described at the top of `src/prefs/fields.js`.
 
 **Adding a colour theme.** Copy a file in `src/themes/palettes/` (for example `nord.js`), give it a new `id`, `name`, `scheme` (`"dark"` or `"light"`) and colours for each role, then add it to `THEMES` in `src/themes/index.js`. The roles are listed, with what each colours, in `ROLES` in that file. `npm run test:unit` checks that the theme defines every role and that its text, accent, loop and error colours have enough contrast. It names any pair that fails.
 
