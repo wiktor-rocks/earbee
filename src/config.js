@@ -30,6 +30,15 @@ export const CONFIG = {
     edgeGrabPx: 6,
   },
 
+  marks: {
+    // Shortest region; R pressed twice closer together than this cancels it.
+    minSeconds: 0.05,
+    // Shift+← skips a mark the cursor is less than this past, so pressing
+    // it again while playing keeps going back instead of returning to the
+    // mark just jumped to.
+    jumpBackSeconds: 0.5,
+  },
+
   audio: {
     // Smoothing for volume and EQ changes, so they don't click.
     paramRampSeconds: 0.015,

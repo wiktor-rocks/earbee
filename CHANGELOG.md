@@ -43,6 +43,19 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-09: Marks: points and regions on the waveform
+
+- **What (so far):** the data behind marks; nothing on screen yet. A mark is a point or a region on the track, with a label and one of six colours.
+- **Why:** the user wants to mark points and regions on the waveform (beats, sections, hard bits). Marks last for the session for now, but must be easy to connect to future TranscriBee files that save them.
+- **How:**
+  - **`src/marks/`**, a new pure layer beside `prefs/` (it may use `core` and `themes`; added to the ESLint layer zones).
+    - `format.js`: the `Mark` type `{ id, start, end, label, color }` (`end: null` for a point); `normalizeMark` (times clamped to the track, region ends ordered, a too-short region becomes a point, labels trimmed and capped at 200, unknown colours become the default); the versioned saved form, `serializeMarks` → `{ version: 1, marks }` and `parseMarks` (drops bad entries and duplicate ids, refuses newer versions with `MarksFormatError`).
+    - `index.js`: `createMarks({ minSeconds })`, the store: `reset(duration, saved?)`, `list`, `get`, `addPoint`, `addRegion` (null if too short), `update` (null if it would make a region too short), `remove`, `previous(time, tolerance)`, `next(time)`, `toJSON`, and one `"change"` event per edit. Default labels count up ("Mark 3", "Region 2"). Marks are frozen objects.
+    - **Where TranscriBee files plug in:** `toJSON()` is what to save, `reset(duration, saved)` brings marks back with their track, and `"change"` says when to save.
+  - **Colours:** `src/themes/mark-colors.js` (`MARK_COLORS`: rose, orange, green, blue, violet, grey, each with a dark and a light shade). `cssVariables()` sets them as `--mark-<id>` in the theme's scheme, so the preload and theme switching apply them with everything else; the `style.css` `:root` defaults have the dark shades.
+  - **`CONFIG.marks`:** `minSeconds` (shortest region) and `jumpBackSeconds`.
+- **Verified by:** `tests/unit/marks.test.mjs` (12 tests: the store, ordering, clamping, labels, updates, events, previous/next, the saved form round trip, bad and newer data); `tests/unit/themes.test.mjs` checks every mark colour at 3:1 against every theme's background and surface, and that the shade follows the scheme. `npm run check` clean.
+
 ## 2026-10-09: Settings: a modular preferences system, with a Settings dialog
 
 - **What:**

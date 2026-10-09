@@ -49,6 +49,15 @@
   --loop-fill-off: color-mix(in srgb, var(--muted) 8%, transparent);
   --loop-edge-off: var(--muted);
 
+  /* Marks on the waveform: one per colour a mark can have (the dark shades;
+     src/themes/mark-colors.js) */
+  --mark-rose: #ff7aa2;
+  --mark-orange: #ff9f43;
+  --mark-green: #5fd38d;
+  --mark-blue: #6ea8ff;
+  --mark-violet: #b88cff;
+  --mark-grey: #aab2c0;
+
   /* Righteous for the logo and titles, Nunito for everything else */
   --display: "Righteous", system-ui, sans-serif;
   --sans: "Nunito Variable", "Nunito", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;

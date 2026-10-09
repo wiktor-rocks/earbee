@@ -6,6 +6,8 @@
 //
 // A new theme: add a file in palettes/ and list it in THEMES below. The
 // unit tests check that it defines every role and has readable contrast.
+// The marks' colours (mark-colors.js) are shared by every theme.
+import { MARK_COLORS, markColorVariable } from "./mark-colors.js";
 import catppuccinLatte from "./palettes/catppuccin-latte.js";
 import dracula from "./palettes/dracula.js";
 import githubLight from "./palettes/github-light.js";
@@ -16,6 +18,8 @@ import oneDark from "./palettes/one-dark.js";
 import solarizedLight from "./palettes/solarized-light.js";
 import transcribee from "./palettes/transcribee.js";
 import transcribeeLight from "./palettes/transcribee-light.js";
+
+export { DEFAULT_MARK_COLOR, MARK_COLORS, markColorVariable } from "./mark-colors.js";
 
 /**
  * @typedef {object} Theme
@@ -108,7 +112,11 @@ export function resolveTheme(prefs, prefersDark) {
 export function cssVariables(theme) {
   const colors = { ...theme.colors };
   for (const [role, derive] of Object.entries(DERIVED)) colors[role] ??= derive(colors, theme.scheme);
-  return Object.fromEntries(Object.entries(ROLES).map(([role, variable]) => [variable, colors[role]]));
+  return {
+    ...Object.fromEntries(Object.entries(ROLES).map(([role, variable]) => [variable, colors[role]])),
+    // The marks' colours, in the shade for the theme's scheme.
+    ...Object.fromEntries(MARK_COLORS.map((color) => [markColorVariable(color.id), color[theme.scheme]])),
+  };
 }
 
 /* ---------- Colour maths ---------- */

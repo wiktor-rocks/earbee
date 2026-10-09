@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import {
   DEFAULT_PREFS,
+  MARK_COLORS,
   REQUIRED_ROLES,
   ROLES,
   THEMES,
@@ -54,6 +55,7 @@ describe("every theme", () => {
       atLeast(3, "--accent", "--surface");
       atLeast(3, "--loop", "--surface");
       atLeast(1.5, "--wave", "--surface");
+      for (const color of MARK_COLORS) atLeast(3, `--mark-${color.id}`, "--bg", "--surface");
       const apart = distance(v["--loop"], v["--accent"]);
       assert.ok(apart >= 90, `loop and accent too alike (${apart.toFixed(0)})`);
     });
@@ -65,9 +67,16 @@ describe("cssVariables", () => {
     const nord = getTheme("nord");
     assert.equal(nord.colors.surfaceHover, undefined);
     const v = cssVariables(nord);
-    assert.deepEqual(Object.keys(v).sort(), Object.values(ROLES).sort());
+    const marks = MARK_COLORS.map((color) => `--mark-${color.id}`);
+    assert.deepEqual(Object.keys(v).sort(), [...Object.values(ROLES), ...marks].sort());
     for (const value of Object.values(v)) assert.match(value, /^#[0-9a-f]{6}$/i);
     assert.equal(v["--bg"], "#2e3440");
+  });
+
+  test("the marks' colours follow the theme's scheme", () => {
+    const [rose] = MARK_COLORS;
+    assert.equal(cssVariables(getTheme("nord"))["--mark-rose"], rose.dark);
+    assert.equal(cssVariables(getTheme("github-light"))["--mark-rose"], rose.light);
   });
 
   test("a theme's own value wins over the derived one", () => {
