@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-10: A snugger step control
+
+- **What:** the step arrows in the transport sit closer to the step size between them, and are slightly smaller, so the start, stop and loop chips have more room before they get cut off.
+- **Why:** the user asked for less space between the arrows, so the chips aren't squished.
+- **How:** `.step-size` loses its fixed `min-width: 58px` (wider than "Step 1 s" needs) for `padding-inline: 2px`. `.step-group`'s gap goes from 2 px to 0, and its arrow buttons from 30 px to 28 px. The control is about 20 px narrower at "Step 1 s". Its width now follows the text, so it changes a little as ↑ / ↓ pick another size.
+- **Where:** `style.css` (`.step-group`, `.step-group .icon-button`, `.step-size`).
+- **Verified by:** `npm run check`.
+
 ## 2026-10-10: Setting a loop no longer resizes the waveform
 
 - **What:** setting an A–B loop leaves the waveform's size alone. The transport bar stays on one row, and the loop chip is shorter (`↻ 0:12.345–0:20.000`, like the ▶ and ■ chips), with the full text in its tooltip. If the chips still don't fit, the message area gives way first, then the chips cut off with "…".

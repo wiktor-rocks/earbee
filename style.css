@@ -2224,25 +2224,26 @@ button.play-button:hover {
   height: 18px;
 }
 
-/* The step arrows with the step size between them, as one control. */
+/* The step arrows with the step size between them, as one control. Kept
+   snug (the size only as wide as its text) to leave the chips room. */
 .step-group {
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 0;
   padding: 2px;
   border-radius: 999px;
   background: var(--surface-2);
 }
 
 .step-group .icon-button {
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   color: var(--text);
 }
 
 .step-size {
-  min-width: 58px;
+  padding-inline: 2px;
   color: var(--muted);
   font: 700 12px var(--num);
   font-variant-numeric: tabular-nums;
