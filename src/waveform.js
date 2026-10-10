@@ -714,7 +714,7 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   }
 
   // Big video: the whole track in view, like a video player's timeline,
-  // until unlocked, which brings the user's view back.
+  // until unlocked, which brings the user's zoom back, on the current time.
   /** @param {boolean} on */
   function lockFit(on) {
     if (on === fitLocked) return;
@@ -731,7 +731,12 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       const saved = lockedView;
       fitLocked = false;
       lockedView = null;
-      if (saved) setView(saved);
+      // The user's zoom, on what is playing now (at the left edge, as
+      // following pages it), and following it from there.
+      if (saved && waveSurfer && duration) {
+        setView({ seconds: saved.seconds, start: waveSurfer.getCurrentTime() });
+        followPaused = false;
+      }
     }
   }
 

@@ -6,7 +6,7 @@
 const path = require("path");
 
 module.exports = async function (h) {
-  const { js, key, check, sleep, shot, openFile, videoWin, FIXTURES } = h;
+  const { js, key, click, pos, check, sleep, shot, openFile, videoWin, FIXTURES } = h;
   const VIDEO = path.join(FIXTURES, "counter.webm");
 
   const layout = () =>
@@ -81,6 +81,9 @@ module.exports = async function (h) {
   check("…which the wheel doesn't zoom", (await layout()).fit);
   check("…the sidebar's own choice is untouched", l.sidebarKey === before.sidebarKey, String(l.sidebarKey));
   await shot("big-video.png");
+  await click(15); // past what the zoomed-in view showed before (the start)
+  await sleep(300);
+  const at = await pos();
 
   key("F");
   await sleep(500);
@@ -90,6 +93,16 @@ module.exports = async function (h) {
     "…and the waveform's zoom",
     Math.abs(l.scrollWidth - before.scrollWidth) <= 2,
     `${before.scrollWidth} → ${l.scrollWidth}`,
+  );
+  const shown = await js(`(() => {
+    const scroll = document.querySelector("#waveform > div").shadowRoot.querySelector(".scroll");
+    return { from: scroll.scrollLeft / scroll.scrollWidth, to: (scroll.scrollLeft + scroll.clientWidth) / scroll.scrollWidth };
+  })()`);
+  const fraction = at / 20.013; // counter.webm's length
+  check(
+    "…showing where playback is now",
+    fraction >= shown.from && fraction <= shown.to,
+    `${at.toFixed(2)} s at ${fraction.toFixed(2)}, view ${shown.from.toFixed(2)}–${shown.to.toFixed(2)}`,
   );
 
   await js(`document.querySelector(".big-video-button").click()`);

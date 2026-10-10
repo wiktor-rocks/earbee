@@ -9,7 +9,7 @@
  *   On / off   F, the button over the picture (on hover), or a
  *              double-click on the picture. It lasts while videos follow
  *              one another; an audio file or a restart ends it. Leaving
- *              it gives the waveform its zoom and scroll back.
+ *              it gives the waveform its zoom back, on what is playing.
  *   How        One class on #app, while big video is on and a video is on
  *              the stage (.stage.has-video): with the video in its own
  *              window the layout is the usual one, and bringing it back

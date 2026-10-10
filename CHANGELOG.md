@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-10: Leaving big video shows where playback is
+
+- **What:** coming back from big video, the waveform has the zoom it had before, scrolled to the current position: the cursor sits at the left edge, as when the view pages along during playback. Following playback continues from there. It used to return to the scroll it had before big video, which could be far from where playback was by then.
+- **Why:** the user asked for the waveform view to be on the current time when coming back from big video.
+- **How:** `lockFit(false)` used to call `setView(saved)`. It now calls `setView({ seconds: saved.seconds, start: waveSurfer.getCurrentTime() })` and clears `followPaused`, which `setView` sets, so following carries on. Near the end of the track WaveSurfer's scroll limit keeps the view full, so the cursor sits further right. Opening a project in big video still restores its zoom on leaving, at the current time.
+- **Where:** `src/waveform.js` (`lockFit`, its comment), `src/features/big-video.js` (header), `README.md`, `tests/e2e/19-big-video.cjs` (new check "…showing where playback is now": seek to 15 s in big video, leave, the cursor is in view).
+- **Verified by:** `npm run check`, and `TB_TOPICS=19 npm test` (21 e2e and 21 smoke, all passing).
+
 ## 2026-10-10: Big video: edge to edge, a YouTube-style timeline
 
 - **What:** in big video the picture now runs to the window's edges, with square corners and no gaps. At 1200×800 it takes 90 % of the height, up from 80 %. Under it is a 32 px waveform strip that always shows the whole track, like a video player's timeline: click or drag to seek, and the wheel doesn't zoom it. Under that is the transport, square too, with a hairline above it. Leaving big video gives the waveform back the zoom and scroll it had. The mode now carries over from one video to the next. An audio file or a restart still ends it.
