@@ -228,6 +228,16 @@
           stroke-linejoin="round"
         />
       </symbol>
+      <symbol id="i-chevron" viewBox="0 0 16 16">
+        <path
+          d="m4.5 6.5 3.5 3.5 3.5-3.5"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
       <symbol id="i-external" viewBox="0 0 16 16">
         <path
           d="M9 2.8h4.2V7M13 3 7.5 8.5M11.5 9.5v3.2c0 .3-.2.5-.5.5H3.3a.5.5 0 0 1-.5-.5V5c0-.3.2-.5.5-.5h3.2"
@@ -337,18 +347,19 @@
         <span class="brand">Transcri<b>Bee</b></span>
 
         <div class="topbar-actions">
-          <label class="open-button" title="Open an audio or video file, or a project (Ctrl+O)">
-            <input id="file" type="file" accept="audio/*,video/*,.mkv,.tbee" />
-            <svg class="icon" aria-hidden="true"><use href="#i-open" /></svg>
-            Open…
-          </label>
-          <button id="saveButton" type="button" title="Save the project: marks and settings (Ctrl+S)" hidden>
-            <svg class="icon" aria-hidden="true"><use href="#i-save" /></svg>
-            Save
-          </button>
-          <button id="downloadButton" type="button" title="Download from YouTube" hidden>
-            <svg class="icon" aria-hidden="true"><use href="#i-download" /></svg>
-            YouTube…
+          <!-- Open, Save and From YouTube are in the File menu below
+               (features/file-menu.js); Ctrl+O opens this input too. -->
+          <input id="file" type="file" accept="audio/*,video/*,.mkv,.tbee" hidden />
+          <button
+            id="fileMenuButton"
+            class="menu-button"
+            type="button"
+            title="Open, save, or download from YouTube"
+            aria-haspopup="menu"
+            aria-expanded="false"
+          >
+            File
+            <svg class="icon chevron" aria-hidden="true"><use href="#i-chevron" /></svg>
           </button>
         </div>
 
@@ -630,7 +641,32 @@
 
     <!-- The colour-theme menu (see features/settings.js), opened by the
          palette buttons; its items are generated. -->
-    <div id="themeMenu" class="theme-menu" role="menu" aria-label="Colour theme" popover></div>
+    <div id="themeMenu" class="menu theme-menu" role="menu" aria-label="Colour theme" popover></div>
+
+    <!-- The File menu (see features/file-menu.js), opened by File in the
+         top bar. Save and From YouTube are shown only in Electron. -->
+    <div id="fileMenu" class="menu file-menu" role="menu" aria-label="File" popover>
+      <button id="openButton" class="menu-item" type="button" role="menuitem">
+        <svg class="icon" aria-hidden="true"><use href="#i-open" /></svg>
+        <span class="menu-label">Open…</span>
+        <span class="menu-keys">Ctrl+O</span>
+      </button>
+      <button id="saveButton" class="menu-item" type="button" role="menuitem" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-save" /></svg>
+        <span class="menu-label">Save</span>
+        <span class="menu-keys">Ctrl+S</span>
+      </button>
+      <button id="saveAsButton" class="menu-item" type="button" role="menuitem" hidden>
+        <svg class="icon" aria-hidden="true"></svg>
+        <span class="menu-label">Save as…</span>
+        <span class="menu-keys">Ctrl+Shift+S</span>
+      </button>
+      <hr />
+      <button id="downloadButton" class="menu-item" type="button" role="menuitem" hidden>
+        <svg class="icon" aria-hidden="true"><use href="#i-download" /></svg>
+        <span class="menu-label">From YouTube…</span>
+      </button>
+    </div>
 
     <!-- Save project as (see saveProjectAs in features/project/index.js):
          link to the media or put it inside. -->

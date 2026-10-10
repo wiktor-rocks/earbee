@@ -43,6 +43,31 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-10: Open, Save and From YouTube in one File menu
+
+- **What:** the top bar no longer has the **Open…**, **Save** and **YouTube…** buttons. In their place is one quiet **File ▾** button with no fill or border and muted text, like the tool icons on the right. It opens a menu with **Open…**, **Save**, **Save as…** and **From YouTube…**, each showing its keys (Ctrl+O, Ctrl+S, Ctrl+Shift+S). Save and Save as… appear only in Electron, as Save did before. The menu has a divider before From YouTube…, which is hidden when that item isn't there. The accent dot for unsaved changes is now on File as well as on Save. Picking an item closes the menu first. The keyboard works the same as in the theme menu: ↑/↓/Home/End move between items and Escape closes it.
+- **Why:** the user found the three file buttons too prominent in the editor's top bar.
+- **How:** the theme menu's popover logic moved from `features/settings.js` into a shared helper, `bindMenu` in `src/ui/menu.js`. It covers anchoring to the button, the press-then-click guard, the arrow keys and `aria-expanded`; `closeOnPick` closes the menu in the capture phase, before the item's handler runs. Both menus use it now. Save and From YouTube kept their ids (`saveButton`, `downloadButton`), so `bindProject`, `bindDownloads` and the tests didn't change. The file input `#file` stays in the top bar, hidden, for Ctrl+O, Open… and the e2e harness. `isFileMenuOpen` blocks shortcuts while the menu is open, as `isThemeMenuOpen` does. In CSS, the menu rules are shared as `.menu` / `.menu-item`, with `.theme-menu` and `.file-menu` adding their own anchor and width. `.menu-button` is the File button. The `.open-button` rules are gone.
+- **Where:** `index.html` (top bar, `#fileMenu`, the `i-chevron` icon), `src/ui/menu.js` (new), `src/features/file-menu.js` (new: `bindFileMenu`, `isFileMenuOpen`), `src/features/settings.js` (`bindThemePicker`), `src/features/project/index.js` (`bindProject`, `renderTitle`), `src/ui/dom.js`, `src/app.js`, `style.css` (controls, the unsaved dot, menus, top bar), `tests/e2e/16-projects.cjs` (new File menu checks), `README.md`.
+- **Verified by:** `npm run check`, and `TB_TOPICS=01,02,09,10,13,16 npm test` (159 e2e and 21 smoke, all passing; 10-themes covers the theme menu after the refactor). The screenshot `tests/output/file-menu.png` shows the result.
+
+## 2026-10-10: A compact timeline and transport in big video
+
+- **What:** in big video, the waveform strip is 26 px (was 32 px) and the transport is compact: 41 px tall instead of about 49 px. It keeps the same controls, just smaller:
+  - a 28 px Play button (was 40 px)
+  - a 26 px Stop button
+  - 22 px step arrows and step size
+  - a 16 px time (was 22 px)
+  - 11 px chips
+  - 14 px icons
+
+  There is still room around them: 6 px above and below, 16 px from the window's sides, and 14 px between groups. A first try with 3 px / 8 px looked squashed. At 1200×800 the picture takes 92 % of the height (was 90 %). The usual layout is unchanged.
+
+- **Why:** the user asked for a slightly compacted timeline and playback controls for big video specifically.
+- **How:** CSS only. The "Big video" section of `style.css` overrides the transport's existing selectors, each prefixed with `.app.big-video`, so they outweigh the base rules without `!important`. `--big-video-wave` goes to 26 px. Leaving the mode drops the class, and the usual sizes come back by themselves.
+- **Where:** `style.css` ("Big video"), `tests/e2e/19-big-video.cjs` (new check "…and a compact transport": ≤ 44 px), `README.md`.
+- **Verified by:** `npm run check`, and `TB_TOPICS=19 npm test` (22 e2e and 21 smoke, all passing). The screenshot `tests/output/big-video.png` shows the result.
+
 ## 2026-10-10: Leaving big video shows where playback is
 
 - **What:** coming back from big video, the waveform has the zoom it had before, scrolled to the current position: the cursor sits at the left edge, as when the view pages along during playback. Following playback continues from there. It used to return to the scroll it had before big video, which could be far from where playback was by then.

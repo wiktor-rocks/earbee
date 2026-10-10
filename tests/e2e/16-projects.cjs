@@ -79,6 +79,46 @@ module.exports = async function (h) {
   check("the Save button is shown in the app", await js(`!saveButton.hidden`));
   check("a file just opened has nothing unsaved", !(await unsaved()), await title());
 
+  // Open, Save, Save as and From YouTube are in the File menu.
+  const fileMenuOpen = () => js(`fileMenu.matches(":popover-open")`);
+  await js(`fileMenuButton.click()`);
+  await sleep(150);
+  const items = await js(
+    `[...fileMenu.querySelectorAll(".menu-item")].filter((item) => item.checkVisibility()).map((item) => item.querySelector(".menu-label").textContent)`,
+  );
+  check(
+    "File opens a menu: Open…, Save, Save as…, From YouTube…, the first focused",
+    (await fileMenuOpen()) &&
+      JSON.stringify(items) === JSON.stringify(["Open…", "Save", "Save as…", "From YouTube…"]) &&
+      (await js(`document.activeElement.id`)) === "openButton" &&
+      (await js(`fileMenuButton.getAttribute("aria-expanded")`)) === "true",
+    JSON.stringify(items),
+  );
+  await shot("file-menu.png");
+  key("Down");
+  await sleep(50);
+  check("↓ moves to Save", (await js(`document.activeElement.id`)) === "saveButton");
+  key("Escape");
+  await sleep(150);
+  // Not opened from the keyboard (Tab): no focus is left on File, as with
+  // the theme menu (see bindFocus in ui/shortcuts.js).
+  check(
+    "Escape closes it, File no longer expanded",
+    !(await fileMenuOpen()) &&
+      (await js(`document.activeElement === document.body`)) &&
+      (await js(`fileMenuButton.getAttribute("aria-expanded")`)) === "false",
+  );
+  await js(`fileMenuButton.click()`);
+  await sleep(150);
+  await js(`downloadButton.click()`);
+  await sleep(150);
+  check(
+    "picking From YouTube… closes the menu and opens its dialog",
+    !(await fileMenuOpen()) && (await js(`downloadDialog.open`)),
+  );
+  await js(`downloadDialog.close()`);
+  await sleep(100);
+
   // A session: sound, marks, loop, step, place and zoom.
   await slide("speed", 0.7);
   await sleep(100);

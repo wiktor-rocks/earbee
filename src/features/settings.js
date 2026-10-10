@@ -6,6 +6,7 @@
 import { SECTIONS } from "../prefs/index.js";
 import { THEMES } from "../themes/index.js";
 import { $, element, onClick } from "../ui/dom.js";
+import { bindMenu } from "../ui/menu.js";
 import { renderField, swatch } from "../ui/pref-fields.js";
 import {
   chooseFolder,
@@ -142,7 +143,6 @@ const choose = (choice) => setPref("theme", "choice", choice);
 
 const menu = $("themeMenu");
 const isOpen = () => menu.matches(":popover-open");
-let menuOpener = null; // the button that opened the menu
 export const isThemeMenuOpen = isOpen;
 
 function item(choice, label, detail, preview) {
@@ -193,54 +193,15 @@ function renderMenu() {
     .replaceChildren(...pair.map((theme) => element("span", { style: `background: ${theme.colors.bg}` })));
 }
 
-const buttons = () => [$("themeButton"), $("welcomeThemeButton")];
-
-// Opens the menu under (or above) the button that asked for it, or closes
-// it if it was open. That button becomes the menu's anchor; CSS places the
-// menu against it and keeps it there (a resized window, a flip near an edge).
-function openFrom(button) {
-  if (isOpen()) return menu.hidePopover();
-  for (const other of buttons()) other.style.removeProperty("anchor-name");
-  button.style.setProperty("anchor-name", "--theme-open");
-  renderMenu();
-  menu.showPopover();
-  menuOpener = button;
-  button.setAttribute("aria-expanded", "true");
-  /** @type {HTMLElement | null} */ (
-    menu.querySelector('[aria-checked="true"]') ?? menu.querySelector(".theme-item")
-  )?.focus();
-}
-
-// ↑ / ↓ move between the items; Home / End jump to the ends.
-function moveFocus(event) {
-  const items = /** @type {HTMLElement[]} */ ([...menu.querySelectorAll(".theme-item")]);
-  const index = items.indexOf(/** @type {HTMLElement} */ (document.activeElement));
-  const next = { ArrowDown: index + 1, ArrowUp: index - 1, Home: 0, End: items.length - 1 }[event.key];
-  if (next === undefined) return;
-  event.preventDefault();
-  items[(next + items.length) % items.length].focus();
-}
-
 export function bindThemePicker() {
   buildMenu();
-  for (const button of buttons()) {
-    // Pressing the button while the menu is open closes it (light dismiss:
-    // a press outside the menu), before the click arrives; that click must
-    // not open it again. So remember whether it was open at the press.
-    // (A click from the keyboard, detail 0, has no press: it just toggles.)
-    let closedByPress = false;
-    button.addEventListener("pointerdown", () => (closedByPress = isOpen()));
-    onClick(button, (/** @type {MouseEvent} */ event) => {
-      if (!(event.detail > 0 && closedByPress)) openFrom(button);
-      closedByPress = false;
-    });
-  }
-  menu.addEventListener("keydown", moveFocus);
-  menu.addEventListener("toggle", (/** @type {any} */ event) => {
-    if (event.newState !== "closed" || !menuOpener) return;
-    menuOpener.setAttribute("aria-expanded", "false");
-    if (menu.contains(document.activeElement) || document.activeElement === document.body) menuOpener.focus();
-    menuOpener = null;
+  bindMenu({
+    menu,
+    buttons: () => [$("themeButton"), $("welcomeThemeButton")],
+    anchor: "--theme-open",
+    itemSelector: ".theme-item",
+    onOpen: renderMenu,
+    initialFocus: () => menu.querySelector('[aria-checked="true"]'),
   });
   onPrefsChange("theme", () => isOpen() && renderMenu());
 }

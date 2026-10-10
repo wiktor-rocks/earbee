@@ -22,6 +22,7 @@ module.exports = async function (h) {
         sidebar: shown(".sidebar"),
         minimap: shown(".waveform-minimap"),
         transport: shown(".transport"),
+        transportHeight: document.querySelector(".transport").getBoundingClientRect().height,
         pane: box.height / innerHeight,
         edges: box.left === 0 && box.top === 0 && Math.abs(box.right - innerWidth) < 1,
         radius: getComputedStyle(pane).borderTopLeftRadius,
@@ -76,6 +77,7 @@ module.exports = async function (h) {
     JSON.stringify(l),
   );
   check("…showing the whole track", l.fit, JSON.stringify(l));
+  check("…and a compact transport", l.transportHeight <= 44, String(l.transportHeight));
   await wheelIn();
   await sleep(300);
   check("…which the wheel doesn't zoom", (await layout()).fit);

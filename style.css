@@ -164,8 +164,7 @@ output {
 /* Buttons are soft: a surface tint, no strong border; the primary one
    (Play, Open, Download) is the accent. An icon and a label sit side by
    side. */
-button,
-.open-button {
+button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -179,8 +178,7 @@ button,
   cursor: pointer;
 }
 
-button:hover,
-.open-button:hover {
+button:hover {
   background: var(--surface-hover);
 }
 
@@ -1082,8 +1080,10 @@ body.dragging .welcome-hint {
   color: var(--muted);
 }
 
-/* Save, with unsaved changes: a dot in the accent colour. */
-#saveButton.unsaved::after {
+/* Save (in the File menu) and File, with unsaved changes: a dot in the
+   accent colour. */
+#saveButton.unsaved::after,
+#fileMenuButton.unsaved::after {
   content: "";
   width: 6px;
   height: 6px;
@@ -1454,29 +1454,23 @@ body.dragging .welcome-hint {
   gap: 8px;
 }
 
-/* A popover: placed next to its button by features/settings.js. */
-/* One size whatever is picked (long names and Automatic's "follows the
-   system: …" are cut short, the checked item isn't bolder, every item keeps
-   room for its ✓), anchored by CSS to the button that opened it
-   (features/settings.js names the anchor), so it never shifts while you choose;
+/* A popover menu (ui/menu.js), anchored by CSS to the button that opened
+   it (each menu has its anchor name), so it never shifts while you choose;
    a short window scrolls it inside. */
-.theme-menu {
+.menu {
   position: fixed;
   inset: auto;
-  position-anchor: --theme-open;
   position-area: bottom span-right;
   position-try-fallbacks:
     flip-block,
     flip-inline,
     flip-block flip-inline;
   box-sizing: border-box;
-  width: 300px;
   max-width: calc(100vw - 16px);
   max-height: min(640px, calc(100vh - 16px));
   margin: 6px 0;
   overflow-y: auto;
   overscroll-behavior: contain;
-  scrollbar-gutter: stable;
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -1485,12 +1479,13 @@ body.dragging .welcome-hint {
   box-shadow: 0 12px 32px color-mix(in srgb, var(--bg) 70%, transparent);
 }
 
-.theme-menu hr {
+.menu hr {
   margin: 6px 4px;
   border: 0;
   border-top: 1px solid var(--border);
 }
 
+.menu-item,
 .theme-item {
   display: flex;
   align-items: center;
@@ -1505,9 +1500,41 @@ body.dragging .welcome-hint {
   text-align: left;
 }
 
+.menu-item:hover,
+.menu-item:focus-visible,
 .theme-item:hover,
 .theme-item:focus-visible {
   background: var(--surface-hover);
+}
+
+/* The File menu: Open, Save, Save as, From YouTube, each with its keys. */
+.file-menu {
+  position-anchor: --file-open;
+  min-width: 240px;
+}
+
+/* No divider before From YouTube when it isn't there (a plain browser). */
+.file-menu hr:has(+ [hidden]) {
+  display: none;
+}
+
+.menu-label {
+  flex: 1;
+}
+
+.menu-keys {
+  color: var(--muted);
+  font-size: 11.5px;
+  font-weight: 400;
+}
+
+/* The colour-theme menu (features/settings.js). One size whatever is picked
+   (long names and Automatic's "follows the system: …" are cut short, the
+   checked item isn't bolder, every item keeps room for its ✓). */
+.theme-menu {
+  position-anchor: --theme-open;
+  width: 300px;
+  scrollbar-gutter: stable;
 }
 
 .theme-item[aria-checked="true"] {
@@ -1778,8 +1805,24 @@ body.dragging .drop-card {
   gap: 6px;
 }
 
-.open-button input {
-  display: none;
+/* File: as quiet as the icon buttons beside the tools, with its name. */
+.menu-button {
+  gap: 4px;
+  padding-inline: 10px 7px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.menu-button:hover,
+.menu-button[aria-expanded="true"] {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.menu-button .chevron {
+  width: 14px;
+  height: 14px;
 }
 
 /* The open file: an icon for audio or video, its name, its length and
@@ -2828,7 +2871,7 @@ button.step-size:hover {
 /* ---------- Big video (src/features/big-video.js) ----------
    The picture takes all the height but a thin waveform strip (the whole
    track, held at fit by waveform.lockFit, like a video player's timeline)
-   and the transport, edge to edge, square, with no gaps: the top bar, the
+   and a compact transport, edge to edge, square, with no gaps: the top bar, the
    dock, the marks sidebar, the minimap and the timeline's lanes are put
    away. #app has big-video only while a video is on the stage (not while
    it is in its own window). The ruler and the marks lane shrink to
@@ -2836,7 +2879,7 @@ button.step-size:hover {
    measures. The sidebar's own remembered choice is untouched. */
 
 :root {
-  --big-video-wave: 32px; /* the strip's height */
+  --big-video-wave: 26px; /* the strip's height */
 }
 
 .app.big-video {
@@ -2875,8 +2918,50 @@ button.step-size:hover {
   border-top: 1px solid var(--hairline);
 }
 
+/* A compact transport: the same controls, smaller, with room around
+   them still (the picture's edges are the window's, so the bar's padding
+   is all that keeps Play and the chips off them). */
 .app.big-video .transport {
-  padding-block: 4px;
+  gap: 6px 14px;
+  padding: 6px 16px;
+}
+
+.app.big-video .transport .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.app.big-video button.play-button {
+  width: 28px;
+  height: 28px;
+}
+
+.app.big-video .transport-buttons .icon-button {
+  width: 26px;
+  height: 26px;
+}
+
+.app.big-video .step-group .icon-button {
+  width: 22px;
+  height: 22px;
+}
+
+.app.big-video button.step-size {
+  height: 22px;
+  font-size: 11px;
+}
+
+.app.big-video .track-time {
+  font-size: 16px;
+}
+
+.app.big-video .time-total {
+  font-size: 11px;
+}
+
+.app.big-video .chip-button {
+  padding: 2px 8px;
+  font-size: 11px;
 }
 
 .app.big-video .stage .timeline {
@@ -2932,11 +3017,6 @@ button.step-size:hover {
 
   .sidebar-actions .label {
     display: none;
-  }
-
-  .topbar-actions button,
-  .topbar-actions .open-button {
-    padding-inline: 10px;
   }
 }
 

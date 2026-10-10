@@ -95,6 +95,7 @@ function renderTitle() {
   const name = session.name ?? session.mediaName;
   document.title = name ? `TranscriBee — ${name}${session.dirty ? " •" : ""}` : "TranscriBee";
   dom.saveButton.classList.toggle("unsaved", session.dirty);
+  dom.fileMenuButton.classList.toggle("unsaved", session.dirty);
 }
 
 function checkDirty() {
@@ -291,8 +292,10 @@ export const isSaveDialogOpen = () => dom.saveDialog.open;
 export function bindProject() {
   if (!bridge) return; // not in Electron: no saving
   dom.saveButton.hidden = false;
+  dom.saveAsButton.hidden = false;
   dom.welcomeProjectFormat.hidden = false;
   onClick(dom.saveButton, saveProject);
+  onClick(dom.saveAsButton, saveProjectAs);
   onClick(dom.saveCancel, () => dom.saveDialog.close(""));
   dom.saveForm.addEventListener("submit", (event) => {
     event.preventDefault();

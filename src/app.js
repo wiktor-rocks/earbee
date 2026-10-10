@@ -231,6 +231,7 @@ import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./featu
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
 import { bindProject, isSaveDialogOpen, openFile, saveProject, saveProjectAs } from "./features/project/index.js";
 import { bindSettings, bindThemePicker, isSettingsOpen, isThemeMenuOpen } from "./features/settings.js";
+import { bindFileMenu, isFileMenuOpen } from "./features/file-menu.js";
 import {
   bindPlayback,
   bindTransportButtons,
@@ -521,6 +522,7 @@ function start() {
   bindProject();
   bindDownloads();
   bindThemePicker();
+  bindFileMenu();
   bindSettings();
   bindMarks();
   bindLayout();
@@ -531,6 +533,7 @@ function start() {
     dom.downloadDialog.open ||
     isSaveDialogOpen() ||
     isThemeMenuOpen() ||
+    isFileMenuOpen() ||
     isSettingsOpen() ||
     dom.shortcutsDialog.open;
   bindShortcuts(SHORTCUTS, keysBlocked);
