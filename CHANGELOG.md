@@ -43,6 +43,38 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-10: The loop's end line sits where B is
+
+- **What:** both edge lines of the A–B loop on the waveform are now centred on A and B, like the cursor and the hover line. The end line used to sit about 2 px left of where B was set.
+- **Why:** the user reported that the loop end looked off from where they placed it. The loop itself (the transport) was right; only the drawing was off.
+- **How:** the region (`::part(loop-region)`) is `box-sizing: border-box` (since "Setting a loop no longer resizes the waveform"), so its 2 px borders were drawn inside `start`..`end`: A's line to the right of A, B's line to the left of B. `renderLoop` now sets `--loop-start` (A in percent) and `--loop-after` (B's distance from the end, in percent) instead of `left`/`width`. The CSS places the box with `left: max(0px, calc(var(--loop-start) - 1px))` and `right: max(0px, calc(var(--loop-after) - 1px))`, half a border past each time. The `max(0px, …)` keeps a loop at 0 or at the end inside the wrapper, so it still doesn't widen `scrollWidth`. Grabbing an edge needed no change: its zone was already centred on the exact time.
+- **Where:** `src/waveform.js` (`renderLoop`); `style.css` (`.waveform ::part(loop-region)` and its comment); `tests/e2e/03-audio-and-loop.cjs` (new check "loop edges centred on A and B": the box reaches about 1 px past A and past B).
+- **Verified by:** `npm run check`, and `TB_TOPICS=03 npm test` (all e2e pass, edges measured at −0.99 px and +1.03 px; the loop-at-the-end track-width checks still pass). The smoke check "saved theme applied on the next start" failed once and passed on the rerun; it's unrelated. The `loop-early.png` screenshot shows B's line on the hover line.
+
+## 2026-10-10: Click the step size to change it
+
+- **What:** clicking "Step 1 s" between the step arrows picks the next larger step size, going round from 10 s back to 0.01 s. Shift+click picks the one before. ↑ / ↓ still work as before, stopping at either end. On hover the step size shows a soft pill and its tooltip says so.
+- **Why:** the user asked for a click on the step chip's text to cycle through the step sizes.
+- **How:** `#stepSize` is now a `<button>` (it was an `<output>`), styled to read as plain text (`button.step-size`: transparent, no border, round hover tint). A new `cycleStepSize(direction)` wraps around `CONFIG.step.sizes`, where `changeStepSize` (↑ / ↓) clamps.
+- **Where:** `index.html` (`#stepSize`); `src/ui/controls.js` (`cycleStepSize`); `src/features/playback.js` (`bindTransportButtons`); `style.css` (`button.step-size`); `tests/e2e/05-stepping.cjs` (new checks: click wraps 10 → 0.01 → 0.05; Shift+click goes back round to 10).
+- **Verified by:** `npm run check`, and `TB_TOPICS=01,02,03,04,05,14,16 npm test` (e2e 176 pass, smoke 21 pass).
+
+## 2026-10-10: Dialogs close with an ✕
+
+- **What:** the "Close" buttons in Settings, From YouTube and Keyboard shortcuts are now an ✕ icon, with a "Close (Esc)" tooltip.
+- **Why:** the user asked for an x icon wherever there was a Close button.
+- **How:** a new `i-close` symbol in the SVG sprite (two crossed strokes, like the other 16×16 line icons). The buttons became `icon-button`s (transparent, round, the top bar's style) and kept their `aria-label`s. Being 34 px, they're pulled into the header's padding (`margin-block: -6px; margin-inline-end: -8px`) so the headers don't grow, and they line up with the right edge. Esc already closed these dialogs (native `<dialog>`).
+- **Where:** `index.html` (`i-close`; `#shortcutsClose`, `#downloadClose`, `#settingsClose`); `style.css` (`.settings-head > .icon-button`).
+- **Verified by:** `npm run check`, and `TB_TOPICS=01,02,09,13 npm test` (e2e 106 pass, smoke 21 pass). The Settings and From YouTube screenshots show the ✕ in place.
+
+## 2026-10-10: The transport bar spans the whole width
+
+- **What:** the transport bar (Play, Stop, the step control, the time and the chips) now runs the full width of the window, under the marks sidebar too. The sidebar is shorter and ends level with the minimap. Hiding the sidebar works as before.
+- **Why:** the user asked for the bar to extend under the sidebar so the chips have room.
+- **How:** the `.main` wrapper (stage + transport) is gone. The stage, the transport and the sidebar are now direct children of `.workspace`, placed by `grid-template` areas: `"stage sidebar"` above `"transport transport"`, or one column when the sidebar is hidden. The DOM order (stage, transport, sidebar) is unchanged, so Tab order is the same.
+- **Where:** `index.html` (the `#workspace` children); `style.css` (`.workspace`, `.workspace.sidebar-hidden`, the new `.stage`/`.transport`/`.sidebar` grid areas, the section 5 comment).
+- **Verified by:** `npm run check`, and `TB_TOPICS=01,02,03,04,05,06,08,14 npm test` (e2e 175 pass, smoke 21 pass), including the sidebar-at-half-a-screen and loop-size checks. A screenshot confirms the layout.
+
 ## 2026-10-10: A snugger step control
 
 - **What:** the step arrows in the transport sit closer to the step size between them, and are slightly smaller, so the start, stop and loop chips have more room before they get cut off.

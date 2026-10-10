@@ -6,6 +6,7 @@
 
 import { player, settings } from "../context.js";
 import { formatTrackTime } from "../core/format.js";
+import { cycleStepSize } from "../ui/controls.js";
 import { dom, guarded, onClick, reportError } from "../ui/dom.js";
 
 export function play() {
@@ -113,6 +114,7 @@ export function bindTransportButtons() {
   onClick(dom.stopButton, stop);
   onClick(dom.stepBackButton, stepBack);
   onClick(dom.stepForwardButton, stepForward);
+  onClick(dom.stepSize, (event) => cycleStepSize(event.shiftKey ? -1 : 1));
   onClick(dom.startPointButton, () => player.transport.seek(startPoint()));
   onClick(dom.stopPointButton, () => stopPoint !== null && player.transport.seek(stopPoint));
 }

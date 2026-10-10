@@ -163,6 +163,14 @@ export function changeStepSize(direction) {
   setStepSize(sizes[clamp(index + direction, 0, sizes.length - 1)]);
 }
 
+// A click on the step size: the next larger (+1) or smaller (−1) one,
+// going round from either end.
+export function cycleStepSize(direction) {
+  const { sizes } = CONFIG.step;
+  const index = sizes.indexOf(settings.stepSize);
+  setStepSize(sizes[(index + direction + sizes.length) % sizes.length]);
+}
+
 /** One of CONFIG.step.sizes (anything else is ignored). @param {number} size */
 export function setStepSize(size) {
   if (!CONFIG.step.sizes.includes(size)) return;

@@ -1130,6 +1130,15 @@ body.dragging .welcome-hint {
   font-size: 18px;
 }
 
+/* The ✕ that closes a dialog (Settings, From YouTube, the shortcuts):
+   pulled into the header's padding so it doesn't make the header taller,
+   and to line up with its right edge. */
+.settings-head > .icon-button {
+  flex: none;
+  margin-block: -6px;
+  margin-inline-end: -8px;
+}
+
 .settings-body {
   display: flex;
   min-height: 0;
@@ -1621,9 +1630,9 @@ body.dragging .welcome-hint {
 
 /* ============================================================
  * 5. PLAYER
- * The page never scrolls: the top bar, then the workspace (the stage
- * and transport on the left, the marks sidebar on the right), then the
- * sound dock. The waveform takes whatever height is left; the marks
+ * The page never scrolls: the top bar, then the workspace (the stage on
+ * the left, the marks sidebar on the right, the transport under both),
+ * then the sound dock. The waveform takes whatever height is left; the marks
  * list scrolls inside its sidebar.
  * ============================================================ */
 
@@ -1696,25 +1705,38 @@ body.dragging .drop-card {
   box-shadow: var(--shadow);
 }
 
+/* The stage beside the marks sidebar, and the transport under both, the
+   whole width, so its chips have room. */
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) var(--sidebar-width);
-  gap: 12px;
+  grid-template:
+    "stage sidebar" minmax(0, 1fr)
+    "transport transport" auto
+    / minmax(0, 1fr) var(--sidebar-width);
+  gap: 10px 12px;
   min-height: 0;
 }
 
-/* The marks sidebar put away (its button in the top bar): the stage and
-   transport take the whole width. */
+/* The marks sidebar put away (its button in the top bar): the stage
+   takes the whole width too. */
 .workspace.sidebar-hidden {
-  grid-template-columns: minmax(0, 1fr);
+  grid-template:
+    "stage" minmax(0, 1fr)
+    "transport" auto
+    / minmax(0, 1fr);
 }
 
-.main {
-  display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  gap: 10px;
+.stage {
+  grid-area: stage;
   min-width: 0;
-  min-height: 0;
+}
+
+.transport {
+  grid-area: transport;
+}
+
+.sidebar {
+  grid-area: sidebar;
 }
 
 /* ---------- Top bar ---------- */
@@ -1842,14 +1864,20 @@ body.dragging .drop-card {
 }
 
 /* The A–B loop, drawn inside WaveSurfer's shadow DOM (see createWaveform),
-   so it is styled through ::part. Positioned in percent, so it follows
-   zoom and scrolling by itself. Its borders go inside that width: a loop
-   reaching the end would otherwise stick out of the wrapper and widen its
-   scrollWidth, which the ruler, the lanes and zooming measure the track by. */
+   so it is styled through ::part. Positioned in percent (--loop-start, and
+   --loop-after, B's distance from the end; waveform.js), so it follows
+   zoom and scrolling by itself. Each 2px edge line is centred on its time
+   (1px either side), like the cursor and the hover line sit on theirs;
+   drawn inside the box, B's line sat left of B. At the track's ends the
+   line stays inside instead: a loop reaching the end would otherwise
+   stick out of the wrapper and widen its scrollWidth, which the ruler,
+   the lanes and zooming measure the track by. */
 .waveform ::part(loop-region) {
   position: absolute;
   top: 0;
   bottom: 0;
+  left: max(0px, calc(var(--loop-start) - 1px));
+  right: max(0px, calc(var(--loop-after) - 1px));
   z-index: 3;
   box-sizing: border-box;
   border-inline: 2px solid var(--loop-edge);
@@ -2242,13 +2270,24 @@ button.play-button:hover {
   color: var(--text);
 }
 
-.step-size {
-  padding-inline: 2px;
+/* The step size reads as plain text, and a click picks the next one (a
+   soft pill on hover says it's a button). (button. to outweigh button.) */
+button.step-size {
+  height: 28px;
+  padding: 0 5px;
+  border-color: transparent;
+  border-radius: 999px;
+  background: transparent;
   color: var(--muted);
   font: 700 12px var(--num);
   font-variant-numeric: tabular-nums;
   text-align: center;
   white-space: nowrap;
+}
+
+button.step-size:hover {
+  background: var(--surface-hover);
+  color: var(--text);
 }
 
 .play-button .icon-pause,

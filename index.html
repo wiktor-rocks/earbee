@@ -242,6 +242,9 @@
         <circle cx="7" cy="7" r="4.3" fill="none" stroke="currentColor" stroke-width="1.5" />
         <path d="m10.2 10.2 3.3 3.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
       </symbol>
+      <symbol id="i-close" viewBox="0 0 16 16">
+        <path d="m4 4 8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+      </symbol>
       <symbol id="i-download" viewBox="0 0 16 16">
         <path
           d="M8 2.5v7.2M5 7l3 3 3-3M3 13h10"
@@ -382,87 +385,92 @@
       </header>
 
       <div id="workspace" class="workspace">
-        <div class="main">
-          <div id="stage" class="stage">
-            <div id="videoPane" class="video-pane" hidden>
-              <canvas id="videoCanvas" aria-label="Video"></canvas>
-            </div>
-
-            <div class="timeline">
-              <div id="ruler" class="ruler" aria-hidden="true"></div>
-              <div id="marksLane" class="marks-lane" aria-hidden="true"></div>
-              <div class="timeline-wave">
-                <div id="waveform" class="waveform"></div>
-                <div id="timelineGuides" class="timeline-guides" aria-hidden="true"></div>
-              </div>
-            </div>
-
-            <div id="waveform-minimap" class="waveform-minimap" aria-label="Full track overview"></div>
+        <div id="stage" class="stage">
+          <div id="videoPane" class="video-pane" hidden>
+            <canvas id="videoCanvas" aria-label="Video"></canvas>
           </div>
 
-          <section class="transport" aria-label="Transport">
-            <div class="transport-buttons">
-              <button
-                id="play"
-                class="primary play-button"
-                type="button"
-                title="Play / pause; plays again from where you started (Space)"
-              >
-                <svg class="icon icon-play" aria-hidden="true"><use href="#i-play" /></svg>
-                <svg class="icon icon-pause" aria-hidden="true"><use href="#i-pause" /></svg>
-                <span id="playLabel" class="visually-hidden">Play</span>
-              </button>
-              <button id="stop" class="icon-button" type="button" title="Stop (.)" aria-label="Stop">
-                <svg class="icon" aria-hidden="true"><use href="#i-stop" /></svg>
-              </button>
+          <div class="timeline">
+            <div id="ruler" class="ruler" aria-hidden="true"></div>
+            <div id="marksLane" class="marks-lane" aria-hidden="true"></div>
+            <div class="timeline-wave">
+              <div id="waveform" class="waveform"></div>
+              <div id="timelineGuides" class="timeline-guides" aria-hidden="true"></div>
             </div>
+          </div>
 
-            <!-- Stepping: the arrows with the step size between them. -->
-            <div class="step-group">
-              <button id="stepBack" class="icon-button" type="button" title="Step back (←)" aria-label="Step back">
-                <svg class="icon" aria-hidden="true"><use href="#i-step-back" /></svg>
-              </button>
-              <output id="stepSize" class="step-size" title="Step size: change with ↑ / ↓">Step 1 s</output>
-              <button
-                id="stepForward"
-                class="icon-button"
-                type="button"
-                title="Step forward (→)"
-                aria-label="Step forward"
-              >
-                <svg class="icon" aria-hidden="true"><use href="#i-step-forward" /></svg>
-              </button>
-            </div>
-
-            <output id="trackTime" class="track-time" aria-label="Playback position and track duration"
-              >0:00.000 / 0:00.000</output
-            >
-
-            <div id="message" class="message" role="status"></div>
-
-            <div class="transport-chips">
-              <button
-                id="startPoint"
-                type="button"
-                class="chip-button start-point"
-                title="Space plays from here (S sets it; click to go there)"
-                hidden
-              >
-                ▶ 0:00.000
-              </button>
-              <button
-                id="stopPoint"
-                type="button"
-                class="chip-button stop-point"
-                title="Playback last stopped here (click to go there)"
-                hidden
-              >
-                ■ 0:00.000
-              </button>
-              <output id="loopInfo" class="chip-button loop-info" aria-label="Loop" hidden></output>
-            </div>
-          </section>
+          <div id="waveform-minimap" class="waveform-minimap" aria-label="Full track overview"></div>
         </div>
+
+        <section class="transport" aria-label="Transport">
+          <div class="transport-buttons">
+            <button
+              id="play"
+              class="primary play-button"
+              type="button"
+              title="Play / pause; plays again from where you started (Space)"
+            >
+              <svg class="icon icon-play" aria-hidden="true"><use href="#i-play" /></svg>
+              <svg class="icon icon-pause" aria-hidden="true"><use href="#i-pause" /></svg>
+              <span id="playLabel" class="visually-hidden">Play</span>
+            </button>
+            <button id="stop" class="icon-button" type="button" title="Stop (.)" aria-label="Stop">
+              <svg class="icon" aria-hidden="true"><use href="#i-stop" /></svg>
+            </button>
+          </div>
+
+          <!-- Stepping: the arrows with the step size between them. -->
+          <div class="step-group">
+            <button id="stepBack" class="icon-button" type="button" title="Step back (←)" aria-label="Step back">
+              <svg class="icon" aria-hidden="true"><use href="#i-step-back" /></svg>
+            </button>
+            <button
+              id="stepSize"
+              class="step-size"
+              type="button"
+              title="Step size: click for the next one (Shift+click: the one before), or ↑ / ↓"
+            >
+              Step 1 s
+            </button>
+            <button
+              id="stepForward"
+              class="icon-button"
+              type="button"
+              title="Step forward (→)"
+              aria-label="Step forward"
+            >
+              <svg class="icon" aria-hidden="true"><use href="#i-step-forward" /></svg>
+            </button>
+          </div>
+
+          <output id="trackTime" class="track-time" aria-label="Playback position and track duration"
+            >0:00.000 / 0:00.000</output
+          >
+
+          <div id="message" class="message" role="status"></div>
+
+          <div class="transport-chips">
+            <button
+              id="startPoint"
+              type="button"
+              class="chip-button start-point"
+              title="Space plays from here (S sets it; click to go there)"
+              hidden
+            >
+              ▶ 0:00.000
+            </button>
+            <button
+              id="stopPoint"
+              type="button"
+              class="chip-button stop-point"
+              title="Playback last stopped here (click to go there)"
+              hidden
+            >
+              ■ 0:00.000
+            </button>
+            <output id="loopInfo" class="chip-button loop-info" aria-label="Loop" hidden></output>
+          </div>
+        </section>
 
         <aside id="sidebar" class="sidebar" aria-labelledby="marksTitle">
           <header class="sidebar-head">
@@ -580,7 +588,9 @@
     <dialog id="shortcutsDialog" class="shortcuts-dialog" aria-labelledby="shortcutsTitle">
       <div class="settings-head">
         <h2 id="shortcutsTitle">Keyboard shortcuts</h2>
-        <button id="shortcutsClose" class="small" type="button" aria-label="Close">Close</button>
+        <button id="shortcutsClose" class="icon-button" type="button" title="Close (Esc)" aria-label="Close">
+          <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+        </button>
       </div>
       <div id="shortcutList" class="shortcut-groups"></div>
     </dialog>
@@ -648,7 +658,9 @@
               <p class="youtube-subtitle">Paste a link, or search by words</p>
             </div>
           </div>
-          <button id="downloadClose" class="small" type="button" aria-label="Close">Close</button>
+          <button id="downloadClose" class="icon-button" type="button" title="Close (Esc)" aria-label="Close">
+            <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+          </button>
         </div>
         <div class="youtube-top">
           <div class="youtube-search">
@@ -705,7 +717,9 @@
     <dialog id="settingsDialog" class="settings-dialog" aria-labelledby="settingsTitle">
       <div class="settings-head">
         <h2 id="settingsTitle">Settings</h2>
-        <button id="settingsClose" class="small" type="button" aria-label="Close settings">Close</button>
+        <button id="settingsClose" class="icon-button" type="button" title="Close (Esc)" aria-label="Close settings">
+          <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+        </button>
       </div>
       <div class="settings-body">
         <div id="settingsTabs" class="settings-tabs" role="tablist" aria-orientation="vertical"></div>

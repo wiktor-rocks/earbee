@@ -408,8 +408,10 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     loopElement.hidden = !shown || !duration;
     if (loopElement.hidden) return;
     loopElement.setAttribute("part", shown.enabled ? "loop-region" : "loop-region loop-disabled");
-    loopElement.style.left = `${(shown.start / duration) * 100}%`;
-    loopElement.style.width = `${((shown.end - shown.start) / duration) * 100}%`;
+    // Where A is, and how far B is from the end; style.css centres the edge
+    // lines on them.
+    loopElement.style.setProperty("--loop-start", `${(shown.start / duration) * 100}%`);
+    loopElement.style.setProperty("--loop-after", `${(1 - shown.end / duration) * 100}%`);
   }
 
   /* ---------- The view, for the lanes ---------- */

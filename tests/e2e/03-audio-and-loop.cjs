@@ -8,6 +8,7 @@ module.exports = async function (h) {
     wc,
     js,
     rect,
+    duration,
     openFile,
     key,
     xAt,
@@ -40,6 +41,16 @@ module.exports = async function (h) {
     `(() => { const e = document.querySelector("#waveform > div").shadowRoot.querySelector('[part~="loop-region"]'); return e && !e.hidden && getComputedStyle(e).backgroundColor; })()`,
   );
   check("loop region drawn and styled", region && region !== "rgba(0, 0, 0, 0)", region);
+  // Each 2px edge line is centred on its time: the box reaches 1px past A
+  // and past B (B's line used to sit left of B).
+  const edges = await js(
+    `(() => { const root = document.querySelector("#waveform > div").shadowRoot; const track = root.querySelector(".wrapper").getBoundingClientRect(); const box = root.querySelector('[part~="loop-region"]').getBoundingClientRect(); const x = (t) => track.left + (t / ${await duration()}) * track.width; return { start: box.left - x(${loop.start}), end: box.right - x(${loop.end}) }; })()`,
+  );
+  check(
+    "loop edges centred on A and B",
+    edges && Math.abs(edges.start + 1) < 1.5 && Math.abs(edges.end - 1) < 1.5,
+    JSON.stringify(edges),
+  );
   await shot("loop-early.png");
 
   // Plain click still seeks

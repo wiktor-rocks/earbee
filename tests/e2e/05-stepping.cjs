@@ -34,6 +34,17 @@ module.exports = async function (h) {
   for (let i = 0; i < 10; i++) key("Up");
   await sleep(100);
   check("step stops at 10", (await stepText()).startsWith("Step 10 s"), await stepText());
+  // A click on the step size picks the next one, round from the end;
+  // Shift+click the one before.
+  await js(`stepSize.click()`);
+  await sleep(50);
+  check("a click on the step size goes round to 0.01", (await stepText()).startsWith("Step 0.01 s"), await stepText());
+  await js(`stepSize.click()`);
+  await sleep(50);
+  check("…and on to 0.05", (await stepText()).startsWith("Step 0.05 s"), await stepText());
+  await js(`for (let i = 0; i < 2; i++) stepSize.dispatchEvent(new MouseEvent("click", { shiftKey: true }))`);
+  await sleep(50);
+  check("Shift+click goes back, round to 10", (await stepText()).startsWith("Step 10 s"), await stepText());
   for (let i = 0; i < 4; i++) key("Down");
   await sleep(100); // back to 0.5
   check("back to 0.5", (await stepText()).startsWith("Step 0.5 s"), await stepText());
