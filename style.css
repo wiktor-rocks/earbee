@@ -457,17 +457,15 @@ kbd {
   border-radius: 16px;
   background: var(--surface);
   transition:
-    transform 180ms ease-out,
     box-shadow 180ms ease-out,
     border-color 180ms ease-out !important;
 }
 
-/* A file over the window: the card lifts a little, and its dashed border
-   becomes the marching amber ring. */
+/* A file over the window: the card stays put, gains a soft shadow, and its
+   dashed border becomes the marching amber ring. */
 body.dragging .welcome-drop {
   border-color: transparent;
   box-shadow: 0 12px 40px -14px var(--aura-shadow);
-  transform: translateY(-2px);
 }
 
 /* The marching ring: a dashed rounded rectangle whose dashes move. On the
@@ -544,6 +542,7 @@ body[data-drop-kind="file"] .drop-kind-file {
 }
 
 .welcome-drop-prompt {
+  margin-top: 8px;
   font-size: 14px;
 }
 
@@ -565,7 +564,9 @@ body[data-drop-kind="file"] .drop-kind-file {
   color: var(--muted);
 }
 
+/* A little air under the buttons, on top of the card's gap. */
 .welcome-hint {
+  margin-top: 8px;
   font-size: 14px;
 }
 
@@ -1651,7 +1652,6 @@ body.dragging .welcome-hint {
     transition: none !important;
   }
 
-  html body.dragging .welcome-drop,
   html .drop-card {
     transform: none !important;
   }

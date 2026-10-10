@@ -121,15 +121,15 @@ module.exports = async function (h) {
   check("dragging a song over the window says what a drop opens", dragPrompt === "Drop to open this song", dragPrompt);
   await sleep(300);
   const dragLook = await js(
-    `(() => { const card = getComputedStyle(document.querySelector(".welcome-drop")); const ring = document.querySelector(".welcome-drop .drop-ring"); const rect = ring.querySelector("rect"); const offset = () => parseFloat(getComputedStyle(rect).strokeDashoffset); return { lifted: card.transform !== "none", ring: getComputedStyle(ring).opacity, marching: document.getAnimations().some((a) => a.animationName === "drop-march" && a.playState === "running"), offset: offset() }; })()`,
+    `(() => { const card = getComputedStyle(document.querySelector(".welcome-drop")); const ring = document.querySelector(".welcome-drop .drop-ring"); const rect = ring.querySelector("rect"); const offset = () => parseFloat(getComputedStyle(rect).strokeDashoffset); return { still: card.transform === "none", ring: getComputedStyle(ring).opacity, marching: document.getAnimations().some((a) => a.animationName === "drop-march" && a.playState === "running"), offset: offset() }; })()`,
   );
   await sleep(200);
   const offsetLater = await js(
     `parseFloat(getComputedStyle(document.querySelector(".welcome-drop .drop-ring rect")).strokeDashoffset)`,
   );
   check(
-    "…the card lifts and its border marches",
-    dragLook.lifted && dragLook.ring === "1" && dragLook.marching && offsetLater !== dragLook.offset,
+    "…the card stays put and its border marches",
+    dragLook.still && dragLook.ring === "1" && dragLook.marching && offsetLater !== dragLook.offset,
     JSON.stringify({ ...dragLook, offsetLater }),
   );
   await shot("welcome-drag.png");

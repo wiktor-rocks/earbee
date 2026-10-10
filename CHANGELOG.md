@@ -43,6 +43,22 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-10: The welcome card no longer lifts on drag
+
+- **What:** dragging a file over the window no longer lifts the welcome card by 2 px. It stays in place. The soft shadow and the marching amber border still appear.
+- **Why:** the user found the small "pop" distracting and wanted the card to keep still.
+- **How:** removed `transform: translateY(-2px)` from `body.dragging .welcome-drop`, and dropped `transform` from the card's transition. Without the lift, the reduced-motion override for the card isn't needed; `.drop-card` keeps its own.
+- **Where:** `style.css` (`.welcome-drop`, `body.dragging .welcome-drop`, the reduced-motion block), `tests/e2e/02-welcome.cjs` (now checks the card has no transform).
+- **Verified by:** `npm run check`, and `TB_TOPICS=02 npm test` (25 e2e and 21 smoke, all passing).
+
+## 2026-10-10: More room above the welcome hint
+
+- **What:** on the welcome screen, "or drop a file anywhere in this window, or paste a YouTube link" sits further below the Open buttons: 18 px instead of 10 px. The "Drop to open…" prompt that replaces it while a file is dragged over gets the same gap, so nothing jumps.
+- **Why:** the user asked for more top margin on the hint.
+- **How:** an 8 px `margin-top` on top of the card's 10 px flex gap.
+- **Where:** `style.css` (`.welcome-hint`, `.welcome-drop-prompt`).
+- **Verified by:** `npm run check`.
+
 ## 2026-10-10: Open, Save and From YouTube in one File menu
 
 - **What:** the top bar no longer has the **Open…**, **Save** and **YouTube…** buttons. In their place is one quiet **File ▾** button with no fill or border and muted text, like the tool icons on the right. It opens a menu with **Open…**, **Save**, **Save as…** and **From YouTube…**, each showing its keys (Ctrl+O, Ctrl+S, Ctrl+Shift+S). Save and Save as… appear only in Electron, as Save did before. The menu has a divider before From YouTube…, which is hidden when that item isn't there. The accent dot for unsaved changes is now on File as well as on Save. Picking an item closes the menu first. The keyboard works the same as in the theme menu: ↑/↓/Home/End move between items and Escape closes it.
