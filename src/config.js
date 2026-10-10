@@ -57,7 +57,7 @@ export const CONFIG = {
     // warmed up (MP3, AAC and Opus are then sample-exact), and the parts
     // are joined where their samples match: within `maxLag` seconds of
     // where the timestamps say, over `joinWindow` frames, to `joinTolerance`
-    // (see core/parts.js findJoin and docs/diagnostics/long-file-loading.md).
+    // (see core/media.js findJoin and docs/diagnostics/long-file-loading.md).
     parallel: {
       minDuration: 60,
       maxWorkers: 4,
@@ -105,4 +105,8 @@ export const CONFIG = {
     minPeaksPerSecond: 50,
     maxPeaksPerSecond: 8000,
   },
+
+  // The notifications (ui/toast.js): how long one shows, and how many at
+  // once (a new one pushes out the oldest).
+  notifications: { showMs: 4000, max: 3 },
 };

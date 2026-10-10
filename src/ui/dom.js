@@ -94,7 +94,8 @@ const transportButtons = () => [dom.playButton, dom.stopButton, dom.stepBackButt
 
 // One message line: in the transport bar, or under the drop zone while
 // the welcome screen is up. An error means something failed (red); a
-// notice means something works only partly (neutral).
+// notice means something works only partly (neutral). Confirmations that
+// something worked are notifications instead (notify, ui/toast.js).
 export function showMessage(text, kind) {
   const line = dom.app.hidden ? dom.welcomeMessage : dom.message;
   line.textContent = text;

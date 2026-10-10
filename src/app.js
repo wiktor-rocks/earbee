@@ -63,26 +63,28 @@
  *   (electron/preload.js). The page shows the progress, then opens the
  *   downloaded file like any other (features/download.js), reading it from
  *   disk by a private URL (electron/media-files.js), never whole. Words
- *   instead of a link search YouTube or SoundCloud (features/search.js; the
+ *   instead of a link search YouTube or SoundCloud (features/download.js; the
  *   sites in src/search/sources.js), also through yt-dlp in the main
  *   process, which fetches the results' pictures too: the page never
  *   touches the network.
  *
  * FILES (src/), in layers: a file imports only from layers above it in
  * this list, never below (enforced by `npm run lint`)
- *   core/          Pure helpers, no DOM: format, peaks, waveshape (scaling the
+ *   core/          Pure helpers, no DOM: format, waveshape (scaling the
  *                  waveform), ruler, timeline (and the
- *                  Segment / Loop / LoopRegion types), emitter, files (and
- *                  the Media type), errors, memory, parts (splitting and
- *                  joining a parallel decode)
- *   themes/        Colour themes: palettes and pure logic; independent of
+ *                  Segment / Loop / LoopRegion types), emitter, errors,
+ *                  media (the Media type, the memory check, waveform
+ *                  levels, splitting and joining a parallel decode)
+ *   themes/        Colour themes: palettes.js (every theme) and index.js
+ *                  (the pure logic, the marks' colours); independent of
  *                  everything else (the main process uses it too)
  *   search/        Where the download dialog searches (sources.js) and what
  *                  a result is; pure, shared with the main process
- *   prefs/         Settings sections (sections/: theme, downloads) and the
- *                  field types; pure, shared with the main process
- *   marks/         What a mark is and its saved form (format.js), and the
- *                  store (index.js); pure
+ *   prefs/         Settings sections (index.js: theme, waveform, downloads)
+ *                  and the field types (fields.js); pure, shared with the
+ *                  main process
+ *   marks/         What a mark is, its saved form, and the store
+ *                  (index.js); pure
  *   project/       What a project file is (format.js): its header, version
  *                  and media; pure, shared with the main process
  *   config.js      CONFIG: every tunable number
@@ -95,17 +97,20 @@
  *                  components above, once created
  *   ui/            dom.js (elements, messages, rendering, loading screens),
  *                  controls.js (sliders, chips, EQ), shortcuts.js (key
- *                  handling), theme.js (applying a theme), prefs.js (the
+ *                  handling, giving focus back), theme.js (applying a theme), prefs.js (the
  *                  settings: values, changes, listeners), pref-fields.js
- *                  (one Settings control per field type)
- *   features/      playback.js, loop.js, marks.js (actions, selection, the
- *                  marks list), open-file.js, download.js, search.js
- *                  (searching in the download dialog), theme-picker.js,
- *                  settings.js (the Settings dialog), layout.js (the
+ *                  (one Settings control per field type), toast.js
+ *                  (notifications: small confirmations, notify())
+ *   features/      playback.js (and the A–B loop), marks.js (actions,
+ *                  selection, the marks list), open-file.js, download.js
+ *                  (and searching in the download dialog), settings.js
+ *                  (the Settings dialog and the theme menu), layout.js (the
  *                  shortcuts dialog), project/ (saving and opening project
  *                  files: index.js; what they save: sections.js),
  *                  video-window/ (the video in a window of its own;
- *                  self-contained, its wiring marked "Video window (")
+ *                  self-contained, its wiring marked "Video window ("),
+ *                  big-video.js (the picture large, the rest put away;
+ *                  its wiring marked "Big video (")
  *   app.js         This file: creates and wires the components, the
  *                  SHORTCUTS table, start()
  *   vendor/        Signalsmith Stretch, patched to read across several
@@ -132,20 +137,24 @@
  *                             reads its colours from there too). Colours
  *                             come from the theme (src/themes); the :root
  *                             values are the default theme's.
- *   New setting               Add a field to its section in src/prefs/sections/
+ *   New setting               Add a field to its section in src/prefs/index.js
  *                             (type, label, default; see src/prefs/fields.js).
  *                             The dialog shows it and the main process checks
  *                             and saves it; read it with getPrefs(section)
  *                             and follow it with onPrefsChange (ui/prefs.js),
  *                             or in the main process with store.get /
  *                             store.onChange (electron/prefs-store.js).
- *   New settings section      A file in src/prefs/sections/ (defineSection),
- *                             listed in SECTIONS (src/prefs/index.js); the
- *                             dialog gets a tab for it.
+ *   New settings section      A defineSection() in src/prefs/index.js,
+ *                             listed in SECTIONS there; the dialog gets a
+ *                             tab for it.
+ *   A new notification        notify(text, detail?) from ui/toast.js, only to
+ *                             confirm something worked (it may be turned off
+ *                             in Settings › General); problems go to
+ *                             showNotice / reportError (ui/dom.js).
  *   New kind of setting       An entry in TYPES (src/prefs/fields.js) and a
  *                             renderer in ui/pref-fields.js.
- *   New colour theme          Add a file in src/themes/palettes/ and list it
- *                             in THEMES (src/themes/index.js); the unit tests
+ *   New colour theme          Add one to src/themes/palettes.js and list it
+ *                             in THEMES there; the unit tests
  *                             check it's complete and readable.
  *   Video file types          CONFIG.video.extensions (also anything with a
  *                             video/* type). Codecs are whatever WebCodecs
@@ -159,10 +168,10 @@
  *                             The red stop point (where playback last
  *                             stopped) is set there too, in stop() and on
  *                             the "paused"/"ended" states.
- *   A–B loop                  State and actions in features/loop.js; audio
+ *   A–B loop                  State and actions in features/playback.js; audio
  *                             looping in audio/transport.js, drawing and
  *                             dragging in waveform.js.
- *   Marks                     The data in src/marks (a field: format.js's
+ *   Marks                     The data in src/marks (a field: index.js's
  *                             normalizeMark and serializeMarks; bump
  *                             MARKS_VERSION if old saves read differently);
  *                             actions, keys and the list in features/marks.js;
@@ -171,7 +180,7 @@
  *   A new lane / marker       In timeline.js: a track element per lane
  *                             (moved by applyView), markers placed in
  *                             percent of it; a .timeline row in index.html.
- *   Mark colours              MARK_COLORS (src/themes/mark-colors.js), and the
+ *   Mark colours              MARK_COLORS (src/themes/index.js), and the
  *                             --mark-* defaults in style.css; the unit tests
  *                             check each is visible on every theme.
  *   Saving something new in   Add a section to SECTIONS (features/project/
@@ -204,7 +213,6 @@ import { createAudioEngine } from "./audio/engine.js";
 import { createTransport } from "./audio/transport.js";
 import { player, settings, totalSemitones } from "./context.js";
 import { bindDownloads } from "./features/download.js";
-import { setLoopEnd, setLoopRegion, setLoopStart, toggleLoop, clearLoop } from "./features/loop.js";
 import {
   bindMarks,
   cancelMarking,
@@ -217,23 +225,28 @@ import {
   renameMark,
   selectMark,
 } from "./features/marks.js";
+import { bigVideoPictureChanged, bindBigVideo, toggleBigVideo } from "./features/big-video.js"; // Big video (src/features/big-video.js)
 import { bindLayout, openShortcuts } from "./features/layout.js";
 import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
 import { bindProject, isSaveDialogOpen, openFile, saveProject, saveProjectAs } from "./features/project/index.js";
-import { bindSettings, isSettingsOpen } from "./features/settings.js";
-import { bindThemePicker, isThemeMenuOpen } from "./features/theme-picker.js";
+import { bindSettings, bindThemePicker, isSettingsOpen, isThemeMenuOpen } from "./features/settings.js";
 import {
   bindPlayback,
   bindTransportButtons,
+  clearLoop,
   holdToPlay,
   releaseHold,
   replayOrPause,
+  setLoopEnd,
+  setLoopRegion,
+  setLoopStart,
   setStartPoint,
   startHere,
   stepBack,
   stepForward,
   stop,
+  toggleLoop,
   togglePlay,
 } from "./features/playback.js";
 import {
@@ -246,8 +259,7 @@ import {
   setEqEnabled,
 } from "./ui/controls.js";
 import { $, dom, renderStepSize, renderTrackTime, renderTransportState, reportError, showNotice } from "./ui/dom.js";
-import { bindFocus } from "./ui/focus.js";
-import { bindShortcuts, renderShortcutLegend } from "./ui/shortcuts.js";
+import { bindFocus, bindShortcuts, renderShortcutLegend } from "./ui/shortcuts.js";
 import { getPrefs, onPrefsChange } from "./ui/prefs.js";
 import { followThemePrefs, onThemeChange } from "./ui/theme.js";
 import { createVideoView } from "./video/view.js";
@@ -301,6 +313,7 @@ const videoView = createVideoView({
   onVisibilityChange: (visible) => {
     $("stage").classList.toggle("has-video", visible);
     videoPictureChanged(visible); // Video window (src/features/video-window/)
+    bigVideoPictureChanged(visible); // Big video (src/features/big-video.js)
   },
   onProblem: (message) => showNotice(message),
 });
@@ -464,6 +477,8 @@ const SHORTCUTS = [
     description: "Video in its own window / back",
     down: toggleVideoWindow,
   },
+  // Big video (src/features/big-video.js)
+  { group: "Video", codes: ["KeyF"], keys: ["F"], description: "Big video on / off", down: toggleBigVideo },
   {
     group: "Help",
     codes: ["Slash"],
@@ -509,6 +524,7 @@ function start() {
   bindSettings();
   bindMarks();
   bindLayout();
+  bindBigVideo(); // Big video (src/features/big-video.js)
   bindFocus();
   const keysBlocked = () =>
     isLoading() ||

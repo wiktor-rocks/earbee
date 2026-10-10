@@ -16,6 +16,7 @@ import { marks, player } from "../../context.js";
 import { AppError } from "../../core/errors.js";
 import { isProjectName } from "../../project/format.js";
 import { dom, guarded, onClick, reportError, showNotice } from "../../ui/dom.js";
+import { notify } from "../../ui/toast.js";
 import { importChapters } from "../marks.js";
 import { loadMediaFile, withLoading } from "../open-file.js";
 import { SECTIONS } from "./sections.js";
@@ -137,7 +138,7 @@ export async function confirmUnsaved() {
 
 // A media file opened on its own: a new, untitled session. Its URL in the
 // main process is what a project will name it by (a download already has one).
-/** @param {import("../../core/files.js").Media} media */
+/** @param {import("../../core/media.js").Media} media */
 async function startMediaSession(media) {
   Object.assign(session, { mediaName: media.name, path: null, name: null, embedded: false, linkable: true });
   session.mediaUrl = "url" in media ? media.url : null;
@@ -152,14 +153,14 @@ async function startMediaSession(media) {
  * Loads a media file as a new session (also for downloads); returns the
  * notices to show. See loadMediaFile. A download's `chapters` become
  * regions, as part of what was opened (not an unsaved change).
- * @param {import("../../core/files.js").Media} media
+ * @param {import("../../core/media.js").Media} media
  * @param {AbortSignal} signal
  * @param {{ chapters?: { start: number, end: number, title: string }[] }} [options]
  */
 export async function loadMedia(media, signal, { chapters = [] } = {}) {
   const notices = await loadMediaFile(media, signal);
   const added = importChapters(chapters);
-  if (added) notices.push(`Added ${added} chapter${added === 1 ? "" : "s"} as marks.`);
+  if (added) notify(`Added ${added} chapter${added === 1 ? "" : "s"} as marks`);
   await startMediaSession(media);
   return notices;
 }
@@ -193,7 +194,10 @@ async function loadProject(opened, signal) {
 export async function openFile(file) {
   if (!file || !(await confirmUnsaved())) return;
   if (isProjectName(file.name)) return openProjectFile(file);
-  return withLoading(file.name, async (signal) => showNotice((await loadMedia(file, signal)).join(" ")));
+  return withLoading(file.name, async (signal) => {
+    showNotice((await loadMedia(file, signal)).join(" "));
+    notify(`Opened “${file.name}”`);
+  });
 }
 
 /** @param {File} file */
@@ -205,7 +209,10 @@ async function openProjectFile(file) {
     return;
   }
   const project = /** @type {OpenedProject} */ (opened);
-  return withLoading(project.name, async (signal) => showNotice((await loadProject(project, signal)).join(" ")));
+  return withLoading(project.name, async (signal) => {
+    showNotice((await loadProject(project, signal)).join(" "));
+    notify(`Opened “${project.name}”`);
+  });
 }
 
 /* ---------- Saving ---------- */
@@ -238,7 +245,7 @@ async function writeProject(file, embed) {
     linkable: result.linkable,
   });
   markSaved();
-  showNotice(`Saved as ${result.path}.`);
+  notify("Project saved", result.path);
   return true;
 }
 

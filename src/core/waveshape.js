@@ -1,5 +1,5 @@
 // Shaping the waveform: from the decoded levels (peak and RMS per slice,
-// core/peaks.js) to heights in 0…1 that look alike from song to song, and
+// core/media.js) to heights in 0…1 that look alike from song to song, and
 // the values of each column the drawing (waveform-draw.js) shows. Pure.
 //
 // The scale is set by a high percentile of the track's level, not its
@@ -7,9 +7,9 @@
 // line; the loudest slices above it are clipped to the full height. What
 // is drawn is never outside 0…1, so it never spills out of the card.
 
-/** @typedef {import("./parts.js").Levels} Levels */
+/** @typedef {import("./media.js").Levels} Levels */
 /**
- * The Settings › Waveform values (prefs/sections/waveform.js).
+ * The Settings › Waveform values (prefs/index.js, waveformSection).
  * @typedef {object} Appearance
  * @property {"bars" | "continuous" | "twoTone"} style
  * @property {"loudness" | "peaks"} measure  what bars and continuous show

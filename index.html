@@ -297,6 +297,27 @@
         <rect x="2" y="3.2" width="12" height="9.6" rx="1.6" fill="none" stroke="currentColor" stroke-width="1.4" />
         <path d="M5 3.2v9.6M11 3.2v9.6M2 8h3M11 8h3" stroke="currentColor" stroke-width="1.2" />
       </symbol>
+      <!-- Big video (src/features/big-video.js) -->
+      <symbol id="i-enlarge" viewBox="0 0 16 16">
+        <path
+          d="M9.5 2.8h3.7v3.7M13 3 9.4 6.6M6.5 13.2H2.8V9.5M3 13l3.6-3.6"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="i-shrink" viewBox="0 0 16 16">
+        <path
+          d="M13 3 9.6 6.4M9.5 3.4v3.1h3.1M3 13l3.4-3.4M3.4 9.5h3.1v3.1"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
     </svg>
 
     <div id="app" class="app" hidden>
@@ -607,7 +628,7 @@
       </div>
     </div>
 
-    <!-- The colour-theme menu (see features/theme-picker.js), opened by the
+    <!-- The colour-theme menu (see features/settings.js), opened by the
          palette buttons; its items are generated. -->
     <div id="themeMenu" class="theme-menu" role="menu" aria-label="Colour theme" popover></div>
 
@@ -642,7 +663,7 @@
     </dialog>
 
     <!-- From YouTube: download a link (see features/download.js and
-         electron/downloader.js) or search by words (features/search.js);
+         electron/downloader.js), or search by words;
          opened by the "From YouTube…" buttons or by pasting a link. Built
          like Settings: a header bar, the options as cards (the same .pref-*
          tiles and switch), and only the results scroll. -->

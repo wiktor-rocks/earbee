@@ -4,7 +4,7 @@
 //              access; it may not navigate away or open other windows.
 //              Its Content-Security-Policy is in index.html.
 //              Video window (src/features/video-window/): the one window
-//              it may open, for the video's picture (video-window.js).
+//              it may open, for the video's picture (windows.js).
 //   Downloads  Through the page's bridge (preload.js): downloading a link
 //              with yt-dlp, or searching by keywords, done here in
 //              downloader.js; a result can be opened in the browser. The page reads the
@@ -15,7 +15,7 @@
 //   Settings   The user's preferences (prefs-store.js, prefs.json): read
 //              and changed by the page's Settings dialog through the
 //              preload; the folder picker is here. The colour theme
-//              (theme-store.js) is one section: applied by the preload
+//              (also prefs-store.js) is one section: applied by the preload
 //              before the page renders, and the window background.
 //              Downloads read theirs for each download.
 //   Projects   TranscriBee files (.tbee) with a session's marks and
@@ -23,7 +23,7 @@
 //              preload, with the native dialogs below. Closing the window
 //              with unsaved changes asks first (guardClose).
 //   Window     Remembers its size, position and maximised state between
-//              runs (window-state.js). The title follows the page's
+//              runs (windows.js). The title follows the page's
 //              <title>, which names the open file.
 //   GPU        Chromium picks the GPU itself and falls back to software
 //              rendering if the GPU process keeps crashing.
@@ -34,11 +34,10 @@ const path = require("path");
 const { handleDownloads } = require("./downloader");
 const { createMediaFiles, registerMediaScheme } = require("./media-files");
 const { handleRendererCrash, handleSystem } = require("./system");
-const { createPrefsStore, handlePrefs } = require("./prefs-store");
+const { createPrefsStore, createThemeView, handlePrefs } = require("./prefs-store");
 const { createProjectFiles, guardClose, handleProjects } = require("./project-files");
-const { createThemeView } = require("./theme-store");
-const { loadWindowState, rememberWindowState } = require("./window-state");
-const { allowVideoWindow, handleVideoWindows } = require("./video-window"); // Video window (src/features/video-window/)
+const { loadWindowState, rememberWindowState } = require("./windows");
+const { allowVideoWindow, handleVideoWindows } = require("./windows"); // Video window (src/features/video-window/)
 
 const ROOT = path.join(__dirname, ".."); // the app's files: index.html, src/, assets/
 

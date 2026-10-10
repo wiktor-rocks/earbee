@@ -58,7 +58,7 @@ async function createHarness() {
   const prefsFile = path.join(OUTPUT, "prefs.json");
   fs.rmSync(prefsFile, { force: true });
   const { createPrefsStore, handlePrefs } = require(path.join(PROJECT, "electron", "prefs-store.js"));
-  const { createThemeView } = require(path.join(PROJECT, "electron", "theme-store.js"));
+  const { createThemeView } = require(path.join(PROJECT, "electron", "prefs-store.js"));
   const prefsStore = createPrefsStore(prefsFile);
   const folderChoice = { path: null, asked: 0 };
   handlePrefs(ipcMain, prefsStore, {
@@ -115,7 +115,7 @@ async function createHarness() {
   // Video window (src/features/video-window/): as main.js allows it, but
   // hidden (an offscreen window.open window gets no size); videoWin() is
   // the open one (or null).
-  const videoWindow = require(path.join(PROJECT, "electron", "video-window.js"));
+  const videoWindow = require(path.join(PROJECT, "electron", "windows.js"));
   videoWindow.handleVideoWindows(ipcMain);
   session.defaultSession.registerPreloadScript({
     type: "frame",
@@ -222,6 +222,12 @@ async function createHarness() {
     }
   }
   const pos = () => js(`__parseTime(document.getElementById("trackTime").textContent)`);
+  // The notifications showing (ui/toast.js): [{ text, detail }], oldest first.
+  const toasts = () =>
+    js(
+      `[...document.querySelectorAll(".toast:not(.leaving)")].map((t) => ({ text: t.querySelector("span").textContent, detail: t.querySelector("small")?.textContent ?? "" }))`,
+    );
+  const clearToasts = () => js(`document.querySelectorAll(".toast").forEach((t) => t.remove())`);
   const loopInfo = () =>
     js(
       `(() => { const e = document.getElementById("loopInfo"); return { hidden: e.hidden, text: e.textContent, disabled: e.classList.contains("disabled") }; })()`,
@@ -267,6 +273,8 @@ async function createHarness() {
     pos,
     loopInfo,
     loopRange,
+    toasts,
+    clearToasts,
     sample,
     firstMoved,
     playing,

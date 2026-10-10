@@ -1,9 +1,18 @@
-// Decoding in parts (src/core/parts.js): splitting a track, how many
-// workers, finding where parts join, and putting them end to end.
+// Media and decoding (src/core/media.js): the memory a decoded track
+// needs; decoding in parts: splitting a track, how many workers, finding
+// where parts join, and putting them end to end.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { findJoin, joinParts, splitFrames, workerCount } from "../../src/core/parts.js";
-import { downsampleLevels } from "../../src/core/peaks.js";
+import { formatMemory } from "../../src/core/format.js";
+import {
+  decodedBytes,
+  downsampleLevels,
+  findJoin,
+  fitsInMemory,
+  joinParts,
+  splitFrames,
+  workerCount,
+} from "../../src/core/media.js";
 
 // A test signal that never repeats: a chirp.
 const chirp = (length, offset = 0) =>
@@ -111,5 +120,19 @@ describe("joinParts", () => {
     // The sums of squares differ in the last float bits between the cut and whole runs.
     assert.equal(levels[0].rms.length, expected.rms.length);
     for (let i = 0; i < expected.rms.length; i++) assert.ok(Math.abs(levels[0].rms[i] - expected.rms[i]) < 1e-6);
+  });
+});
+
+describe("memory", () => {
+  test("decoded size: an hour of stereo at 48 kHz is about 1.3 GB", () => {
+    assert.equal(decodedBytes(3600, 48000, 2), 1_382_400_000);
+    assert.equal(formatMemory(decodedBytes(3600, 48000, 2)), "1.3 GB");
+    assert.equal(formatMemory(850 * 1024 ** 2), "850 MB");
+  });
+
+  test("fits in at most 80 % of the free memory; unknown always fits", () => {
+    assert.ok(fitsInMemory(800, 1000));
+    assert.ok(!fitsInMemory(801, 1000));
+    assert.ok(fitsInMemory(10 ** 12, null));
   });
 });

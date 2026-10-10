@@ -4,7 +4,7 @@
 // dialog, ui/prefs.js) and the main process (electron/prefs-store.js, which
 // keeps prefs.json) share it.
 //
-// A section is one file in sections/, listed in SECTIONS (index.js):
+// A section is a defineSection() in index.js, listed in SECTIONS there:
 //
 //   defineSection({
 //     id: "downloads",            // its key in prefs.json

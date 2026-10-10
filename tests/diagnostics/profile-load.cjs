@@ -203,7 +203,7 @@ const BENCHMARKS = {
   parts: (workers, compare) => `(async () => {
     const file = document.getElementById("__diagFile").files[0];
     const { decodeFile } = await import("./src/audio/decoder.js");
-    const { splitFrames } = await import("./src/core/parts.js");
+    const { splitFrames } = await import("./src/core/media.js");
     const peakFactor = 400;
     let info = null;
     const decode = async (count) => {
@@ -296,7 +296,7 @@ app.whenReady().then(async () => {
   const prefsStore = require(path.join(PROJECT, "electron", "prefs-store.js")).createPrefsStore(
     path.join(app.getPath("userData"), "prefs.json"),
   );
-  const { createThemeView } = require(path.join(PROJECT, "electron", "theme-store.js"));
+  const { createThemeView } = require(path.join(PROJECT, "electron", "prefs-store.js"));
   require(path.join(PROJECT, "electron", "prefs-store.js")).handlePrefs(ipcMain, prefsStore, {
     initialTheme: createThemeView(prefsStore, nativeTheme).initial,
     defaultPaths: {},

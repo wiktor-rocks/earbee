@@ -1,14 +1,13 @@
 import { CONFIG } from "./config.js";
 import { clamp, formatTrackTime } from "./core/format.js";
 import { shapeLevels, shapeOverview, slicesPerWindow } from "./core/waveshape.js";
-import { defaultsOf } from "./prefs/fields.js";
-import waveformPrefs from "./prefs/sections/waveform.js";
+import { defaultsOf, waveformSection as waveformPrefs } from "./prefs/index.js";
 import { drawWaveform } from "./waveform-draw.js";
 
 /** @typedef {import("./core/timeline.js").Loop} Loop */
 /** @typedef {import("./core/timeline.js").LoopRegion} LoopRegion */
 /** @typedef {{ duration: number, width: number, offset: number }} View */
-/** @typedef {import("./core/parts.js").Levels} Levels */
+/** @typedef {import("./core/media.js").Levels} Levels */
 /** @typedef {import("./core/waveshape.js").Appearance} Appearance */
 
 /* =====================================================================
@@ -57,6 +56,7 @@ import { drawWaveform } from "./waveform-draw.js";
  * Exposes: preload, init, load, setTime, follow, resumeFollow, setLoop,
  *          setAppearance (the look, from Settings › Waveform),
  *          getView / setView (the zoom and scroll, for project files),
+ *          lockFit (the whole track in view, no zooming, for big video),
  *          refreshColors (after the colour variables changed, e.g. a
  *          theme), and for the lanes: view, onView, timeAtClientX,
  *          clientXAt, wheel (an event handler), scrollNearEdge, holdFollow
@@ -88,6 +88,12 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   // pointer position reuse the exact time instead of re-reading it from
   // the (whole-pixel) scroll, which would drift a little every step.
   let zoomAnchor = null;
+  // While locked (lockFit), the whole track stays in view and the wheel
+  // does nothing; the user's own view waits in lockedView, and getView /
+  // setView read and write it, so projects still save and restore it.
+  let fitLocked = false;
+  /** @type {{ seconds: number | null, start: number } | null} */
+  let lockedView = null;
   /** @type {LoopRegion | null} */
   let loop = null; // as last set by setLoop()
   let loopElement = null;
@@ -526,6 +532,7 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   function wheel(event) {
     if (!duration || (event.deltaY === 0 && event.deltaX === 0)) return;
     event.preventDefault();
+    if (fitLocked) return;
 
     followPaused = true;
     if (Math.abs(event.deltaY) >= Math.abs(event.deltaX)) zoomBy(Math.exp(-event.deltaY * 0.001), event.clientX);
@@ -657,7 +664,14 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     waveSurfer.setTime(0);
     duration = trackDuration;
     followPaused = false;
-    // Start zoomed in on the beginning (see CONFIG.waveform.initialViewSeconds).
+    // Start zoomed in on the beginning (see CONFIG.waveform.initialViewSeconds);
+    // while locked to fit, that waits until the lock ends.
+    if (fitLocked) {
+      lockedView = { seconds: initialViewSeconds, start: 0 };
+      waveSurfer.zoom(0);
+      setScroll(0);
+      return;
+    }
     const fit = fitZoom();
     const initial = clamp(waveSurfer.getWidth() / initialViewSeconds, fit, fit * maxZoomMultiplier);
     zoomLevel = initial > fit ? initial : null;
@@ -670,6 +684,7 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   // whole track, fit to width) and the time at the left edge.
   /** @returns {{ seconds: number | null, start: number } | null} */
   function getView() {
+    if (fitLocked) return lockedView;
     if (!waveSurfer || !duration) return null;
     const pxPerSecond = waveSurfer.getWrapper().scrollWidth / duration;
     return {
@@ -681,6 +696,10 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   // Brings back a view from getView(), within the zoom limits.
   /** @param {{ seconds?: number | null, start?: number }} saved */
   function setView({ seconds = null, start = 0 }) {
+    if (fitLocked) {
+      lockedView = { seconds, start };
+      return;
+    }
     if (!waveSurfer || !duration) return;
     const fit = fitZoom();
     const wanted = Number.isFinite(seconds) && seconds > 0 ? waveSurfer.getWidth() / seconds : fit;
@@ -692,6 +711,28 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     setScroll(clamp(Number.isFinite(start) ? start : 0, 0, duration) * pxPerSecond);
     // The view stays where it was saved until the cursor comes into it.
     followPaused = true;
+  }
+
+  // Big video: the whole track in view, like a video player's timeline,
+  // until unlocked, which brings the user's view back.
+  /** @param {boolean} on */
+  function lockFit(on) {
+    if (on === fitLocked) return;
+    if (on) {
+      lockedView = getView();
+      fitLocked = true;
+      zoomLevel = null;
+      zoomAnchor = null;
+      if (waveSurfer && duration) {
+        waveSurfer.zoom(0);
+        setScroll(0);
+      }
+    } else {
+      const saved = lockedView;
+      fitLocked = false;
+      lockedView = null;
+      if (saved) setView(saved);
+    }
   }
 
   // Keeps the cursor in view when zoomed in: once it leaves the visible
@@ -734,6 +775,7 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     view,
     getView,
     setView,
+    lockFit,
     /** Calls `listener` with the view whenever it changes. @param {(view: View) => void} listener */
     onView(listener) {
       viewListeners.add(listener);

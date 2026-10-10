@@ -1,5 +1,5 @@
-// Settings: the dialog (generated from src/prefs), the Theme and Downloads
-// sections, Reset, keeping the palette menu in step, what the main process
+// Settings: the dialog (generated from src/prefs), the General, Theme and
+// Downloads sections, Reset, keeping the palette menu in step, what the main process
 // refuses, and keeping the values over a reload.
 // Part of the end-to-end run (see run.cjs); `h` is the harness.
 const fs = require("fs");
@@ -25,12 +25,12 @@ module.exports = async function (h) {
   await sleep(200);
   check(
     "the gear opens Settings, focus on the first tab",
-    (await isOpen()) && (await js(`document.activeElement.id`)) === "settings-tab-theme",
+    (await isOpen()) && (await js(`document.activeElement.id`)) === "settings-tab-general",
   );
   check(
     "one tab per settings section",
     JSON.stringify(await js(`[...document.querySelectorAll(".settings-tab")].map((tab) => tab.textContent)`)) ===
-      JSON.stringify(["Theme", "Waveform", "Downloads"]),
+      JSON.stringify(["General", "Theme", "Waveform", "Downloads"]),
   );
   // The dialog has one size: switching tabs, or fields showing and hiding,
   // never moves it or its tabs.
@@ -40,7 +40,7 @@ module.exports = async function (h) {
         `(() => { const d = document.getElementById("settingsDialog").getBoundingClientRect(); const t = document.querySelector(".settings-tab").getBoundingClientRect(); const p = document.getElementById("settingsPanels"); return { dialog: [d.left, d.top, d.width, d.height].map(Math.round).join(), tab: [t.left, t.top].map(Math.round).join(), content: p.scrollHeight, shown: p.clientHeight }; })()`,
       );
     const seen = [];
-    for (const id of ["theme", "waveform", "downloads", "theme"]) {
+    for (const id of ["general", "theme", "waveform", "downloads", "theme"]) {
       await js(`document.getElementById("settings-tab-${id}").click()`);
       await sleep(100);
       seen.push({ id, ...(await layout()) });
@@ -81,6 +81,23 @@ module.exports = async function (h) {
       (await js(`${radio("theme", "choice", "transcribee")}.checked`)) &&
       !(await resetShown("theme", "choice")),
   );
+
+  // General: notifications are on by default; the switch turns them off.
+  await tab("general");
+  await sleep(100);
+  const notifySwitch = `${row("general", "notifications")}.querySelector("input")`;
+  check(
+    "notifications are on by default",
+    (await js(`${notifySwitch}.checked`)) && saved().general?.notifications !== false,
+  );
+  await js(`${notifySwitch}.click()`);
+  await sleep(200);
+  check("the switch turns notifications off, and it's saved", saved().general.notifications === false);
+  await js(`${notifySwitch}.click()`);
+  await sleep(200);
+  check("…and on again", saved().general.notifications === true);
+  await tab("theme");
+  await sleep(100);
 
   // A change made elsewhere (here the main process, as the palette menu or
   // another window would) shows in the open dialog.

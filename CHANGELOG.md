@@ -22,26 +22,143 @@ The architecture overview, the file map and a list of where to make common chang
 
 **Older entries** (before "Modules") refer to `script.js` and its numbered sections, and to `main.js`, `downloader.js` and `preload.js` at the top level. Here is where each now lives:
 
-| Then                                     | Now                                                                                         |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------- |
-| §1 Config                                | `src/config.js`                                                                             |
-| §2 Pure helpers                          | `src/core/` (`format.js`, `peaks.js`, `timeline.js`, `emitter.js`, `files.js`, `errors.js`) |
-| §3 Settings                              | `src/context.js`                                                                            |
-| §4 Audio engine                          | `src/audio/engine.js`                                                                       |
-| §5 Transport                             | `src/audio/transport.js`                                                                    |
-| §6 Waveform                              | `src/waveform.js`                                                                           |
-| §7 Video                                 | `src/video/view.js`, `src/video/proxy.js`                                                   |
-| §8 Instances                             | `src/app.js`; the `returnPoint` listeners are in `features/playback.js` (`bindPlayback`)    |
-| §9 UI                                    | `src/ui/dom.js`; the generated controls are in `src/ui/controls.js`                         |
-| §10 Setting controls                     | `src/ui/controls.js`                                                                        |
-| §11 File loading                         | `src/features/open-file.js`, `src/features/download.js`                                     |
-| §12 Playback actions                     | `src/features/playback.js`, `src/features/loop.js`                                          |
-| §13 Keyboard shortcuts                   | `src/ui/shortcuts.js`; the `SHORTCUTS` table is in `src/app.js`                             |
-| §14 Startup                              | `src/app.js` (`start`)                                                                      |
-| `main.js`, `downloader.js`, `preload.js` | `electron/`                                                                                 |
-| `tests/run.cjs` (one sequence)           | `tests/run.cjs` + `tests/e2e/`                                                              |
+| Then                                     | Now                                                                                      |
+| ---------------------------------------- | ---------------------------------------------------------------------------------------- |
+| §1 Config                                | `src/config.js`                                                                          |
+| §2 Pure helpers                          | `src/core/` (`format.js`, `media.js`, `timeline.js`, `emitter.js`, `errors.js`)          |
+| §3 Settings                              | `src/context.js`                                                                         |
+| §4 Audio engine                          | `src/audio/engine.js`                                                                    |
+| §5 Transport                             | `src/audio/transport.js`                                                                 |
+| §6 Waveform                              | `src/waveform.js`                                                                        |
+| §7 Video                                 | `src/video/view.js`, `src/video/proxy.js`                                                |
+| §8 Instances                             | `src/app.js`; the `returnPoint` listeners are in `features/playback.js` (`bindPlayback`) |
+| §9 UI                                    | `src/ui/dom.js`; the generated controls are in `src/ui/controls.js`                      |
+| §10 Setting controls                     | `src/ui/controls.js`                                                                     |
+| §11 File loading                         | `src/features/open-file.js`, `src/features/download.js`                                  |
+| §12 Playback actions                     | `src/features/playback.js` (the A–B loop too)                                            |
+| §13 Keyboard shortcuts                   | `src/ui/shortcuts.js`; the `SHORTCUTS` table is in `src/app.js`                          |
+| §14 Startup                              | `src/app.js` (`start`)                                                                   |
+| `main.js`, `downloader.js`, `preload.js` | `electron/`                                                                              |
+| `tests/run.cjs` (one sequence)           | `tests/run.cjs` + `tests/e2e/`                                                           |
 
 ---
+
+## 2026-10-10: Big video: edge to edge, a YouTube-style timeline
+
+- **What:** in big video the picture now runs to the window's edges, with square corners and no gaps. At 1200×800 it takes 90 % of the height, up from 80 %. Under it is a 32 px waveform strip that always shows the whole track, like a video player's timeline: click or drag to seek, and the wheel doesn't zoom it. Under that is the transport, square too, with a hairline above it. Leaving big video gives the waveform back the zoom and scroll it had. The mode now carries over from one video to the next. An audio file or a restart still ends it.
+- **Why:** the user wanted the waveform fully zoomed out and lower still, working like a YouTube timeline. They also wanted the containers to reach the viewport's edges without rounded corners, so the video fills as much space as possible.
+- **How:**
+  - **`waveform.lockFit(on)`.** On, it saves the user's view (`getView`) and zooms to fit (`zoom(0)`, scroll 0). While locked:
+    - The wheel is swallowed.
+    - `load()` stays at fit and saves the usual starting view (`initialViewSeconds`) for later.
+    - `getView` / `setView` read and write the saved view, so a project saved or opened in big video keeps the real zoom.
+
+    Off, it calls `setView(saved)`.
+
+  - **Lock before the layout changes, unlock after.** A view is saved as "seconds in view", measured on the waveform's width. Saving it after the big layout had widened the waveform brought the zoom back wrong (1910 → 1366 px in the test).
+    - `big-video.js` `render()` therefore locks _before_ adding the class and unlocks _after_ removing it.
+    - The `big-video` class on `#app` now means "big layout on screen": on, and a video on the stage. A `MutationObserver` on `#stage`'s class re-runs `render()` when the video goes to its own window and comes back. While the video is out, the waveform is unlocked with its own zoom.
+    - The CSS no longer needs `:has(.stage.has-video)`.
+  - **Edge to edge.** In big video, `.app` loses its padding and gaps, and so do the workspace and the stage. The picture, timeline and transport lose their borders, corners and shadows; the timeline and transport keep a top hairline. The strip's height is one variable, `--big-video-wave` (32 px).
+- **Where:**
+  - `src/waveform.js` (`fitLocked`, `lockedView`, `lockFit`; `wheel`, `load`, `getView`, `setView`; header)
+  - `src/features/big-video.js` (`render`, the observer, header)
+  - `style.css` ("Big video")
+  - `tests/e2e/19-big-video.cjs`:
+    - edges at 0 / `innerWidth` and a 0 px radius
+    - the picture ≥ 85 %
+    - a strip ≤ 40 px at fit, which the wheel doesn't zoom
+    - the zoom restored on leaving
+    - the usual zoom while the video is in its own window
+    - video → video stays big
+  - `README.md`
+- **Verified by:** `npm run check`, and `TB_TOPICS=19 npm test` (20 e2e and 21 smoke, all passing). The full suite wasn't run, at the user's request. The screenshot `tests/output/big-video.png` shows the result.
+
+## 2026-10-10: Big video
+
+- **What:** with a video open, **F**, a new button over the picture (on hover, left of the pop-out button) or a double-click on the picture switches to "big video". This is not fullscreen. The picture takes almost all the window: 80 % of its height at 1200×800, against 32 % before.
+  - **Put away:** the top bar, the marks sidebar, the Sound dock, the minimap, and the timeline's ruler and marks lane.
+  - **Left:** a 64 px waveform strip (click to seek, as ever) and the transport.
+
+  The same toggles go back. Every key still works. The mode isn't remembered across restarts, and an audio file turns it off (a next video keeps it; see the next entry). With the video in its own window (V), the main window keeps its usual layout. Bringing the video back makes it big again.
+
+- **Why:** the user wanted a mode where the video is clearly the largest part of the UI when they want the image bigger, with the other parts small or minimised, without breaking the app. They chose the slim waveform strip over a short full timeline or the minimap alone. They also chose to hide both the dock and the top bar, the F / button / double-click toggles, and not remembering the mode.
+- **How:**
+  - **One class, `big-video` on `#app`.** `style.css` does the layout. Every rule is scoped to `.app.big-video:has(.stage.has-video)`, so the mode applies only while a video is on the stage. With an audio file, or the video in its own window (`video-window` takes `has-video` off), the usual layout returns with no wiring between the two features.
+  - **No sizing code changed.** The picture's canvas and the waveform already follow their containers (their ResizeObservers in `video/view.js` and `waveform.js` `bindResizeClamp`). A paused frame is redrawn, the waveform is redrawn at its new height, and the fit-to-width zoom is re-clamped for the wider stage.
+  - **Ruler and marks lane collapse to 0 height, not `display: none`.** Their rows go to 0 with `visibility: hidden`, so they keep their width. `timeline.js` `renderRuler` reads `ruler.clientWidth`, and leaving the mode needs no re-render.
+  - **Sidebar hidden by CSS only.** The remembered choice (`transcribee.sidebarHidden`, `features/layout.js`) is never touched.
+  - **F only works while a video is docked.** `toggleBigVideo` does nothing unless `#stage.has-video` is set. `bigVideoPictureChanged(false)` (from the video view's `onVisibilityChange`) turns the mode off when the picture goes.
+  - **Self-contained.** Removing it means deleting `src/features/big-video.js`, the "Big video" section of `style.css`, and the lines marked `Big video (` (`src/app.js`, the `i-enlarge` / `i-shrink` sprite symbols in `index.html`, `tests/run.cjs`).
+- **Where:**
+  - New: `src/features/big-video.js` (`bindBigVideo`, `toggleBigVideo`, `bigVideoPictureChanged`) and `tests/e2e/19-big-video.cjs`.
+  - Changed:
+    - `src/app.js` (import, `onVisibilityChange`, the F entry in `SHORTCUTS` under "Video", `start()`, the header's `features/` list)
+    - `style.css` ("Big video", before "Smaller windows")
+    - `index.html` (sprite: `i-enlarge`, `i-shrink`)
+    - `tests/run.cjs` (`TOPICS`)
+    - `README.md`
+- **Verified by:** `npm run check`, and the full `npm test`: 187 unit, 391 e2e and 21 smoke, all passing. Topic 19 checks:
+  - F hides the top bar, dock, sidebar and minimap. The picture is ≥ 75 % of the height, and the waveform strip is drawn at its height. The sidebar's stored choice is unchanged.
+  - F again restores the usual layout.
+  - The button and a double-click both toggle.
+  - V gives the usual layout, and bringing the video back is big again.
+  - An audio file turns it off, and F then does nothing.
+  - The next video opens normally.
+
+  The screenshot `tests/output/big-video.png` shows the result.
+
+## 2026-10-10: Notifications
+
+- **What:** small messages ("toasts") at the bottom centre of the window confirm that something worked:
+  - "Project saved", with the path
+  - "Downloaded “…”", with the path
+  - "Opened “…”" for a file or a project
+  - "Added N chapters as marks"
+
+  Each fades after 4 s, and a click dismisses it sooner. A new tab, **Settings › General**, has **Show notifications** (on by default) to turn them off.
+
+- **Why:** the user asked for a simple, modular, non-critical notification system, for things like where a file was saved, with a setting to turn it off. They chose "file / project opened" as the only extra event. They also asked to take notifications out of places they didn't belong: the "Saved as …" messages and the chapters notice sat in the transport bar's message line until something replaced them.
+- **How:**
+  - **`src/ui/toast.js`** has one export, `notify(text, detail?)`. On first use it adds a `.toasts` host (`role="status"`, `aria-live="polite"`) to `<body>`, so no markup is in `index.html`. It shows at most `CONFIG.notifications.max` (3) toasts, the oldest leaving first, for `CONFIG.notifications.showMs` (4000 ms). It reads `getPrefs("general").notifications`. The whole body is in `try/catch` (a `console.warn` at most), so a notification can never break the save, download or open that asked for it.
+  - **Split of duties:** notifications only confirm. The message line (`showNotice` / `reportError`) keeps errors and "works only partly" notices. With notifications off, nothing that matters is lost. I checked every other message: the Settings dialog's error line, the download dialog's search status, the loading screens and Electron's message boxes (unsaved changes, crashed page). All are errors, progress or real decisions in the right place, so they stay.
+  - **Settings:** `generalSection` comes first in `SECTIONS`, so the dialog opens on General. It has one boolean field, `notifications`. The main process normalises it like any section, so an old `prefs.json` gets the default.
+  - **Styles:** `.toasts` / `.toast` use theme tokens only, sit at `z-index: 30` (above the loading overlay), and take clicks only on the toasts. They fade and slide in and out, with no motion under `prefers-reduced-motion`.
+- **Where:**
+  - New: `src/ui/toast.js`.
+  - Changed:
+    - `src/config.js` (`notifications`)
+    - `src/prefs/index.js` (`generalSection`)
+    - `src/features/project/index.js` (`writeProject`, `loadMedia`, `openFile`, `openProjectFile`)
+    - `src/features/download.js` (the download's end)
+    - `src/ui/dom.js` (`showMessage`'s comment)
+    - `style.css` ("Notifications" before the shortcuts dialog; the reduced-motion block)
+    - `src/app.js` (header: `ui/` list, "A new notification")
+    - `README.md`
+  - Tests:
+    - `tests/e2e/harness.cjs` (`toasts()`, `clearToasts()`)
+    - `tests/e2e/13-settings.cjs` (the General tab first; the switch saves off and on)
+    - `tests/e2e/16-projects.cjs` (save → "Project saved" with the path and no "Saved" in the transport bar, plus a screenshot; opening a project → "Opened “Tone session.tbee”"; with the setting off, saving shows none)
+    - `tests/e2e/09-downloads.cjs` (the download's toast and path, an empty message line, the chapters toast)
+    - `tests/unit/prefs.test.mjs` (General's default; a non-boolean falls back to on)
+- **Verified by:** `npm run check`, and the full `npm test`: 187 unit, 376 e2e and 21 smoke, all passing. A new screenshot, `tests/output/project-saved-toast.png` (from `16-projects.cjs`), shows the "Opened" and "Project saved" toasts stacked at the bottom centre.
+
+## 2026-10-10: Fewer, larger files
+
+- **What:** the app's JavaScript went from 81 files to 50 (`src/` 71 → 42, `electron/` 10 → 8), and the tests from 41 to 40. No behaviour changed. Code was moved, not rewritten.
+- **Why:** the user felt the program had more files than its features justify. An audit found the amount of code fits the features, but the file count was inflated: 17 theme files of about 24 lines each, and many small modules with a single importer.
+- **How (old → new):**
+  - `src/themes/palettes/*.js` (17 themes) → `src/themes/palettes.js`, which also holds the `THEMES` list (menu order unchanged). `src/themes/mark-colors.js` → `src/themes/index.js`. `DEFAULT_THEME` is now looked up by id.
+  - `src/prefs/sections/{theme,waveform,downloads}.js` → `src/prefs/index.js` (`themeSection`, `waveformSection` (exported, for `waveform.js`), `downloadsSection`).
+  - `src/marks/format.js` → `src/marks/index.js` (same exports).
+  - `src/core/{files,memory,peaks,parts}.js` → `src/core/media.js`. It is still pure, so the decode workers import it.
+  - `src/features/loop.js` → `src/features/playback.js`; `src/features/search.js` → `src/features/download.js`; `src/features/theme-picker.js` → `src/features/settings.js` (its `opener` renamed `menuOpener`); `src/features/video-window/popup.js` → `src/features/video-window/index.js` (`ICONS`, `icon` and `buildVideoWindow` no longer exported).
+  - `src/ui/focus.js` → `src/ui/shortcuts.js`.
+  - `electron/theme-store.js` → `electron/prefs-store.js` (exports `createThemeView`). `electron/window-state.js` + `electron/video-window.js` → `electron/windows.js`. The state files (`window-state.json`, `video-window-state.json`) are unchanged.
+  - Tests: `tests/unit/parts.test.mjs` + `decoding.test.mjs` → `tests/unit/media.test.mjs`. `tests/e2e/10-themes.cjs` compares the theme menu with `THEMES.length` instead of counting files in `palettes/`. `tests/e2e/11-parallel.cjs` imports `setLoopRegion` from `playback.js`.
+  - Kept apart on purpose: `features/project/sections.js` (the one place that says what a project saves), `waveform-draw.js` and `video/proxy.js` (split off very large files), `decode-worker.js` and `preload.js` (must be their own files), `electron/system.js` (its unit test `require`s it; `main.js` would start the app), and the e2e topic files (`TB_TOPICS` picks them).
+- **Where:** the files above, plus every importer and every comment that named an old path: `src/app.js` (header map and "common changes"), `README.md` (Files, "Adding a setting", "Marks", "Adding a colour theme"), `index.html`, `style.css`, `docs/diagnostics/long-file-loading.md`, `tests/e2e/harness.cjs`, `tests/diagnostics/profile-load.cjs`, and the then/now table above.
+- **Verified by:** `npm run check`, and the full `npm test`: 185 unit, 370 e2e and 21 smoke, all passing. A `git grep` for every old path finds only this changelog's history.
 
 ## 2026-10-10: The loop's end line sits where B is
 

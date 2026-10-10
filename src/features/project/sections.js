@@ -20,9 +20,8 @@ import { CONFIG } from "../../config.js";
 import { marks, player, settings } from "../../context.js";
 import { MARKS_VERSION } from "../../marks/index.js";
 import { setEqEnabled, setSetting, setStepSize } from "../../ui/controls.js";
-import { getLoopRegion, setLoopRegion } from "../loop.js";
 import { resetMarks } from "../marks.js";
-import { getStartPoint, setStartPoint } from "../playback.js";
+import { getLoopRegion, getStartPoint, setLoopRegion, setStartPoint } from "../playback.js";
 
 /**
  * @typedef {object} Section
@@ -62,7 +61,7 @@ export const SECTIONS = [
     label: "the marks",
     version: MARKS_VERSION,
     dirties: true,
-    // Already versioned (src/marks/format.js), which also checks them on the way back.
+    // Already versioned (src/marks/index.js), which also checks them on the way back.
     capture: () => marks.toJSON(),
     restore: (data, { duration }) => resetMarks(duration, data),
   },

@@ -3,7 +3,7 @@
 // drawings (the waveform) don't, so they listen with onThemeChange().
 //
 // Which theme comes from the settings (section "theme", see
-// src/prefs/sections/theme.js); this follows them, whoever changes them.
+// src/prefs/index.js); this follows them, whoever changes them.
 // The preload has usually applied the saved theme already, before the
 // page rendered (no flash); applying it again here is harmless and makes
 // the page work without the preload too.

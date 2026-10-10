@@ -3,7 +3,7 @@
 // side, which runs several of these on one file in parallel).
 //
 // Messages, in order:
-//   page → { type: "open", media }   (a File, or { name, url }: core/files.js)
+//   page → { type: "open", media }   (a File, or { name, url }: core/media.js)
 //   ←      { type: "info", duration, sampleRate, channels }
 //   page → { type: "decode", peakFactor, from, to, preRoll }
 //          (or terminates the worker): frames [from, to) of the track,
@@ -33,8 +33,7 @@ import {
   Input,
   UrlSource,
 } from "../../node_modules/mediabunny/dist/bundles/mediabunny.mjs";
-import { mediaSource } from "../core/files.js";
-import { downsampleLevels } from "../core/peaks.js";
+import { downsampleLevels, mediaSource } from "../core/media.js";
 
 const scope = /** @type {any} */ (self);
 

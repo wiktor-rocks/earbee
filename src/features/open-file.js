@@ -16,11 +16,15 @@ import { DecodeFailure, decodeFile } from "../audio/decoder.js";
 import { CONFIG } from "../config.js";
 import { player } from "../context.js";
 import { AppError } from "../core/errors.js";
-import { fileExtension, isVideoFile } from "../core/files.js";
+import {
+  decodedBytes,
+  fileExtension,
+  fitsInMemory,
+  isVideoFile,
+  peaksPerSecondFor,
+  workerCount,
+} from "../core/media.js";
 import { formatDuration, formatMemory } from "../core/format.js";
-import { decodedBytes, fitsInMemory } from "../core/memory.js";
-import { workerCount } from "../core/parts.js";
-import { peaksPerSecondFor } from "../core/peaks.js";
 import { resetSoundSettings } from "../ui/controls.js";
 import {
   clearMessage,
@@ -33,7 +37,7 @@ import {
   setLoadingStatus,
   showPlayer,
 } from "../ui/dom.js";
-import { setLoopRegion } from "./loop.js";
+import { setLoopRegion } from "./playback.js";
 import { resetMarks } from "./marks.js";
 
 // The current load, while one runs; the UI is locked, so loads never
@@ -117,10 +121,10 @@ function explainDecodeFailure(error, media, isVideo) {
 }
 
 /**
- * Loads `media` (a File, or a download's { name, url }: core/files.js)
+ * Loads `media` (a File, or a download's { name, url }: core/media.js)
  * into the player; returns notices about what works only partly. Aborting
  * `signal` (Cancel) rejects with an AbortError and changes nothing.
- * @param {import("../core/files.js").Media} media
+ * @param {import("../core/media.js").Media} media
  * @param {AbortSignal} [signal]
  */
 export async function loadMediaFile(media, signal) {

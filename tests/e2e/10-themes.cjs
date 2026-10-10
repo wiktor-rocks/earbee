@@ -2,10 +2,9 @@
 // canvases), keyboard use, Automatic, saving the choice.
 // Part of the end-to-end run (see run.cjs); `h` is the harness.
 const fs = require("fs");
-const path = require("path");
 
 module.exports = async function (h) {
-  const { wc, js, dbg, key, shot, playing, ensurePaused, check, sleep, prefsFile, PROJECT } = h;
+  const { wc, js, dbg, key, shot, playing, ensurePaused, check, sleep, prefsFile } = h;
   const variable = (name) => js(`getComputedStyle(document.documentElement).getPropertyValue("${name}").trim()`);
   const themeId = () => js(`document.documentElement.dataset.theme`);
   const menuOpen = () => js(`document.getElementById("themeMenu").matches(":popover-open")`);
@@ -36,9 +35,9 @@ module.exports = async function (h) {
     (await menuOpen()) && (await js(`document.activeElement.dataset.choice`)) === "transcribee",
   );
   check(
-    "menu lists Automatic and every palette file",
+    "menu lists Automatic and every theme",
     (await js(`document.querySelectorAll("#themeMenu .theme-item").length`)) ===
-      1 + fs.readdirSync(path.join(PROJECT, "src", "themes", "palettes")).length,
+      1 + (await js(`import("./src/themes/index.js").then(({ THEMES }) => THEMES.length)`)),
   );
   key("Space");
   await sleep(300);

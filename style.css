@@ -59,7 +59,7 @@
   --loop-edge-off: var(--muted);
 
   /* Marks on the waveform: one per colour a mark can have (the dark shades;
-     src/themes/mark-colors.js) */
+     src/themes/index.js) */
   --mark-rose: #ff7aa2;
   --mark-orange: #ff9f43;
   --mark-green: #5fd38d;
@@ -1454,11 +1454,11 @@ body.dragging .welcome-hint {
   gap: 8px;
 }
 
-/* A popover: placed next to its button by features/theme-picker.js. */
+/* A popover: placed next to its button by features/settings.js. */
 /* One size whatever is picked (long names and Automatic's "follows the
    system: …" are cut short, the checked item isn't bolder, every item keeps
    room for its ✓), anchored by CSS to the button that opened it
-   (theme-picker.js names the anchor), so it never shifts while you choose;
+   (features/settings.js names the anchor), so it never shifts while you choose;
    a short window scrolls it inside. */
 .theme-menu {
   position: fixed;
@@ -1608,7 +1608,8 @@ body.dragging .welcome-hint {
   html .welcome:not(.settled) .welcome-content > *,
   html .welcome .welcome-logo,
   html .welcome .logo-aura::before,
-  html body.dragging .drop-ring rect {
+  html body.dragging .drop-ring rect,
+  html .toast {
     animation: none !important;
   }
 
@@ -1618,7 +1619,8 @@ body.dragging .welcome-hint {
   html body.dragging .drop-overlay,
   html .drop-card,
   html .pref-switch,
-  html .pref-switch::after {
+  html .pref-switch::after,
+  html .toast {
     transition: none !important;
   }
 
@@ -2703,6 +2705,62 @@ button.step-size:hover {
   text-transform: none;
 }
 
+/* ---------- Notifications (ui/toast.js) ----------
+   Small confirmations at the bottom centre, above everything but modal
+   dialogs; only the toasts themselves take clicks (one dismisses it). */
+
+.toasts {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: min(480px, calc(100vw - 32px));
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.toast {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 100%;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font: 600 12px/1.4 var(--sans);
+  cursor: pointer;
+  pointer-events: auto;
+  animation: toast-in 0.18s ease-out;
+  transition:
+    opacity 0.2s,
+    transform 0.2s;
+}
+
+.toast small {
+  color: var(--muted);
+  font: 11px/1.4 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.toast.leaving {
+  opacity: 0;
+  transform: translateY(6px);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
 /* ---------- Keyboard shortcuts dialog ---------- */
 
 .shortcuts-dialog {
@@ -2765,6 +2823,93 @@ button.step-size:hover {
   align-items: center;
   gap: 3px;
   color: var(--muted);
+}
+
+/* ---------- Big video (src/features/big-video.js) ----------
+   The picture takes all the height but a thin waveform strip (the whole
+   track, held at fit by waveform.lockFit, like a video player's timeline)
+   and the transport, edge to edge, square, with no gaps: the top bar, the
+   dock, the marks sidebar, the minimap and the timeline's lanes are put
+   away. #app has big-video only while a video is on the stage (not while
+   it is in its own window). The ruler and the marks lane shrink to
+   nothing rather than go, so they keep their width, which timeline.js
+   measures. The sidebar's own remembered choice is untouched. */
+
+:root {
+  --big-video-wave: 32px; /* the strip's height */
+}
+
+.app.big-video {
+  grid-template-rows: minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+}
+
+.app.big-video > .topbar,
+.app.big-video > .dock,
+.app.big-video .sidebar,
+.app.big-video .waveform-minimap {
+  display: none;
+}
+
+.app.big-video .workspace {
+  grid-template:
+    "stage" minmax(0, 1fr)
+    "transport" auto
+    / minmax(0, 1fr);
+  gap: 0;
+}
+
+.app.big-video .stage {
+  grid-template-rows: minmax(0, 1fr) var(--big-video-wave);
+  gap: 0;
+}
+
+.app.big-video :is(.video-pane, .timeline, .transport) {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.app.big-video :is(.timeline, .transport) {
+  border-top: 1px solid var(--hairline);
+}
+
+.app.big-video .transport {
+  padding-block: 4px;
+}
+
+.app.big-video .stage .timeline {
+  grid-template-rows: 0 0 minmax(0, 1fr);
+}
+
+.app.big-video .stage :is(.ruler, .marks-lane) {
+  visibility: hidden;
+}
+
+/* Over the picture's top-right corner while the pointer is on it, left of
+   the video window's button. */
+.video-pane {
+  position: relative;
+}
+
+.big-video-button {
+  position: absolute;
+  top: 8px;
+  right: 40px;
+  opacity: 0;
+  background: color-mix(in srgb, #000 55%, transparent);
+  color: #fff;
+}
+
+.video-pane:hover .big-video-button,
+.big-video-button:focus-visible {
+  opacity: 1;
+}
+
+.big-video-button:hover {
+  background: color-mix(in srgb, #000 75%, transparent);
+  color: #fff;
 }
 
 /* ---------- Smaller windows ----------

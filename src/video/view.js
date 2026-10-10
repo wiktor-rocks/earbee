@@ -40,7 +40,7 @@
  * Exposes: preload, prepare, show, clear, discard,
  *          start, advance, showFrameAt, attach
  *   prepare(media) → { video, reason }: opens a file (a File, or a
- *   download's { name, url }; core/files.js) without touching the
+ *   download's { name, url }; core/media.js) without touching the
  *   video on screen; `video` is null (with a reason) if it has no
  *   picture this app can decode. Never throws.
  *   attach({ pane, canvas }) moves the picture to another pane and
@@ -49,7 +49,7 @@
  * ===================================================================== */
 
 import { CONFIG } from "../config.js";
-import { mediaSource } from "../core/files.js";
+import { mediaSource } from "../core/media.js";
 import { createVideoProxy } from "./proxy.js";
 
 /**
@@ -102,7 +102,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
 
   /* ---------- Opening files ---------- */
 
-  /** @param {import("../core/files.js").Media} media */
+  /** @param {import("../core/media.js").Media} media */
   async function prepare(media) {
     let input = null;
     try {

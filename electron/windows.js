@@ -1,3 +1,66 @@
+// The app's windows. First, a window's size, position, maximised and
+// always-on-top state, kept between runs in <name>.json in the user-data
+// folder (window-state.json for the main window). Then the video window,
+// the one other window the page may open.
+const { app, screen } = require("electron");
+const fs = require("fs");
+const path = require("path");
+
+const stateFile = (name) => path.join(app.getPath("userData"), `${name}.json`);
+
+// The saved bounds, if they are sane and still on a connected display
+// (a monitor may have been unplugged since); otherwise `defaults`.
+function loadWindowState(minSize, defaults, name = "window-state") {
+  try {
+    const saved = JSON.parse(fs.readFileSync(stateFile(name), "utf8"));
+    const { x, y, width, height } = saved;
+    if (![x, y, width, height].every(Number.isFinite)) return defaults;
+
+    const visible = screen.getAllDisplays().some(({ workArea: area }) => {
+      const overlapX = Math.min(x + width, area.x + area.width) - Math.max(x, area.x);
+      const overlapY = Math.min(y + height, area.y + area.height) - Math.max(y, area.y);
+      return overlapX >= 100 && overlapY >= 100;
+    });
+    if (!visible) return defaults;
+
+    return {
+      x,
+      y,
+      width: Math.max(width, minSize.width),
+      height: Math.max(height, minSize.height),
+      maximized: saved.maximized === true,
+      alwaysOnTop: saved.alwaysOnTop === true,
+    };
+  } catch {
+    return defaults; // first run, or an unreadable file
+  }
+}
+
+function saveWindowState(state, name) {
+  try {
+    fs.mkdirSync(path.dirname(stateFile(name)), { recursive: true });
+    fs.writeFileSync(stateFile(name), JSON.stringify(state));
+  } catch (error) {
+    console.warn("Couldn't save the window state:", error);
+  }
+}
+
+// Tracks `win`'s bounds as they change and saves them once it is gone.
+// ("close" alone isn't enough: it doesn't fire when the page itself closes
+// the window.)
+function rememberWindowState(win, name = "window-state") {
+  let state = { ...win.getNormalBounds(), maximized: false, alwaysOnTop: win.isAlwaysOnTop() };
+  const remember = () => {
+    if (!win.isDestroyed())
+      state = { ...win.getNormalBounds(), maximized: win.isMaximized(), alwaysOnTop: win.isAlwaysOnTop() };
+  };
+  for (const event of ["resize", "move", "maximize", "unmaximize", "always-on-top-changed", "close"])
+    win.on(event, remember);
+  win.on("closed", () => saveWindowState(state, name));
+}
+
+/* ---------- The video window ---------- */
+
 // The video window (src/features/video-window/): the page may open one
 // window of its own, an empty same-origin page that it fills with the
 // video's picture. Every other window.open is still denied, and the video
@@ -7,14 +70,12 @@
 //              which is its process too), so closing the main window
 //              still quits the app; a canceled close (guardClose) leaves it.
 //   State      Its size, position and "always on top" are kept between
-//              runs in video-window-state.json (window-state.js); the page
+//              runs in video-window-state.json (as above); the page
 //              turns "always on top" on and off through the preload.
 //
-// Self-contained: removing the feature means deleting this file, its
+// Self-contained: removing the feature means deleting this part, its
 // lines marked "Video window (" in main.js and preload.js, and putting
 // back main.js's `setWindowOpenHandler(() => ({ action: "deny" }))`.
-const { loadWindowState, rememberWindowState } = require("./window-state");
-
 const FRAME_NAME = "transcribee-video"; // the page's window.open name
 const STATE_NAME = "video-window-state";
 const MIN_SIZE = { width: 240, height: 135 };
@@ -80,4 +141,4 @@ function allowVideoWindow(win, { icon, extraOptions = {} } = {}) {
   contents.on("render-process-gone", () => closeChild(true));
 }
 
-module.exports = { allowVideoWindow, handleVideoWindows };
+module.exports = { allowVideoWindow, handleVideoWindows, loadWindowState, rememberWindowState };

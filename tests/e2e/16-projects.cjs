@@ -7,7 +7,24 @@ const fs = require("fs");
 const path = require("path");
 
 module.exports = async function (h) {
-  const { wc, js, dbg, key, click, ensurePaused, check, sleep, projectDialogs, projectState, FIXTURES, OUTPUT } = h;
+  const {
+    wc,
+    js,
+    dbg,
+    key,
+    click,
+    ensurePaused,
+    check,
+    sleep,
+    projectDialogs,
+    projectState,
+    prefsStore,
+    toasts,
+    clearToasts,
+    shot,
+    FIXTURES,
+    OUTPUT,
+  } = h;
   const folder = path.join(OUTPUT, "projects");
   fs.rmSync(folder, { recursive: true, force: true });
   fs.mkdirSync(folder, { recursive: true });
@@ -120,6 +137,13 @@ module.exports = async function (h) {
     JSON.stringify(saved.media),
   );
   check(
+    "saving shows a notification with where, not a message in the transport bar",
+    (await toasts()).some((t) => t.text === "Project saved" && t.detail === linked) &&
+      !(await js(`document.getElementById("message").textContent`)).includes("Saved"),
+    JSON.stringify(await toasts()),
+  );
+  await shot("project-saved-toast.png");
+  check(
     "after saving, the title names the project and nothing is unsaved",
     (await title()) === "TranscriBee — Tone session.tbee" && projectState.get(wc.id)?.dirty === false,
     await title(),
@@ -139,8 +163,17 @@ module.exports = async function (h) {
     `${JSON.stringify(before)}\n     ${JSON.stringify(back)}`,
   );
   check("…with nothing unsaved", !(await unsaved()), await title());
+  check(
+    "opening a project says so in a notification",
+    (await toasts()).some((t) => t.text === "Opened “Tone session.tbee”"),
+    JSON.stringify(await toasts()),
+  );
 
-  // Ctrl+S on an opened project: written in place, no questions.
+  // Ctrl+S on an opened project: written in place, no questions. With
+  // notifications off (Settings › General), saving shows none.
+  prefsStore.set("general", "notifications", false);
+  await sleep(200);
+  await clearToasts();
   const asked = projectDialogs.asked.length;
   await slide("speed", 0.8);
   key("S", ["control"]);
@@ -152,6 +185,9 @@ module.exports = async function (h) {
       JSON.parse(fs.readFileSync(linked, "utf8")).sections.sound.speed === 0.8 &&
       !(await unsaved()),
   );
+  check("with notifications off, saving shows none", (await toasts()).length === 0, JSON.stringify(await toasts()));
+  prefsStore.set("general", "notifications", true);
+  await sleep(200);
 
   // Unsaved changes, then another file: Cancel keeps them, Don't save doesn't.
   key("M");

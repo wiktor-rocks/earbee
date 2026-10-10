@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, mock, test } from "node:test";
 import { createEmitter } from "../../src/core/emitter.js";
-import { fileExtension, isVideoFile, mediaSource } from "../../src/core/files.js";
+import { downsampleLevels, fileExtension, isVideoFile, mediaSource, peaksPerSecondFor } from "../../src/core/media.js";
 import { formatRulerTime, rulerTicks } from "../../src/core/ruler.js";
 import {
   clamp,
@@ -16,7 +16,6 @@ import {
   formatTrackTime,
   formatDuration,
 } from "../../src/core/format.js";
-import { downsampleLevels, peaksPerSecondFor } from "../../src/core/peaks.js";
 import { timelinePositionAt } from "../../src/core/timeline.js";
 
 describe("format", () => {

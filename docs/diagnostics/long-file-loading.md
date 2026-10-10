@@ -19,7 +19,7 @@ The results land in `tests/output/diagnostics/`. See [How it was measured](#how-
 Two follow-ups from the list at the end of "After the fix" were implemented (see `CHANGELOG.md`, "Long files decode in parallel" and "Downloads are read from disk").
 
 - **Parallel decoding.**
-  - A track of a minute or more is split into one part per spare core, up to 4. Each part is decoded by its own Worker (`src/audio/decoder.js`, `core/parts.js`).
+  - A track of a minute or more is split into one part per spare core, up to 4. Each part is decoded by its own Worker (`src/audio/decoder.js`, `core/media.js`).
   - The parts aren't copied into one array. The time stretcher plays them one after the other, which needed a fix in Signalsmith Stretch (see below).
 - **Downloads by URL.** The page reads a download from disk through a private URL (`electron/media-files.js`) instead of receiving its bytes.
 

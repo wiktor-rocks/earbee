@@ -116,7 +116,7 @@ contextBridge.exposeInMainWorld("transcribee", {
   },
 
   // Video window (src/features/video-window/): its "always on top"; each
-  // resolves to the state now (electron/video-window.js).
+  // resolves to the state now (electron/windows.js).
   videoWindow: {
     alwaysOnTop: () => ipcRenderer.invoke("video-window:always-on-top"),
     setAlwaysOnTop: (on) => ipcRenderer.invoke("video-window:always-on-top", Boolean(on)),

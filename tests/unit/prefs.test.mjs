@@ -144,6 +144,19 @@ describe("the theme section", () => {
   });
 });
 
+describe("the general section", () => {
+  const general = getSection("general");
+
+  test("defaults: notifications on", () => {
+    assert.deepEqual(defaultsOf(general), { notifications: true });
+  });
+
+  test("anything but true or false falls back to on", () => {
+    assert.equal(normalizePrefsFile({ general: { notifications: "no" } }).general.notifications, true);
+    assert.equal(normalizePrefsFile({ general: { notifications: false } }).general.notifications, false);
+  });
+});
+
 describe("the downloads section", () => {
   test("defaults: the usual folder, audio, chapters as marks, searching YouTube, 1080p", () => {
     assert.deepEqual(defaultsOf(getSection("downloads")), {

@@ -2,31 +2,35 @@
 // pure logic around them (which theme applies, the CSS variables it sets,
 // contrast). No DOM: the page applies themes in ui/theme.js, and the main
 // process uses this file too, for the window background
-// (electron/theme-store.js).
+// (electron/prefs-store.js).
 //
-// A new theme: add a file in palettes/ and list it in THEMES below. The
-// unit tests check that it defines every role and has readable contrast.
-// The marks' colours (mark-colors.js) are shared by every theme.
-import { MARK_COLORS, markColorVariable } from "./mark-colors.js";
-import catppuccinLatte from "./palettes/catppuccin-latte.js";
-import catppuccinMocha from "./palettes/catppuccin-mocha.js";
-import dracula from "./palettes/dracula.js";
-import everforestLight from "./palettes/everforest-light.js";
-import githubLight from "./palettes/github-light.js";
-import gruvboxDark from "./palettes/gruvbox-dark.js";
-import gruvboxLight from "./palettes/gruvbox-light.js";
-import monokai from "./palettes/monokai.js";
-import nord from "./palettes/nord.js";
-import oneDark from "./palettes/one-dark.js";
-import oneLight from "./palettes/one-light.js";
-import solarizedDark from "./palettes/solarized-dark.js";
-import solarizedLight from "./palettes/solarized-light.js";
-import tokyoNight from "./palettes/tokyo-night.js";
-import tokyoNightDay from "./palettes/tokyo-night-day.js";
-import transcribee from "./palettes/transcribee.js";
-import transcribeeLight from "./palettes/transcribee-light.js";
+// The themes themselves are in palettes.js (a new theme goes there). The
+// marks' colours (MARK_COLORS, below) are shared by every theme.
+import { THEMES } from "./palettes.js";
 
-export { DEFAULT_MARK_COLOR, MARK_COLORS, markColorVariable } from "./mark-colors.js";
+export { THEMES };
+
+// The colours a mark on the waveform can have (see src/marks). Unlike a
+// theme's roles they're the same in every theme, with one shade for dark
+// themes and one for light ones; cssVariables() sets them as --mark-<id>.
+// The unit tests check each is visible on every theme.
+
+/** @typedef {{ id: string, name: string, dark: string, light: string }} MarkColor */
+
+/** @type {MarkColor[]} */
+export const MARK_COLORS = [
+  { id: "rose", name: "Rose", dark: "#ff7aa2", light: "#c2185b" },
+  { id: "orange", name: "Orange", dark: "#ff9f43", light: "#b35400" },
+  { id: "green", name: "Green", dark: "#5fd38d", light: "#2e7d32" },
+  { id: "blue", name: "Blue", dark: "#6ea8ff", light: "#1f5fbf" },
+  { id: "violet", name: "Violet", dark: "#b88cff", light: "#7b3fbf" },
+  { id: "grey", name: "Grey", dark: "#aab2c0", light: "#5f6673" },
+];
+
+export const DEFAULT_MARK_COLOR = MARK_COLORS[0].id;
+
+/** @param {string} id */
+export const markColorVariable = (id) => `--mark-${id}`;
 
 /**
  * @typedef {object} Theme
@@ -43,31 +47,11 @@ export { DEFAULT_MARK_COLOR, MARK_COLORS, markColorVariable } from "./mark-color
  * @property {string} light The theme "auto" uses in light mode.
  */
 
-/** @type {Theme[]} */
-// Dark themes first, then light ones; the menu lists them in this order.
-export const THEMES = [
-  transcribee,
-  monokai,
-  dracula,
-  nord,
-  oneDark,
-  gruvboxDark,
-  solarizedDark,
-  catppuccinMocha,
-  tokyoNight,
-  transcribeeLight,
-  solarizedLight,
-  catppuccinLatte,
-  githubLight,
-  gruvboxLight,
-  oneLight,
-  tokyoNightDay,
-  everforestLight,
-];
-export const DEFAULT_THEME = transcribee;
+// TranscriBee, and TranscriBee Light for Automatic in light mode.
+export const DEFAULT_THEME = THEMES.find((theme) => theme.id === "transcribee");
 
 /** @type {ThemePrefs} */
-export const DEFAULT_PREFS = { choice: DEFAULT_THEME.id, dark: transcribee.id, light: transcribeeLight.id };
+export const DEFAULT_PREFS = { choice: DEFAULT_THEME.id, dark: DEFAULT_THEME.id, light: "transcribee-light" };
 
 // Each role and the CSS variable it sets. Optional roles are derived from
 // the others when a theme leaves them out (see DERIVED).

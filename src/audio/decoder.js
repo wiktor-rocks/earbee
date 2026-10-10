@@ -1,7 +1,5 @@
 import { CONFIG } from "../config.js";
-import { readWhole } from "../core/files.js";
-import { findJoin, joinParts, splitFrames } from "../core/parts.js";
-import { downsampleLevels } from "../core/peaks.js";
+import { downsampleLevels, findJoin, joinParts, readWhole, splitFrames } from "../core/media.js";
 
 /* =====================================================================
  * DECODER
@@ -11,7 +9,7 @@ import { downsampleLevels } from "../core/peaks.js";
  * decodeAudioData on the whole file (the old way, fine for short files).
  *
  * decodeFile(media, { prepare, onProgress, signal, workers }):
- *   media          a File, or a download's { name, url } (core/files.js)
+ *   media          a File, or a download's { name, url } (core/media.js)
  *   prepare(info)  called once the track is known, before decoding:
  *                  info = { duration, sampleRate, channels }; returns
  *                  { peakFactor (samples per peak), workers (how many
@@ -29,7 +27,7 @@ import { downsampleLevels } from "../core/peaks.js";
  *
  * In parallel, each part but the first starts decoding a little early to
  * warm up, and decodes a little past its end; the parts are then joined
- * where their samples match (core/parts.js findJoin), because timestamps
+ * where their samples match (core/media.js findJoin), because timestamps
  * aren't always sample-exact. If they don't match, the track is decoded
  * again in one part: slower, never wrong.
  * ===================================================================== */
@@ -43,7 +41,7 @@ export class DecodeFailure extends Error {
 }
 
 /**
- * @typedef {import("../core/files.js").Media} Media
+ * @typedef {import("../core/media.js").Media} Media
  * @typedef {{ duration: number, sampleRate: number, channels: number }} TrackInfo
  * @typedef {{ peakFactor: number, workers?: number }} DecodePlan
  * @typedef {object} DecodeOptions
@@ -51,7 +49,7 @@ export class DecodeFailure extends Error {
  * @property {(fraction: number) => void} [onProgress]
  * @property {AbortSignal} [signal]
  * @property {number} [workers]
- * @typedef {{ pieces: Float32Array[][], levels: import("../core/parts.js").Levels[], sampleRate: number, duration: number }} Decoded
+ * @typedef {{ pieces: Float32Array[][], levels: import("../core/media.js").Levels[], sampleRate: number, duration: number }} Decoded
  */
 
 const aborted = () => new DOMException("Decoding was canceled.", "AbortError");

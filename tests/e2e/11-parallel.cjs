@@ -109,7 +109,7 @@ module.exports = async function (h) {
     );
 
     await js(
-      `import("./src/features/loop.js").then(({ setLoopRegion }) => setLoopRegion({ start: ${join - 0.5}, end: ${join + 0.5}, enabled: true }))`,
+      `import("./src/features/playback.js").then(({ setLoopRegion }) => setLoopRegion({ start: ${join - 0.5}, end: ${join + 0.5}, enabled: true }))`,
     );
     await js(`import("./src/context.js").then(({ player }) => player.transport.seek(${join - 0.5}))`);
     key(",");
@@ -119,7 +119,7 @@ module.exports = async function (h) {
       seen.push(await pos());
     }
     await ensurePaused();
-    await js(`import("./src/features/loop.js").then(({ setLoopRegion }) => setLoopRegion(null))`);
+    await js(`import("./src/features/playback.js").then(({ setLoopRegion }) => setLoopRegion(null))`);
     const inside = seen.every((time) => time >= join - 0.55 && time <= join + 0.55);
     const wrapped = seen.some((time, i) => i > 0 && time < seen[i - 1]);
     check("a loop over a join stays in it and wraps", inside && wrapped, JSON.stringify(seen));

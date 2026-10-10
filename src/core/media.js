@@ -1,5 +1,100 @@
-// Decoding a track in parts, in parallel (see audio/decoder.js): where the
-// parts go, how many there are, and where each one joins the one before.
+// Media and decoding helpers. Pure, so the decode workers and the unit
+// tests use them too:
+//   - what a media file is (its name and type, and reading it),
+//   - how much memory a decoded track needs, and whether that fits,
+//   - waveform levels (peaks and loudness) from decoded samples,
+//   - decoding a track in parts, in parallel (see audio/decoder.js): where
+//     the parts go, how many there are, and where each one joins the one
+//     before.
+import { clamp } from "./format.js";
+
+/* ---------- Media files ---------- */
+
+/**
+ * Something to open: a File the user chose or dropped, or a file the main
+ * process serves by URL (a download; see electron/media-files.js). Either
+ * way it's read in pieces, never whole.
+ * @typedef {File | { name: string, url: string }} Media
+ */
+
+export const fileExtension = (name) => name.slice(name.lastIndexOf(".") + 1).toLowerCase();
+
+// `videoExtensions` is CONFIG.video.extensions.
+/** @param {Media} media @param {string[]} videoExtensions */
+export const isVideoFile = (media, videoExtensions) =>
+  ("type" in media && media.type.startsWith("video/")) || videoExtensions.includes(fileExtension(media.name));
+
+/**
+ * A Mediabunny source reading `media`. The classes are passed in (core
+ * imports nothing).
+ * @param {Media} media
+ * @param {{ BlobSource: any, UrlSource: any }} sources
+ */
+export const mediaSource = (media, { BlobSource, UrlSource }) =>
+  media instanceof Blob ? new BlobSource(media) : new UrlSource(media.url);
+
+/**
+ * All of `media`'s bytes at once (only for the decoding fallback, on files
+ * Mediabunny can't read).
+ * @param {Media} media
+ */
+export const readWhole = async (media) =>
+  media instanceof Blob ? media.arrayBuffer() : (await fetch(media.url)).arrayBuffer();
+
+/* ---------- Memory ---------- */
+
+// Bytes of decoded audio: one 32-bit float per sample per channel, which is
+// how the time-stretcher needs it.
+export const decodedBytes = (duration, sampleRate, channels) => Math.ceil(duration * sampleRate) * channels * 4;
+
+// Leave room for the rest of the app and the system: a track may use at
+// most `share` of the free memory. Unknown free memory (null) always fits.
+export const fitsInMemory = (bytes, freeBytes, share = 0.8) => freeBytes == null || bytes <= freeBytes * share;
+
+/* ---------- Waveform levels ---------- */
+
+// Reduce samples to two values per `factor` samples: the largest
+// magnitude (the peak, so transients survive in the drawing) and the RMS
+// (the loudness, which tells beats from gaps even in a loud mastered song,
+// where nearly every block peaks near full scale). Both are ≥ 0.
+// Runs over every sample of a song, so the inner loop is kept minimal.
+// Always new arrays (the worker transfers them), even for a factor of 1.
+/** @returns {{ peak: Float32Array, rms: Float32Array }} */
+export function downsampleLevels(samples, factor) {
+  const step = Math.max(1, factor);
+  const length = samples.length;
+  const count = Math.ceil(length / step);
+  const peak = new Float32Array(count);
+  const rms = new Float32Array(count);
+
+  for (let start = 0, out = 0; start < length; start += step, out++) {
+    const end = Math.min(start + step, length);
+    let max = 0;
+    let squares = 0;
+
+    for (let i = start; i < end; i++) {
+      const sample = samples[i];
+      squares += sample * sample;
+      if (sample > max) max = sample;
+      else if (-sample > max) max = -sample;
+    }
+
+    peak[out] = max;
+    rms[out] = Math.sqrt(squares / (end - start));
+  }
+
+  return { peak, rms };
+}
+
+// Peaks per second needed to draw a track of `duration` seconds at 2 peaks
+// per device pixel at maximum zoom, in a window at most `widestPx` wide.
+// `limits` is CONFIG.waveform.
+export function peaksPerSecondFor(duration, widestPx, { maxZoomMultiplier, minPeaksPerSecond, maxPeaksPerSecond }) {
+  const needed = (widestPx / duration) * maxZoomMultiplier * 2;
+  return clamp(Math.ceil(needed), minPeaksPerSecond, maxPeaksPerSecond);
+}
+
+/* ---------- Decoding in parts ---------- */
 
 /**
  * Splits `[0, totalFrames)` into `count` parts of about equal length:
@@ -98,4 +193,4 @@ export function joinParts(parts, keep, peakFactor) {
   return { pieces, levels, frames: keep.reduce((sum, frames) => sum + frames, 0) };
 }
 
-/** @typedef {{ peak: Float32Array, rms: Float32Array }} Levels One channel's waveform levels (core/peaks.js). */
+/** @typedef {{ peak: Float32Array, rms: Float32Array }} Levels One channel's waveform levels (downsampleLevels). */

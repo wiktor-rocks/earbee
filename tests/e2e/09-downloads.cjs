@@ -19,6 +19,7 @@ module.exports = async function (h) {
     sleep,
     prefsStore,
     externalOpens,
+    toasts,
     DOWNLOADS,
   } = h;
 
@@ -98,7 +99,15 @@ module.exports = async function (h) {
     check("downloaded audio opens in the player", u.file === audioName, JSON.stringify(u));
     check("window title names the download", (await js(`document.title`)) === `TranscriBee — ${audioName}`);
     check("downloaded audio has its full length", Math.abs((await duration()) - 6) < 0.1, `${await duration()}`);
-    check("notice says where it was saved", !u.error && u.message.includes(path.join(DOWNLOADS, audioName)), u.message);
+    check(
+      "a notification says where it was saved, the transport bar stays clear",
+      (await toasts()).some(
+        (t) => t.text === `Downloaded “${audioName}”` && t.detail === path.join(DOWNLOADS, audioName),
+      ) &&
+        !u.error &&
+        u.message === "",
+      JSON.stringify({ toasts: await toasts(), message: u.message }),
+    );
     key("Space");
     await sleep(600);
     const heard = await pos();
@@ -234,11 +243,11 @@ module.exports = async function (h) {
       JSON.stringify(chapters),
     );
     check("…each in the next colour", new Set(chapters.map((mark) => mark.color)).size === 3, JSON.stringify(chapters));
-    u = await ui();
     check(
-      "…the notice says so, and they aren't an unsaved change",
-      u.message.includes("Added 3 chapters as marks.") && !(await js(`document.title`)).endsWith("•"),
-      u.message,
+      "…a notification says so, and they aren't an unsaved change",
+      (await toasts()).some((t) => t.text === "Added 3 chapters as marks") &&
+        !(await js(`document.title`)).endsWith("•"),
+      JSON.stringify(await toasts()),
     );
     await download("https://fake.test/chapters", "video");
     await waitIdle();

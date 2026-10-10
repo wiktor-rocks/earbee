@@ -3,7 +3,7 @@
 // song, and the per-column values the drawing uses.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { downsampleLevels } from "../../src/core/peaks.js";
+import { downsampleLevels } from "../../src/core/media.js";
 import { columnLevels, rangeLevel, referenceLevel, shapeLevels, shapeOverview } from "../../src/core/waveshape.js";
 
 const DEFAULTS = { style: "bars", measure: "loudness", scale: "linear", stereo: "combined", height: 100 };
