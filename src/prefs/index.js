@@ -4,9 +4,10 @@
 import { normalizeAll } from "./fields.js";
 import downloads from "./sections/downloads.js";
 import theme from "./sections/theme.js";
+import waveform from "./sections/waveform.js";
 
 /** @type {import("./fields.js").Section[]} */
-export const SECTIONS = [theme, downloads];
+export const SECTIONS = [theme, waveform, downloads];
 
 /** @param {string} id */
 export const getSection = (id) => SECTIONS.find((section) => section.id === id);

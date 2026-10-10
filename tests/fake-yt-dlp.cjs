@@ -11,6 +11,13 @@
 //   https://fake.test/offline   fails like yt-dlp without a network
 //   https://fake.test/forbidden YouTube refuses the stream (HTTP 403)
 //   https://fake.test/flaky     refuses once (403), then works like /song
+//   https://fake.test/chapters  like /song, with chapters (any other: none)
+// A search (ytsearchN:words or scsearchN:words, with --flat-playlist)
+// prints one JSON line per result, honouring --playlist-items a:b:
+//   nothing   no results
+//   offline   fails like yt-dlp without a network
+//   slow      results, after 3 s (to test canceling)
+//   anything else: 12 results, "<words> 1" … "<words> 12"
 const fs = require("fs");
 const path = require("path");
 
@@ -24,11 +31,47 @@ const fail = (message, code = 1) => {
 // The link must come after "--", so it can never be read as an option.
 const dashes = args.indexOf("--");
 if (dashes === -1 || dashes !== args.length - 2) fail("fake-yt-dlp: the link must be the last argument, after --", 2);
-const url = new URL(args.at(-1));
-// What it was asked for, for the tests to check (e.g. the -f format).
-fs.writeFileSync(path.join(__dirname, "output", "fake-yt-dlp-args.json"), JSON.stringify(args));
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+const search = /^(yt|sc)search(\d+):(.*)$/.exec(args.at(-1));
+if (search) {
+  fs.writeFileSync(path.join(__dirname, "output", "fake-yt-dlp-args.json"), JSON.stringify(args));
+  const [, site, count, words] = search;
+  const [first, last] = option("--playlist-items").split(":").map(Number);
+  (async () => {
+    if (words === "offline") fail("[youtube:search] Unable to download API page: Temporary failure in name resolution");
+    if (words === "slow") await sleep(3000);
+    const total = words === "nothing" ? 0 : Math.min(12, Number(count));
+    for (let n = first; n <= Math.min(last, total); n++) {
+      const id = `fakeVideo${String(n).padStart(2, "0")}`;
+      console.log(
+        JSON.stringify({
+          id,
+          title: `${words} ${n}`,
+          channel: site === "yt" ? `Channel ${n}` : undefined,
+          uploader: `Uploader ${n}`,
+          duration: 60 + n,
+          view_count: 1500 * n,
+          url: site === "yt" ? `https://www.youtube.com/watch?v=${id}` : `https://api.soundcloud.com/tracks/${n}`,
+          webpage_url:
+            site === "yt" ? `https://www.youtube.com/watch?v=${id}` : `https://soundcloud.com/someone/track-${n}`,
+          thumbnails: [{ url: `https://fake.test/thumb-${n}.png`, width: 320 }],
+        }),
+      );
+    }
+  })();
+  return;
+}
+
+const url = new URL(args.at(-1));
+// Within the 6 s fixtures, as yt-dlp's %(chapters)j prints them.
+const CHAPTERS = [
+  { start_time: 0, title: "Intro", end_time: 2 },
+  { start_time: 2, title: "Verse", end_time: 4.5 },
+  { start_time: 4.5, title: "Outro", end_time: 6 },
+];
+// What it was asked for, for the tests to check (e.g. the -f format).
+fs.writeFileSync(path.join(__dirname, "output", "fake-yt-dlp-args.json"), JSON.stringify(args));
 (async () => {
   if (url.pathname === "/private") fail("[youtube] priv4te: Private video. Sign in if you've been granted access");
   if (url.pathname === "/offline") {
@@ -57,6 +100,7 @@ const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   for (const part of parts) {
     console.log("[tb-title] fakeId123 Test Song: “Quotes” / Slashes");
+    console.log(`[tb-chapters] ${url.pathname === "/chapters" ? JSON.stringify(CHAPTERS) : "NA"}`);
     const source = path.join(fixtures, part.file);
     const total = fs.statSync(source).size;
     const target = option("-o").replace("%(format_id)s", part.id).replace("%(ext)s", part.ext);

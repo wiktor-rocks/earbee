@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { describe, test } from "node:test";
 
-const { checkUrl, explainFailure, fileNameFor, DownloadError } = createRequire(import.meta.url)(
+const { checkUrl, explainFailure, fileNameFor, parseChapters, DownloadError } = createRequire(import.meta.url)(
   "../../electron/downloader.js",
 );
 
@@ -18,6 +18,45 @@ describe("checkUrl", () => {
     assert.throws(() => checkUrl("not a link"), DownloadError);
     assert.throws(() => checkUrl("file:///etc/passwd"), /Only web links/);
     assert.throws(() => checkUrl("--exec=rm"), DownloadError);
+  });
+});
+
+describe("parseChapters", () => {
+  test("yt-dlp's %(chapters)j, as a full album prints it", () => {
+    const printed =
+      '[{"start_time": 0, "title": "Off The Record", "end_time": 190}, {"start_time": 190, "title": "Baddie", "end_time": 343.5}]';
+    assert.deepEqual(parseChapters(printed), [
+      { start: 0, end: 190, title: "Off The Record" },
+      { start: 190, end: 343.5, title: "Baddie" },
+    ]);
+  });
+
+  test("none, or nothing readable: no chapters", () => {
+    for (const text of ["NA", "null", "", "{not json", '{"start_time": 0}', "42", undefined])
+      assert.deepEqual(parseChapters(text), [], String(text));
+  });
+
+  test("bad entries are left out, missing titles numbered, sorted by start", () => {
+    const chapters = parseChapters(
+      JSON.stringify([
+        { start_time: 30, end_time: 40, title: "  Late  " },
+        { start_time: -5, end_time: 10, title: "Negative" },
+        { start_time: 20, end_time: 10, title: "Reversed" },
+        { start_time: 5, end_time: 5, title: "Empty" },
+        { start_time: "1", end_time: 2, title: "Text time" },
+        { start_time: 0, end_time: 30 },
+        null,
+      ]),
+    );
+    assert.deepEqual(chapters, [
+      { start: 0, end: 30, title: "Chapter 2" },
+      { start: 30, end: 40, title: "Late" },
+    ]);
+  });
+
+  test("at most 500", () => {
+    const many = Array.from({ length: 600 }, (_, i) => ({ start_time: i, end_time: i + 1, title: `${i}` }));
+    assert.equal(parseChapters(JSON.stringify(many)).length, 500);
   });
 });
 

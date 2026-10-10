@@ -1,6 +1,7 @@
 // Settings › Downloads: where downloaded files go, and what the From
-// YouTube dialog downloads. electron/downloader.js reads them for each
+// YouTube dialog downloads, and where it searches. electron/downloader.js reads them for each
 // download; features/download.js starts the dialog on `kind`.
+import { DEFAULT_SOURCE, SEARCH_SOURCES } from "../../search/sources.js";
 import { defineSection } from "../fields.js";
 
 export const VIDEO_HEIGHTS = [480, 720, 1080, 1440, 2160];
@@ -8,6 +9,7 @@ export const VIDEO_HEIGHTS = [480, 720, 1080, 1440, 2160];
 export default defineSection({
   id: "downloads",
   title: "Downloads",
+  icon: "download",
   electronOnly: true,
   fields: [
     {
@@ -27,6 +29,21 @@ export default defineSection({
         { value: "audio", label: "Audio" },
         { value: "video", label: "Video" },
       ],
+    },
+    {
+      key: "chapters",
+      type: "boolean",
+      label: "Add a video's chapters as marks",
+      help: "When the uploader split the video into chapters, each becomes a region named after it.",
+      default: true,
+    },
+    {
+      key: "searchSource",
+      type: "choice",
+      label: "Search on",
+      help: "Where the From YouTube dialog searches when you type words instead of a link; it remembers the last one you used.",
+      default: DEFAULT_SOURCE,
+      options: SEARCH_SOURCES.map((source) => ({ value: source.id, label: source.name })),
     },
     {
       key: "maxHeight",

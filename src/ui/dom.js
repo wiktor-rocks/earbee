@@ -16,6 +16,9 @@ export const dom = {
   welcomeOpen: $("welcomeOpen"),
   welcomeMessage: $("welcomeMessage"),
   welcomeDownload: $("welcomeDownload"),
+  welcomeProjectFormat: $("welcomeProjectFormat"),
+  welcomeDropText: $("welcomeDropText"),
+  dropOverlayText: $("dropOverlayText"),
   loadingScreen: $("loadingScreen"),
   loadingStatus: $("loadingStatus"),
   loadingFileName: $("loadingFileName"),
@@ -26,12 +29,26 @@ export const dom = {
   overlayTitle: $("overlayTitle"),
   overlayCancel: $("overlayCancel"),
   downloadButton: $("downloadButton"),
+  saveButton: $("saveButton"),
+  saveDialog: /** @type {HTMLDialogElement} */ ($("saveDialog")),
+  saveForm: /** @type {HTMLFormElement} */ ($("saveForm")),
+  saveModeLink: /** @type {HTMLInputElement} */ ($("saveModeLink")),
+  saveModeEmbed: /** @type {HTMLInputElement} */ ($("saveModeEmbed")),
+  saveMediaName: $("saveMediaName"),
+  saveLinkNote: $("saveLinkNote"),
+  saveCancel: $("saveCancel"),
   downloadDialog: /** @type {HTMLDialogElement} */ ($("downloadDialog")),
   downloadForm: /** @type {HTMLFormElement} */ ($("downloadForm")),
   downloadUrl: /** @type {HTMLInputElement} */ ($("downloadUrl")),
   downloadClose: $("downloadClose"),
   downloadVideoLabel: $("downloadVideoLabel"),
   downloadFolder: $("downloadFolder"),
+  downloadSubmit: $("downloadSubmit"),
+  downloadChapters: /** @type {HTMLInputElement} */ ($("downloadChapters")),
+  searchSource: /** @type {HTMLSelectElement} */ ($("searchSource")),
+  searchStatus: $("searchStatus"),
+  searchResults: $("searchResults"),
+  searchMore: /** @type {HTMLButtonElement} */ ($("searchMore")),
   fileInput: /** @type {HTMLInputElement} */ ($("file")),
   fileInfo: $("fileInfo"),
   fileName: $("fileName"),
@@ -60,6 +77,9 @@ export const dom = {
   shortcutsDialog: /** @type {HTMLDialogElement} */ ($("shortcutsDialog")),
   shortcutsClose: $("shortcutsClose"),
   helpButton: $("helpButton"),
+  sidebarToggle: $("sidebarToggle"),
+  sidebar: $("sidebar"),
+  workspace: $("workspace"),
   marksList: $("marksList"),
   marksEmpty: $("marksEmpty"),
   marksCount: $("marksCount"),
@@ -126,10 +146,15 @@ export function renderStepSize() {
 }
 
 // The loop readout next to the track time; dimmed while the loop is off.
+// Kept short (↻, like the ▶ and ■ chips) so the transport stays one row;
+// the tooltip has it in full in case the chip is cut off.
 export function renderLoopInfo(region) {
   dom.loopInfo.hidden = !region;
   if (!region) return;
-  dom.loopInfo.textContent = `Loop ${formatTrackTime(region.start)} – ${formatTrackTime(region.end)}`;
+  const start = formatTrackTime(region.start);
+  const end = formatTrackTime(region.end);
+  dom.loopInfo.textContent = `↻ ${start}–${end}`;
+  dom.loopInfo.title = `Loop ${start} – ${end}${region.enabled ? "" : " (off)"}`;
   dom.loopInfo.classList.toggle("disabled", !region.enabled);
 }
 

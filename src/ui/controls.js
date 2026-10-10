@@ -160,7 +160,13 @@ export function resetEq() {
 export function changeStepSize(direction) {
   const { sizes } = CONFIG.step;
   const index = sizes.indexOf(settings.stepSize);
-  settings.stepSize = sizes[clamp(index + direction, 0, sizes.length - 1)];
+  setStepSize(sizes[clamp(index + direction, 0, sizes.length - 1)]);
+}
+
+/** One of CONFIG.step.sizes (anything else is ignored). @param {number} size */
+export function setStepSize(size) {
+  if (!CONFIG.step.sizes.includes(size)) return;
+  settings.stepSize = size;
   renderStepSize();
 }
 

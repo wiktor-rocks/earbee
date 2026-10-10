@@ -43,6 +43,387 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-10: Setting a loop no longer resizes the waveform
+
+- **What:** setting an A–B loop leaves the waveform's size alone. The transport bar stays on one row, and the loop chip is shorter (`↻ 0:12.345–0:20.000`, like the ▶ and ■ chips), with the full text in its tooltip. If the chips still don't fit, the message area gives way first, then the chips cut off with "…".
+- **Why:** the user reported that applying a loop changed the size of the waveform container.
+- **How:** two causes, both fixed:
+  - The loop region (`::part(loop-region)`, inside WaveSurfer's shadow DOM) was `content-box`, so a loop reaching the end (e.g. `[`, which sets B to the end) stuck out of the wrapper by its 4 px of borders. That widened the wrapper's `scrollWidth`, which `waveform.js` uses as the track width (`view().trackWidth`, the ruler, the lanes, zooming and the cursor). It's now `box-sizing: border-box`. (The page's global `box-sizing` rule doesn't reach into the shadow DOM.)
+  - In narrower windows, the extra loop chip wrapped the transport's chips onto a second row. `.main`'s `auto` row then took that height from the stage, and the waveform redrew shorter. `.transport` is now `flex-wrap: nowrap`, and `.transport-chips` and `.chip-button` can shrink (`min-width: 0`, `overflow: hidden`, `text-overflow: ellipsis`).
+- **Where:** `style.css` (`.waveform ::part(loop-region)`, `.transport`, `.transport-chips`, `.chip-button`, the "Smaller windows" comment); `src/ui/dom.js` (`renderLoopInfo`: the shorter text and a `title`); `tests/e2e/harness.cjs` (`loopRange` parses the new text); `tests/e2e/03-audio-and-loop.cjs` (new checks: a loop, including one reaching the end, keeps the waveform's height, the track width and the transport's height).
+- **Verified by:** `npm run check`, and `TB_TOPICS=01,02,03,04,05,06,07,08,16,17 npm test` (e2e 204 pass, smoke 21 pass). With `box-sizing` removed, the new "reaching the end" check fails (track 862 px instead of 858).
+
+## 2026-10-10: The theme menu keeps its size and place
+
+- **What:** the palette button's theme menu no longer changes size or moves while you pick themes. It always stays attached to the button that opened it, including after a window resize, and a short window scrolls it inside. The checked theme shows the accent colour and a ✓ but is no longer bold. A long Automatic line ("follows the system: X or Y") is cut short with "…", and the full pairing shows on hover.
+- **Why:** the user asked for a sturdier theme menu that doesn't resize itself and keeps its position when the theme changes.
+- **How:** the menu had only a `min-width`, so its width followed the longest line. That line changed with every pick (Automatic's text, the bold checked item, the ✓ only on the checked item). It was also placed once with pixel `left`/`top` from `getBoundingClientRect`. Now it has a fixed `width: 300px`, a `max-height` with `overflow-y: auto`, every item keeps room for the ✓ (`visibility: hidden` unless checked), and labels have ellipsis. It's placed by CSS anchor positioning (`position-anchor: --theme-open`, flipping near edges), the same way the EQ popover is. Because the menu opens from either the top bar or the welcome screen, `openFrom` gives `anchor-name` to whichever button opened it.
+- **Where:** `style.css` (`.theme-menu`, `.theme-item`, `.theme-name`); `src/features/theme-picker.js` (`openFrom`, `buttons`, `renderMenu`'s `title`, and the label wrapped in a span in `item`); `tests/e2e/10-themes.cjs` (a new check that the menu keeps its size and place).
+- **Verified by:** `npm run check`, and `TB_TOPICS=01,02,03,10,13 npm test` (e2e 114 pass, smoke 21 pass). The new check confirms the menu's box stays at 300×640 in the same place across Automatic, Catppuccin Mocha, Tokyo Night Day and Nord.
+
+## 2026-10-10: Six more colour themes
+
+- **What:** three new dark themes (**Solarized Dark**, **Catppuccin Mocha**, **Tokyo Night**) and three new light ones (**One Light**, **Tokyo Night Day**, **Everforest Light**). The menu now has 9 dark and 8 light themes. Four of them complete pairs that already existed: Solarized, Catppuccin, One Dark/Light, Tokyo Night/Day.
+- **Why:** the user brainstormed popular editor themes and picked these six.
+- **How:** one palette file each, built from the theme's official palette. Where a colour failed the readability or "too alike" checks in `tests/unit/themes.test.mjs`, only its lightness changed (or it was swapped for another colour from the same palette):
+  - Solarized Dark: the text is base1 a touch lighter (`#9aa8a8`) to read on the hover shade, and the red is lightened to `#e56765`.
+  - Catppuccin Mocha: the loop is Sapphire `#74c7ec`, because Latte's Teal sat too near Mauve.
+  - Tokyo Night: the start point is teal `#73daca`, because the default green sat too near the green loop. No other colour changed.
+  - One Light: the blue accent is darkened to `#3a6cda` so the light text on it reads, and the muted grey is a little darker. The loop is purple `#a626a4`, because green sat too near the start point.
+  - Tokyo Night Day: the palette is pale, so the text (`#3358b0`), muted grey (`#575c77`, darkened from the comment colour), blue (`#2565bd`) and red (`#b01e49`) are darkened, and the background is a lighter `#d6d8e1`. The start point is teal `#118c74`, apart from the green loop.
+  - Everforest Light: the palette is soft, so the text (`#56646b`), grey (`#636e62`), green accent (`#687701`) and red (`#bc413e`) are darkened.
+- **Where:** `src/themes/palettes/` (`solarized-dark.js`, `catppuccin-mocha.js`, `tokyo-night.js`, `one-light.js`, `tokyo-night-day.js`, `everforest-light.js`); `src/themes/index.js` (imports, `THEMES`: the dark ones after Gruvbox Dark, the light ones after Gruvbox Light); `README.md` (the list of themes).
+- **Verified by:** unit tests (185 pass), `npm run check`, and `TB_TOPICS=01,02,03,10 npm test` (e2e 87 pass, smoke 21 pass). The e2e theme test counts the palette files, so it covers the new themes.
+
+## 2026-10-10: A Gruvbox Dark theme
+
+- **What:** a new dark theme, **Gruvbox Dark**, listed after One Dark in the theme menu and in Settings. It's the dark counterpart of Gruvbox Light: warm grey-brown panels, cream text, the bright orange accent, a blue A–B loop.
+- **Why:** the user asked for a dark Gruvbox theme.
+- **How:** colours from morhetz's Gruvbox palette: `bg0_h` `#1d2021` for the background, `bg0` `#282828` for the panels, `fg` `#ebdbb2` for text, `#a89984` for muted text, `#fe8019` for the accent, and `#83a598` for the loop. Three colours differ from what the theme test would otherwise get:
+  - The error red is `#fb5a44`, a touch lighter than Gruvbox's `#fb4934`, which is 4.29:1 on the panels (text needs 4.5).
+  - The start point is Gruvbox's green `#b8bb26`, because the shared default green sat too near the blue-green loop.
+  - The stop point is Gruvbox's red `#fb4934`, set explicitly. Otherwise it would take the lightened error red, which sat too near the orange accent.
+- **Where:** `src/themes/palettes/gruvbox-dark.js` (new); `src/themes/index.js` (import, `THEMES`); `README.md` (the list of themes).
+- **Verified by:** `node --test tests/unit/*.mjs` (179 pass) and `npm run check`. The e2e theme test counts the files in `palettes/`, so it covers the new theme without changes, but it was not run here.
+
+## 2026-10-10: TranscriBee Light uses the dark theme's yellow
+
+- **What:** the TranscriBee Light theme's amber (played waveform, primary buttons, focus rings, and their hover) is now the same yellow as TranscriBee's: `#f5b301`, hovering to `#ffc52e`. Before, it was a darker `#b97e00` / `#cf9000`.
+- **Why:** the user wanted the yellow to be the same in both TranscriBee themes.
+- **How:** only the two colours changed; the minimap's played part is derived from the accent, so it follows. On the pale panels the yellow is about 1.8:1 against the surface, below the 3:1 the theme test asks of the accent, so that one check now skips `transcribee-light` (on purpose: one brand colour). The dark text on the accent (`accentInk`) still passes 4.5:1.
+- **Where:** `src/themes/palettes/transcribee-light.js`; `tests/unit/themes.test.mjs` ("readable").
+- **Verified by:** `node --test tests/unit/themes.test.mjs` and `npm run check`.
+
+## 2026-10-10: The From YouTube dialog looks like Settings
+
+- **What:** the From YouTube dialog (download a link, or search by words) has a new look, built the way Settings is:
+  - A header bar: the download icon on an amber tile, the title **From YouTube** with "Paste a link, or search by words" under it, and **Close** on the right. The Cancel button at the bottom is gone.
+  - One large search bar: a magnifier, the box, the site picker as a pill (only shown for words, as before) and **Download** / **Search** inside the bar. It gets an amber ring when focused.
+  - The options are cards, side by side (one under the other in narrow windows). **Get** has Audio / Video tiles, with "Sound only" and "up to 1080p" (the best quality from Settings) in small type. **Chapters as marks** is an on/off switch with a line of help.
+  - The search results are the only part that scrolls. A result under the mouse is shown as a card, and the pictures are a little larger.
+  - The footer says where downloads are saved, with the folder in a chip, and the rights note.
+  - A click outside the dialog closes it, as in Settings.
+- **Why:** the user asked for a more appealing From YouTube dialog, modelled on how Settings is structured, with changes that suit this dialog.
+- **How:**
+  - What it takes from Settings: the `.settings-head` header bar, the `.pref-field` cards with `.pref-head`, `.pref-label` and `.pref-help`, the `.pref-options-row` tiles (the radio is still there, hidden from view but focusable), the `.pref-switch`, the `.pref-path` chip, a scrolling middle with `scrollbar-gutter: stable`, and closing on a backdrop click. These are the same classes, not copies of the rules.
+  - What is its own: the search bar (`.youtube-search`), the icon tile (`.youtube-badge`), the cards' grid (`.youtube-options`), the footer, and the height. The dialog fits its content until results show. From then on (`.youtube-dialog:has(#searchResults:not([hidden]))`) it takes Settings' fixed height, so more pages of results never move the frame. With nothing to show, the results area is hidden, so there is no empty strip.
+  - Every id stays the same (`downloadUrl`, `searchSource`, `downloadSubmit`, `downloadChapters`, the `downloadKind` radios…), so `features/download.js` and `features/search.js` needed no logic changes. `#downloadVideoLabel` is now the Video tile's detail ("up to 720p"), not the whole label.
+  - The Save project dialog still uses the plain `.download-dialog` / `.download-form` look, and those shared rules are unchanged. Rules that only the old From YouTube layout used were removed: `.download-field`, `.download-check`, `.search-row`. A new `i-search` icon was added to the sprite. The misplaced comment above the Save dialog in index.html now describes that dialog.
+- **Where:** `index.html` (`#downloadDialog`, `i-search`); `style.css` ("From YouTube dialog" section, `.search-results` / `.search-result` / `.search-thumb` in "Searching"); `src/features/download.js` (`openDownloadDialog`, `bindDownloads`); `tests/e2e/09-downloads.cjs` (backdrop check), `tests/e2e/13-settings.cjs` (the Video detail text).
+- **Verified by:** `npm run check`; e2e topics 01, 02, 03, 09, 13 (141 pass), including a new check that a click on the backdrop closes the dialog. I looked at the `download-dialog.png` and `search-results.png` screenshots (dark theme).
+
+## 2026-10-10: The hover line stays under the mouse, and keeps up with it
+
+- **What:**
+  - The hover line on the waveform (and its time) now stays under a still mouse when the view moves beneath it: the view paging to follow playback, zooming, scrolling, the minimap, a resize. Its time changes instead. Before, it moved along with the waveform and only came back under the mouse once the mouse moved.
+  - It also comes back right after a click or drag, without moving the mouse, and the resize cursor at a loop edge updates when the view or the loop changes.
+  - The line trails the mouse less on quick moves.
+- **Why:** the user had to nudge the mouse after the view shifted, and asked for the line to follow the mouse more closely.
+- **How:**
+  - The waveform remembers the hovering mouse's x (`hoverX`; null while dragging or outside). `emitView`, which already runs on every scroll, zoom, redraw and resize, places the line there again (`refreshHover`). So does `setLoop`, and so does the end of a drag if the mouse is still over the waveform.
+  - Faster: the hover path listens to `pointerrawupdate` where there is one (Chromium; it comes as soon as the mouse moves, without waiting for the next frame as `pointermove` does), falling back to `pointermove`. Drags still use `pointermove` and one update per frame. `renderHoverLine` measures everything before changing anything, so it never forces a layout. It moves the line with `transform: translateX(px)` (`will-change: transform` in style.css) instead of `left: %`. It only rewrites the label's text and `part` when they change.
+- **Where:** `src/waveform.js` (`renderHoverLine`, `refreshHover`, `emitView`, `bindPointerSeek`, `setLoop`), `style.css` (`::part(hover-line)`), `tests/e2e/03-audio-and-loop.cjs`.
+- **Verified by:** `npm run check`; e2e topics 03 and 06 (55 pass). Two new checks in topic 03: the line is back after a click without the mouse moving, and after zooming in and scrolling sideways under a still mouse, it is still within 1 px of the mouse, with a new time. Topic 03 now zooms back to fit when it finishes, because topic 06 measures its zoom from the view it starts with. The smoke check "saved theme applied on the next start" failed on some runs and passed on others; it doesn't involve the waveform.
+
+## 2026-10-10: The video in a window of its own
+
+- **What:**
+  - A video can be popped out into its own window: the button that appears over the picture on hover (top right), or **V** (V again brings it back). Useful on a second screen, or as a small window beside an editor.
+  - Meanwhile the main window looks as it does for a song (the full-height timeline), with a slim strip on top: "The video is in its own window · **Bring back**".
+  - Moving the pointer over the video window shows the time, a **pin** (keep the window on top) and **Bring back**; they and the pointer hide after 2 s still. All keyboard shortcuts work there too.
+  - Remembered: once out, the next video (also after a restart) opens in the window too. A song closes the window; the next video reopens it. Bringing it back, or closing the window, ends that. The window's size, place and pin are kept between runs.
+  - Fixed on the way: a window made only taller or shorter (or the timeline given more room) now redraws the waveform at its new height; it used to keep the old height until the width changed.
+- **Why:** the user asked for a video pop-out, with the main window like an audio file's plus a way back. They chose the strip as the indicator, hover controls and "always on top" as extras, remembering the choice, and closing the window for a song. They asked for it to be modular and easy to remove later.
+- **How:**
+  - There is no `<video>`: `video/view.js` draws decoded frames on a canvas. The page opens an empty same-origin window (`window.open("", "transcribee-video")`), which shares its process, so the page builds that window's DOM and the video view draws into a canvas there through a new `attach({ pane, canvas })`. Nothing is decoded twice; the picture stays frame-exact. `attach` takes the ResizeObserver and `devicePixelRatio` from the pane's own window.
+  - The main window's animation frames (the transport's position events) stop while it is minimised, or covered on some systems. While the page is hidden and playing, the feature drives the picture from the video window's own frames (`followWhileHidden`), treating a backward step as a loop jump.
+  - Electron: `electron/video-window.js` replaces the deny-all `setWindowOpenHandler` with one that allows only that empty window (every other `window.open` is still refused, and the video window itself can't navigate or open windows). It closes the window when the main window closes or its renderer dies, so quitting still works, and a canceled close leaves it. Bounds and pin are saved through `window-state.js` (now named state files, with `alwaysOnTop`) in `video-window-state.json`. The pin goes through `window.transcribee.videoWindow` (preload).
+  - The waveform fix: WaveSurfer with `height: "auto"` only re-renders when its scroll container resizes, and that container's height follows its content. `bindResizeClamp` now re-renders (`setOptions({ height: "auto" })`, debounced 100 ms) when the container's height changes.
+- **Modularity (removing the feature):**
+  1. Delete `src/features/video-window/`, `electron/video-window.js` and `tests/e2e/18-video-window.cjs`.
+  2. `grep -rn "Video window ("` lists every wiring line (app.js, index.html's stylesheet link, main.js, preload.js, the e2e harness, run.cjs, smoke.cjs, and the expected shortcut groups in topic 01); delete them, or take "Video" out of topic 01's list. In `electron/main.js`, put back `win.webContents.setWindowOpenHandler(() => ({ action: "deny" }))` (it's quoted in the marked line), and in app.js drop the `videoPictureChanged` call from `onVisibilityChange`.
+  3. The generic hooks can stay; they do nothing unused: `videoView.attach`, the `target` window of `bindShortcuts` / `bindFocus`, and `window-state.js`'s `name` and `alwaysOnTop`. So can the waveform height fix (it's tested in topic 17).
+  4. The leftover `localStorage["transcribee.videoPopped"]` and `video-window-state.json` are harmless.
+- **Where:** `src/features/video-window/` (`index.js`: out and back, remembering, the strip and hover button, `followWhileHidden`; `popup.js`: the window's page and controls; `video-window.css`), `src/video/view.js` (`attach`, `observePane`), `src/ui/shortcuts.js` (`bindShortcuts`), `src/ui/focus.js` (`bindFocus`), `src/waveform.js` (`bindResizeClamp`), `src/app.js` (wiring, the V shortcut in a new "Video" group, `keysBlocked`), `index.html`, `electron/video-window.js`, `electron/window-state.js`, `electron/main.js`, `electron/preload.js`, `tests/e2e/18-video-window.cjs`, `tests/e2e/17-waveform.cjs`, `tests/e2e/harness.cjs`, `tests/run.cjs`, `tests/smoke.cjs`, `README.md`.
+- **Verified by:**
+  - A spike in Electron 44 (sandbox, context isolation) first: the empty child window is scriptable, a `VideoFrame` draws on its canvas, its ResizeObserver and animation frames run, a relative stylesheet loads, `pagehide` fires on close, and `window.open("https://example.com")` is still refused.
+  - New e2e topic 18 (19 checks): V opens the window; the main stage loses `has-video`, shows the strip and hides the pane; the waveform fills the taller timeline; the title; the picture follows a seek and playback; Space in the video window plays; the pointer wakes the controls; the pin sets always-on-top and is saved; a song closes the window and the next video reopens it, still pinned; closing the window brings the video back and the next video stays; other windows are refused. In the harness the video window is hidden rather than offscreen (an offscreen `window.open` window gets no size).
+  - A new check in topic 17: a taller and then shorter window redraws the waveform at its height. It failed before the fix (the waveform stayed 430 px in a 630 px timeline).
+  - `tests/smoke.cjs` (the real main.js) opens the video window, and the app still quits when the main window closes (21 pass).
+  - Screenshots: the main window with the strip; the video window with its controls.
+  - `npm run check`; `npm test`: 178 unit, 360 e2e (after updating topic 01's expected shortcut groups for the new "Video" group), 21 smoke, all pass.
+
+## 2026-10-10: The Settings dialog stays put, and looks better
+
+- **What:**
+  - The Settings dialog has one size. Switching tabs, or a field appearing (Automatic theme adds two pickers), no longer moves the dialog or its tabs. Fields that don't fit scroll inside it.
+  - The side tabs have icons (palette, waveform, download), and the open tab has an amber bar on its left.
+  - Choices without colour swatches are tiles: Shape, Show, Scale, Stereo, Download, Search on, Best video quality. The chosen tile is outlined in amber, with its detail in small type. Themes stay a list, with the chosen row tinted.
+  - Each setting is a card.
+  - On/off settings ("Add a video's chapters as marks") are a switch on the right of their label.
+  - The Height slider shows its value in an amber chip ("100 %").
+- **Why:** the user asked for a more appealing Settings dialog, above all one that doesn't shift as it changes. They chose the fixed size and all four visual ideas.
+- **How:**
+  - Before: the `<dialog>` was as tall as its content and centred, so every height change re-centred it (the test saw its top at 204, 38, 63 and 24 px across tabs).
+  - `.settings-dialog` now has a fixed width and height (`min(720px, 100vw − 32px)` × `min(760px, 100vh − 48px)`), and `.settings-panels` scrolls with `scrollbar-gutter: stable`.
+  - Sections can name an `icon` (a sprite id); `build()` in settings.js adds it to the tab, with a new `#i-wave` symbol.
+  - The `choice` renderer uses the list only for options with swatches; the rest are `.pref-options-row` tiles, whose radio stays in the DOM, visually hidden, so keyboards, screen readers and `input.click()` work as before. `:has(input:checked)` and `:has(input:focus-visible)` style the chosen and focused tile.
+  - `renderField` puts boolean controls in the field's head. `.pref-switch` is drawn with `appearance: none`, and its knob's slide is another `!important` exception to the base rule, off for reduced motion.
+  - Number fields have an optional `unit` (Height: "%", so its label lost the "(%)").
+- **Where:** `style.css` (the Settings dialog block, section 2's comment, the reduced-motion block), `index.html` (`#i-wave`), `src/features/settings.js` (`spriteIcon`, `build`), `src/ui/pref-fields.js` (`choice`, `number`, `renderField`), `src/prefs/fields.js` (`icon`, `unit` documented), `src/prefs/sections/*.js` (icons, Height's unit), `tests/e2e/13-settings.cjs`.
+- **Verified by:**
+  - A new check in `tests/e2e/13-settings.cjs` that the dialog's rect and the first tab stay identical through Theme → Waveform → Downloads → Theme → Automatic → Reset. It failed before the change and passes now (the dialog stays at 720 × 752 in the test window).
+  - `npm run check`, `npm run test:unit` (178 pass), e2e topics 13 and 17 (53 pass), and screenshots of each tab.
+
+## 2026-10-10: No slogan on the welcome screen
+
+- **What:** the line under the title ("Slow down, loop and transcribe the music you're learning") is gone.
+- **Why:** the user asked to remove it.
+- **How:** the `.welcome-tagline` paragraph and its style were removed. The title now carries the 32 px gap to the drop card the tagline used to give.
+- **Where:** `index.html` (the welcome screen), `style.css` (`.welcome-title`).
+- **Verified by:** `npm run check`. No tests were run (as the user asked).
+
+## 2026-10-10: The welcome screen's animations actually run; From YouTube… back beside Open
+
+- **What:** the bee now floats and its aura breathes, the entrance plays, and the drop card's lift, the marching border and the player's drop overlay fade all move, as the previous entry intended. From YouTube… is back to the right of the Open button.
+- **Why:** the user saw no animation at all, and preferred the buttons side by side. The longer Open label had pushed From YouTube… onto its own row.
+- **How:**
+  - The base rule in style.css (section 2) sets `animation: none !important; transition: none !important` on every element. The loader bars and the loading screen's pulse get past it with `!important`, but the new welcome animations and transitions didn't. They now carry `!important` too, and the base comment lists every exception.
+  - The reduced-motion block's selectors are prefixed with `html`, so they still win over those `!important` rules wherever they sit in the file.
+  - `.welcome-content` is 640 px wide instead of 560, so both buttons fit on one row.
+- **Where:** `style.css` (section 2's comment; section 4's welcome animations, `.drop-ring`, `.welcome-drop`; section 5's `.drop-overlay`, `.drop-card`; the reduced-motion block), `tests/e2e/02-welcome.cjs`.
+- **Verified by:** new checks in `tests/e2e/02-welcome.cjs`:
+  - From YouTube… is on the same row, right of Open.
+  - `bee-float` and `aura-breathe` are running, and their transforms change over 0.7 s.
+  - The entrance is done once `.settled` is set.
+  - With reduced motion emulated, the bee and aura stand still.
+  - While a song is dragged over, the card is lifted, the ring shows, `drop-march` runs, and its dash offset moves.
+  - E2E topics 01 and 02: 33 pass. `npm run check`.
+
+## 2026-10-10: A livelier welcome screen, and a drop indicator
+
+- **What:**
+  - **Dragging a file over the window** says what a drop will open: "Drop to open this song / video / file", with the matching icon (and "(the first of N)" for several files). On the welcome screen, the drop card lifts a little with an amber glow, its dashed border becomes amber dashes that slowly move round it, and the prompt takes the hint's place. Over the player, the page dims and a card with the same prompt and moving border fades in, replacing the old dashed outline. Dragged text or links no longer light anything up.
+  - **Gentle motion on the welcome screen:** the content rises in once on launch, and the bee floats by a few pixels while its glow breathes (6 s per cycle). All of it is off when the system asks for reduced motion.
+  - **Projects:** the Open button reads "Open a song, video or project…" with a Ctrl+O chip. The plain formats line became chips (Audio, Video, and, in the app, Project .tbee).
+  - The welcome screen's corner gear is the new gear from the top bar, at the same size.
+- **Why:** the user asked for a more appealing welcome screen, with tiny, non-irritating animations and an indicator for a file dragged over the window. The welcome screen didn't mention .tbee projects and still had the old gear. They picked all four ideas (drag indicator, breathing bee, entrance, format chips) and the player overlay.
+- **How:**
+  - `bindFileDrop` reacts only when `dataTransfer.types` has `"Files"`. It reads the first file item's MIME type (`audio/*` → song, `video/*` → video, else file; the name can't be read before the drop, so a .tbee is "file") into `body.dataset.dropKind`, and writes the prompt into both prompts.
+  - CSS shows the prompt, its icon (`#i-note`, `#i-film`, new `#i-project`) and the ring from `body.dragging` and `[data-drop-kind]`. The ring is an SVG `rect` with `rx` whose `stroke-dashoffset` animates only while it shows, so it follows the rounded corners.
+  - The entrance runs until app.js adds `#welcome.settled` (1 s after start), so a failed first file doesn't replay it.
+  - `bindProject` shows the Project chip in Electron, as it does the Save button.
+  - The style.css comments no longer count the animations ("1 of 2"); they describe each one, and the reduced-motion block covers the new ones.
+- **Where:** `index.html` (the welcome screen, `.drop-overlay`, `#i-project`, the corner icons), `style.css` (section 4: the welcome animations, `.drop-ring`, `.drop-prompt`, `.welcome-formats`, `.welcome-open kbd`; section 5: `.drop-overlay`, `.drop-card`; the reduced-motion block), `src/features/open-file.js` (`dragged`, `bindFileDrop`), `src/ui/dom.js`, `src/features/project/index.js` (`bindProject`), `src/app.js` (`start`), `tests/e2e/02-welcome.cjs`.
+- **Verified by:**
+  - `npm run check`.
+  - Screenshots from a scratch script: the welcome screen at rest; dragging a song; dragging two .tbee files ("Drop to open this file (the first of 2)"); dragging a video over the player. With reduced motion emulated, the bee and glow animations are `none`.
+  - No tests were run, as the user asked. The one welcome check that relied on the old look (an amber border on a file-less `dragover`) was updated to the new behaviour: a song's `dragover` shows "Drop to open this song". It hasn't been run.
+
+## 2026-10-10: Lines between the top bar's sections, no bee there, a clearer gear
+
+- **What:**
+  - Thin lines now separate every section of the top bar: the name | Open… / Save / YouTube… | the open file | the tools.
+  - The bee picture is gone from the top bar and is only on the welcome screen. The name stays first.
+  - The Settings gear has 8 even, centred teeth and is drawn a little bigger (18 px), so it reads like the icons beside it.
+- **Why:** the user asked for no bee in the main UI and separators between the sections. The gear looked small and not properly aligned: the old one was an uneven 6-tooth outline. (For a moment the name sat between the file buttons and the open file; the user preferred it back in front.)
+- **How:**
+  - `.topbar > * + *` gives every section after the first `padding-left` and a `border-left` hairline. This replaces the open file's own border.
+  - The `.brand` span lost its `<img>`, and `.brand-logo` was removed.
+  - The `#i-gear` symbol is a new path (outer radius 7, inner radius 5.3, centre circle 2.2), and `.settings-button .icon` is 18 px.
+- **Where:** `index.html` (the top bar, `#i-gear`), `style.css` (`.topbar > * + *`, `.brand`, `.file-info`, `.settings-button .icon`).
+- **Verified by:** `npm run check`, and a screenshot of the top bar. No tests were run (as the user asked).
+
+## 2026-10-10: Waveform code tidied up (no change in behaviour)
+
+- **What:** nothing changes for the user. The waveform code written this session is simpler, and the waveform test runs faster (topic 17: 122 s → 86 s).
+- **Why:** the user asked to clean up the code from the waveform redesign and the bar seam fix, which had grown in steps.
+- **How:**
+  - `core/waveshape.js`: `rangeLevel` (one range of values as their max or RMS) is used by `columnLevels` and by the bars, which no longer allocate an array per bar. `combineFor(kind)` decides RMS for loudness and max for peaks in one place. One `louderOf` replaces two ways of taking the louder channel. `referenceLevel` takes a `floor`, so the overview no longer makes a masked copy to find its quiet level. Constants sit at the top, helpers at the end, and the `Shaped` type is named.
+  - `waveform-draw.js`: bars always get the track (`trackWidth`, `pixelRatio`), so the guess from the canvas's values is gone. There's one pixel ratio, and the header describes the track-wide bar grid.
+  - `waveform.js`: `renderFrom(levels, look, track)` makes both renderFunctions (`renderWaveform`, `renderMinimap`). `MINIMAP_LOOK` is a plain constant, and `shapeOptions` became `loudnessWindow`.
+  - Tests: topic 17's helpers sit at the top, it uses `wc`/`win`/`key` directly, and it restores the defaults without a `try/catch`. The seam scan uses 3 zoom levels (fit, middle, deep) instead of 5, reaching the same depth. Topic 11 lost its guard from the red run. New unit tests cover `rangeLevel` and `referenceLevel`'s `floor`.
+- **Where:** `src/core/waveshape.js`, `src/waveform-draw.js`, `src/waveform.js`, `tests/e2e/17-waveform.cjs`, `tests/e2e/11-parallel.cjs`, `tests/unit/waveshape.test.mjs`.
+- **Verified by:**
+  - `npm run check` and `npm run test:unit` after each step (178 pass).
+  - E2E topics 03, 06, 10, 11, 13 and 17: 132 pass, the same checks as before the cleanup, in 142 s instead of 179 s.
+  - The screenshots (`tests/output/waveform-*.png`) look the same.
+
+## 2026-10-10: No gaps in the bar waveform where its canvases meet
+
+- **What:** the bars no longer have a strip of background cutting the waveform in two, or a bar drawn at two heights. Every gap between bars is the same, at any zoom, scroll and display scaling.
+- **Why:** the user reported a gap where the background showed through. It first showed in both shapes (in the old drawing, and in other apps using WaveSurfer), and in the bars only after the redesign.
+- **How:**
+  - WaveSurfer draws a zoomed-in track on several canvases side by side (858 CSS px each here), at whole CSS pixels.
+  - The old drawing let WaveSurfer draw bars, and it rounds each canvas's width down to the bar spacing (`clampWidthToBarGrid` in its `renderer-utils.js`). That can leave a strip at the seams. Since the redesign WaveSurfer doesn't know about bars, which fixed the continuous shape.
+  - Our own first bar code then spread each canvas's bars over that canvas alone, with fractional widths. Gaps doubled at seams (2 px where the gap is 1 px).
+  - Under display scaling (125 %), a canvas also starts on a fraction of a pixel, and each canvas's own idea of its values drew a bar cut by a seam at two heights (105 px vs 94 px).
+  - Now `fillBars` lays the bars out on the **whole track**, in whole pixels of WaveSurfer's ratio (`max(1, devicePixelRatio)`, as it sizes its canvases): slot `round(3·ratio)`, bar `round(2·ratio)`. They are mapped onto each canvas exactly, with no rounding of where it starts. A canvas draws the bar cut by its edge too, and every bar takes its values from the whole track (`trackWidth`, passed by `render`), so both halves of a cut bar match.
+- **Where:** `src/waveform-draw.js` (`fillBars`, `drawWaveform`'s new `track` argument), `src/waveform.js` (`render` passes `trackWidth` and `pixelRatio`).
+- **Verified by:** tests run red first.
+  - New `tests/unit/waveform-draw.test.mjs`: canvases laid out as WaveSurfer does, at 100, 125, 150 and 90 %. Checks one even grid with no bar missing at a seam, and a cut bar as tall on both sides. It failed at 125 % before the fix.
+  - The seam check in `tests/e2e/17-waveform.cjs` (`longestGap`): real screenshots of a steady 90 s sound along the middle, 5 zooms × 5 scrolls, paging a view-width at a time read at once, at 100, 125, 150 and 90 % (a page zoom changes `devicePixelRatio` as display scaling does). The continuous shape may show no background; bars only their own gap, `round(3s) − round(2s)`. It failed at 100 % and 90 % with the first bar code, and at 125 %/150 % with a whole-pixel grid that rounded where each canvas starts.
+  - After: `npm run test:unit` (176 pass), `npm run check`, e2e topics 03, 06, 10 and 17 (99 pass).
+
+## 2026-10-10: The minimap exaggerates loud and quiet parts
+
+- **What:** the minimap stretches each song's quiet and loud parts apart. The quietest sound is a thin band (12 % of the height), the loudest fills it, and silence is empty. Choruses, drops and breaks stand out, which makes the song easier to find your way around. It is always drawn as one filled shape, whatever Settings › Waveform says. The main waveform is unchanged.
+- **Why:** the user asked for exaggerated peaks and valleys in the minimap, to make navigating easier.
+- **How:** `shapeOverview` smooths the loudness of both channels (louder of the two) over about 60 ms, three loudness windows. It then maps the 1st to the 99.5th percentile, in dB, onto 12–100 % of the height. A range under 3 dB is widened (`OVERVIEW_MIN_DB`), so a steady sound isn't blown up from its own wobbles. Anything 80 dB below the loudest counts as silence. The minimap's `renderFunction` is `renderOverview`, which draws the overview with the continuous shape.
+- **Where:** `src/core/waveshape.js` (`shapeOverview` and the `OVERVIEW_*` constants), `src/waveform.js` (`renderOverview`, `overview`, `minimapOptions`, `load`).
+- **Verified by:** tests written first and run red. In e2e, the minimap's column-height variation matched the waveform's (0.22 vs 0.24). After: three new unit tests in `waveshape.test.mjs` (exaggeration vs the waveform, the same at any volume, silence and floor, a steady sound); 168 pass. A new check in `tests/e2e/17-waveform.cjs` on the new fixture `verse-chorus.wav` (minimap variation 0.69 vs the waveform's 0.24), and it stays inside its card. `npm run check`, and e2e topics 03, 06, 10 and 17 (91 pass). Screenshot: `tests/output/waveform-minimap.png`.
+
+## 2026-10-10: The waveform is scaled alike for every song; Settings › Waveform
+
+- **What:**
+  - The waveform fills its card about the same way from song to song. A quiet song with one loud click is no longer a thin line, and a loud, mastered song is no longer a solid block: its beats and gaps show. Nothing is ever drawn outside the card.
+  - It shows **loudness** (RMS) by default instead of peaks, and stereo is drawn **combined** (the louder channel, mirrored) instead of left on top and right below.
+  - A new **Settings › Waveform** tab (also in a plain browser): **Shape** (Bars, the default; Continuous, one filled shape; Peak + loudness, pale peaks around a solid loudness core), **Show** (Loudness or Peaks; hidden for Peak + loudness, which shows both), **Scale** (Linear, or Logarithmic in dB, which brings out quiet parts), **Stereo** (Combined, or Left above and right below) and **Height** (50–300 %). A change redraws at once, keeping the zoom and scroll, and the minimap follows.
+- **Why:** the user reported that on some tracks the waveform looked compressed with few peaks, on others it was very small, and on some it went out of bounds. They wanted it consistent and suited to transcribing, plus a choice of shape (bars or continuous). Shapes, the default and the stereo setting were chosen with them.
+- **How:**
+  - Decoding now keeps two values per slice: the peak magnitude and the RMS (`downsampleLevels`, in the same single pass as before).
+  - Shaping is pure (`core/waveshape.js`). The scale comes from the 99.5th percentile of the drawn measure (`referenceLevel`, a log-spaced histogram in one pass), not the loudest sample, so one spike can't shrink the rest. The reference fills 90 % of each half, and every value is clamped to 0…1, which is why nothing can spill out. Loudness is a sliding ~20 ms RMS (`slicesPerWindow`). Without it, a short track, which has only a few samples per slice, measured its "RMS" on the wave itself and drew lower than a long one. Two-tone scales both layers by the peak reference and keeps the core under the outline.
+  - WaveSurfer no longer scales or draws. It gets an "index channel" (`(i + 0.5) / N`, always ≤ 1, so its own normalising leaves it alone) and our `renderFunction`. The slice of that channel each lazily drawn canvas receives says which levels to draw (`waveform-draw.js`). The minimap draws the same way. Columns combine as max for peaks and as RMS for loudness, so a single loud slice doesn't fill a zoomed-out column. The progress canvas is WaveSurfer's `source-in` copy, so the played part keeps the shape and both tones.
+  - `waveform.setAppearance` re-shapes and redraws through the shared `redraw()`, which `refreshColors` now uses too.
+- **Where:** `src/core/peaks.js` (`downsampleLevels`, replacing `downsamplePeaks`), `src/core/parts.js` (`joinParts` joins `levels`), `src/audio/decode-worker.js`, `src/audio/decoder.js` (`Decoded.levels`), `src/features/open-file.js`, new `src/core/waveshape.js`, new `src/waveform-draw.js`, `src/waveform.js` (`render`, `indexChannel`, `redraw`, `setAppearance`, `load`), new `src/prefs/sections/waveform.js` (listed in `src/prefs/index.js`), `src/app.js` (follows the `waveform` prefs).
+- **Verified by:** the tests were written first and run before the change. Before: quiet-spike drew at 3 % of the height, loud-beats as a block (column variation 0), and stereo as left-only on top. After: new `tests/unit/waveshape.test.mjs`, levels tests in `core.test.mjs` and `parts.test.mjs`, the waveform section in `prefs.test.mjs` (`npm run test:unit`: 165 pass). New e2e topic `tests/e2e/17-waveform.cjs`, which measures the drawn canvases column by column on three new fixtures (`quiet-spike.wav`, `loud-beats.wav`, `stereo-left.wav`, made by `make-fixtures.sh`), plus the shapes, saving, the kept view and the minimap. `13-settings.cjs` and `11-parallel.cjs` were updated. `npm run check`, and e2e topics 03, 06, 10, 11, 13 and 17 (122 pass). The full `npm test` was not run. Screenshots: `tests/output/waveform-*.png`.
+
+## 2026-10-10: The view follows the cursor when stepping with the arrows
+
+- **What:** when zoomed in, stepping with ← / → (or jumping to a mark with Shift+← / →) past the edge of the view now pages the view to the cursor, paused or playing. Stepping back off the left edge while paused puts the cursor at the right edge, so the next steps back stay in view.
+- **Why:** the user reported that the view stayed put while the arrows moved the cursor out of it.
+- **How:** the view was only paged from the transport's `position` event while playing. The `jump` listener (every seek) now also calls `waveform.follow(time, { backward: !transport.playing })` after `resumeFollow()`. `follow`'s new `backward` option scrolls so a cursor that left on the left is at the right edge; otherwise it pages to the left edge as before. While playing, the left edge is kept, since playback moves right.
+- **Where:** `src/waveform.js` (`follow`), `src/app.js` (the `jump` listener).
+- **Verified by:** `npm run check`. Not yet tried by hand in `npm start`.
+
+## 2026-10-10: A downloaded video's chapters become regions
+
+- **What:**
+  - When a downloaded video has chapters from its uploader ("0:00 Intro, 1:23 Verse…"; common on full albums, lessons and live sets), the file opens with one **region** per chapter. Each is named after its chapter, and the colours alternate through the mark colours so neighbouring chapters are told apart.
+  - The notice adds "Added 6 chapters as marks." The regions are part of what was opened, so they aren't an unsaved change; editing or deleting them is.
+  - A checkbox in the download dialog, "Add the video's chapters as marks", turns it off. It is remembered as a new setting, Settings › Downloads (on by default).
+- **Why:** the user asked to import the uploader's timestamps as regions.
+- **How:**
+  - The download's existing yt-dlp run also prints `before_dl:[tb-chapters] %(chapters)j`, so there's no extra request. For a video download it prints once per part, so the first is kept.
+  - `parseChapters` reads it. `NA` (no chapters) or anything unreadable gives `[]`. Entries without finite times, with a negative start, or with an end not after the start are dropped. Empty titles become "Chapter n". There are at most 500, sorted by start.
+  - The result reaches the page with the download's answer (`chapters`). `loadMedia(media, signal, { chapters })` adds them through the new `importChapters` after the file loads and before the session's saved state is taken.
+  - The marks store clamps their times to the track and drops regions that are too short.
+- **Where:**
+  - `electron/downloader.js` (`parseChapters`, `fetchParts`, `download` now returns `{ file, chapters }`, `handleDownloads`).
+  - `src/features/marks.js` (`importChapters`), `src/features/project/index.js` (`loadMedia`).
+  - `src/features/download.js` (the checkbox, `downloadLink`), `src/prefs/sections/downloads.js` (`chapters`).
+  - `index.html` (`#downloadChapters`), `src/ui/dom.js`, `style.css` (`.download-check`), `README.md`.
+- **Verified by:**
+  - `npm run check`.
+  - `tests/unit/downloader.test.mjs` (`parseChapters`: the real shape, `NA` and garbage, bad entries, the cap).
+  - `tests/e2e/09-downloads.cjs`: no chapters adds no marks; `/chapters` gives Intro, Verse and Outro at their times in 3 colours, with the notice and no •; a video's two parts give 3, not 6; unticked gives none and is remembered. The fake yt-dlp prints `[tb-chapters]` for `https://fake.test/chapters`, else `NA`.
+  - `tests/unit/prefs.test.mjs` updated for the new default.
+  - Full `npm test`: unit 146/146, e2e 306/306, smoke 20/20.
+  - A live download with the real yt-dlp of a chaptered full album (its 5 tracks came back with the file). Not yet tried by hand in `npm start`.
+
+## 2026-10-09: Search by keywords in the download dialog
+
+- **What:** the download dialog ("Download or search", from YouTube… / From YouTube…) takes a link **or** words.
+  - With words, the button reads **Search** and a site picker (YouTube, SoundCloud) appears. 8 results are listed, each with its picture, title, "channel · length · views", and an arrow that opens its page in the system browser. **Show more** adds the next 8.
+  - Clicking a result closes the dialog and downloads it (Audio/Video as chosen), exactly like a pasted link.
+  - The status line says "Searching YouTube…", shows the downloader's first-time setup progress, says "No results for “…” on YouTube.", or explains a failure. Changing site searches the same words there.
+  - A new search, or closing the dialog, stops one still running.
+  - The last site is remembered as a new setting, Settings › Downloads › "Search on".
+- **Why:** the user asked for downloading by keywords, with a few results to choose from. They picked thumbnails, Show more, opening a result in the browser, and other sites to search.
+- **How:**
+  - **Searching:** yt-dlp's flat search (`ytsearchN:` / `scsearchN:`, `--flat-playlist --dump-json --playlist-items a:b`): one JSON line per result, without opening each video, about 2 s a page against the real sites. Page 2 asks for 16 items and keeps 9–16. The words go through `cleanQuery` (one line, no control characters, at most 200 characters) and come after `--`, so they can never be read as an option.
+  - **Results:** `normalizeResult` keeps a result only if its link is https on the source's hosts. For SoundCloud that is `webpage_url`, since its `url` is the API. It picks the smallest picture at least 160 px wide, else the widest; a YouTube result without one gets `i.ytimg.com/vi/<id>/mqdefault.jpg`.
+  - **Pictures:** fetched in the main process with `net.fetch`, 4 at a time. Only https and jpeg/png/webp/gif up to 300 KB are accepted, within 10 s. Each is sent to the page as a `data:` URL (`download:thumbnail { searchId, index, src }`). The page's CSP is unchanged and the page still never touches the network. Pictures for a list no longer shown are ignored, and ones that arrive before their list are held until it's drawn.
+  - **Opening in the browser:** `download:open-external` calls `shell.openExternal` only for an https link on a source's hosts (`isResultLink`).
+  - **Downloader:** `run()`, the yt-dlp setup and the GitHub fetches now take their job explicitly, so a search has its own job and cancel and never touches a download's. Setup is shared through one in-flight promise.
+  - **YouTube Music is not offered:** checked against the real site, its search results through yt-dlp have only a title (no artist, length or picture), so the rows can't be told apart. If yt-dlp starts returning more, adding it is one entry in `SEARCH_SOURCES`.
+- **Where:**
+  - New: `src/search/sources.js` (`SEARCH_SOURCES`, `PAGE_SIZE`, `cleanQuery`, `normalizeResult`, `isLinkOn`, `isResultLink`; a new lint layer above `prefs/`) and `src/features/search.js` (`searchFor`, `bindSearch`, `resetSearch`, `updateSearchMode`, `cancelSearch`).
+  - `electron/downloader.js`: `search`, `cancelSearch`, `fetchThumbnail`, the `download:search` / `download:cancel-search` / `download:open-external` handlers, `sendThumbnails`; `run(job, …)`, `prepare(job, …)`.
+  - `electron/preload.js` (`search`, `cancelSearch`, `onThumbnail`, `openExternal`), `electron/main.js` (`shell.openExternal`).
+  - `src/features/download.js` (words search, a result downloads), `src/prefs/sections/downloads.js` (`searchSource`), `src/core/format.js` (`formatCount`), `src/ui/dom.js`.
+  - `index.html` (the box is a text field with the site picker, `#searchStatus`, `#searchResults`, `#searchMore`, the `i-external` icon; the title "Download or search").
+  - `style.css` (the dialog is 640 px wide and only the results scroll), `eslint.config.js`, `src/app.js` header, `README.md`.
+- **Verified by:**
+  - `npm run check`.
+  - `tests/unit/search.test.mjs` (12): sources, `cleanQuery`, host checks, `normalizeResult` for YouTube and SoundCloud, and against the fake yt-dlp: pages 1 and 2 and their arguments, words that look like options, no results, a failure explained, cancel by a new search and by `cancelSearch`, and picture size, type and https limits.
+  - `tests/e2e/09-downloads.cjs`: Search mode, 8 rows with titles, meta and data: pictures, Show more to 12, opening in the browser, switching to SoundCloud (remembered in prefs), no results, a failure, closing during a slow search, a link back to Download, and picking a result downloads and opens it. The harness has a stand-in `fetch` and browser; the fake yt-dlp learned `ytsearchN:` / `scsearchN:`.
+  - `tests/unit/prefs.test.mjs` updated for the new default.
+  - Full `npm test`: unit 142/142, e2e 298/298. Smoke: the same theme checks as before failed in some runs; that flakiness is already there on a clean checkout, see the previous entry.
+  - A live search with the real yt-dlp (YouTube pages 1 and 2, SoundCloud, pictures fetched). Not yet tried by hand in `npm start`.
+
+## 2026-10-09: Project files (.tbee): save a session and open it back
+
+- **What:** **Save** (button in the top bar, Ctrl+S) writes a `.tbee` project with the marks (points and regions), speed, semitones, cents, volume, the EQ gains and on/off, the A–B loop (and whether it's on), the step size, the cursor position and start point, and the zoom and scroll. The first save (and Ctrl+Shift+S, Save As) asks whether to **link** to the song or video or put it **inside** the project, then shows the native Save dialog. A project opens like any file: Open… (which now accepts `.tbee`), Ctrl+O, or drag and drop. Everything comes back as saved. A linked file that moved is looked for relative to the project, then where it was; if both fail, the user is asked where it is (saving again remembers the new place). Unsaved changes show a • in the title and a dot on Save. Opening another file, downloading, or closing the window with unsaved changes asks Save / Don't save / Cancel. Moving the cursor or zooming doesn't count as an unsaved change.
+- **Why:** the user asked to save and load everything about a session, with a file format that is modular and easy to extend.
+- **How:**
+  - **File:** a UTF-8 JSON header `{ format: "transcribee-project", version: 1, savedWith, media, sections }`, optionally followed by one NUL byte and the media's raw bytes. A linked project is plain, readable JSON. JSON never contains a raw NUL, so the reader scans to the first one (capped at 16 MB) and never reads the media to get the header.
+  - **Extension point:** `SECTIONS` (sections.js), one entry per part of the session, each with its own `version`, `capture()`, `restore(data, { duration })` and `dirties`. Restoring runs after the media has loaded, from the defaults a new file gets. Every value is clamped (`setSetting`, `parseMarks`, times clamped to the track). A section that fails, or was saved by a newer version, is skipped with a notice; unknown sections are ignored. The frame's `version` is refused if it's newer.
+  - **Unsaved changes:** the sections with `dirties` are captured as JSON and compared with the last save, on the next animation frame after any input, click, pointer-up or key-up and after every marks change. A new section needs no event wiring.
+  - **Media:** the page names its media only by the `transcribee-media://` URL the main process gave it. For a file the user opened, the preload finds its path from the `File` (`webUtils.getPathForFile`) and registers it. `media-files.js` can now serve a slice of a file, so media inside a project streams straight from the `.tbee` with the usual range requests. After saving with the media inside, the page's URL is pointed at the new file and offset (`update`), so a project saved over itself keeps playing. Media that is only inside a project can't be saved as a link: the dialog disables that choice and the main process refuses it.
+  - **Writing:** to `<target>.<pid>-<time>.tmp`, then renamed over the target (retried briefly on Windows, where a file still being read can't be replaced), so a crash never leaves half a file.
+  - **Closing:** `guardClose` keeps each page's unsaved state (sent with `project:dirty`). On close with unsaved changes it shows the native box. Save sends `project:save-then-close` to the page, which saves and then asks to close.
+  - **Keys:** `Shortcut` gains `ctrl` (Ctrl or Cmd; these also work in text fields) and `anytime` (allowed before a track is loaded). The legend shows "Ctrl+" and a new "File" group.
+- **Where:** new `src/project/format.js` (pure, a new lint layer next to `marks/`), `src/features/project/index.js` (save, open, sessions, unsaved changes, the Save dialog), `src/features/project/sections.js`, and `electron/project-files.js` (`createProjectFiles`, `handleProjects`, `guardClose`, `readHeader`, `mediaCandidates`). Changed: `electron/media-files.js` (slices, `lookup`, `update`, `sliceSize`), `electron/main.js` (native dialogs, wiring), `electron/preload.js` (`transcribee.project`), `src/features/open-file.js` (`openFile` moved to features/project; `bindFileInput` and `bindFileDrop` take the opener), `src/features/download.js` (asks first; `loadMedia`), `src/features/marks.js` (`resetMarks(duration, saved)`), `src/features/loop.js` (`getLoopRegion`), `src/features/playback.js` (`getStartPoint`), `src/ui/controls.js` (`setStepSize`), `src/waveform.js` (`getView` and `setView`, in seconds in view and the start time, so a view means the same in any window size), `src/ui/shortcuts.js`, `src/ui/dom.js`, `src/app.js` (File shortcuts, header docs), `index.html` (Save button, `i-save` icon, `#saveDialog`), `style.css`, `eslint.config.js`, `README.md`.
+- **Verified by:** `npm run check`; `tests/unit/project.test.mjs` (the format's round trip and refusals; saving linked and with the media inside; serving and range requests from the slice; saving over itself; finding moved media; asking for missing media); new e2e topic `tests/e2e/16-projects.cjs` (23 checks: a full session saved linked and with the media inside and reopened identically, including the exact zoom and scroll; Ctrl+S in place; •; Cancel and Don't save; moved and missing media; the legend), with stand-in dialogs in `tests/e2e/harness.cjs`. Full `npm test`: unit 130/130, e2e all pass (01-static-ui updated for the new "File" group). Smoke: the theme checks ("saved theme applied on the next start" / "theme.json … imported") fail about half the time, and do the same on a clean checkout of HEAD, so this is existing flakiness and not from this change. Not yet tried by hand in `npm start`.
+
+## 2026-10-09: Hide the marks sidebar
+
+- **What:** a sidebar button in the top bar (left of ?) hides the marks sidebar, and the timeline, minimap and transport take its width. Pressing it again brings the sidebar back. The choice is remembered on this computer.
+- **Why:** the user asked to bring back a way to put the marks away, with a visible button. The old drawer (narrow windows only, removed in "Layout tweaks") isn't restored; this works at any width.
+- **How:** `showSidebar()` sets `#sidebar`'s `hidden`, a `sidebar-hidden` class on `#workspace` (one grid column instead of two), and the button's `aria-pressed` and title. The waveform re-fits through its existing ResizeObserver. The choice is in `localStorage` (`transcribee.sidebarHidden`), read and written inside try/catch; without storage the sidebar shows.
+- **Where:** `index.html` (`#sidebarToggle`, `id="workspace"`), `src/features/layout.js` (`bindSidebarToggle`, `showSidebar`), `src/ui/dom.js`, `style.css` (`.workspace.sidebar-hidden`).
+- **Verified by:** `npm run check` (no tests run, at the user's request).
+
+## 2026-10-09: The sound dock's groups line up
+
+- **What:** the titles of the dock's groups (Speed, Pitch, Volume, EQ) sit on one line, and each group's first row of controls starts at the same height below it.
+- **Why:** the user saw "Pitch" sitting lower than the others and asked for the dock's widgets to line up.
+- **How:** each `.dock-group` was centred vertically on its own content (`justify-content: center`), so shorter groups started lower. Now they start at the top, and `.dock-head` has a fixed `height: 26px` (was `min-height: 24px`, which Pitch's 26 px reset button stretched). In Speed, the slider aligns with the presets' first row (`align-items: flex-start`, plus a 4 px nudge) rather than the middle of both rows.
+- **Where:** `style.css` (`.dock-group`, `.dock-head`, `.speed-controls`).
+- **Verified by:** `npm run check` (no tests run, at the user's request).
+
+## 2026-10-09: The timeline flush with its border, with small corners
+
+- **What:** the ruler, the marks lane and the waveform reach the timeline card's border with no gap, and the card's corners are small (4 px instead of 12 px), so little at their edges hides behind them.
+- **Why:** a first try padded the card by 6 px (with the ruler's top corners rounded). The user found it didn't help much and asked for no visible gap between the border and the waveform, so the padding was removed.
+- **How:** `.timeline` has `border-radius: 4px`, overriding the cards' `--radius`. It still clips its contents (`overflow: hidden`).
+- **Where:** `style.css` (`.timeline`).
+- **Verified by:** `npm run check` (no tests run, at the user's request).
+
+## 2026-10-09: The minimap fits its card
+
+- **What:** the minimap's waveform and its view box now fit inside the minimap's card, with 4 px of padding, in normal and short windows. Before, their bottom was cut off.
+- **Why:** the user saw that the waveform and the view box on the minimap didn't fit.
+- **How:** the minimap was drawn at a fixed 46 px, but the stage's grid row gives its card 44 px (34 px in short windows), border included, and the card hides overflow. Now the card has padding (`--minimap-pad`), the plugin's `[part~="minimap"]` element (in the light DOM) is `height: 100%`, and the minimap is drawn at `height: "auto"`, which WaveSurfer reads from that element and re-reads on resize. The marks' layer (`.minimap-marks`) is inset by the same padding, so it lines up with the drawing.
+- **Where:** `style.css` (`.waveform-minimap`, `.minimap-marks`), `src/waveform.js` (`minimapOptions`).
+- **Verified by:** `npm test` (261 e2e pass), and the `timeline-zoomed.png` screenshot.
+
+## 2026-10-09: Files open zoomed in on their start; more zoom
+
+- **What:** a newly opened file shows its first 15 seconds on the waveform (the whole track if it is shorter), scrolled to the start, instead of the whole track. The wheel can now zoom in to 48× fit-to-width (was 32×).
+- **Why:** the user asked for the waveform to start zoomed in at the beginning, and for a little more zoom.
+- **How:** `load()` sets `zoomLevel` to the waveform's width / `initialViewSeconds` px per second, clamped between fit-to-width and the maximum zoom (null, i.e. fit, if that isn't more than fit), then scrolls to 0 and clears `followPaused`. The peaks' density (`peaksPerSecondFor`) follows `maxZoomMultiplier`, so the deeper zoom stays sharp up to `maxPeaksPerSecond`.
+- **Where:** `src/config.js` (`CONFIG.waveform.maxZoomMultiplier`, new `initialViewSeconds`), `src/waveform.js` (`load`).
+- **Verified by:** `npm test` (261 e2e pass). The harness's `openFile` now records the view a file opens with (`h.opened.view`) and then zooms all the way out, since the topics assume the whole track in view. **`06-zoom.cjs`:** a file opens with 15 s in view at its start; max zoom is 48× fit. **`02-welcome.cjs`:** the dropped 20 s file is drawn at 20/15 of the container's width (was: at full width).
+
+## 2026-10-09: A visible view box on the minimap
+
+- **What:** the box on the minimap that shows which part of the song is in view now has a clear frame (2 px, in the text colour) and a light fill, on every theme.
+- **Why:** the user could barely see it. It was the accent at 12% opacity, drawn over the minimap's played part, which is also accent-coloured.
+- **How:** `--minimap-overlay` is now the text colour at 16% (the plugin sets it inline as the box's fill), and a new `--minimap-overlay-edge` (text colour at 85%) frames it. The text colour contrasts with the background on every theme, so this works without per-theme values. The overlay element (`[part~="minimap-overlay"]`) is in the light DOM, so plain CSS can style it.
+  It is also raised to `z-index: 6 !important` (over the plugin's inline 2): the minimap's waveform layers (z-index 2, cursor 5) were covering it.
+- **Where:** `style.css` (`:root` colours; the rule after `.waveform-minimap:active`).
+- **Verified by:** `npm run check`.
+
+## 2026-10-09: Green Play, red Stop
+
+- **What:** the round Play button is green (dark icon) and the Stop button's icon is red, on every colour theme.
+- **Why:** the user asked for Play and Stop to be green and red regardless of theme.
+- **How:** fixed colours (not theme variables, so no palette can override them): `button.play-button` gets a `#2fbf71` fill (hover `#45d486`), outweighing `button.primary`'s accent; `.transport-buttons #stop` gets `#e5484d` (hover `#ff6369`), outweighing `.transport-buttons .icon-button`.
+- **Where:** `style.css` (section 5, next to `button.play-button`).
+- **Verified by:** `npm run check`.
+
 ## 2026-10-09: Keys never focus or ring buttons
 
 - **What:** a button, slider, chip or menu item clicked with the mouse gives its focus back at once. So later keys (Space, the arrows, any shortcut) go to the shortcuts and never draw a focus ring on what was clicked. When a dialog or menu (Settings, the shortcuts, From YouTube, the theme menu, the EQ bands) closes, focus isn't left on the button that opened it. Text fields keep their focus, and so do controls inside an open dialog or menu. **Keyboard navigation is unchanged:** after a Tab, focus is left alone until the next mouse press, so Tab, Enter and Esc still bring you back to the button. The welcome screen's Open button is still focused on purpose, so Enter opens a file.

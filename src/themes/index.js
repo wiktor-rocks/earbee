@@ -9,13 +9,20 @@
 // The marks' colours (mark-colors.js) are shared by every theme.
 import { MARK_COLORS, markColorVariable } from "./mark-colors.js";
 import catppuccinLatte from "./palettes/catppuccin-latte.js";
+import catppuccinMocha from "./palettes/catppuccin-mocha.js";
 import dracula from "./palettes/dracula.js";
+import everforestLight from "./palettes/everforest-light.js";
 import githubLight from "./palettes/github-light.js";
+import gruvboxDark from "./palettes/gruvbox-dark.js";
 import gruvboxLight from "./palettes/gruvbox-light.js";
 import monokai from "./palettes/monokai.js";
 import nord from "./palettes/nord.js";
 import oneDark from "./palettes/one-dark.js";
+import oneLight from "./palettes/one-light.js";
+import solarizedDark from "./palettes/solarized-dark.js";
 import solarizedLight from "./palettes/solarized-light.js";
+import tokyoNight from "./palettes/tokyo-night.js";
+import tokyoNightDay from "./palettes/tokyo-night-day.js";
 import transcribee from "./palettes/transcribee.js";
 import transcribeeLight from "./palettes/transcribee-light.js";
 
@@ -44,11 +51,18 @@ export const THEMES = [
   dracula,
   nord,
   oneDark,
+  gruvboxDark,
+  solarizedDark,
+  catppuccinMocha,
+  tokyoNight,
   transcribeeLight,
   solarizedLight,
   catppuccinLatte,
   githubLight,
   gruvboxLight,
+  oneLight,
+  tokyoNightDay,
+  everforestLight,
 ];
 export const DEFAULT_THEME = transcribee;
 

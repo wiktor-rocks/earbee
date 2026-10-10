@@ -32,5 +32,8 @@ export function setLoopEnd() {
   setLoopRegion({ start, end, enabled: true });
 }
 
+/** The loop as it is now, or null. @returns {LoopRegion | null} */
+export const getLoopRegion = () => loopRegion && { ...loopRegion };
+
 export const toggleLoop = () => loopRegion && setLoopRegion({ ...loopRegion, enabled: !loopRegion.enabled });
 export const clearLoop = () => setLoopRegion(null);

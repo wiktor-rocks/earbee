@@ -24,6 +24,8 @@
     <link rel="stylesheet" href="node_modules/@fontsource/righteous/index.css" />
 
     <link rel="stylesheet" href="style.css" />
+    <!-- Video window (src/features/video-window/) -->
+    <link rel="stylesheet" href="src/features/video-window/video-window.css" />
   </head>
 
   <body>
@@ -32,22 +34,13 @@
       <div class="welcome-corner">
         <button
           id="welcomeSettingsButton"
-          class="theme-button"
+          class="theme-button settings-button"
           type="button"
           title="Settings"
           aria-label="Settings"
           aria-haspopup="dialog"
         >
-          <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
-            <path
-              d="M6.9 1.5h2.2l.4 1.8 1.2.7 1.8-.6 1.1 1.9-1.4 1.2v1.4l1.4 1.2-1.1 1.9-1.8-.6-1.2.7-.4 1.8H6.9l-.4-1.8-1.2-.7-1.8.6-1.1-1.9L3.8 8.7V7.3L2.4 6.1l1.1-1.9 1.8.6 1.2-.7Z"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.3"
-              stroke-linejoin="round"
-            />
-            <circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.3" />
-          </svg>
+          <svg class="icon" aria-hidden="true"><use href="#i-gear" /></svg>
         </button>
         <button
           id="welcomeThemeButton"
@@ -58,17 +51,7 @@
           aria-haspopup="menu"
           aria-expanded="false"
         >
-          <svg class="icon" viewBox="0 0 16 16" aria-hidden="true">
-            <path
-              d="M8 1.5a6.5 6.5 0 0 0 0 13c1 0 1.5-.6 1.5-1.3 0-.9-.8-1.2-.8-2 0-.7.6-1.2 1.4-1.2h1.4a3 3 0 0 0 3-3C14.5 3.9 11.6 1.5 8 1.5Z"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="1.4"
-            />
-            <circle cx="4.8" cy="7.4" r="1" fill="currentColor" />
-            <circle cx="7" cy="4.6" r="1" fill="currentColor" />
-            <circle cx="10.4" cy="4.9" r="1" fill="currentColor" />
-          </svg>
+          <svg class="icon" aria-hidden="true"><use href="#i-palette" /></svg>
         </button>
       </div>
       <div class="welcome-content">
@@ -76,15 +59,39 @@
           <img class="welcome-logo" src="assets/logo.webp" alt="" />
         </div>
         <h1 class="welcome-title">Transcri<b>Bee</b></h1>
-        <p class="welcome-tagline">Slow down, loop and transcribe the music you're learning</p>
 
         <div class="welcome-drop">
+          <!-- The marching border while a file is dragged over the window. -->
+          <svg class="drop-ring" aria-hidden="true"><rect /></svg>
           <div class="welcome-actions">
-            <button id="welcomeOpen" class="primary welcome-open" type="button">Open audio or video…</button>
+            <button id="welcomeOpen" class="primary welcome-open" type="button">
+              Open a song, video or project…
+              <kbd>Ctrl+O</kbd>
+            </button>
             <button id="welcomeDownload" class="welcome-open" type="button" hidden>From YouTube…</button>
           </div>
           <p class="welcome-hint">or drop a file anywhere in this window, or paste a YouTube link</p>
-          <p class="welcome-formats">MP3 · WAV · FLAC · M4A · OGG — MP4 · MOV · WebM · MKV</p>
+          <!-- Takes the hint's place while a file is dragged over the window. -->
+          <p class="drop-prompt welcome-drop-prompt" aria-live="polite">
+            <svg class="icon drop-kind drop-kind-song" aria-hidden="true"><use href="#i-note" /></svg>
+            <svg class="icon drop-kind drop-kind-video" aria-hidden="true"><use href="#i-film" /></svg>
+            <svg class="icon drop-kind drop-kind-file" aria-hidden="true"><use href="#i-project" /></svg>
+            <span id="welcomeDropText">Drop to open this file</span>
+          </p>
+          <ul class="welcome-formats">
+            <li>
+              <svg class="icon" aria-hidden="true"><use href="#i-note" /></svg>
+              <b>Audio</b> MP3 · WAV · FLAC · M4A · OGG
+            </li>
+            <li>
+              <svg class="icon" aria-hidden="true"><use href="#i-film" /></svg>
+              <b>Video</b> MP4 · MOV · WebM · MKV
+            </li>
+            <li id="welcomeProjectFormat" hidden>
+              <svg class="icon" aria-hidden="true"><use href="#i-project" /></svg>
+              <b>Project</b> .tbee
+            </li>
+          </ul>
         </div>
 
         <div id="welcomeMessage" class="message welcome-message" role="status"></div>
@@ -137,15 +144,35 @@
           stroke-linejoin="round"
         />
       </symbol>
-      <symbol id="i-gear" viewBox="0 0 16 16">
+      <symbol id="i-wave" viewBox="0 0 16 16">
         <path
-          d="M6.9 1.5h2.2l.4 1.8 1.2.7 1.8-.6 1.1 1.9-1.4 1.2v1.4l1.4 1.2-1.1 1.9-1.8-.6-1.2.7-.4 1.8H6.9l-.4-1.8-1.2-.7-1.8.6-1.1-1.9L3.8 8.7V7.3L2.4 6.1l1.1-1.9 1.8.6 1.2-.7Z"
+          d="M2.5 6.5v3M5.25 4v8M8 2v12M10.75 5v6M13.5 7v2"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.6"
+          stroke-linecap="round"
+        />
+      </symbol>
+      <symbol id="i-project" viewBox="0 0 16 16">
+        <path
+          d="M4 1.8h5.2L12.6 5.2v8a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V2.8a1 1 0 0 1 1-1ZM9 2v3.4h3.4M5.6 8.4h4.8M5.6 11h3.2"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.3"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="i-gear" viewBox="0 0 16 16">
+        <!-- 8 even teeth, centred, as wide as the other icons. -->
+        <path
+          d="M6.81 2.84L7.03 1.07L8.97 1.07L9.19 2.84A5.3 5.3 0 0 1 10.81 3.51L12.21 2.41L13.59 3.79L12.49 5.19A5.3 5.3 0 0 1 13.16 6.81L14.93 7.03L14.93 8.97L13.16 9.19A5.3 5.3 0 0 1 12.49 10.81L13.59 12.21L12.21 13.59L10.81 12.49A5.3 5.3 0 0 1 9.19 13.16L8.97 14.93L7.03 14.93L6.81 13.16A5.3 5.3 0 0 1 5.19 12.49L3.79 13.59L2.41 12.21L3.51 10.81A5.3 5.3 0 0 1 2.84 9.19L1.07 8.97L1.07 7.03L2.84 6.81A5.3 5.3 0 0 1 3.51 5.19L2.41 3.79L3.79 2.41L5.19 3.51A5.3 5.3 0 0 1 6.81 2.84Z"
           fill="none"
           stroke="currentColor"
           stroke-width="1.3"
           stroke-linejoin="round"
         />
-        <circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.3" />
+        <circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.3" />
       </symbol>
       <symbol id="i-palette" viewBox="0 0 16 16">
         <path
@@ -191,6 +218,29 @@
           stroke-width="1.4"
           stroke-linejoin="round"
         />
+      </symbol>
+      <symbol id="i-save" viewBox="0 0 16 16">
+        <path
+          d="M3 2.8h8l2.2 2.2v8.2H2.8V2.8ZM5.3 2.8v3h5v-3M5 13.2V9.5h6v3.7"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.3"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="i-external" viewBox="0 0 16 16">
+        <path
+          d="M9 2.8h4.2V7M13 3 7.5 8.5M11.5 9.5v3.2c0 .3-.2.5-.5.5H3.3a.5.5 0 0 1-.5-.5V5c0-.3.2-.5.5-.5h3.2"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.4"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </symbol>
+      <symbol id="i-search" viewBox="0 0 16 16">
+        <circle cx="7" cy="7" r="4.3" fill="none" stroke="currentColor" stroke-width="1.5" />
+        <path d="m10.2 10.2 3.3 3.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
       </symbol>
       <symbol id="i-download" viewBox="0 0 16 16">
         <path
@@ -247,18 +297,31 @@
     </svg>
 
     <div id="app" class="app" hidden>
+      <!-- Over the player while a file is dragged over the window. -->
+      <div class="drop-overlay" aria-hidden="true">
+        <div class="drop-card">
+          <svg class="drop-ring" aria-hidden="true"><rect /></svg>
+          <p class="drop-prompt">
+            <svg class="icon drop-kind drop-kind-song" aria-hidden="true"><use href="#i-note" /></svg>
+            <svg class="icon drop-kind drop-kind-video" aria-hidden="true"><use href="#i-film" /></svg>
+            <svg class="icon drop-kind drop-kind-file" aria-hidden="true"><use href="#i-project" /></svg>
+            <span id="dropOverlayText">Drop to open this file</span>
+          </p>
+        </div>
+      </div>
       <header class="topbar">
-        <span class="brand">
-          <span>Transcri<b>Bee</b></span>
-          <img class="brand-logo" src="assets/logo.webp" alt="" />
-        </span>
+        <span class="brand">Transcri<b>Bee</b></span>
 
         <div class="topbar-actions">
-          <label class="open-button" title="Open an audio or video file">
-            <input id="file" type="file" accept="audio/*,video/*,.mkv" />
+          <label class="open-button" title="Open an audio or video file, or a project (Ctrl+O)">
+            <input id="file" type="file" accept="audio/*,video/*,.mkv,.tbee" />
             <svg class="icon" aria-hidden="true"><use href="#i-open" /></svg>
             Open…
           </label>
+          <button id="saveButton" type="button" title="Save the project: marks and settings (Ctrl+S)" hidden>
+            <svg class="icon" aria-hidden="true"><use href="#i-save" /></svg>
+            Save
+          </button>
           <button id="downloadButton" type="button" title="Download from YouTube" hidden>
             <svg class="icon" aria-hidden="true"><use href="#i-download" /></svg>
             YouTube…
@@ -273,6 +336,17 @@
         </div>
 
         <div class="topbar-tools">
+          <button
+            id="sidebarToggle"
+            class="icon-button"
+            type="button"
+            title="Hide the marks"
+            aria-label="Show the marks"
+            aria-controls="sidebar"
+            aria-pressed="true"
+          >
+            <svg class="icon" aria-hidden="true"><use href="#i-sidebar" /></svg>
+          </button>
           <button
             id="helpButton"
             class="icon-button"
@@ -307,7 +381,7 @@
         </div>
       </header>
 
-      <div class="workspace">
+      <div id="workspace" class="workspace">
         <div class="main">
           <div id="stage" class="stage">
             <div id="videoPane" class="video-pane" hidden>
@@ -527,38 +601,102 @@
          palette buttons; its items are generated. -->
     <div id="themeMenu" class="theme-menu" role="menu" aria-label="Colour theme" popover></div>
 
-    <!-- Download a link (see electron/downloader.js); opened by the "From YouTube…"
-         buttons or by pasting a link. -->
-    <dialog id="downloadDialog" class="download-dialog" aria-labelledby="downloadTitle">
-      <form id="downloadForm" class="download-form">
-        <h2 id="downloadTitle">Download from YouTube</h2>
-        <label class="download-field">
-          Link
-          <input
-            id="downloadUrl"
-            type="url"
-            required
-            placeholder="https://www.youtube.com/watch?v=…"
-            spellcheck="false"
-            autocomplete="off"
-          />
-        </label>
-        <fieldset class="download-kind">
-          <legend>Get</legend>
-          <label><input type="radio" name="downloadKind" value="audio" checked /> Audio</label>
+    <!-- Save project as (see saveProjectAs in features/project/index.js):
+         link to the media or put it inside. -->
+    <dialog id="saveDialog" class="download-dialog" aria-labelledby="saveTitle">
+      <form id="saveForm" class="download-form">
+        <h2 id="saveTitle">Save project</h2>
+        <p class="download-note">
+          A project keeps the marks, the speed, pitch, volume and EQ, the loop, and where you were, for
+          <span id="saveMediaName" class="download-folder"></span>.
+        </p>
+        <fieldset class="download-kind save-mode">
+          <legend>The song or video</legend>
           <label
-            ><input type="radio" name="downloadKind" value="video" />
-            <span id="downloadVideoLabel">Video (up to 1080p)</span></label
+            ><input id="saveModeLink" type="radio" name="saveMode" value="link" checked />
+            <span>Link to it: a small file; keep the song or video where it is</span></label
+          >
+          <label
+            ><input id="saveModeEmbed" type="radio" name="saveMode" value="embed" />
+            <span>Put it inside: one file that works anywhere, as large as the song or video</span></label
           >
         </fieldset>
-        <p class="download-note">
-          Saved in <span id="downloadFolder" class="download-folder">your Downloads folder</span> (change it in
-          Settings). Only download what you have the rights to.
+        <p id="saveLinkNote" class="download-note" hidden>
+          This song or video is only inside its project, so it goes inside the new one too.
         </p>
         <div class="download-buttons">
-          <button id="downloadClose" type="button">Cancel</button>
-          <button class="primary" type="submit">Download</button>
+          <button id="saveCancel" type="button">Cancel</button>
+          <button class="primary" type="submit">Save…</button>
         </div>
+      </form>
+    </dialog>
+
+    <!-- From YouTube: download a link (see features/download.js and
+         electron/downloader.js) or search by words (features/search.js);
+         opened by the "From YouTube…" buttons or by pasting a link. Built
+         like Settings: a header bar, the options as cards (the same .pref-*
+         tiles and switch), and only the results scroll. -->
+    <dialog id="downloadDialog" class="download-dialog youtube-dialog" aria-labelledby="downloadTitle">
+      <form id="downloadForm" class="youtube-form">
+        <div class="settings-head">
+          <div class="youtube-heading">
+            <span class="youtube-badge" aria-hidden="true"
+              ><svg class="icon"><use href="#i-download" /></svg
+            ></span>
+            <div>
+              <h2 id="downloadTitle">From YouTube</h2>
+              <p class="youtube-subtitle">Paste a link, or search by words</p>
+            </div>
+          </div>
+          <button id="downloadClose" class="small" type="button" aria-label="Close">Close</button>
+        </div>
+        <div class="youtube-top">
+          <div class="youtube-search">
+            <svg class="icon" aria-hidden="true"><use href="#i-search" /></svg>
+            <input
+              id="downloadUrl"
+              type="text"
+              required
+              aria-label="Link or search"
+              placeholder="Paste a link, or type what to search for"
+              spellcheck="false"
+              autocomplete="off"
+            />
+            <select id="searchSource" aria-label="Search on" hidden></select>
+            <button id="downloadSubmit" class="primary" type="submit">Download</button>
+          </div>
+          <div class="youtube-options">
+            <div class="pref-field">
+              <div class="pref-head"><span id="downloadKindLabel" class="pref-label">Get</span></div>
+              <div class="pref-options pref-options-row" role="radiogroup" aria-labelledby="downloadKindLabel">
+                <label class="pref-option"
+                  ><input type="radio" name="downloadKind" value="audio" checked />
+                  <span class="pref-option-text">Audio<small>Sound only</small></span></label
+                >
+                <label class="pref-option"
+                  ><input type="radio" name="downloadKind" value="video" />
+                  <span class="pref-option-text">Video<small id="downloadVideoLabel">up to 1080p</small></span></label
+                >
+              </div>
+            </div>
+            <div class="pref-field">
+              <div class="pref-head">
+                <label for="downloadChapters" class="pref-label">Chapters as marks</label>
+                <input id="downloadChapters" class="pref-switch" type="checkbox" checked />
+              </div>
+              <p class="pref-help">Each chapter the uploader made becomes a region, named after it.</p>
+            </div>
+          </div>
+        </div>
+        <div class="youtube-results">
+          <p id="searchStatus" class="search-status" role="status" hidden></p>
+          <ol id="searchResults" class="search-results" aria-label="Search results" hidden></ol>
+          <button id="searchMore" class="search-more" type="button" hidden>Show more</button>
+        </div>
+        <p class="youtube-footer">
+          Saved in <code id="downloadFolder" class="pref-path">your Downloads folder</code> (change it in Settings).
+          Only download what you have the rights to.
+        </p>
       </form>
     </dialog>
 

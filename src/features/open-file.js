@@ -1,5 +1,7 @@
 /* =====================================================================
  * OPENING FILES
+ * Loading a song or video into the player; which file to open, and the
+ * session it starts (or the project it belongs to), are features/project's.
  * Nothing about the current media changes until the new file has
  * decoded, so a bad file (or Cancel) leaves the previous song or video
  * playable, with its settings. A file that opens starts fresh: no loop,
@@ -23,12 +25,12 @@ import { resetSoundSettings } from "../ui/controls.js";
 import {
   clearMessage,
   dom,
+  guarded,
   onClick,
   renderTransportState,
   reportError,
   setLoading,
   setLoadingStatus,
-  showNotice,
   showPlayer,
 } from "../ui/dom.js";
 import { setLoopRegion } from "./loop.js";
@@ -169,7 +171,7 @@ export async function loadMediaFile(media, signal) {
   // The samples move to the audio thread (no copy) while the waveform draws.
   await Promise.all([
     timer.time("transfer", () => player.engine.loadPieces(decoded.pieces)),
-    timer.time("waveform", () => player.waveform.load(decoded.peaks, decoded.duration)),
+    timer.time("waveform", () => player.waveform.load(decoded.levels, decoded.duration)),
   ]);
   player.transport.load(decoded.duration);
   // A new file starts fresh: no loop or marks, and default speed, pitch,
@@ -219,11 +221,6 @@ export async function withLoading(name, task) {
   }
 }
 
-export function openFile(file) {
-  if (!file) return;
-  return withLoading(file.name, async (signal) => showNotice((await loadMediaFile(file, signal)).join(" ")));
-}
-
 // The Cancel buttons on the loading screen and overlay, for files and
 // downloads alike.
 export function bindLoadCancel() {
@@ -231,7 +228,10 @@ export function bindLoadCancel() {
   onClick(dom.overlayCancel, cancelLoading);
 }
 
-export function bindFileInput() {
+// The Open buttons and dropping a file call `open` with the File (a song,
+// a video or a project: features/project decides).
+/** @param {(file: File | undefined) => unknown} open */
+export function bindFileInput(open) {
   // The welcome screen's button opens the same (hidden) file input.
   dom.welcomeOpen.addEventListener("click", () => dom.fileInput.click());
 
@@ -239,24 +239,53 @@ export function bindFileInput() {
     const file = dom.fileInput.files?.[0];
     // Clear it so choosing the same file again still fires "change".
     dom.fileInput.value = "";
-    openFile(file);
+    guarded(open)(file);
   });
 }
 
-export function bindFileDrop() {
+// What a dragged file looks like before it's dropped: only its type is
+// readable then, not its name, so a project (.tbee) is just "file".
+/** @param {DataTransfer} transfer */
+function dragged(transfer) {
+  const files = [...transfer.items].filter((item) => item.kind === "file");
+  const type = files[0]?.type ?? "";
+  const kind = type.startsWith("audio/") ? "song" : type.startsWith("video/") ? "video" : "file";
+  const more = files.length > 1 ? ` (the first of ${files.length})` : "";
+  return { kind, prompt: `Drop to open this ${kind}${more}` };
+}
+
+// While a file is dragged over the window, the welcome screen's drop card
+// or the player's overlay says what a drop will open (style.css shows
+// them from body.dragging and data-drop-kind). Other drags (text, links)
+// are left alone.
+/** @param {(file: File | undefined) => unknown} open */
+export function bindFileDrop(open) {
+  const stop = () => {
+    document.body.classList.remove("dragging");
+    delete document.body.dataset.dropKind;
+  };
+
   // Without preventDefault, Electron navigates to a dropped file.
   window.addEventListener("dragover", (event) => {
     event.preventDefault();
-    if (!loading) document.body.classList.add("dragging");
+    const transfer = event.dataTransfer;
+    if (loading || !transfer?.types.includes("Files")) return;
+    const { kind, prompt } = dragged(transfer);
+    if (document.body.dataset.dropKind !== kind) {
+      document.body.dataset.dropKind = kind;
+      dom.welcomeDropText.textContent = prompt;
+      dom.dropOverlayText.textContent = prompt;
+    }
+    document.body.classList.add("dragging");
   });
 
   window.addEventListener("dragleave", (event) => {
-    if (event.relatedTarget === null) document.body.classList.remove("dragging");
+    if (event.relatedTarget === null) stop();
   });
 
   window.addEventListener("drop", (event) => {
     event.preventDefault();
-    document.body.classList.remove("dragging");
-    openFile(event.dataTransfer?.files?.[0]);
+    stop();
+    guarded(open)(event.dataTransfer?.files?.[0]);
   });
 }

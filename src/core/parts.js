@@ -4,7 +4,7 @@
 /**
  * Splits `[0, totalFrames)` into `count` parts of about equal length:
  * [{ from, to }]. Inner boundaries are multiples of `align` (the peak
- * factor), so the parts' peaks put end to end are the whole track's. The
+ * factor), so the parts' levels put end to end are the whole track's. The
  * last part runs to the end of the stream (`to` Infinity): the length is
  * only an estimate from the duration.
  * @param {number} totalFrames
@@ -75,17 +75,17 @@ export function findJoin(before, after, expected, { maxLag, window, tolerance })
 /**
  * Puts decoded parts end to end, without copying the samples: part k keeps
  * its first `keep[k]` frames (where the next part starts). The pieces stay
- * separate (they're played one after the other); the peaks, which are
- * small, are joined per channel.
- * @param {{ channels: Float32Array[], peaks: Float32Array[] }[]} parts
+ * separate (they're played one after the other); the waveform levels,
+ * which are small, are joined per channel.
+ * @param {{ channels: Float32Array[], levels: Levels[] }[]} parts
  * @param {number[]} keep  frames kept of each part
- * @param {number} peakFactor  samples per peak
- * @returns {{ pieces: Float32Array[][], peaks: Float32Array[], frames: number }}
+ * @param {number} peakFactor  samples per level
+ * @returns {{ pieces: Float32Array[][], levels: Levels[], frames: number }}
  */
 export function joinParts(parts, keep, peakFactor) {
   const pieces = parts.map((part, k) => part.channels.map((samples) => samples.subarray(0, keep[k])));
-  const peaks = parts[0].peaks.map((_, c) => {
-    const kept = parts.map((part, k) => part.peaks[c].subarray(0, Math.ceil(keep[k] / peakFactor)));
+  const join = (c, key) => {
+    const kept = parts.map((part, k) => part.levels[c][key].subarray(0, Math.ceil(keep[k] / peakFactor)));
     const joined = new Float32Array(kept.reduce((sum, array) => sum + array.length, 0));
     let offset = 0;
     for (const array of kept) {
@@ -93,6 +93,9 @@ export function joinParts(parts, keep, peakFactor) {
       offset += array.length;
     }
     return joined;
-  });
-  return { pieces, peaks, frames: keep.reduce((sum, frames) => sum + frames, 0) };
+  };
+  const levels = parts[0].levels.map((_, c) => ({ peak: join(c, "peak"), rms: join(c, "rms") }));
+  return { pieces, levels, frames: keep.reduce((sum, frames) => sum + frames, 0) };
 }
+
+/** @typedef {{ peak: Float32Array, rms: Float32Array }} Levels One channel's waveform levels (core/peaks.js). */

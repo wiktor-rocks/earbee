@@ -67,6 +67,26 @@ module.exports = async function (h) {
     await js(`!!document.querySelector('#waveform-minimap [part~="minimap-overlay"]')`),
   );
   check("menu stays open to compare themes", await menuOpen());
+  // Picking never resizes or moves it (long names, Automatic's "follows
+  // the system: …", the ✓), and it stays on its button, inside the window.
+  const menuBox = () =>
+    js(`(() => {
+      const m = document.getElementById("themeMenu").getBoundingClientRect();
+      const b = document.getElementById("themeButton").getBoundingClientRect();
+      return { box: [m.left, m.top, m.width, m.height].map(Math.round).join(), onButton: Math.abs(m.top - b.bottom) < 12 || Math.abs(m.bottom - b.top) < 12, inside: m.bottom <= innerHeight && m.right <= innerWidth };
+    })()`);
+  const before = await menuBox();
+  const after = [];
+  for (const id of ["auto", "catppuccin-mocha", "tokyo-night-day", "nord"]) {
+    await pick(id);
+    await sleep(150);
+    after.push((await menuBox()).box);
+  }
+  check(
+    "picking themes keeps the menu's size and place, on its button",
+    before.onButton && before.inside && after.every((box) => box === before.box),
+    `${before.box} → ${after.join(" | ")}`,
+  );
   check(
     "the choice is checked and saved",
     (await js(`document.querySelector('#themeMenu [aria-checked="true"]').dataset.choice`)) === "nord" &&

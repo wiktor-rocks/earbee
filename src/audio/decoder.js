@@ -1,11 +1,11 @@
 import { CONFIG } from "../config.js";
 import { readWhole } from "../core/files.js";
 import { findJoin, joinParts, splitFrames } from "../core/parts.js";
-import { downsamplePeaks } from "../core/peaks.js";
+import { downsampleLevels } from "../core/peaks.js";
 
 /* =====================================================================
  * DECODER
- * The audio of a file at its own sample rate, plus the waveform peaks.
+ * The audio of a file at its own sample rate, plus the waveform levels (peak and RMS).
  * Normally decoded in chunks by decode-worker.js, a long track in parts
  * by several of them at once; formats it can't read fall back to
  * decodeAudioData on the whole file (the old way, fine for short files).
@@ -20,7 +20,7 @@ import { downsamplePeaks } from "../core/peaks.js";
  *   onProgress(f)  0…1 while decoding (not for the fallback)
  *   signal         aborting stops the decoding (rejects with AbortError)
  *   workers        overrides prepare's count (for the tests)
- * Resolves to { pieces, peaks, sampleRate, duration }: `pieces` is the
+ * Resolves to { pieces, levels, sampleRate, duration }: `pieces` is the
  * track in order, as [piece][channel] Float32Arrays, never copied into one
  * array (that would need twice the memory for a moment); the engine plays
  * them one after the other.
@@ -51,7 +51,7 @@ export class DecodeFailure extends Error {
  * @property {(fraction: number) => void} [onProgress]
  * @property {AbortSignal} [signal]
  * @property {number} [workers]
- * @typedef {{ pieces: Float32Array[][], peaks: Float32Array[], sampleRate: number, duration: number }} Decoded
+ * @typedef {{ pieces: Float32Array[][], levels: import("../core/parts.js").Levels[], sampleRate: number, duration: number }} Decoded
  */
 
 const aborted = () => new DOMException("Decoding was canceled.", "AbortError");
@@ -164,8 +164,8 @@ async function decodeInWorkers(media, options) {
       results = null; // not kept alive while the track decodes again
       return decodeInWorkers(media, { ...options, workers: 1 });
     }
-    const { pieces, peaks, frames } = joinParts(results, keep, plan.peakFactor);
-    return { pieces, peaks, sampleRate, duration: frames / sampleRate };
+    const { pieces, levels, frames } = joinParts(results, keep, plan.peakFactor);
+    return { pieces, levels, sampleRate, duration: frames / sampleRate };
   } finally {
     signal?.removeEventListener("abort", onAbort);
     for (const worker of workers) worker.terminate();
@@ -191,7 +191,7 @@ async function decodeWhole(media, { prepare, signal }) {
   const info = { duration: buffer.duration, sampleRate: buffer.sampleRate, channels: buffer.numberOfChannels };
   const { peakFactor } = await prepare(info);
   const channels = Array.from({ length: buffer.numberOfChannels }, (_, i) => buffer.getChannelData(i));
-  return { ...info, pieces: [channels], peaks: channels.map((samples) => downsamplePeaks(samples, peakFactor)) };
+  return { ...info, pieces: [channels], levels: channels.map((samples) => downsampleLevels(samples, peakFactor)) };
 }
 
 /**

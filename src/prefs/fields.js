@@ -9,6 +9,7 @@
 //   defineSection({
 //     id: "downloads",            // its key in prefs.json
 //     title: "Downloads",         // its heading in the dialog
+//     icon: "download",           // its tab's icon: an #i-… sprite id (optional)
 //     electronOnly: true,         // hidden outside Electron (optional)
 //     fields: [ { key, type, label, help?, default, …type's own } ],
 //     onSet(values, key) { … },   // keeps related fields consistent (optional)
@@ -18,7 +19,7 @@
 // ui/pref-fields.js):
 //   choice   one of `options` [{ value, label, detail?, swatch? }]
 //   boolean  true or false
-//   number   `min` … `max`, rounded to `step`
+//   number   `min` … `max`, rounded to `step`; `unit` is shown after it
 //   folder   an absolute path, or null for the default. Only the main
 //            process sets one (its folder picker): the page can't send a
 //            path (`fromPage: false`).
@@ -41,11 +42,13 @@
  * @property {number} [min] number
  * @property {number} [max] number
  * @property {number} [step] number
+ * @property {string} [unit] number: shown after the value, e.g. "%"
  * @property {(values: Record<string, any>) => boolean} [visibleWhen]
  *
  * @typedef {object} Section
  * @property {string} id
  * @property {string} title
+ * @property {string} [icon] Its tab's icon, an #i-… id in index.html's sprite.
  * @property {boolean} [electronOnly]
  * @property {Field[]} fields
  * @property {(values: Record<string, any>, key: string) => void} [onSet]

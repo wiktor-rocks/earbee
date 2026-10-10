@@ -9,7 +9,7 @@
 //          (or terminates the worker): frames [from, to) of the track,
 //          counted from its first sample; `to` Infinity = to the end
 //   ←      { type: "progress", written } …  (at most every 100 ms)
-//   ←      { type: "done", channels, peaks, written }
+//   ←      { type: "done", channels, levels, written }
 // or at any point ← { type: "error", kind, message }, kind being
 //   "cannot-decode"  the format or codec can't be read here
 //   "no-audio"       the file has no audio track
@@ -34,7 +34,7 @@ import {
   UrlSource,
 } from "../../node_modules/mediabunny/dist/bundles/mediabunny.mjs";
 import { mediaSource } from "../core/files.js";
-import { downsamplePeaks } from "../core/peaks.js";
+import { downsampleLevels } from "../core/peaks.js";
 
 const scope = /** @type {any} */ (self);
 
@@ -144,14 +144,14 @@ async function decode({ track, first, duration, sampleRate, channels }, { peakFa
     if (full) break; // also stops the decoder
   }
 
-  // The peaks in one pass at the end: 0.7 s per hour, against 2–4 s for
+  // The waveform levels (peak and RMS) in one pass at the end: 0.7 s per hour, against 2–4 s for
   // computing them chunk by chunk (measured; the per-chunk bookkeeping
   // costs more than the loop itself).
   const decoded = store.finish();
-  // slice(): with a factor of 1 the peaks would be the samples themselves,
-  // and one buffer can't be transferred twice. Peaks are small.
-  const peaks = decoded.map((samples) => downsamplePeaks(samples, peakFactor).slice(0));
-  return { channels: decoded, peaks, written: store.written };
+  // Always new arrays, so they can be transferred alongside the samples.
+  // They are small.
+  const levels = decoded.map((samples) => downsampleLevels(samples, peakFactor));
+  return { channels: decoded, levels, written: store.written };
 }
 
 let opened = null;
@@ -167,7 +167,7 @@ scope.onmessage = async ({ data }) => {
       opened.input.dispose?.();
       scope.postMessage({ type: "done", ...result }, [
         ...result.channels.map((array) => array.buffer),
-        ...result.peaks.map((array) => array.buffer),
+        ...result.levels.flatMap(({ peak, rms }) => [peak.buffer, rms.buffer]),
       ]);
     }
   } catch (error) {

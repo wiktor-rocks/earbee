@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { findJoin, joinParts, splitFrames, workerCount } from "../../src/core/parts.js";
-import { downsamplePeaks } from "../../src/core/peaks.js";
+import { downsampleLevels } from "../../src/core/peaks.js";
 
 // A test signal that never repeats: a chirp.
 const chirp = (length, offset = 0) =>
@@ -86,17 +86,17 @@ describe("findJoin", () => {
 });
 
 describe("joinParts", () => {
-  test("parts cut at their joins give the whole track, peaks included", () => {
+  test("parts cut at their joins give the whole track, levels included", () => {
     const factor = 10;
     const whole = chirp(10_005);
     const bounds = splitFrames(whole.length, 3, factor);
     // Each part decodes a little past its end (as the decoder does).
     const parts = bounds.map(({ from, to }) => {
       const samples = whole.slice(from, Math.min(to + 300, whole.length));
-      return { channels: [samples], peaks: [downsamplePeaks(samples, factor)] };
+      return { channels: [samples], levels: [downsampleLevels(samples, factor)] };
     });
     const keep = bounds.map(({ from, to }, k) => (k + 1 < bounds.length ? to - from : parts[k].channels[0].length));
-    const { pieces, peaks, frames } = joinParts(parts, keep, factor);
+    const { pieces, levels, frames } = joinParts(parts, keep, factor);
 
     assert.equal(frames, whole.length);
     const joined = new Float32Array(frames);
@@ -106,6 +106,10 @@ describe("joinParts", () => {
       offset += samples.length;
     }
     assert.deepEqual(joined, whole);
-    assert.deepEqual(peaks[0], downsamplePeaks(whole, factor));
+    const expected = downsampleLevels(whole, factor);
+    assert.deepEqual(levels[0].peak, expected.peak);
+    // The sums of squares differ in the last float bits between the cut and whole runs.
+    assert.equal(levels[0].rms.length, expected.rms.length);
+    for (let i = 0; i < expected.rms.length; i++) assert.ok(Math.abs(levels[0].rms[i] - expected.rms[i]) < 1e-6);
   });
 });

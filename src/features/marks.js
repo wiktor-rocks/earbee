@@ -47,13 +47,30 @@ function goTo(mark) {
   selectMark(mark.id);
 }
 
-// A new track: no marks, nothing selected or being marked. (A TranscriBee
-// file would pass its saved marks here: marks.reset(duration, saved).)
-/** @param {number} duration */
-export function resetMarks(duration) {
+// A new track: no marks, or the ones a project saved (marks.toJSON()'s
+// form; throws a MarksFormatError if they can't be read), and nothing
+// selected or being marked.
+/** @param {number} duration @param {unknown} [saved] */
+export function resetMarks(duration, saved) {
   selected = null;
   pendingStart = null;
-  marks.reset(duration);
+  marks.reset(duration, saved);
+}
+
+/**
+ * A downloaded video's chapters, as regions named after them, in turn
+ * through the mark colours so neighbours (which meet end to start) are
+ * told apart. The store keeps them inside the track and drops ones too
+ * short. Returns how many were added.
+ * @param {{ start: number, end: number, title: string }[]} chapters
+ */
+export function importChapters(chapters) {
+  let added = 0;
+  for (const { start, end, title } of chapters) {
+    const color = MARK_COLORS[added % MARK_COLORS.length].id;
+    if (marks.addRegion(start, end, { label: title, color })) added++;
+  }
+  return added;
 }
 
 // M: a point where it was heard (the key's own time, so tapping along

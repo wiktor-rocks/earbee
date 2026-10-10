@@ -30,8 +30,29 @@ module.exports = async function (h) {
   check(
     "one tab per settings section",
     JSON.stringify(await js(`[...document.querySelectorAll(".settings-tab")].map((tab) => tab.textContent)`)) ===
-      JSON.stringify(["Theme", "Downloads"]),
+      JSON.stringify(["Theme", "Waveform", "Downloads"]),
   );
+  // The dialog has one size: switching tabs, or fields showing and hiding,
+  // never moves it or its tabs.
+  {
+    const layout = () =>
+      js(
+        `(() => { const d = document.getElementById("settingsDialog").getBoundingClientRect(); const t = document.querySelector(".settings-tab").getBoundingClientRect(); const p = document.getElementById("settingsPanels"); return { dialog: [d.left, d.top, d.width, d.height].map(Math.round).join(), tab: [t.left, t.top].map(Math.round).join(), content: p.scrollHeight, shown: p.clientHeight }; })()`,
+      );
+    const seen = [];
+    for (const id of ["theme", "waveform", "downloads", "theme"]) {
+      await js(`document.getElementById("settings-tab-${id}").click()`);
+      await sleep(100);
+      seen.push({ id, ...(await layout()) });
+    }
+    await js(`document.querySelector('#settings-theme [data-key="choice"] input[value="auto"]').click()`);
+    await sleep(200);
+    seen.push({ id: "theme, Automatic", ...(await layout()) });
+    await js(`document.querySelector('#settings-theme [data-key="choice"] .pref-reset').click()`);
+    await sleep(200);
+    const still = seen.every((s) => s.dialog === seen[0].dialog && s.tab === seen[0].tab);
+    check("the dialog and its tabs stay put across tabs and changes", still, JSON.stringify(seen));
+  }
   key("Space");
   await sleep(300);
   check("shortcuts don't fire while Settings is open", !(await playing()));
@@ -133,7 +154,7 @@ module.exports = async function (h) {
   check(
     "the From YouTube dialog starts on the kind, quality and folder from Settings",
     (await js(`document.querySelector('input[name="downloadKind"][value="video"]').checked`)) &&
-      (await js(`document.getElementById("downloadVideoLabel").textContent`)) === "Video (up to 720p)" &&
+      (await js(`document.getElementById("downloadVideoLabel").textContent`)) === "up to 720p" &&
       (await js(`document.getElementById("downloadFolder").textContent`)) === elsewhere,
   );
   await js(

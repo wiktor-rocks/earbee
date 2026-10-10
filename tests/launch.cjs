@@ -27,6 +27,10 @@ const needed = [
   "long-chirp.mp3",
   "long-chirp.m4a",
   "long-chirp.webm",
+  "quiet-spike.wav",
+  "loud-beats.wav",
+  "stereo-left.wav",
+  "verse-chorus.wav",
 ];
 
 if (!needed.every((name) => fs.existsSync(path.join(fixtures, name)))) {

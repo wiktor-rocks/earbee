@@ -2,7 +2,7 @@
  * TranscriBee styles
  *
  *   1 Tokens       colours, fonts, sizes (the page's code reads some of them)
- *   2 Base         element defaults; no animations except two
+ *   2 Base         element defaults; no animations except a few
  *   3 Controls     buttons, sliders, keys
  *   4 Screens      welcome, loading screen, loading overlay,
  *                  download dialog
@@ -41,7 +41,10 @@
   --wave-progress: var(--accent);
   --minimap-wave: #343a48;
   --minimap-progress: #8a6a12;
-  --minimap-overlay: color-mix(in srgb, var(--accent) 12%, transparent);
+  /* The minimap's view box: the text colour, which contrasts with the
+     background on every theme (the accent didn't, over the amber played part) */
+  --minimap-overlay: color-mix(in srgb, var(--text) 16%, transparent);
+  --minimap-overlay-edge: color-mix(in srgb, var(--text) 85%, transparent);
   --cursor: #ffffff;
   /* Where Space plays from (the start point): green */
   --start: #5fd38d;
@@ -86,8 +89,12 @@
 
 /* ============================================================
  * 2. BASE
- * No animations, except the loader bars and the loading screen's
- * pulsing aura (both in section 4).
+ * No animations or transitions, except (all in section 4, each marked
+ * !important to get past this rule, and all off for reduced motion): the
+ * loader bars, the loading screen's pulsing aura, and on the welcome
+ * screen its entrance, the floating bee and breathing aura, and the
+ * drop indicator (the card's lift, the marching ring, the player's
+ * drop overlay); and the Settings switches' sliding knob (section 4).
  * ============================================================ */
 
 *,
@@ -247,6 +254,12 @@ button.small .icon {
   height: 13px;
 }
 
+/* The gear's teeth make it look smaller than the round icons beside it. */
+.settings-button .icon {
+  width: 18px;
+  height: 18px;
+}
+
 .icon-button.small {
   width: 26px;
   height: 26px;
@@ -338,7 +351,7 @@ kbd {
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: min(560px, 100%);
+  width: min(640px, 100%);
   text-align: center;
 }
 
@@ -367,8 +380,62 @@ kbd {
   background: radial-gradient(circle, var(--aura-core), var(--aura-mid) 40%, transparent 70%);
 }
 
+/* The welcome screen's animations, all gentle and off for reduced motion
+   (the block after the loader bars): the content rises in once on launch
+   (app.js adds .settled after it, so a failed first file doesn't replay
+   it), the bee floats and its glow breathes, and the drop ring marches
+   while a file is dragged over (below). */
+.welcome:not(.settled) .welcome-content > * {
+  animation: rise-in 420ms ease-out both !important;
+}
+
+.welcome:not(.settled) .welcome-content > :nth-child(2) {
+  animation-delay: 60ms !important;
+}
+
+.welcome:not(.settled) .welcome-content > :nth-child(3) {
+  animation-delay: 120ms !important;
+}
+
+.welcome:not(.settled) .welcome-content > :nth-child(n + 4) {
+  animation-delay: 180ms !important;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+.welcome .welcome-logo {
+  animation: bee-float 6s ease-in-out infinite !important;
+}
+
+.welcome .logo-aura::before {
+  animation: aura-breathe 6s ease-in-out infinite !important;
+}
+
+@keyframes bee-float {
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+@keyframes aura-breathe {
+  0%,
+  100% {
+    opacity: 0.8;
+    transform: scale(0.97);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.03);
+  }
+}
+
 .welcome-title {
-  margin: 10px 0 0;
+  margin: 10px 0 32px;
   font-family: var(--display);
   font-size: 48px;
   font-weight: 400;
@@ -380,13 +447,8 @@ kbd {
   font-weight: inherit;
 }
 
-.welcome-tagline {
-  margin: 8px 0 32px;
-  color: var(--muted);
-  font-size: 16px;
-}
-
 .welcome-drop {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -396,11 +458,95 @@ kbd {
   border: 2px dashed var(--border);
   border-radius: 16px;
   background: var(--surface);
+  transition:
+    transform 180ms ease-out,
+    box-shadow 180ms ease-out,
+    border-color 180ms ease-out !important;
 }
 
+/* A file over the window: the card lifts a little, and its dashed border
+   becomes the marching amber ring. */
 body.dragging .welcome-drop {
-  border-color: var(--accent);
+  border-color: transparent;
+  box-shadow: 0 12px 40px -14px var(--aura-shadow);
+  transform: translateY(-2px);
+}
+
+/* The marching ring: a dashed rounded rectangle whose dashes move. On the
+   welcome card it covers the card's own 2 px border. */
+.drop-ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 180ms ease-out !important;
+}
+
+.welcome-drop .drop-ring {
+  top: -2px;
+  left: -2px;
+  width: calc(100% + 4px);
+  height: calc(100% + 4px);
+}
+
+.drop-ring rect {
+  x: 1px;
+  y: 1px;
+  width: calc(100% - 2px);
+  height: calc(100% - 2px);
+  rx: 15px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: 10 6;
+}
+
+/* Only while it shows. */
+body.dragging .drop-ring rect {
+  animation: drop-march 0.9s linear infinite !important;
+}
+
+@keyframes drop-march {
+  to {
+    stroke-dashoffset: -16;
+  }
+}
+
+body.dragging .drop-ring {
+  opacity: 1;
+}
+
+/* What a drop will open ("Drop to open this video"), with its icon. */
+.drop-prompt {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0;
   color: var(--accent);
+  font-weight: 700;
+}
+
+body.dragging .drop-prompt {
+  display: flex;
+}
+
+.drop-kind {
+  display: none;
+}
+
+body[data-drop-kind="song"] .drop-kind-song,
+body[data-drop-kind="video"] .drop-kind-video,
+body[data-drop-kind="file"] .drop-kind-file {
+  display: block;
+}
+
+.welcome-drop-prompt {
+  font-size: 14px;
 }
 
 .welcome-actions {
@@ -426,13 +572,50 @@ body.dragging .welcome-drop {
 }
 
 body.dragging .welcome-hint {
-  color: var(--accent);
+  display: none;
 }
 
+/* The Open button's shortcut, dark on the amber button. */
+.welcome-open kbd {
+  margin-left: 6px;
+  border-color: color-mix(in srgb, var(--accent-ink) 22%, transparent);
+  background: color-mix(in srgb, var(--accent-ink) 10%, transparent);
+  color: var(--accent-ink);
+  font-size: 11px;
+}
+
+/* What opens: small chips for audio, video and (in the app) projects. */
 .welcome-formats {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 6px;
+  padding: 0;
+  list-style: none;
   font-size: 12px;
   letter-spacing: 0.02em;
-  opacity: 0.8;
+}
+
+.welcome-formats li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--surface-2);
+}
+
+.welcome-formats b {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.welcome-formats .icon {
+  width: 13px;
+  height: 13px;
+  color: var(--accent);
 }
 
 .welcome-message {
@@ -464,7 +647,8 @@ body.dragging .welcome-hint {
   max-width: 100%;
 }
 
-/* Animation 1 of 2: the aura pulses while the first file loads. */
+/* The loading screen's animation: the aura pulses while the first file
+   loads. */
 .logo-aura.pulsing::before {
   animation: aura-pulse 1.8s ease-in-out infinite !important;
 }
@@ -553,13 +737,26 @@ body.dragging .welcome-hint {
 
 /* ---------- Download dialog ---------- */
 
+/* The plain dialog look, shared by Save project; From YouTube builds on it
+   (see "From YouTube dialog" below). */
 .download-dialog {
-  width: min(520px, calc(100vw - 32px));
+  width: min(640px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--surface);
   color: var(--text);
+}
+
+/* The search results take the height left, so only they scroll. */
+.download-dialog[open] {
+  display: flex;
+}
+
+.download-dialog .download-form {
+  flex: 1;
+  min-height: 0;
 }
 
 .download-dialog::backdrop {
@@ -571,22 +768,6 @@ body.dragging .welcome-hint {
   flex-direction: column;
   gap: 16px;
   padding: 20px 22px;
-}
-
-.download-field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  color: var(--muted);
-}
-
-.download-field input {
-  padding: 8px 10px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--text);
-  font: 14px/1.4 var(--sans);
 }
 
 .download-kind {
@@ -627,13 +808,299 @@ body.dragging .welcome-hint {
   word-break: break-all;
 }
 
+/* ---------- Searching (in the download dialog) ---------- */
+
+.search-status {
+  font-size: 13px;
+}
+
+.search-status.error {
+  color: var(--danger);
+}
+
+/* Each result is a row: picture, title, "channel · length · views", and
+   open in the browser. The list scrolls with .youtube-results around it. */
+.search-results {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 -4px;
+  padding: 3px 4px;
+  list-style: none;
+}
+
+.search-results li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.search-result {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 6px;
+  border-color: transparent;
+  background: transparent;
+  text-align: left;
+}
+
+/* A result under the mouse or focused: a card, like a setting's. */
+.search-results li:hover .search-result,
+.search-result:focus-visible {
+  border-color: var(--hairline);
+  background: var(--surface-2);
+}
+
+.search-thumb {
+  flex: none;
+  width: 112px;
+  height: 63px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  object-fit: cover;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.search-thumb.loaded {
+  opacity: 1;
+}
+
+.search-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.search-title {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+}
+
+.search-meta {
+  overflow: hidden;
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-open {
+  flex: none;
+  padding: 8px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.search-more {
+  align-self: center;
+}
+
+/* ---------- From YouTube dialog ---------- */
+
+/* Built like Settings: its header bar (.settings-head), the options as
+   .pref-field cards with the same tiles and switch, the folder as a
+   .pref-path chip, and only the results scrolling (with a stable gutter).
+   Its own parts: the big search bar with the button inside it, the
+   site picker as a pill, and the height: it fits its content until results
+   show, then it takes Settings' fixed height, so pages of results and
+   Show more never move the frame. */
+.youtube-dialog {
+  width: min(720px, calc(100vw - 32px));
+}
+
+.youtube-dialog:has(#searchResults:not([hidden])) {
+  height: min(760px, calc(100vh - 48px));
+}
+
+.youtube-form {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.youtube-heading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* The download icon on an amber tile, like the settings tabs' accent. */
+.youtube-badge {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+}
+
+.youtube-badge .icon {
+  width: 18px;
+  height: 18px;
+}
+
+.youtube-subtitle {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.youtube-top {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px 4px;
+}
+
+/* The box: a magnifier, the words or link, where to search (words only),
+   and Download / Search, all in one rounded bar with an amber ring when
+   focused. */
+.youtube-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 46px;
+  padding: 0 5px 0 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  color: var(--muted);
+}
+
+.youtube-search:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+
+.youtube-search input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: 15px/1.4 var(--sans);
+}
+
+.youtube-search select {
+  flex: none;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: 600 12px/1.2 var(--sans);
+  cursor: pointer;
+}
+
+.youtube-search button.primary {
+  flex: none;
+  height: 36px;
+  min-width: 104px;
+}
+
+/* The two cards side by side; one under the other on narrow windows. */
+.youtube-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 10px;
+}
+
+.youtube-options .pref-head label {
+  cursor: pointer;
+}
+
+.youtube-options .pref-option {
+  flex: 1;
+}
+
+/* The results (and the status above them): the part that scrolls. */
+.youtube-results {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 0;
+  padding: 10px 14px 10px 20px;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+/* Nothing to show yet: no empty strip above the footer. */
+.youtube-results:not(:has(> :not([hidden]))) {
+  display: none;
+}
+
+.youtube-results .search-status:not([hidden]) {
+  padding: 2px 2px 0;
+}
+
+.youtube-footer {
+  flex: none;
+  margin: 0;
+  padding: 12px 22px 14px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+/* ---------- Save project dialog ---------- */
+
+/* Shares the download dialog's look; its two choices are one per line. */
+.save-mode {
+  flex-direction: column;
+}
+
+.save-mode label {
+  align-items: flex-start;
+}
+
+.save-mode input {
+  margin-top: 3px;
+}
+
+.save-mode input:disabled + span {
+  color: var(--muted);
+}
+
+/* Save, with unsaved changes: a dot in the accent colour. */
+#saveButton.unsaved::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+
 /* ---------- Settings dialog ---------- */
 
-/* Tabs on the left (one per section in src/prefs), the section's fields on
-   the right; one column on narrow windows. */
+/* Tabs on the left (one per section in src/prefs, each with its icon), the
+   section's fields on the right as cards; one column on narrow windows.
+   The dialog has one size whatever the tab shows, so switching tabs or a
+   field appearing never moves it: the fields scroll inside instead, with
+   room kept for the scrollbar so they don't shift sideways either. */
 .settings-dialog {
-  width: min(680px, calc(100vw - 32px));
-  max-height: calc(100vh - 48px);
+  width: min(720px, calc(100vw - 32px));
+  height: min(760px, calc(100vh - 48px));
   padding: 0;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -674,36 +1141,59 @@ body.dragging .welcome-hint {
   flex: none;
   flex-direction: column;
   gap: 2px;
-  width: 150px;
+  width: 170px;
   padding: 12px 8px;
   border-right: 1px solid var(--border);
 }
 
 .settings-tab {
+  position: relative;
   justify-content: flex-start;
-  padding: 8px 12px;
+  gap: 10px;
+  padding: 9px 12px;
   border: 0;
   border-radius: 7px;
   background: transparent;
+  color: var(--muted);
   font-weight: 500;
   text-align: left;
 }
 
 .settings-tab:hover {
   background: var(--surface-hover);
+  color: var(--text);
 }
 
+/* The open tab: amber, with a bar on its left. */
 .settings-tab[aria-selected="true"] {
   background: var(--surface-2);
   color: var(--accent);
   font-weight: 700;
 }
 
+.settings-tab[aria-selected="true"]::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+
 .settings-panels {
   flex: 1;
   min-width: 0;
   overflow-y: auto;
-  padding: 8px 22px 18px;
+  scrollbar-gutter: stable;
+  padding: 16px 14px 18px 20px;
+}
+
+.settings-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .settings-message {
@@ -717,16 +1207,15 @@ body.dragging .welcome-hint {
   display: none;
 }
 
+/* One setting: a card with its label, help, control and Reset. */
 .pref-field {
   display: flex;
   flex-direction: column;
-  gap: 8px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--border);
-}
-
-.pref-field:last-child {
-  border-bottom: 0;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
 }
 
 .pref-head {
@@ -741,8 +1230,13 @@ body.dragging .welcome-hint {
   font-weight: 700;
 }
 
+/* Reset, then (for on/off) the switch, on the right. */
+.pref-head .pref-reset {
+  margin-left: auto;
+}
+
 .pref-help {
-  margin: -4px 0 0;
+  margin: -6px 0 0;
   color: var(--muted);
   font-size: 12px;
 }
@@ -752,11 +1246,51 @@ body.dragging .welcome-hint {
   gap: 4px 18px;
 }
 
+/* Choices without swatches (Bars / Continuous…, Audio / Video, 720p…):
+   tiles, with their detail in small type. The
+   radio stays (hidden from view, still focusable and clickable), so
+   keyboards and screen readers work as before. */
 .pref-options-row {
   flex-wrap: wrap;
+  gap: 8px;
 }
 
-/* Many options with details (themes): two columns of rows. */
+.pref-options-row .pref-option {
+  position: relative;
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-weight: 600;
+}
+
+.pref-options-row .pref-option:hover {
+  background: var(--surface-hover);
+}
+
+.pref-options-row .pref-option input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.pref-options-row .pref-option:has(input:checked) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+  color: var(--accent);
+}
+
+.pref-options-row .pref-option:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.pref-options-row .pref-option-text small {
+  color: inherit;
+  opacity: 0.75;
+}
+
+/* Options with swatches (themes): two columns of rows. */
 .pref-options-list {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
@@ -779,6 +1313,10 @@ body.dragging .welcome-hint {
   background: var(--surface-hover);
 }
 
+.pref-options-list .pref-option:has(input:checked) {
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
 .pref-option input {
   margin: 0;
   accent-color: var(--accent);
@@ -792,6 +1330,42 @@ body.dragging .welcome-hint {
 .pref-option-text small {
   color: var(--muted);
   font-size: 11px;
+}
+
+/* On / off: a switch, amber when on. Its knob slides (one of the few
+   transitions allowed past the base rule). */
+.pref-switch {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 22px;
+  margin: 0;
+  border-radius: 11px;
+  background: var(--border);
+  cursor: pointer;
+  appearance: none;
+  transition: background 150ms ease-out !important;
+}
+
+.pref-switch::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--text);
+  transition: transform 150ms ease-out !important;
+}
+
+.pref-switch:checked {
+  background: var(--accent);
+}
+
+.pref-switch:checked::after {
+  background: var(--accent-ink);
+  transform: translateX(16px);
 }
 
 .pref-folder {
@@ -816,7 +1390,24 @@ body.dragging .welcome-hint {
 .pref-range {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+}
+
+.pref-range input {
+  accent-color: var(--accent);
+}
+
+/* A slider's value, with its unit: a small amber chip. */
+.pref-number {
+  flex: none;
+  min-width: 56px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 14%, transparent);
+  color: var(--accent);
+  font: 700 12px/1.4 var(--num);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 @media (max-width: 560px) {
@@ -829,6 +1420,10 @@ body.dragging .welcome-hint {
     width: auto;
     border-right: 0;
     border-bottom: 1px solid var(--border);
+  }
+
+  .settings-tab[aria-selected="true"]::before {
+    display: none;
   }
 }
 
@@ -851,11 +1446,28 @@ body.dragging .welcome-hint {
 }
 
 /* A popover: placed next to its button by features/theme-picker.js. */
+/* One size whatever is picked (long names and Automatic's "follows the
+   system: …" are cut short, the checked item isn't bolder, every item keeps
+   room for its ✓), anchored by CSS to the button that opened it
+   (theme-picker.js names the anchor), so it never shifts while you choose;
+   a short window scrolls it inside. */
 .theme-menu {
   position: fixed;
   inset: auto;
-  min-width: 270px;
-  margin: 0;
+  position-anchor: --theme-open;
+  position-area: bottom span-right;
+  position-try-fallbacks:
+    flip-block,
+    flip-inline,
+    flip-block flip-inline;
+  box-sizing: border-box;
+  width: 300px;
+  max-width: calc(100vw - 16px);
+  max-height: min(640px, calc(100vh - 16px));
+  margin: 6px 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
   padding: 6px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -891,23 +1503,35 @@ body.dragging .welcome-hint {
 
 .theme-item[aria-checked="true"] {
   color: var(--accent);
+}
+
+.theme-item::after {
+  content: "✓";
+  flex: none;
   font-weight: 700;
+  visibility: hidden;
 }
 
 .theme-item[aria-checked="true"]::after {
-  content: "✓";
-  margin-left: auto;
+  visibility: visible;
 }
 
 .theme-name {
   display: flex;
+  flex: 1;
   flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .theme-name small {
+  overflow: hidden;
   color: var(--muted);
   font-size: 11px;
   font-weight: 400;
+  text-overflow: ellipsis;
 }
 
 /* Four squares: background, panel, accent, loop. Automatic's shows its
@@ -928,7 +1552,7 @@ body.dragging .welcome-hint {
 
 /* ---------- Loader bars (loading screen and overlay) ---------- */
 
-/* Animation 2 of 2: four equalizer bars. */
+/* The loaders' animation: four equalizer bars. */
 .loader {
   display: flex;
   align-items: flex-end;
@@ -967,10 +1591,31 @@ body.dragging .welcome-hint {
   }
 }
 
+/* "html" makes these win over the animations' own rules, wherever those
+   sit in the file. */
 @media (prefers-reduced-motion: reduce) {
-  .loader span,
-  .logo-aura.pulsing::before {
+  html .loader span,
+  html .logo-aura.pulsing::before,
+  html .welcome:not(.settled) .welcome-content > *,
+  html .welcome .welcome-logo,
+  html .welcome .logo-aura::before,
+  html body.dragging .drop-ring rect {
     animation: none !important;
+  }
+
+  html .welcome-drop,
+  html .drop-ring,
+  html .drop-overlay,
+  html body.dragging .drop-overlay,
+  html .drop-card,
+  html .pref-switch,
+  html .pref-switch::after {
+    transition: none !important;
+  }
+
+  html body.dragging .welcome-drop,
+  html .drop-card {
+    transform: none !important;
   }
 }
 
@@ -991,9 +1636,51 @@ body.dragging .welcome-hint {
   overflow: hidden;
 }
 
-body.dragging .app {
-  outline: 2px dashed var(--accent);
-  outline-offset: -6px;
+/* A file over the player: the page dims and a card says what a drop
+   opens, with the marching ring. It never takes the pointer, so the drop
+   still reaches the window. */
+.drop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-items: center;
+  background: color-mix(in srgb, var(--bg) 60%, transparent);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 150ms ease-out,
+    visibility 0s 150ms !important;
+}
+
+body.dragging .drop-overlay {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 150ms ease-out !important;
+}
+
+.drop-card {
+  position: relative;
+  padding: 28px 44px;
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 16px 48px -16px var(--aura-shadow);
+  transform: scale(0.96);
+  transition: transform 150ms ease-out !important;
+}
+
+body.dragging .drop-card {
+  transform: scale(1);
+}
+
+.drop-card .drop-prompt {
+  font-size: 18px;
+}
+
+.drop-card .drop-kind {
+  width: 22px;
+  height: 22px;
 }
 
 /* A card: the timeline, the transport, the sidebar, the dock. */
@@ -1016,6 +1703,12 @@ body.dragging .app {
   min-height: 0;
 }
 
+/* The marks sidebar put away (its button in the top bar): the stage and
+   transport take the whole width. */
+.workspace.sidebar-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .main {
   display: grid;
   grid-template-rows: minmax(0, 1fr) auto;
@@ -1034,26 +1727,24 @@ body.dragging .app {
   height: 40px;
 }
 
+/* Its sections (the name, the file buttons, the open file, the tools)
+   are set apart by thin lines. */
+.topbar > * + * {
+  padding-left: 14px;
+  border-left: 1px solid var(--hairline);
+}
+
+/* The name; the bee is only on the welcome screen. */
 .brand {
-  display: flex;
-  align-items: center;
-  gap: 6px;
   font-family: var(--display);
   font-size: 22px;
+  line-height: 1;
   white-space: nowrap;
 }
 
 .brand b {
   color: var(--accent);
   font-weight: inherit;
-}
-
-/* The bee; its glow is part of the image, so it can overhang a little. */
-.brand-logo {
-  width: 38px;
-  height: 38px;
-  margin-block: -6px;
-  object-fit: contain;
 }
 
 .topbar-actions,
@@ -1075,8 +1766,6 @@ body.dragging .app {
   align-items: center;
   gap: 8px;
   min-width: 0;
-  padding-left: 12px;
-  border-left: 1px solid var(--hairline);
   color: var(--muted);
 }
 
@@ -1154,12 +1843,15 @@ body.dragging .app {
 
 /* The A–B loop, drawn inside WaveSurfer's shadow DOM (see createWaveform),
    so it is styled through ::part. Positioned in percent, so it follows
-   zoom and scrolling by itself. */
+   zoom and scrolling by itself. Its borders go inside that width: a loop
+   reaching the end would otherwise stick out of the wrapper and widen its
+   scrollWidth, which the ruler, the lanes and zooming measure the track by. */
 .waveform ::part(loop-region) {
   position: absolute;
   top: 0;
   bottom: 0;
   z-index: 3;
+  box-sizing: border-box;
   border-inline: 2px solid var(--loop-edge);
   background: var(--loop-fill);
   pointer-events: none;
@@ -1182,6 +1874,9 @@ body.dragging .app {
   display: grid;
   grid-template-rows: 22px 26px minmax(0, 1fr);
   min-height: 0;
+  /* The lanes and the waveform reach the border, with no gap; small
+     corners, so little at their edges hides behind them. */
+  border-radius: 4px;
   overflow: hidden;
   isolation: isolate;
 }
@@ -1365,9 +2060,11 @@ body.dragging .app {
   position: absolute;
   top: 0;
   bottom: 0;
+  left: 0; /* placed with a transform (waveform.js) */
   z-index: 5;
   width: 0;
   border-left: 1px solid color-mix(in srgb, var(--cursor) 45%, transparent);
+  will-change: transform;
   pointer-events: none;
 }
 
@@ -1389,18 +2086,27 @@ body.dragging .app {
   left: auto;
 }
 
+/* The minimap fills its card, inside a little padding (the stage's grid
+   row sets the card's height; the minimap is drawn at height "auto"). */
 .waveform-minimap {
+  --minimap-pad: 4px;
   position: relative;
+  box-sizing: border-box;
+  padding: var(--minimap-pad);
   border-radius: var(--radius-sm);
   cursor: grab;
   touch-action: none;
 }
 
+.waveform-minimap [part~="minimap"] {
+  height: 100%;
+}
+
 /* The marks on the minimap: thin ticks and light bands, under the pointer's
-   dragging (they don't take it). */
+   dragging (they don't take it). Over the drawn minimap, inside the padding. */
 .minimap-marks {
   position: absolute;
-  inset: 0;
+  inset: var(--minimap-pad);
   z-index: 3;
   pointer-events: none;
 }
@@ -1444,13 +2150,28 @@ body.dragging .app {
   cursor: grabbing;
 }
 
+/* The part of the song in view: a framed box. (The plugin sets its fill
+   inline from --minimap-overlay; the frame is added here.) The plugin's
+   z-index (2) ties with the minimap waveform's own layers (2, and 5 for the
+   cursor), which then cover it, so it is raised above them; the marks'
+   ticks still show through its light fill. */
+.waveform-minimap [part~="minimap-overlay"] {
+  z-index: 6 !important;
+  box-sizing: border-box;
+  border: 2px solid var(--minimap-overlay-edge);
+  border-radius: 4px;
+}
+
 /* ---------- Transport bar ---------- */
 
 /* The buttons, the time (large), any message, then the chips: where Space
-   plays from, the loop, the step size. */
+   plays from, the loop, the step size. Always one row: wrapping would
+   make the bar taller and take that height from the waveform. When room
+   runs out the message gives way first, then the chips (cut off with an
+   ellipsis; their tooltips have them in full). */
 .transport {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   align-items: center;
   gap: 6px 16px;
   min-width: 0;
@@ -1475,6 +2196,27 @@ button.play-button {
   height: 40px;
   padding: 0;
   border-radius: 50%;
+}
+
+/* Play is green and Stop red on every theme (fixed, not theme colours). */
+button.play-button,
+button.play-button:hover {
+  border-color: #2fbf71;
+  background: #2fbf71;
+  color: #06210f;
+}
+
+button.play-button:hover {
+  border-color: #45d486;
+  background: #45d486;
+}
+
+.transport-buttons #stop {
+  color: #e5484d;
+}
+
+.transport-buttons #stop:hover {
+  color: #ff6369;
 }
 
 .play-button .icon {
@@ -1534,11 +2276,15 @@ button.play-button {
   display: flex;
   align-items: center;
   gap: 6px;
+  min-width: 0;
   margin-left: auto;
 }
 
-/* Small rounded readouts; the start point's is a button. */
+/* Small rounded readouts; the start point's is a button. They shrink,
+   cut off, rather than wrap the transport (see .transport). */
 .chip-button {
+  min-width: 0;
+  overflow: hidden;
   padding: 4px 10px;
   border: 1px solid var(--hairline);
   border-radius: 999px;
@@ -1546,6 +2292,7 @@ button.play-button {
   color: var(--muted);
   font: 700 12px/1.3 var(--num);
   font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -1738,10 +2485,12 @@ button.play-button {
   padding: 12px 0 18px;
 }
 
+/* Each group starts at the top, so the titles and the first row of
+   controls line up across the dock. */
 .dock-group {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   gap: 6px;
   min-width: 0;
   padding: 0 16px;
@@ -1751,11 +2500,13 @@ button.play-button {
   border-left: 1px solid var(--hairline);
 }
 
+/* One height for every title row, whatever buttons it holds (Pitch's
+   reset, EQ's on/off). */
 .dock-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  min-height: 24px;
+  height: 26px;
 }
 
 .dock-head h2 {
@@ -1767,10 +2518,16 @@ button.play-button {
   font-weight: 800;
 }
 
+/* The slider lines up with the presets' first row (and the other groups'
+   first rows), not the middle of both rows. */
 .speed-controls {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 14px;
+}
+
+.speed-controls .dock-slider {
+  margin-top: 4px;
 }
 
 .dock-slider {
@@ -1974,7 +2731,7 @@ button.play-button {
    The marks sidebar always stays in view, so half a screen (about 960 px
    wide) still shows everything: under 1100 px it gets narrower and its
    buttons show only their icons; under 1280 px the speed presets take two
-   rows; the transport's chips wrap to a second row when they don't fit.
+   rows; the transport stays one row, its chips cut off when they don't fit.
    Short windows: the dock and the minimap get more compact. */
 
 @media (max-width: 1279px) {

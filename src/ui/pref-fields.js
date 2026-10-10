@@ -31,10 +31,10 @@ let fieldCount = 0;
 
 /** @type {Record<string, (field: Field, actions: FieldActions, id: string) => Rendered>} */
 const RENDERERS = {
-  // Radios: a list with details and swatches (themes), or a row of short
-  // labels (audio / video, 720p / 1080p…).
+  // Radios: a list with swatches (themes), or a row of tiles (audio /
+  // video, 720p / 1080p, Bars / Continuous…), each with its detail if any.
   choice(field, actions, id) {
-    const rich = field.options.some((option) => option.detail || option.swatch);
+    const rich = field.options.some((option) => option.swatch);
     const group = element("div", {
       className: `pref-options ${rich ? "pref-options-list" : "pref-options-row"}`,
       role: "radiogroup",
@@ -79,7 +79,8 @@ const RENDERERS = {
     const input = element("input", { type: "range", min: field.min, max: field.max, step: field.step ?? "any" });
     input.setAttribute("aria-labelledby", `${id}-label`);
     const output = element("output", { className: "pref-number" });
-    input.addEventListener("input", () => (output.textContent = input.value));
+    const show = (value) => (output.textContent = field.unit ? `${value} ${field.unit}` : String(value));
+    input.addEventListener("input", () => show(input.value));
     input.addEventListener(
       "change",
       guarded(() => actions.set(Number(input.value))),
@@ -88,7 +89,7 @@ const RENDERERS = {
       element: element("div", { className: "pref-range" }, input, output),
       update(values) {
         input.value = String(values[field.key]);
-        output.textContent = String(values[field.key]);
+        show(values[field.key]);
       },
     };
   },
@@ -130,6 +131,9 @@ export function renderField(field, actions) {
     "click",
     guarded(() => actions.reset()),
   );
+  // An on/off switch sits on the right of its label; other controls go
+  // under the label and help.
+  const inHead = field.type === "boolean";
   const row = element(
     "div",
     { className: "pref-field" },
@@ -138,9 +142,10 @@ export function renderField(field, actions) {
       { className: "pref-head" },
       element("span", { id: `${id}-label`, className: "pref-label" }, field.label),
       reset,
+      ...(inHead ? [control.element] : []),
     ),
     ...(field.help ? [element("p", { className: "pref-help" }, field.help)] : []),
-    control.element,
+    ...(inHead ? [] : [control.element]),
   );
   row.dataset.key = field.key;
   return {

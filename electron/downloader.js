@@ -20,6 +20,14 @@
 //             .m4a is a "DASH" file that not every player opens.
 //   One link, one video: a playlist or search page gets its first video
 //             only (--playlist-items 1); the page shows its title.
+//   Search    Keywords instead of a link: a flat search (sources and what a
+//             result is: src/search/sources.js), one page of results at a
+//             time; their pictures are fetched here and handed to the page
+//             as data: URLs, so the page itself never touches the network.
+//             A result opens in the browser only if it links to a source.
+//   Chapters  The ones the uploader gave the video come back with the file
+//             ([tb-chapters], from the same run), for the page to add as
+//             marks.
 //   Progress  Sent to the page as { stage, part, parts, fraction, eta,
 //             title }: "setup" (fetching yt-dlp), "update", "download",
 //             "join".
@@ -28,6 +36,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const searchSources = require("../src/search/sources.js");
 
 const RELEASES = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/";
 const UPDATE_EVERY_MS = 24 * 60 * 60 * 1000;
@@ -40,6 +49,10 @@ const AUDIO_FORMAT = "ba[ext=m4a]/ba";
 const videoFormat = (maxHeight) => `bv[vcodec^=avc1][height<=${maxHeight}]/bv[height<=${maxHeight}]/bv,${AUDIO_FORMAT}`;
 const formatFor = (kind, maxHeight) => (kind === "video" ? videoFormat(maxHeight) : AUDIO_FORMAT);
 const PARTS = { audio: 1, video: 2 };
+// Search results' pictures: fetched here, at most this big and this slow.
+const MAX_THUMBNAIL_BYTES = 300 * 1024;
+const THUMBNAIL_TIMEOUT_MS = 10_000;
+const THUMBNAILS_AT_ONCE = 4;
 
 // A failure whose message is written for the user.
 class DownloadError extends Error {}
@@ -93,6 +106,30 @@ function explainFailure(stderrLines) {
   return message.replace(/\s*\(caused by .*\)$/, "");
 }
 
+// The chapters the uploader gave the video ("0:00 Intro, 1:23 Verse…"),
+// from yt-dlp's %(chapters)j: [{ start, end, title }], in time order; []
+// when there are none ("NA") or they can't be read.
+const MAX_CHAPTERS = 500;
+function parseChapters(text) {
+  let raw;
+  try {
+    raw = JSON.parse(String(text ?? "").trim());
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(raw)) return [];
+  const chapters = [];
+  for (const entry of raw) {
+    const start = entry?.start_time;
+    const end = entry?.end_time;
+    if (!Number.isFinite(start) || !Number.isFinite(end) || start < 0 || end <= start) continue;
+    const title = typeof entry.title === "string" ? entry.title.trim() : "";
+    chapters.push({ start, end, title: title || `Chapter ${chapters.length + 1}` });
+    if (chapters.length === MAX_CHAPTERS) break;
+  }
+  return chapters.sort((a, b) => a.start - b.start);
+}
+
 // A file name made from the video's title, safe on every system.
 function fileNameFor(title, id, extension) {
   const clean = String(title)
@@ -139,8 +176,8 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
 
   /* ---------- yt-dlp itself ---------- */
 
-  async function fetchYtDlp(onProgress) {
-    const sums = await (await fetchOk(RELEASES + "SHA2-256SUMS")).text();
+  async function fetchYtDlp(job, onProgress) {
+    const sums = await (await fetchOk(job, RELEASES + "SHA2-256SUMS")).text();
     const expected = sums
       .split("\n")
       .map((line) => line.trim().split(/\s+/))
@@ -150,7 +187,7 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
     // Canceled, or stalled: no data for STALL_MS.
     const stalled = new AbortController();
     let stallTimer = setTimeout(() => stalled.abort(), STALL_MS);
-    const response = await fetchOk(RELEASES + asset, stalled.signal);
+    const response = await fetchOk(job, RELEASES + asset, stalled.signal);
     const total = Number(response.headers.get("content-length")) || 0;
     const hash = crypto.createHash("sha256");
     const partial = `${binary}.part`;
@@ -176,59 +213,67 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
     } catch (error) {
       out.destroy();
       fs.rmSync(partial, { force: true });
-      throw fetchFailure(error);
+      throw fetchFailure(job, error);
     } finally {
       clearTimeout(stallTimer);
     }
   }
 
-  // Fetches from GitHub; canceling the download or `stalled` aborts it.
-  async function fetchOk(url, stalled = AbortSignal.timeout(STALL_MS)) {
+  // Fetches from GitHub; canceling the job or `stalled` aborts it.
+  async function fetchOk(job, url, stalled = AbortSignal.timeout(STALL_MS)) {
     let response;
     try {
-      response = await fetch(url, { signal: AbortSignal.any([current.abort.signal, stalled]) });
+      response = await fetch(url, { signal: AbortSignal.any([job.abort.signal, stalled]) });
     } catch (error) {
-      throw fetchFailure(error);
+      throw fetchFailure(job, error);
     }
     if (!response.ok) throw new DownloadError(`Couldn't download yt-dlp (HTTP ${response.status}).`);
     return response;
   }
 
-  function fetchFailure(error) {
-    if (current?.canceled) return new DownloadCanceled();
+  function fetchFailure(job, error) {
+    if (job.canceled) return new DownloadCanceled();
     if (error instanceof DownloadError) return error;
     return new DownloadError("Couldn't download yt-dlp. Check your internet connection.", { cause: error });
   }
 
-  // Makes sure yt-dlp is there and reasonably fresh.
-  async function prepare(onProgress) {
+  // Makes sure yt-dlp is there and reasonably fresh. A search and a
+  // download share one setup: whoever comes second waits for it.
+  let preparing = null;
+  function prepare(job, onProgress) {
+    preparing ??= setUp(job, onProgress).finally(() => (preparing = null));
+    return preparing;
+  }
+
+  async function setUp(job, onProgress) {
     if (!managed) return;
     if (!asset)
       throw new DownloadError(`Downloading isn't supported on this system (${process.platform} ${process.arch}).`);
     if (!fs.existsSync(binary)) {
       onProgress({ stage: "setup", fraction: 0 });
-      await fetchYtDlp(onProgress);
+      await fetchYtDlp(job, onProgress);
       return;
     }
     const checked = fs.statSync(updateStamp, { throwIfNoEntry: false })?.mtimeMs ?? 0;
     if (Date.now() - checked < UPDATE_EVERY_MS) return;
     onProgress({ stage: "update" });
     // A failed update (offline, GitHub down) keeps the copy we have.
-    const { code } = await run(["--update"], () => {}, 60_000);
+    const { code } = await run(job, ["--update"], () => {}, 60_000);
     if (code !== 0) console.warn("yt-dlp update failed; using the installed copy.");
     fs.writeFileSync(updateStamp, "");
   }
 
   /* ---------- Running yt-dlp ---------- */
 
-  // Runs yt-dlp, calling onLine for each line it prints to stdout.
-  function run(args, onLine, timeoutMs = 0) {
+  // Runs yt-dlp for `job` (whose cancel kills it), calling onLine for each
+  // line it prints to stdout.
+  function run(job, args, onLine, timeoutMs = 0) {
     const child = spawn(binary, args, {
       env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
       windowsHide: true,
       detached: process.platform !== "win32", // own process group, so cancel stops all of it
     });
-    if (current) current.child = child;
+    job.child = child;
     const stderr = [];
     let stdoutRest = "";
     let stderrRest = "";
@@ -339,10 +384,12 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
     let part = 0;
     let title = "";
     let id = "";
+    let chapters = null; // from the first part (a video's sound part says it again)
     const files = [];
     let movedOn = false; // stopped at the start of a second video
     onProgress({ stage: "download", part: 1, parts, fraction: 0 });
     const { code, stderr } = await run(
+      job,
       [
         "--ignore-config",
         "--no-playlist",
@@ -358,6 +405,8 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
         `node:${jsRuntime}`,
         "--print",
         "before_dl:[tb-title] %(id)s %(title)s",
+        "--print",
+        "before_dl:[tb-chapters] %(chapters)j",
         "--print",
         "after_move:[tb-file] %(filepath)s",
         "--progress-template",
@@ -381,6 +430,8 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
           [id] = rest;
           title = rest.slice(1).join(" ");
           onProgress({ stage: "download", part, parts, fraction: 0, title });
+        } else if (tag === "[tb-chapters]") {
+          chapters ??= parseChapters(rest.join(" "));
         } else if (tag === "[tb-progress]") {
           const [done, total, estimate, eta] = rest.map(Number);
           const size = total || estimate;
@@ -397,11 +448,12 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
       },
     );
     const ok = code === 0 || (movedOn && files.length === parts);
-    return { ok, stderr, files, title, id };
+    return { ok, stderr, files, title, id, chapters: chapters ?? [] };
   }
 
   /**
-   * Downloads `url` as audio or video into the download folder and returns the file's path.
+   * Downloads `url` as audio or video into the download folder; returns
+   * the file's path and the video's chapters.
    * @param {string} url
    * @param {"audio" | "video"} kind
    * @param {(progress: object) => void} onProgress
@@ -416,7 +468,7 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
     current = job;
     const work = fs.mkdtempSync(path.join(os.tmpdir(), "transcribee-download-"));
     try {
-      await prepare(onProgress);
+      await prepare(job, onProgress);
       if (job.canceled) throw new DownloadCanceled();
 
       // YouTube sometimes refuses a stream link (HTTP 403); a fresh run
@@ -429,15 +481,109 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
         fs.rmSync(work, { recursive: true, force: true });
         fs.mkdirSync(work);
       }
-      const { ok, stderr, files, title, id } = result;
+      const { ok, stderr, files, title, id, chapters } = result;
       if (!ok) throw new DownloadError(explainFailure(stderr));
       if (!files.length) throw new DownloadError("The download produced no file.");
 
       onProgress({ stage: "join" });
-      return await join(files, title, id, kind === "video", folder ?? saveDir);
+      return { file: await join(files, title, id, kind === "video", folder ?? saveDir), chapters };
     } finally {
       current = null;
       fs.rmSync(work, { recursive: true, force: true });
+    }
+  }
+
+  /* ---------- Searching ---------- */
+
+  let searching = null; // the running search's job
+
+  /**
+   * Searches `sourceId` (src/search/sources.js) for `text`: page 1 is the
+   * first PAGE_SIZE results, page 2 the next, and so on. A new search
+   * cancels one still running. `more`: a full page came back, so there
+   * may be another.
+   * @param {string} text
+   * @param {string} sourceId
+   * @param {number} page
+   * @param {(progress: object) => void} onProgress Only while yt-dlp is set up.
+   * @returns {Promise<{ results: import("../src/search/sources.js").SearchResult[], more: boolean }>}
+   */
+  async function search(text, sourceId, page, onProgress) {
+    const source = searchSources.sourceById(String(sourceId));
+    if (!source) throw new DownloadError(`Unknown place to search: ${sourceId}`);
+    const query = searchSources.cleanQuery(text);
+    if (!query) throw new DownloadError("Type what to search for.");
+    const pageNumber = Number.isInteger(page) && page >= 1 && page <= 20 ? page : 1;
+    const first = (pageNumber - 1) * searchSources.PAGE_SIZE + 1;
+    const last = pageNumber * searchSources.PAGE_SIZE;
+
+    cancelSearch();
+    const job = { child: null, canceled: false, abort: new AbortController() };
+    searching = job;
+    try {
+      await prepare(job, onProgress);
+      if (job.canceled) throw new DownloadCanceled();
+      const results = [];
+      const { code, stderr } = await run(
+        job,
+        [
+          "--ignore-config",
+          "--flat-playlist",
+          "--dump-json",
+          "--playlist-items",
+          `${first}:${last}`,
+          "--no-colors",
+          "--no-js-runtimes",
+          "--js-runtimes",
+          `node:${jsRuntime}`,
+          "--",
+          source.query(query, last),
+        ],
+        (line) => {
+          let entry;
+          try {
+            entry = JSON.parse(line);
+          } catch {
+            return; // not a result
+          }
+          const result = searchSources.normalizeResult(entry, source);
+          if (result) results.push(result);
+        },
+        60_000,
+      );
+      if (job.canceled) throw new DownloadCanceled();
+      if (code !== 0 && !results.length) throw new DownloadError(explainFailure(stderr));
+      return { results, more: results.length === searchSources.PAGE_SIZE };
+    } finally {
+      if (searching === job) searching = null;
+    }
+  }
+
+  function cancelSearch() {
+    if (!searching) return;
+    searching.canceled = true;
+    searching.abort.abort();
+    if (searching.child) kill(searching.child);
+    searching = null;
+  }
+
+  /**
+   * A result's picture as a data: URL, for the page (which never fetches
+   * anything itself); null if it isn't a small https image.
+   * @param {string} url
+   */
+  async function fetchThumbnail(url) {
+    if (typeof url !== "string" || !url.startsWith("https://")) return null;
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(THUMBNAIL_TIMEOUT_MS) });
+      const type = response.headers.get("content-type")?.split(";")[0].trim() ?? "";
+      if (!response.ok || !/^image\/(jpeg|png|webp|gif)$/.test(type)) return null;
+      if (Number(response.headers.get("content-length")) > MAX_THUMBNAIL_BYTES) return null;
+      const bytes = Buffer.from(await response.arrayBuffer());
+      if (bytes.length > MAX_THUMBNAIL_BYTES) return null;
+      return `data:${type};base64,${bytes.toString("base64")}`;
+    } catch {
+      return null;
     }
   }
 
@@ -448,7 +594,7 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
     if (current.child) kill(current.child);
   }
 
-  return { download, cancel };
+  return { download, cancel, search, cancelSearch, fetchThumbnail };
 }
 
 /**
@@ -456,9 +602,10 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
  * saved file's URL from `share` (media-files.js), never its bytes: it reads
  * the file from disk in pieces, as it does a file the user opens.
  * @param {import("electron").IpcMain} ipcMain
- * @param {Parameters<typeof createDownloader>[0] & { share: (file: string) => string }} options
+ * @param {Parameters<typeof createDownloader>[0] & { share: (file: string) => string,
+ *   openExternal: (url: string) => unknown }} options The system browser (shell.openExternal), for search results.
  */
-function handleDownloads(ipcMain, { share, ...options }) {
+function handleDownloads(ipcMain, { share, openExternal, ...options }) {
   const downloader = createDownloader(options);
 
   ipcMain.handle("download:start", async (event, url, kind) => {
@@ -466,8 +613,8 @@ function handleDownloads(ipcMain, { share, ...options }) {
       if (!event.sender.isDestroyed()) event.sender.send("download:progress", progress);
     };
     try {
-      const file = await downloader.download(url, kind, send);
-      return { ok: true, name: path.basename(file), path: file, url: share(file) };
+      const { file, chapters } = await downloader.download(url, kind, send);
+      return { ok: true, name: path.basename(file), path: file, url: share(file), chapters };
     } catch (error) {
       if (!(error instanceof DownloadError)) console.error("Download failed:", error);
       return {
@@ -479,6 +626,48 @@ function handleDownloads(ipcMain, { share, ...options }) {
   });
 
   ipcMain.handle("download:cancel", () => downloader.cancel());
+
+  // Answers { ok: true, searchId, results, more } or { ok: false, canceled, error };
+  // the pictures follow, one "download:thumbnail" { searchId, index, src } each.
+  let searchCount = 0;
+  ipcMain.handle("download:search", async (event, text, source, page) => {
+    const searchId = ++searchCount;
+    const send = (channel, message) => !event.sender.isDestroyed() && event.sender.send(channel, message);
+    try {
+      const { results, more } = await downloader.search(text, source, page, (progress) =>
+        send("download:progress", progress),
+      );
+      // The page ignores pictures for a list it no longer shows.
+      sendThumbnails(results, (index, src) => send("download:thumbnail", { searchId, index, src }));
+      return { ok: true, searchId, results, more };
+    } catch (error) {
+      if (!(error instanceof DownloadError)) console.error("Search failed:", error);
+      return {
+        ok: false,
+        canceled: error instanceof DownloadCanceled,
+        error: error instanceof DownloadError ? error.message : `The search failed: ${error?.message ?? error}`,
+      };
+    }
+  });
+  ipcMain.handle("download:cancel-search", () => downloader.cancelSearch());
+  ipcMain.handle("download:open-external", (_event, url) => {
+    if (!searchSources.isResultLink(url)) return false;
+    openExternal(String(url));
+    return true;
+  });
+
+  // Fetches the results' pictures, a few at a time, and hands each over as it arrives.
+  function sendThumbnails(results, deliver) {
+    let next = 0;
+    const worker = async () => {
+      while (next < results.length) {
+        const index = next++;
+        const src = await downloader.fetchThumbnail(results[index].thumbnail);
+        if (src) deliver(index, src);
+      }
+    };
+    for (let i = 0; i < THUMBNAILS_AT_ONCE; i++) worker();
+  }
 }
 
 module.exports = {
@@ -489,5 +678,6 @@ module.exports = {
   checkUrl,
   explainFailure,
   fileNameFor,
+  parseChapters,
   videoFormat,
 };

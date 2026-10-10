@@ -42,6 +42,10 @@ export function formatTrackTime(time) {
 export const formatMemory = (bytes) =>
   bytes >= 1024 ** 3 ? `${(bytes / 1024 ** 3).toFixed(1)} GB` : `${Math.round(bytes / 1024 ** 2)} MB`;
 
+// 1234567 → "1.2M": counts (a video's views), short.
+const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFractionDigits: 1 });
+export const formatCount = (count) => compact.format(count);
+
 // 75 → "1:15" (time left in a download).
 export const formatEta = (seconds) =>
   `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;

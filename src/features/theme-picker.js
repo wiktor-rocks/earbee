@@ -1,7 +1,9 @@
 // The colour-theme menu (the palette button in the top bar and on the
 // welcome screen): a shortcut to Settings › Theme. Choosing here sets the
 // same setting (ui/prefs.js), so the menu, the dialog and the theme on
-// screen (ui/theme.js) always agree.
+// screen (ui/theme.js) always agree. The menu keeps one size and stays on
+// the button that opened it (CSS anchor positioning, see .theme-menu), so
+// nothing moves while you pick.
 import { THEMES } from "../themes/index.js";
 import { $, element, onClick } from "../ui/dom.js";
 import { swatch } from "../ui/pref-fields.js";
@@ -21,7 +23,14 @@ function item(choice, label, detail, preview) {
   const button = element("button", { type: "button", className: "theme-item", role: "menuitemradio" });
   button.dataset.choice = choice;
   button.append(preview ?? element("span", { className: "theme-swatch auto", ariaHidden: "true" }));
-  button.append(element("span", { className: "theme-name" }, label, detail ? element("small", {}, detail) : ""));
+  button.append(
+    element(
+      "span",
+      { className: "theme-name" },
+      element("span", {}, label),
+      detail ? element("small", {}, detail) : "",
+    ),
+  );
   onClick(button, () => choose(choice));
   return button;
 }
@@ -49,23 +58,26 @@ function renderMenu() {
     button.setAttribute("aria-checked", String(choice === prefs.choice));
   }
   const pair = [prefs.dark, prefs.light].map((id) => THEMES.find((theme) => theme.id === id));
-  menu.querySelector('[data-choice="auto"] small').textContent =
-    `follows the system: ${pair[0].name} or ${pair[1].name}`;
+  // Cut short if it doesn't fit (the menu never widens); the full text on hover.
+  const auto = /** @type {HTMLElement} */ (menu.querySelector('[data-choice="auto"]'));
+  auto.querySelector("small").textContent = `follows the system: ${pair[0].name} or ${pair[1].name}`;
+  auto.title = `Automatic: ${pair[0].name} in dark mode, ${pair[1].name} in light mode`;
   menu
     .querySelector(".theme-swatch.auto")
     .replaceChildren(...pair.map((theme) => element("span", { style: `background: ${theme.colors.bg}` })));
 }
 
+const buttons = () => [$("themeButton"), $("welcomeThemeButton")];
+
 // Opens the menu under (or above) the button that asked for it, or closes
-// it if it was open.
+// it if it was open. That button becomes the menu's anchor; CSS places the
+// menu against it and keeps it there (a resized window, a flip near an edge).
 function openFrom(button) {
   if (isOpen()) return menu.hidePopover();
+  for (const other of buttons()) other.style.removeProperty("anchor-name");
+  button.style.setProperty("anchor-name", "--theme-open");
   renderMenu();
   menu.showPopover();
-  const anchor = button.getBoundingClientRect();
-  const room = window.innerHeight - anchor.bottom;
-  menu.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - menu.offsetWidth - 8))}px`;
-  menu.style.top = `${room > menu.offsetHeight + 8 ? anchor.bottom + 6 : Math.max(8, anchor.top - menu.offsetHeight - 6)}px`;
   opener = button;
   button.setAttribute("aria-expanded", "true");
   /** @type {HTMLElement | null} */ (
@@ -85,7 +97,7 @@ function moveFocus(event) {
 
 export function bindThemePicker() {
   buildMenu();
-  for (const button of [$("themeButton"), $("welcomeThemeButton")]) {
+  for (const button of buttons()) {
     // Pressing the button while the menu is open closes it (light dismiss:
     // a press outside the menu), before the click arrives; that click must
     // not open it again. So remember whether it was open at the press.

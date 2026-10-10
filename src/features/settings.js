@@ -67,10 +67,22 @@ function selectTab(id) {
   for (const panel of panels.children) /** @type {HTMLElement} */ (panel).hidden = panel.id !== `settings-${id}`;
 }
 
+// An icon from index.html's sprite (an SVG element, so not element()).
+function spriteIcon(id) {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "icon");
+  svg.setAttribute("aria-hidden", "true");
+  const use = document.createElementNS("http://www.w3.org/2000/svg", "use");
+  use.setAttribute("href", `#i-${id}`);
+  svg.append(use);
+  return svg;
+}
+
 function build() {
   for (const section of sections()) {
     const tab = element("button", { type: "button", className: "settings-tab", id: `settings-tab-${section.id}` });
-    tab.textContent = section.title;
+    if (section.icon) tab.append(spriteIcon(section.icon));
+    tab.append(section.title);
     tab.setAttribute("role", "tab");
     tab.setAttribute("aria-controls", `settings-${section.id}`);
     onClick(tab, () => selectTab(section.id));

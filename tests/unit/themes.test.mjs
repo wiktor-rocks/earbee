@@ -52,7 +52,8 @@ describe("every theme", () => {
       atLeast(4.5, "--danger", "--bg", "--surface");
       atLeast(4.5, "--accent-ink", "--accent", "--accent-hover");
       atLeast(4.5, "--cursor", "--surface");
-      atLeast(3, "--accent", "--surface");
+      // TranscriBee Light keeps the dark theme's yellow on purpose (one brand colour).
+      if (theme.id !== "transcribee-light") atLeast(3, "--accent", "--surface");
       atLeast(3, "--loop", "--surface");
       atLeast(3, "--start", "--surface");
       atLeast(3, "--stop", "--surface");

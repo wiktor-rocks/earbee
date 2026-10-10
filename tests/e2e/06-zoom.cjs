@@ -4,7 +4,18 @@
 // Part of the end-to-end run (see run.cjs); `h` is the harness.
 
 module.exports = async function (h) {
-  const { win, wc, js, key, duration, click, shot, pos, sample, ensurePaused, check, sleep } = h;
+  const { win, wc, js, key, duration, click, shot, pos, sample, ensurePaused, check, sleep, opened } = h;
+
+  {
+    // The harness zooms out after opening; this is the view a file opens with.
+    const v = opened.view;
+    const dur = await duration();
+    check(
+      "a file opens zoomed in (15 s in view) at its start",
+      v.scroll === 0 && Math.abs(v.wl - v.cl) < 3 && Math.abs((v.cw / v.ww) * dur - 15) < 0.5,
+      JSON.stringify(v),
+    );
+  }
 
   {
     const view = () =>
@@ -57,7 +68,7 @@ module.exports = async function (h) {
     for (let i = 0; i < 40; i++) wheel(ax, ay, 300 * zoomSign);
     await sleep(300);
     const vmax = await view();
-    check("max zoom is 32× fit", Math.abs(vmax.ww / v0.ww - 32) < 0.5, (vmax.ww / v0.ww).toFixed(2));
+    check("max zoom is 48× fit", Math.abs(vmax.ww / v0.ww - 48) < 0.5, (vmax.ww / v0.ww).toFixed(2));
     for (let i = 0; i < 40; i++) wheel(ax, ay, -300 * zoomSign);
     await sleep(300);
     vz = await view();

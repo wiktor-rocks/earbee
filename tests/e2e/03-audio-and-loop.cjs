@@ -185,6 +185,31 @@ module.exports = async function (h) {
   );
   check("region removed from waveform", regionHidden);
 
+  // A loop doesn't change the waveform's size: its chip keeps the
+  // transport bar one row (so the waveform keeps its height), and a loop
+  // reaching the end stays inside the track (whose scrollWidth the ruler,
+  // the lanes and zooming go by).
+  const sizes = () =>
+    js(
+      `(() => { const wrapper = document.querySelector("#waveform > div").shadowRoot.querySelector(".wrapper"); return { wave: waveform.clientHeight, track: wrapper.scrollWidth, transport: document.querySelector(".transport").offsetHeight, chips: [...document.querySelectorAll(".transport-chips > :not([hidden])")].map((e) => e.id) }; })()`,
+    );
+  const sameSize = (a, b) => a.wave === b.wave && a.track === b.track && a.transport === b.transport;
+  const noLoop = await sizes();
+  await drag(13, 14, ["shift"]);
+  const withLoop = await sizes();
+  check(
+    "a loop doesn't change the waveform's size",
+    withLoop.chips.includes("loopInfo") && sameSize(noLoop, withLoop),
+    JSON.stringify({ noLoop, withLoop }),
+  );
+  await click(15);
+  key("["); // A here, B at the end
+  await sleep(100);
+  const toEnd = await sizes();
+  check("…nor does one reaching the end", sameSize(noLoop, toEnd), JSON.stringify({ noLoop, toEnd }));
+  key("L", ["shift"]);
+  await sleep(100);
+
   // A slim playback cursor, and a hover line where a click would land.
   const shadow = `document.querySelector("#waveform > div").shadowRoot`;
   check(
@@ -211,6 +236,37 @@ module.exports = async function (h) {
     Math.abs((await pos()) - parseTime(shown.time)) <= 0.01,
     await pos(),
   );
+  await sleep(150);
+  check("the hover line is back after the click, without moving the mouse", (await hover())?.time === shown.time);
+
+  // The view moving under a still mouse (a sideways scroll, once zoomed
+  // in) changes the line's time, not its place.
+  const wheel = (deltaX, deltaY) => wc.sendInputEvent({ type: "mouseWheel", x, y, deltaX, deltaY });
+  const trackWidth = () => js(`${shadow}.querySelector(".wrapper").getBoundingClientRect().width`);
+  const fitWidth = await trackWidth();
+  for (const deltaY of [-600, 600]) {
+    wheel(0, deltaY);
+    await sleep(150);
+    if ((await trackWidth()) > fitWidth * 1.5) break;
+  }
+  let moved = await hover();
+  for (const deltaX of [-200, 200]) {
+    wheel(deltaX, 0);
+    await sleep(150);
+    moved = await hover();
+    if (moved && moved.time !== shown.time) break;
+  }
+  check(
+    "the hover line stays under the mouse when the view moves",
+    moved && Math.abs(moved.x - x) <= 1 && moved.time !== shown.time,
+    JSON.stringify({ shown, moved }),
+  );
+  // Back to fit to width, as the next topics expect.
+  for (const deltaY of [-600, 600]) {
+    for (let i = 0; i < 20; i++) wheel(0, deltaY);
+    await sleep(150);
+    if ((await trackWidth()) <= fitWidth + 1) break;
+  }
   wc.sendInputEvent({ type: "mouseMove", x, y: 2 });
   await sleep(150);
   check("the hover line goes when the mouse leaves", (await hover()) === null);

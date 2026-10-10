@@ -69,10 +69,10 @@ module.exports = async function (h) {
         return {
           pieces: three.pieces.length, frames: [a.length, b.length], max, step,
           snr: error ? 10 * Math.log10(power / error) : Infinity,
-          peaks: one.peaks[0].length === three.peaks[0].length,
+          levels: one.levels[0].peak.length === three.levels[0].peak.length && one.levels[0].rms.length === three.levels[0].rms.length,
         };
       })()`);
-      const joined = result.pieces === 3 && result.frames[0] === result.frames[1] && result.peaks;
+      const joined = result.pieces === 3 && result.frames[0] === result.frames[1] && result.levels;
       check(
         identical
           ? `${name}: 3 parts give exactly the samples of one`

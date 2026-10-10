@@ -1,11 +1,23 @@
 // The page's only ways out of its sandbox, exposed as window.transcribee:
-//   - downloading a link (see downloader.js); the page hides its download
+//   - downloading a link, or searching by keywords (see downloader.js); the page hides its download
 //     buttons when this is missing (e.g. opened in a plain browser);
 //   - the memory available for a track (see system.js);
+//   - project files (.tbee; see project-files.js): opening, saving, and
+//     whether there are unsaved changes; a File's path is found here, so
+//     the page never names a path itself;
 //   - the settings (see prefs-store.js): read at startup, changed one at a
 //     time, and every change heard; the saved colour theme is applied here,
 //     before the page renders, so it never flashes the default colours.
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
+
+// The path of a File the user chose or dropped; "" if it has none.
+const pathOf = (file) => {
+  try {
+    return webUtils.getPathForFile(file);
+  } catch {
+    return "";
+  }
+};
 
 /* ---------- Settings, and the theme ---------- */
 
@@ -42,6 +54,19 @@ contextBridge.exposeInMainWorld("transcribee", {
   // `url` serves the saved file in pieces (media-files.js).
   download: (url, kind) => ipcRenderer.invoke("download:start", String(url), String(kind)),
   cancelDownload: () => ipcRenderer.invoke("download:cancel"),
+  // Resolves to { ok: true, searchId, results, more } or { ok: false, canceled, error }
+  // (src/search/sources.js says what a result is); setup progress comes
+  // through onDownloadProgress.
+  search: (text, source, page) => ipcRenderer.invoke("download:search", String(text), String(source), Number(page)),
+  cancelSearch: () => ipcRenderer.invoke("download:cancel-search"),
+  // Calls `callback` with { searchId, index, src } as each result's picture arrives; returns a function that stops it.
+  onThumbnail(callback) {
+    const listener = (_event, thumbnail) => callback(thumbnail);
+    ipcRenderer.on("download:thumbnail", listener);
+    return () => ipcRenderer.removeListener("download:thumbnail", listener);
+  },
+  // A search result's page in the system browser (only the sources' sites).
+  openExternal: (url) => ipcRenderer.invoke("download:open-external", String(url)),
   // Calls `callback` with each progress report; returns a function that stops it.
   onDownloadProgress(callback) {
     const listener = (_event, progress) => callback(progress);
@@ -51,6 +76,28 @@ contextBridge.exposeInMainWorld("transcribee", {
 
   // Bytes the system can still give programs, or null if unknown.
   availableMemory: () => ipcRenderer.invoke("system:available-memory"),
+
+  // See src/features/project/. Each resolves to { ok: true, … } or
+  // { ok: false, canceled?, error? }.
+  project: {
+    // A media file the user opened: its URL, so a project can name it.
+    registerMedia: (file) => ipcRenderer.invoke("project:register-media", pathOf(file)),
+    // { path, name, sections, media: { name, url }, embedded, linkable, relinked }
+    open: (file) => ipcRenderer.invoke("project:open", pathOf(file)),
+    openDialog: () => ipcRenderer.invoke("project:open-dialog"),
+    // { file (null: ask), mediaUrl, embed, duration, sections } → { path, name, embedded, linkable }
+    save: (request) => ipcRenderer.invoke("project:save", request),
+    // "save" | "discard" | "cancel"
+    confirm: (name) => ipcRenderer.invoke("project:confirm", String(name ?? "")),
+    setDirty: (dirty, name) => ipcRenderer.send("project:dirty", Boolean(dirty), String(name ?? "")),
+    // The window is closing and the user chose Save: `callback` saves, then calls close().
+    onSaveThenClose(callback) {
+      const listener = () => callback();
+      ipcRenderer.on("project:save-then-close", listener);
+      return () => ipcRenderer.removeListener("project:save-then-close", listener);
+    },
+    close: () => ipcRenderer.send("project:close"),
+  },
 
   // See src/ui/prefs.js. set, reset and chooseFolder resolve to
   // { ok: true, values } (the section's values after it) or { ok: false, error }.
@@ -66,5 +113,12 @@ contextBridge.exposeInMainWorld("transcribee", {
       ipcRenderer.on("prefs:changed", listener);
       return () => ipcRenderer.removeListener("prefs:changed", listener);
     },
+  },
+
+  // Video window (src/features/video-window/): its "always on top"; each
+  // resolves to the state now (electron/video-window.js).
+  videoWindow: {
+    alwaysOnTop: () => ipcRenderer.invoke("video-window:always-on-top"),
+    setAlwaysOnTop: (on) => ipcRenderer.invoke("video-window:always-on-top", Boolean(on)),
   },
 });

@@ -3,8 +3,11 @@
 //   Security   The page runs sandboxed with context isolation and no Node
 //              access; it may not navigate away or open other windows.
 //              Its Content-Security-Policy is in index.html.
+//              Video window (src/features/video-window/): the one window
+//              it may open, for the video's picture (video-window.js).
 //   Downloads  Through the page's bridge (preload.js): downloading a link
-//              with yt-dlp, done here in downloader.js. The page reads the
+//              with yt-dlp, or searching by keywords, done here in
+//              downloader.js; a result can be opened in the browser. The page reads the
 //              saved file by a private URL (media-files.js), in pieces.
 //   System     The memory available for a track (system.js); if the page's
 //              process dies, a message and a reload instead of a blank
@@ -15,6 +18,10 @@
 //              (theme-store.js) is one section: applied by the preload
 //              before the page renders, and the window background.
 //              Downloads read theirs for each download.
+//   Projects   TranscriBee files (.tbee) with a session's marks and
+//              settings (project-files.js): opened and saved through the
+//              preload, with the native dialogs below. Closing the window
+//              with unsaved changes asks first (guardClose).
 //   Window     Remembers its size, position and maximised state between
 //              runs (window-state.js). The title follows the page's
 //              <title>, which names the open file.
@@ -22,14 +29,16 @@
 //              rendering if the GPU process keeps crashing.
 //              `npm run start:no-gpu` forces software rendering;
 //              `npm run start:gpu-info` logs what the GPU is doing.
-const { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, protocol } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, protocol, shell } = require("electron");
 const path = require("path");
 const { handleDownloads } = require("./downloader");
 const { createMediaFiles, registerMediaScheme } = require("./media-files");
 const { handleRendererCrash, handleSystem } = require("./system");
 const { createPrefsStore, handlePrefs } = require("./prefs-store");
+const { createProjectFiles, guardClose, handleProjects } = require("./project-files");
 const { createThemeView } = require("./theme-store");
 const { loadWindowState, rememberWindowState } = require("./window-state");
+const { allowVideoWindow, handleVideoWindows } = require("./video-window"); // Video window (src/features/video-window/)
 
 const ROOT = path.join(__dirname, ".."); // the app's files: index.html, src/, assets/
 
@@ -61,15 +70,62 @@ if (!app.isPackaged) {
 /* ---------- Window ---------- */
 
 let themeView = null; // set once the app is ready
+const projectState = new Map(); // each page's unsaved changes (project-files.js)
+
+// The native dialogs for project files, over the window that asked.
+const owner = (sender) => BrowserWindow.fromWebContents(sender);
+const withOwner = (sender, show, options) => (owner(sender) ? show(owner(sender), options) : show(options));
+const PROJECT_FILTERS = [{ name: "TranscriBee projects", extensions: ["tbee"] }];
+const projectDialogs = {
+  async save(sender, defaultPath) {
+    const { canceled, filePath } = await withOwner(sender, dialog.showSaveDialog, {
+      title: "Save project",
+      defaultPath,
+      filters: PROJECT_FILTERS,
+      properties: ["showOverwriteConfirmation", "createDirectory"],
+    });
+    return canceled || !filePath ? null : filePath;
+  },
+  async open(sender) {
+    const { canceled, filePaths } = await withOwner(sender, dialog.showOpenDialog, {
+      title: "Open project",
+      filters: PROJECT_FILTERS,
+      properties: ["openFile"],
+    });
+    return canceled || !filePaths.length ? null : filePaths[0];
+  },
+  async locate(sender, name, defaultPath) {
+    const { canceled, filePaths } = await withOwner(sender, dialog.showOpenDialog, {
+      title: `Where is “${name}”?`,
+      message: `The project's song or video, “${name}”, isn't where it was. Where is it now?`,
+      defaultPath,
+      properties: ["openFile"],
+    });
+    return canceled || !filePaths.length ? null : filePaths[0];
+  },
+  async confirm(sender, name) {
+    const { response } = await withOwner(sender, dialog.showMessageBox, {
+      type: "warning",
+      message: name ? `Save the changes to “${name}”?` : "Save this session as a project?",
+      detail: "Your marks and settings are lost if you don't save them.",
+      buttons: ["Save…", "Don't save", "Cancel"],
+      defaultId: 0,
+      cancelId: 2,
+      noLink: true,
+    });
+    return /** @type {const} */ (["save", "discard", "cancel"])[response] ?? "cancel";
+  },
+};
 
 function createWindow() {
   const { maximized, ...bounds } = loadWindowState(MIN_SIZE, DEFAULT_BOUNDS);
+  const icon = path.join(ROOT, "assets", "icon-512.png");
   const win = new BrowserWindow({
     ...bounds,
     minWidth: MIN_SIZE.width,
     minHeight: MIN_SIZE.height,
     title: "TranscriBee",
-    icon: path.join(ROOT, "assets", "icon-512.png"),
+    icon,
     backgroundColor: themeView.current().colors.bg, // the page background, so opening doesn't flash
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -83,9 +139,10 @@ function createWindow() {
   // The page never navigates or opens windows; a dropped file or a stray
   // link must not replace the app.
   win.webContents.on("will-navigate", (event) => event.preventDefault());
-  win.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  allowVideoWindow(win, { icon }); // Video window (src/features/video-window/); else deny all: setWindowOpenHandler(() => ({ action: "deny" }))
 
   rememberWindowState(win);
+  guardClose(win, { ipcMain, dialogs: projectDialogs, state: projectState });
   handleRendererCrash(win, dialog);
   win.loadFile(path.join(ROOT, "index.html"));
 }
@@ -115,15 +172,19 @@ app.whenReady().then(() => {
   });
   prefsStore.onChange((section) => section === "theme" && followTheme());
   handleSystem(ipcMain);
+  handleVideoWindows(ipcMain); // Video window (src/features/video-window/)
   nativeTheme.on("updated", followTheme); // "Automatic" follows the system
   const mediaFiles = createMediaFiles();
   mediaFiles.handle(protocol);
+  const projectFiles = createProjectFiles({ mediaFiles, dialogs: projectDialogs, appVersion: app.getVersion() });
+  handleProjects(ipcMain, projectFiles, { mediaFiles, dialogs: projectDialogs, state: projectState });
   handleDownloads(ipcMain, {
     binDir: path.join(userData, "bin"),
     saveDir: downloadsFolder,
     prefs: () => prefsStore.get("downloads"),
     fetch: net.fetch, // follows the system's proxy settings
     share: mediaFiles.share,
+    openExternal: (url) => shell.openExternal(url), // a search result, in the browser
   });
   createWindow();
 

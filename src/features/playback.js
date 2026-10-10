@@ -66,6 +66,9 @@ function setStopPoint(time) {
   if (time !== null) dom.stopPointButton.textContent = `■ ${formatTrackTime(time)}`;
 }
 
+/** Where Space plays from next, as set (before the loop has its say). */
+export const getStartPoint = () => returnPoint ?? player.transport.position;
+
 /** Space plays from `time` next (dragging the start point). @param {number} time */
 export function setStartPoint(time) {
   returnPoint = time;

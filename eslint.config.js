@@ -4,7 +4,7 @@ const globals = require("globals");
 const { importX } = require("eslint-plugin-import-x");
 
 // The page's layers (src/). Imports only go downward:
-//   core, themes → prefs, marks → config → audio, video, waveform, timeline → context → ui → features → app.js
+//   core, themes, search → prefs, marks, project → config → audio, video, waveform, timeline → context → ui → features → app.js
 // Each zone lists what a layer may not import.
 const below = (target, ...from) => from.map((path) => ({ target, from: path }));
 const layering = [
@@ -14,6 +14,26 @@ const layering = [
     "./src/core",
     "./src/prefs",
     "./src/marks",
+    "./src/project",
+    "./src/config.js",
+    "./src/audio",
+    "./src/video",
+    "./src/waveform.js",
+    "./src/timeline.js",
+    "./src/context.js",
+    "./src/ui",
+    "./src/features",
+    "./src/app.js",
+  ),
+  // Search sources: data plus pure logic, shared with the main process
+  // (prefs list them); they import nothing.
+  ...below(
+    "./src/search",
+    "./src/core",
+    "./src/themes",
+    "./src/prefs",
+    "./src/marks",
+    "./src/project",
     "./src/config.js",
     "./src/audio",
     "./src/video",
@@ -28,6 +48,7 @@ const layering = [
     "./src/core",
     "./src/prefs",
     "./src/marks",
+    "./src/project",
     "./src/config.js",
     "./src/audio",
     "./src/video",
@@ -43,6 +64,7 @@ const layering = [
   ...below(
     "./src/prefs",
     "./src/marks",
+    "./src/project",
     "./src/config.js",
     "./src/audio",
     "./src/video",
@@ -57,6 +79,22 @@ const layering = [
   ...below(
     "./src/marks",
     "./src/prefs",
+    "./src/config.js",
+    "./src/audio",
+    "./src/video",
+    "./src/waveform.js",
+    "./src/timeline.js",
+    "./src/context.js",
+    "./src/ui",
+    "./src/features",
+    "./src/app.js",
+  ),
+  // Project files: the frame around a session's saved sections; pure,
+  // shared with the main process.
+  ...below(
+    "./src/project",
+    "./src/prefs",
+    "./src/marks",
     "./src/config.js",
     "./src/audio",
     "./src/video",

@@ -145,7 +145,40 @@ describe("the theme section", () => {
 });
 
 describe("the downloads section", () => {
-  test("defaults: the usual folder, audio, 1080p", () => {
-    assert.deepEqual(defaultsOf(getSection("downloads")), { folder: null, kind: "audio", maxHeight: 1080 });
+  test("defaults: the usual folder, audio, chapters as marks, searching YouTube, 1080p", () => {
+    assert.deepEqual(defaultsOf(getSection("downloads")), {
+      folder: null,
+      kind: "audio",
+      chapters: true,
+      searchSource: "youtube",
+      maxHeight: 1080,
+    });
+  });
+});
+
+describe("the waveform section", () => {
+  const waveform = getSection("waveform");
+  const values = defaultsOf(waveform);
+
+  test("defaults: bars of loudness, linear, stereo combined, normal height", () => {
+    assert.deepEqual(values, { style: "bars", measure: "loudness", scale: "linear", stereo: "combined", height: 100 });
+    assert.ok(!waveform.electronOnly, "the waveform settings work in a plain browser too");
+  });
+
+  test("invalid stored values fall back; the height is clamped and stepped", () => {
+    assert.deepEqual(normalizeSection(waveform, { style: "dots", measure: 3, scale: "", stereo: null }), values);
+    assert.equal(normalizeSection(waveform, { height: 1000 }).height, 300);
+    assert.equal(normalizeSection(waveform, { height: 10 }).height, 50);
+    assert.equal(normalizeSection(waveform, { height: 123 }).height, 120);
+  });
+
+  test("what is measured is hidden for the two-tone style, which shows both", () => {
+    const measure = waveform.fields.find((field) => field.key === "measure");
+    assert.equal(isVisible(measure, values), true);
+    assert.equal(isVisible(measure, { ...values, style: "twoTone" }), false);
+    assert.deepEqual(
+      waveform.fields.find((field) => field.key === "style").options.map((option) => option.value),
+      ["bars", "continuous", "twoTone"],
+    );
   });
 });

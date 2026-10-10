@@ -26,7 +26,7 @@ module.exports = async function (h) {
   check(
     "the shortcuts are grouped",
     (await js(`[...document.querySelectorAll("#shortcutList h3")].map((h) => h.textContent).join("|")`)) ===
-      "Playback|Moving around|A–B loop|Marks|Help",
+      "File|Playback|Moving around|A–B loop|Marks|Video|Help", // Video window (src/features/video-window/): "Video"
   );
   check("the shortcuts dialog starts closed", !(await js(`shortcutsDialog.open`)));
   // Nothing can be highlighted, except text in fields being edited.

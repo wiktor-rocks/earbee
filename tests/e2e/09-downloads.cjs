@@ -6,7 +6,21 @@ const os = require("os");
 const { clipboard } = require("electron");
 
 module.exports = async function (h) {
-  const { wc, js, key, duration, shot, pos, playing, ensurePaused, check, sleep, DOWNLOADS } = h;
+  const {
+    wc,
+    js,
+    key,
+    duration,
+    shot,
+    pos,
+    playing,
+    ensurePaused,
+    check,
+    sleep,
+    prefsStore,
+    externalOpens,
+    DOWNLOADS,
+  } = h;
 
   {
     const dialogOpen = () => js(`document.getElementById("downloadDialog").open`);
@@ -43,7 +57,7 @@ module.exports = async function (h) {
       `document.getElementById("downloadUrl").value = "not a link"; document.querySelector("#downloadForm button[type=submit]").click()`,
     );
     await sleep(200);
-    check("a non-link is refused (dialog stays open)", await dialogOpen());
+    check("words aren't downloaded: they search, and the dialog stays open", await dialogOpen());
     await shot("download-dialog.png");
     await js(`document.querySelector("#downloadForm button[type=submit]").focus()`);
     key("Space");
@@ -52,6 +66,10 @@ module.exports = async function (h) {
     key("Escape");
     await sleep(200);
     check("Escape closes the dialog", !(await dialogOpen()));
+    // Like Settings, a click on the backdrop closes it too.
+    await js(`document.getElementById("downloadButton").click()`);
+    await js(`downloadDialog.dispatchEvent(new MouseEvent("click", { bubbles: true }))`);
+    check("a click on the backdrop closes the dialog", !(await dialogOpen()));
 
     // Pasting a link anywhere opens the dialog with it.
     clipboard.writeText("https://fake.test/pasted");
@@ -86,6 +104,163 @@ module.exports = async function (h) {
     const heard = await pos();
     await ensurePaused();
     check("downloaded audio plays", heard > 0.2, `${heard}`);
+
+    // Searching by words: results with pictures, Show more, another site,
+    // open in the browser, no results, failures, and picking one.
+    const rows = () =>
+      js(`[...document.querySelectorAll("#searchResults li")].map((row) => ({
+        title: row.querySelector(".search-title").textContent, meta: row.querySelector(".search-meta").textContent,
+        picture: row.querySelector("img").src.slice(0, 22) }))`);
+    const status = () => js(`searchStatus.hidden ? "" : searchStatus.textContent`);
+    const until = async (condition, ms = 5000) => {
+      for (let waited = 0; waited < ms && !(await condition()); waited += 50) await sleep(50);
+    };
+    const type = (text) =>
+      js(
+        `downloadUrl.value = ${JSON.stringify(text)}; downloadUrl.dispatchEvent(new Event("input", { bubbles: true }))`,
+      );
+    const submit = () => js(`document.querySelector("#downloadForm button[type=submit]").click()`);
+    await js(`document.getElementById("downloadButton").click()`);
+    await type("test words");
+    check(
+      "words turn Download into Search, with where to search",
+      (await js(`downloadSubmit.textContent`)) === "Search" &&
+        (await js(`!searchSource.hidden && searchSource.value`)) === "youtube",
+    );
+    await submit();
+    await until(async () => (await rows()).length === 8);
+    let found = await rows();
+    check(
+      "a search lists 8 results: title, channel · length · views",
+      found.length === 8 && found[0].title === "test words 1" && found[0].meta === "Channel 1 · 1:01 · 1.5K views",
+      JSON.stringify(found[0]),
+    );
+    await until(async () => (await rows()).every((row) => row.picture.startsWith("data:image/png")));
+    check(
+      "…with their pictures, handed over as data (the page fetches nothing)",
+      (await rows()).every((row) => row.picture.startsWith("data:image/png")),
+    );
+    check("…and Show more", await js(`!searchMore.hidden`));
+    await shot("search-results.png");
+    await js(`searchMore.click()`);
+    await until(async () => (await rows()).length === 12);
+    found = await rows();
+    check(
+      "Show more adds the next ones, then hides (no more)",
+      found.length === 12 && found[11].title === "test words 12" && (await js(`searchMore.hidden`)),
+      `${found.length}`,
+    );
+    await js(`document.querySelector("#searchResults .search-open").click()`);
+    await sleep(200);
+    check(
+      "the arrow opens the result in the browser, and the dialog stays",
+      externalOpens.at(-1) === "https://www.youtube.com/watch?v=fakeVideo01" && (await dialogOpen()),
+      JSON.stringify(externalOpens),
+    );
+    await js(`searchSource.value = "soundcloud"; searchSource.dispatchEvent(new Event("change"))`);
+    await until(async () => (await rows())[0]?.meta.startsWith("Uploader 1"));
+    check(
+      "another site searches the same words there, and is remembered",
+      (await rows())[0]?.meta === "Uploader 1 · 1:01 · 1.5K views" &&
+        prefsStore.get("downloads").searchSource === "soundcloud",
+      JSON.stringify((await rows())[0]),
+    );
+    await js(`searchSource.value = "youtube"; searchSource.dispatchEvent(new Event("change"))`);
+    await sleep(300);
+    await type("nothing");
+    await submit();
+    await until(async () => (await status()).startsWith("No results"));
+    check(
+      "no results says so",
+      (await status()) === "No results for “nothing” on YouTube." && (await rows()).length === 0,
+      await status(),
+    );
+    await type("offline");
+    await submit();
+    await until(async () => (await status()).startsWith("Couldn't"));
+    check(
+      "a failed search explains why",
+      (await status()) === "Couldn't reach the site. Check your internet connection." &&
+        (await js(`searchStatus.classList.contains("error")`)),
+      await status(),
+    );
+    await type("slow");
+    await submit();
+    await sleep(300);
+    const searching = await status();
+    key("Escape");
+    await sleep(300);
+    await js(`document.getElementById("downloadButton").click()`);
+    check(
+      "closing the dialog stops a search; it opens empty again",
+      searching === "Searching YouTube…" && (await status()) === "" && (await rows()).length === 0,
+      searching,
+    );
+    await type("https://fake.test/song");
+    check(
+      "a link is a Download again",
+      (await js(`downloadSubmit.textContent`)) === "Download" && (await js(`searchSource.hidden`)),
+    );
+    await type("test words");
+    await submit();
+    await until(async () => (await rows()).length === 8);
+    await js(`document.querySelector('input[name="downloadKind"][value="audio"]').click()`);
+    await js(`document.querySelector("#searchResults .search-result").click()`);
+    await sleep(100);
+    check("picking a result closes the dialog and downloads it", !(await dialogOpen()));
+    await waitIdle();
+    u = await ui();
+    check("…and it opens in the player", u.file === audioName, JSON.stringify(u));
+    check(
+      "…from the result's link",
+      JSON.parse(fs.readFileSync(path.join(h.OUTPUT, "fake-yt-dlp-args.json"), "utf8")).at(-1) ===
+        "https://www.youtube.com/watch?v=fakeVideo01",
+    );
+
+    // Chapters the uploader gave the video become regions, named and in turn
+    // through the mark colours; not an unsaved change. The checkbox turns it off.
+    const marksListed = () =>
+      js(`[...document.querySelectorAll("#marksList .mark-row")].map((row) => ({
+        name: row.querySelector(".mark-name").value, time: row.querySelector(".mark-time").textContent,
+        color: row.querySelector(".mark-color").style.getPropertyValue("--mark-color") }))`);
+    check("a video without chapters adds no marks", (await marksListed()).length === 0);
+    await download("https://fake.test/chapters", "audio");
+    await waitIdle();
+    let chapters = await marksListed();
+    check(
+      "a video's chapters become regions named after them, at their times",
+      JSON.stringify(chapters.map((mark) => `${mark.name} ${mark.time}`)) ===
+        JSON.stringify(["Intro 0:00.000 – 0:02.000", "Verse 0:02.000 – 0:04.500", "Outro 0:04.500 – 0:06.000"]),
+      JSON.stringify(chapters),
+    );
+    check("…each in the next colour", new Set(chapters.map((mark) => mark.color)).size === 3, JSON.stringify(chapters));
+    u = await ui();
+    check(
+      "…the notice says so, and they aren't an unsaved change",
+      u.message.includes("Added 3 chapters as marks.") && !(await js(`document.title`)).endsWith("•"),
+      u.message,
+    );
+    await download("https://fake.test/chapters", "video");
+    await waitIdle();
+    check("a video's two parts still give each chapter once", (await marksListed()).length === 3);
+    await js(`document.getElementById("downloadButton").click()`);
+    check("the chapters box starts ticked", await js(`downloadChapters.checked`));
+    await js(`downloadChapters.click()`);
+    await sleep(200);
+    await js(
+      `downloadUrl.value = "https://fake.test/chapters"; document.querySelector("#downloadForm button[type=submit]").click()`,
+    );
+    await waitIdle();
+    check(
+      "unticked: no chapters, and that's remembered",
+      (await marksListed()).length === 0 && prefsStore.get("downloads").chapters === false,
+    );
+    await js(`document.getElementById("downloadButton").click()`);
+    check("…the box starts unticked next time", !(await js(`downloadChapters.checked`)));
+    await js(`downloadChapters.click()`);
+    await sleep(200);
+    key("Escape");
+    await sleep(200);
 
     // Video: picture and sound joined into one .mp4 with a picture.
     await download("https://fake.test/song", "video");

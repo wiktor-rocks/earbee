@@ -38,11 +38,14 @@
  * onProblem.
  *
  * Exposes: preload, prepare, show, clear, discard,
- *          start, advance, showFrameAt
+ *          start, advance, showFrameAt, attach
  *   prepare(media) → { video, reason }: opens a file (a File, or a
  *   download's { name, url }; core/files.js) without touching the
  *   video on screen; `video` is null (with a reason) if it has no
  *   picture this app can decode. Never throws.
+ *   attach({ pane, canvas }) moves the picture to another pane and
+ *   canvas, which may be in another same-origin window; the frame on
+ *   screen is redrawn there and the old pane is hidden.
  * ===================================================================== */
 
 import { CONFIG } from "../config.js";
@@ -58,7 +61,9 @@ import { createVideoProxy } from "./proxy.js";
  */
 export function createVideoView({ pane, canvas, onVisibilityChange, onProblem }) {
   const { maxLagSeconds } = CONFIG.video;
-  const context2d = canvas.getContext("2d");
+  let context2d = canvas.getContext("2d");
+  /** @type {ResizeObserver | undefined} */
+  let resizeObserver;
 
   let modulePromise = null;
   // On screen: { input, track, sink, proxySourceSink, packets,
@@ -214,19 +219,54 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     else delete canvas.dataset.proxy;
   }
 
+  // The pane's own window: another screen may have another pixel ratio.
+  const paneWindow = () => pane.ownerDocument.defaultView ?? window;
+
   function resizeCanvas() {
-    const ratio = window.devicePixelRatio;
+    const ratio = paneWindow().devicePixelRatio;
     canvas.width = Math.max(1, Math.round(pane.clientWidth * ratio));
     canvas.height = Math.max(1, Math.round(pane.clientHeight * ratio));
   }
 
   // Resizing clears the canvas; redraw the frame on screen when paused
   // (while playing, the next frame redraws within a few milliseconds).
-  new ResizeObserver(() => {
-    if (pane.hidden) return;
+  // The observer comes from the pane's window, so it sees that window's
+  // layout.
+  function observePane() {
+    resizeObserver?.disconnect();
+    resizeObserver = new (paneWindow().ResizeObserver)(() => {
+      if (pane.hidden) return;
+      resizeCanvas();
+      if (current && mode !== "playing") showFrameAt(shownTime ?? target);
+    });
+    resizeObserver.observe(pane);
+  }
+  observePane();
+
+  // Draws from now on in `surface` (see the header); the old canvas is
+  // cleared and its pane hidden.
+  /** @param {{ pane: HTMLElement, canvas: HTMLCanvasElement }} surface */
+  function attach(surface) {
+    if (surface.pane === pane && surface.canvas === canvas) return;
+    pane.hidden = true;
+    context2d.clearRect(0, 0, canvas.width, canvas.height);
+    delete canvas.dataset.frameTime;
+    delete canvas.dataset.proxy;
+
+    ({ pane, canvas } = surface);
+    context2d = canvas.getContext("2d");
+    observePane();
+    if (!current) return;
+
+    pane.hidden = false;
     resizeCanvas();
-    if (current && mode !== "playing") showFrameAt(shownTime ?? target);
-  }).observe(pane);
+    // The new canvas is empty: redraw what was on screen. While playing,
+    // the next frame (or a proxy one, at once) draws it.
+    const time = shownTime ?? target;
+    shownTime = null;
+    shownIsProxy = false;
+    if (mode !== "playing") showFrameAt(time);
+  }
 
   /* ---------- Proxy fill-in ---------- */
 
@@ -498,6 +538,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     start,
     advance,
     showFrameAt,
+    attach,
   };
 }
 

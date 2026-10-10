@@ -4,18 +4,20 @@ A desktop player for transcribing music by ear. Open a song or a video, slow it 
 
 - **Speed** from 0.25× to 3× with presets, and **pitch** shift in semitones and cents. Both use [Signalsmith Stretch](https://signalsmith-audio.co.uk/code/stretch/).
 - **A–B loop.** Shift+drag on the waveform, drag the edges to adjust, or use `[` `]` `L`.
-- **Marks:** points and regions on the track, each with a name and a colour, shown in the marks lane above the waveform (with a faint guide line over it). `M` marks a point where you hear it (tap along while it plays); `R` starts a region and `R` again ends it. In the lane, drag a mark to move it, or a region's end to resize it; double-click to rename; Shift+← / Shift+→ go from mark to mark, Delete removes the selected one. The **Marks** sidebar on the right lists them (it scrolls on its own, so the page never grows), with **Point** and **Region** buttons; there you rename, recolour, delete and go to them. For now marks last until another file is opened.
-- **Waveform** with a minimap, and a **time ruler** above it (click or drag it to seek). The wheel on the waveform or the lanes zooms at the mouse; the wheel on the minimap scrolls. A thin line follows the mouse and shows the time a click goes to; the playback cursor is 1 px wide, for precise placing. Markers never cover the sound: they live on the ruler and the marks lane, which always move with the waveform.
+- **Marks:** points and regions on the track, each with a name and a colour, shown in the marks lane above the waveform (with a faint guide line over it). `M` marks a point where you hear it (tap along while it plays); `R` starts a region and `R` again ends it. In the lane, drag a mark to move it, or a region's end to resize it; double-click to rename; Shift+← / Shift+→ go from mark to mark, Delete removes the selected one. The **Marks** sidebar on the right lists them (it scrolls on its own, so the page never grows), with **Point** and **Region** buttons; there you rename, recolour, delete and go to them. Marks are saved in project files (below).
+- **Project files (`.tbee`).** **Save** (Ctrl+S) keeps the session: the marks, speed, pitch, volume and EQ, the A–B loop, the step size, where you were and the zoom. The first save asks whether to **link** to the song or video (a small file; keep the media where it is) or put it **inside** (one file that works anywhere, as large as the media); Ctrl+Shift+S saves as a new file. Open a project like any file (Open…, Ctrl+O or drop it). A linked song that moved is looked for next to the project (where it was relative to it) and then where it was; if it's in neither place, you're asked where it is. Unsaved changes show a • in the title, and TranscriBee asks before closing or opening something else.
+- **Waveform** with a minimap, and a **time ruler** above it (click or drag it to seek). The wheel on the waveform or the lanes zooms at the mouse; the wheel on the minimap scrolls. A thin line follows the mouse and shows the time a click goes to; the playback cursor is 1 px wide, for precise placing. Every song is scaled alike (by its typical loudness, not its single loudest click), and Settings › Waveform picks the shape (bars, continuous, or peaks around loudness), loudness or peaks, a linear or dB scale, combined or left/right stereo, and the height. Markers never cover the sound: they live on the ruler and the marks lane, which always move with the waveform.
 - **Keyboard stepping:**
   - ← / → step back and forward;
   - ↑ / ↓ change the step (0.01–10 s);
   - Space replays from where you started listening. That spot, the **start point**, is shown in green: a ▶ on the ruler (drag it to move it) with a guide line over the waveform, a tick on the minimap, and `▶ 0:05.000` in the transport bar (click it to go there). `S` sets it to what you're hearing now, without stopping. Where playback last stopped (paused, stopped or reached the end) is shown the same way in red, with a ■ on the ruler you can click to go back there.
 - **Video:** the picture is decoded frame by frame with WebCodecs (via [Mediabunny](https://mediabunny.dev)) and always shows the frame at the audio position, so it stays in sync at any speed.
+- **Video in its own window:** the button over the picture, or V, moves it to a window of its own (for a second screen, or a small window beside your editor). The main window then looks as it does for a song, with a strip to bring the video back. Moving the pointer over the video window shows the time, a pin to keep it on top, and Bring back. It's remembered: the next video, even after a restart, opens there too, until you bring it back or close that window. A song closes it.
 - **5-band EQ, volume up to 200 %,** and a limiter.
 - **Long files:** songs and videos of an hour or two open reliably and fast (an hour of MP3 in about 7 s on a mid-range laptop: long tracks are decoded in parallel parts), with progress and a Cancel button. A file whose sound wouldn't fit in the available memory is refused with a message (about 1.2 GB per hour of stereo audio).
-- **Download from YouTube.** Paste a link, or click **From YouTube…**, to get the audio or the video (up to 1080p). It's saved to `~/Downloads/TranscriBee/` and opened. You can choose another folder and the best video quality in Settings. This uses [yt-dlp](https://github.com/yt-dlp/yt-dlp), which TranscriBee downloads on first use (about 40 MB) and keeps up to date; nothing else needs installing. Only download what you have the rights to.
-- **Settings:** the gear button opens them: the colour theme, and where downloads are saved, whether From YouTube starts on audio or video, and the best video quality (480p to 2160p). Changes apply at once and are remembered.
-- **Colour themes:** dark (TranscriBee, Monokai, Dracula, Nord, One Dark) and light (TranscriBee Light, Solarized Light, Catppuccin Latte, GitHub Light, Gruvbox Light), or **Automatic**, which follows your system's dark or light mode (TranscriBee or TranscriBee Light unless you pick others). Pick one with the palette button in the top bar, or in Settings; it's remembered.
+- **Download from YouTube.** Paste a link, or click **From YouTube…**, to get the audio or the video (up to 1080p). Or type words instead of a link to **search** YouTube or SoundCloud. You get 8 results at a time (**Show more** for the next 8), each with its picture, title, channel, length and views. Click one to download it, or use the arrow to open its page in your browser first. The site searched last is remembered (also in Settings › Downloads). If the uploader split the video into **chapters** (common on full albums, lessons and live sets), each one becomes a region named after it. Untick **Add the video's chapters as marks** in the dialog to skip them; that choice is remembered too. It's saved to `~/Downloads/TranscriBee/` and opened. You can choose another folder and the best video quality in Settings. This uses [yt-dlp](https://github.com/yt-dlp/yt-dlp), which TranscriBee downloads on first use (about 40 MB) and keeps up to date; nothing else needs installing. Only download what you have the rights to.
+- **Settings:** the gear button opens them: the colour theme, the waveform's look, and where downloads are saved, whether From YouTube starts on audio or video, and the best video quality (480p to 2160p). Changes apply at once and are remembered.
+- **Colour themes:** dark (TranscriBee, Monokai, Dracula, Nord, One Dark, Gruvbox Dark, Solarized Dark, Catppuccin Mocha, Tokyo Night) and light (TranscriBee Light, Solarized Light, Catppuccin Latte, GitHub Light, Gruvbox Light, One Light, Tokyo Night Day, Everforest Light), or **Automatic**, which follows your system's dark or light mode (TranscriBee or TranscriBee Light unless you pick others). Pick one with the palette button in the top bar, or in Settings; it's remembered.
 - **Works offline.** All libraries and fonts are bundled. Only downloading needs the internet.
 
 **The layout.** The waveform takes all the spare height; the marks sidebar is on the right, and speed, pitch, volume and EQ sit in one dock along the bottom (the EQ's bands open in a popover from **Bands**). The page itself never scrolls. The sidebar always stays in view, so the window can take half a screen (about 960 px wide) and still show everything: under 1100 px it gets narrower. In a short window (under 720 px) the dock gets more compact. The smallest window is 900 × 640.
@@ -57,31 +59,38 @@ TB_APP_BINARY=$PWD/dist/linux-unpacked/transcribee npm test
 ```
 electron/          The main process (CommonJS, Node)
   main.js            window, security, wiring
-  window-state.js    remembers the window's size and position
+  window-state.js    remembers a window's size and position
+  video-window.js    allows the video window (the one other window), remembers it
   prefs-store.js     keeps the settings (prefs.json): checks, saves, the folder picker
   theme-store.js     the colour theme from the settings; applied before the page shows
-  downloader.js      downloading links with yt-dlp
-  media-files.js     serves downloaded files to the page by private URL
+  downloader.js      downloading links, and searching by keywords, with yt-dlp
+  media-files.js     serves downloaded files (or a slice of one) to the page by private URL
+  project-files.js   reads and writes project files (.tbee); the close guard
   system.js          available memory; recovering from a crashed page
   preload.js         the page's bridge to the main process (window.transcribee)
 src/               The page (ES modules, no build step), in layers:
   core/              pure helpers, no DOM (unit-tested)
   themes/            colour themes: palettes/ (one file each) and the logic
+  search/            searching: the sites (sources.js) and what a result is
   prefs/             settings: sections/ (one file each) and the field types
   marks/             marks: what one is, the saved form, the store
+  project/           project files: the header, its version, the media
   config.js          every tunable number
   audio/             engine.js (Web Audio + Signalsmith), transport.js,
                      decoder.js + decode-worker.js (parallel decoding)
   video/             view.js, proxy.js
-  waveform.js        WaveSurfer drawing, zoom, the loop region; its view (zoom,
-                     scroll) for the lanes
+  waveform.js        WaveSurfer: zoom, the loop region; its view (zoom,
+                     scroll) for the lanes. waveform-draw.js draws it
+                     (shaped by core/waveshape.js)
   timeline.js        the lanes above the waveform: ruler (start/stop points),
                      marks lane, guide lines; follows the waveform's view
   context.js         settings, the track's marks, the shared components (`player`)
   ui/                dom.js, controls.js, shortcuts.js, theme.js, prefs.js,
                      pref-fields.js
   features/          playback.js, loop.js, marks.js, open-file.js, download.js,
-                     theme-picker.js, settings.js, layout.js
+                     search.js, theme-picker.js, settings.js, layout.js,
+                     project/ (index.js: save and open; sections.js: what is saved),
+                     video-window/ (the video in its own window; self-contained)
   app.js             entry point: creates and wires everything
   vendor/            Signalsmith Stretch, patched (see its README.md)
 index.html         The page: welcome screen, loading screen, player
@@ -90,9 +99,10 @@ assets/            Logo and icons (generated from transcribee-source.png
                    by scripts/make-images.py)
 tests/
   unit/              node:test unit tests (core, transport, decoding parts,
-                     downloader, media files, system, themes, prefs, marks)
+                     downloader, media files, system, themes, prefs, marks,
+                     project files, search)
   run.cjs            end-to-end runner: e2e/harness.cjs plus topic files
-  e2e/               01-static-ui.cjs … 15-security.cjs
+  e2e/               01-static-ui.cjs … 16-projects.cjs
   smoke.cjs          the real app: security, window state, the bridge
   preload.cjs        page instrumentation for the e2e tests
   fake-yt-dlp.cjs    stands in for yt-dlp, so downloads test offline
@@ -106,7 +116,9 @@ CHANGELOG.md       What changed, why, how and where, newest first
 
 **Adding a setting.** Settings are declared in `src/prefs/sections/`, one file per section (a tab in the dialog). Add a field there: its `key`, `type` (`choice`, `boolean`, `number` or `folder`), `label`, optional `help` and `default`. The Settings dialog shows it, and the main process checks and saves it in `prefs.json`. The page reads it with `getPrefs("section")` and follows changes with `onPrefsChange` (`src/ui/prefs.js`); the main process uses `store.get` and `store.onChange` (`electron/prefs-store.js`). A new section is a new file listed in `SECTIONS` (`src/prefs/index.js`). The formats are described at the top of `src/prefs/fields.js`.
 
-**Marks and TranscriBee files.** A mark is `{ id, start, end, label, color }` (`end: null` for a point), described in `src/marks/format.js` along with its saved form, `{ version: 1, marks: [...] }`. The store (`createMarks`, `src/marks/index.js`) lives in `context.js` and is changed through the actions in `src/features/marks.js`. Saving marks with a song will plug in at three places: `marks.toJSON()` is what to save, `marks.reset(duration, saved)` brings them back when the song opens (called from `resetMarks` in `features/marks.js`), and `marks.on("change")` fires once per edit. `src/marks/` is pure, so the main process can use `parseMarks` to check a file it reads.
+**Marks.** A mark is `{ id, start, end, label, color }` (`end: null` for a point), described in `src/marks/format.js` along with its saved form, `{ version: 1, marks: [...] }`. The store (`createMarks`, `src/marks/index.js`) lives in `context.js` and is changed through the actions in `src/features/marks.js`.
+
+**Project files (.tbee).** A project is a JSON header, optionally followed by a NUL byte and the media's bytes (when the media is inside). The header is `{ format, version, savedWith, media, sections }`, described in `src/project/format.js`. **To save something new, add a section** to `SECTIONS` in `src/features/project/sections.js`. A section has an `id`, its own `version`, `capture()` (its saved form), `restore(data, { duration })` (check and clamp: the data comes from a file), and `dirties` (whether changing it counts as an unsaved change). Nothing else needs to change: saving, opening and spotting unsaved changes all go through the list. When a section's form changes, bump its `version` and teach `restore()` to read the old one. Older apps skip a section they don't know, and a section saved by a newer app is skipped with a notice. The main process (`electron/project-files.js`) writes the file to a temporary file and renames it into place, and serves media that's inside a project as a slice of it (`media-files.js`). The page names its media only by the private URL it was given, never by a path.
 
 **Adding a colour theme.** Copy a file in `src/themes/palettes/` (for example `nord.js`), give it a new `id`, `name`, `scheme` (`"dark"` or `"light"`) and colours for each role, then add it to `THEMES` in `src/themes/index.js`. The roles are listed, with what each colours, in `ROLES` in that file. `npm run test:unit` checks that the theme defines every role and that its text, accent, loop and error colours have enough contrast. It names any pair that fails.
 

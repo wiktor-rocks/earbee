@@ -40,8 +40,14 @@
  *   marks      Points and regions on the open track, with a label and a
  *              colour: the store (src/marks, kept in context.js) is changed
  *              by features/marks.js, which redraws the timeline and the
- *              marks list. Session-only for now; versioned, so a TranscriBee
- *              file can save and restore them (see COMMON CHANGES).
+ *              marks list. Versioned, and saved in project files.
+ *   project    A project file (.tbee) saves the session: the marks, the
+ *              sound settings, the loop, where you were and the zoom, and
+ *              links to the song or video (or has it inside). One section
+ *              per part (features/project/sections.js); the file's frame
+ *              in src/project; reading and writing in the main process
+ *              (electron/project-files.js). Unsaved changes show a • in the
+ *              title and are asked about before they'd be lost.
  *   prefs      The user's Settings (theme, downloads), kept between runs by
  *              the main process (electron/prefs-store.js) and changed in the
  *              Settings dialog. Declared per section in src/prefs; the
@@ -56,24 +62,34 @@
  *   (electron/downloader.js), reached through window.transcribee
  *   (electron/preload.js). The page shows the progress, then opens the
  *   downloaded file like any other (features/download.js), reading it from
- *   disk by a private URL (electron/media-files.js), never whole.
+ *   disk by a private URL (electron/media-files.js), never whole. Words
+ *   instead of a link search YouTube or SoundCloud (features/search.js; the
+ *   sites in src/search/sources.js), also through yt-dlp in the main
+ *   process, which fetches the results' pictures too: the page never
+ *   touches the network.
  *
  * FILES (src/), in layers: a file imports only from layers above it in
  * this list, never below (enforced by `npm run lint`)
- *   core/          Pure helpers, no DOM: format, peaks, ruler, timeline (and the
+ *   core/          Pure helpers, no DOM: format, peaks, waveshape (scaling the
+ *                  waveform), ruler, timeline (and the
  *                  Segment / Loop / LoopRegion types), emitter, files (and
  *                  the Media type), errors, memory, parts (splitting and
  *                  joining a parallel decode)
  *   themes/        Colour themes: palettes and pure logic; independent of
  *                  everything else (the main process uses it too)
+ *   search/        Where the download dialog searches (sources.js) and what
+ *                  a result is; pure, shared with the main process
  *   prefs/         Settings sections (sections/: theme, downloads) and the
  *                  field types; pure, shared with the main process
  *   marks/         What a mark is and its saved form (format.js), and the
  *                  store (index.js); pure
+ *   project/       What a project file is (format.js): its header, version
+ *                  and media; pure, shared with the main process
  *   config.js      CONFIG: every tunable number
  *   audio/         engine.js, transport.js, decoder.js (+ decode-worker.js)
  *   video/         view.js (the picture), proxy.js (low-res copy for seeking)
- *   waveform.js    The waveform, zoom, minimap, loop; its view for the lanes
+ *   waveform.js    The waveform, zoom, minimap, loop; its view for the lanes.
+ *                  waveform-draw.js draws it (bars, continuous, two-tone)
  *   timeline.js    The lanes: ruler, start/stop points, marks; guide lines
  *   context.js     `settings`, `marks` (the open track's), and `player`: the
  *                  components above, once created
@@ -83,9 +99,13 @@
  *                  settings: values, changes, listeners), pref-fields.js
  *                  (one Settings control per field type)
  *   features/      playback.js, loop.js, marks.js (actions, selection, the
- *                  marks list), open-file.js, download.js, theme-picker.js,
+ *                  marks list), open-file.js, download.js, search.js
+ *                  (searching in the download dialog), theme-picker.js,
  *                  settings.js (the Settings dialog), layout.js (the
- *                  shortcuts dialog)
+ *                  shortcuts dialog), project/ (saving and opening project
+ *                  files: index.js; what they save: sections.js),
+ *                  video-window/ (the video in a window of its own;
+ *                  self-contained, its wiring marked "Video window (")
  *   app.js         This file: creates and wires the components, the
  *                  SHORTCUTS table, start()
  *   vendor/        Signalsmith Stretch, patched to read across several
@@ -154,10 +174,17 @@
  *   Mark colours              MARK_COLORS (src/themes/mark-colors.js), and the
  *                             --mark-* defaults in style.css; the unit tests
  *                             check each is visible on every theme.
- *   TranscriBee files         Where saving marks plugs in: marks.toJSON() to
- *   (saving marks)            save, marks.reset(duration, saved) on opening
- *                             (resetMarks, features/marks.js), and
- *                             marks.on("change") to know when to save.
+ *   Saving something new in   Add a section to SECTIONS (features/project/
+ *   project files (.tbee)     sections.js): capture() and restore(), its own
+ *                             version, and whether changing it is an unsaved
+ *                             change. When its saved form changes, bump its
+ *                             version and teach restore() the old one. The
+ *                             file's frame (src/project/format.js) changes
+ *                             rarely: then PROJECT_VERSION.
+ *   A site to search          An entry in SEARCH_SOURCES (src/search/
+ *                             sources.js): its yt-dlp search prefix and
+ *                             hosts; check what its flat results hold first.
+ *                             Settings › Downloads and the dialog list it.
  *   Opening files             features/open-file.js (loadMediaFile: the order
  *                             of a load, the memory check, error wording);
  *                             decoding in audio/decoder.js; how many parts
@@ -191,7 +218,9 @@ import {
   selectMark,
 } from "./features/marks.js";
 import { bindLayout, openShortcuts } from "./features/layout.js";
+import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
+import { bindProject, isSaveDialogOpen, openFile, saveProject, saveProjectAs } from "./features/project/index.js";
 import { bindSettings, isSettingsOpen } from "./features/settings.js";
 import { bindThemePicker, isThemeMenuOpen } from "./features/theme-picker.js";
 import {
@@ -219,6 +248,7 @@ import {
 import { $, dom, renderStepSize, renderTrackTime, renderTransportState, reportError, showNotice } from "./ui/dom.js";
 import { bindFocus } from "./ui/focus.js";
 import { bindShortcuts, renderShortcutLegend } from "./ui/shortcuts.js";
+import { getPrefs, onPrefsChange } from "./ui/prefs.js";
 import { followThemePrefs, onThemeChange } from "./ui/theme.js";
 import { createVideoView } from "./video/view.js";
 import { createTimeline } from "./timeline.js";
@@ -268,7 +298,10 @@ const timeline = createTimeline({
 const videoView = createVideoView({
   pane: $("videoPane"),
   canvas: /** @type {HTMLCanvasElement} */ ($("videoCanvas")),
-  onVisibilityChange: (visible) => $("stage").classList.toggle("has-video", visible),
+  onVisibilityChange: (visible) => {
+    $("stage").classList.toggle("has-video", visible);
+    videoPictureChanged(visible); // Video window (src/features/video-window/)
+  },
   onProblem: (message) => showNotice(message),
 });
 
@@ -276,6 +309,9 @@ Object.assign(player, { engine, transport, waveform, timeline, videoView });
 
 // The waveform draws on canvases, which don't follow the CSS colours.
 onThemeChange(() => waveform.refreshColors());
+// Its look follows Settings › Waveform.
+waveform.setAppearance(getPrefs("waveform"));
+onPrefsChange("waveform", (values) => waveform.setAppearance(values));
 
 // Everything that follows playback subscribes here.
 transport.on("position", (time) => {
@@ -295,6 +331,7 @@ transport.on("state", (state) => {
 
 transport.on("jump", (time) => {
   waveform.resumeFollow(); // a deliberate move brings the view back to the cursor
+  waveform.follow(time, { backward: !transport.playing });
   if (transport.playing) videoView.start(time);
   else videoView.showFrameAt(time);
 });
@@ -308,6 +345,25 @@ transport.on("jump", (time) => {
 
 /** @type {Shortcut[]} */
 const SHORTCUTS = [
+  {
+    group: "File",
+    codes: ["KeyO"],
+    ctrl: true,
+    anytime: true,
+    keys: ["O"],
+    description: "Open a song, video or project",
+    down: () => dom.fileInput.click(),
+  },
+  { group: "File", codes: ["KeyS"], ctrl: true, keys: ["S"], description: "Save the project", down: saveProject },
+  {
+    group: "File",
+    codes: ["KeyS"],
+    ctrl: true,
+    shift: true,
+    keys: ["S"],
+    description: "Save the project as…",
+    down: saveProjectAs,
+  },
   {
     group: "Playback",
     codes: ["Space"],
@@ -400,6 +456,14 @@ const SHORTCUTS = [
     description: "Stop marking a region / deselect the mark",
     down: cancelMarking,
   },
+  // Video window (src/features/video-window/)
+  {
+    group: "Video",
+    codes: ["KeyV"],
+    keys: ["V"],
+    description: "Video in its own window / back",
+    down: toggleVideoWindow,
+  },
   {
     group: "Help",
     codes: ["Slash"],
@@ -437,19 +501,29 @@ function start() {
   bindSettingControls();
   bindPlayback();
   bindLoadCancel();
-  bindFileInput();
-  bindFileDrop();
+  bindFileInput(openFile);
+  bindFileDrop(openFile);
+  bindProject();
   bindDownloads();
   bindThemePicker();
   bindSettings();
   bindMarks();
   bindLayout();
   bindFocus();
-  bindShortcuts(
-    SHORTCUTS,
-    () => isLoading() || dom.downloadDialog.open || isThemeMenuOpen() || isSettingsOpen() || dom.shortcutsDialog.open,
-  );
+  const keysBlocked = () =>
+    isLoading() ||
+    dom.downloadDialog.open ||
+    isSaveDialogOpen() ||
+    isThemeMenuOpen() ||
+    isSettingsOpen() ||
+    dom.shortcutsDialog.open;
+  bindShortcuts(SHORTCUTS, keysBlocked);
+  // Video window (src/features/video-window/): the same keys there.
+  bindVideoWindow({ bindKeys: (win) => (bindShortcuts(SHORTCUTS, keysBlocked, win), bindFocus(win)) });
   dom.welcomeOpen.focus();
+  // The welcome screen's entrance plays once (style.css), not again when a
+  // failed first file brings the screen back.
+  setTimeout(() => dom.welcome.classList.add("settled"), 1000);
 }
 
 start();

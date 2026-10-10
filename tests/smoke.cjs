@@ -148,6 +148,14 @@ const near = (a, b) => Math.abs(a - b) <= 40; // window decorations differ betwe
         "pop-up windows are blocked",
         (await page.evaluate(`window.open("https://example.com") === null`)) === true,
       );
+      // Video window (src/features/video-window/): the one window the page
+      // may open; it must close with the app (the quit check below).
+      check(
+        "the video window may open",
+        (await page.evaluate(
+          `(() => { const win = window.open("", "transcribee-video"); return win !== null && !win.closed; })()`,
+        )) === true,
+      );
 
       const before = await page.evaluate("location.href");
       await page.evaluate(`location.href = "https://example.com"; 0`);

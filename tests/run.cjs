@@ -52,6 +52,9 @@ const TOPICS = [
   "13-settings.cjs",
   "14-marks.cjs",
   "15-security.cjs",
+  "16-projects.cjs",
+  "17-waveform.cjs",
+  "18-video-window.cjs", // Video window (src/features/video-window/)
 ];
 
 prepare();

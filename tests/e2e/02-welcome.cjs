@@ -25,6 +25,47 @@ module.exports = async function (h) {
       `!document.getElementById("welcomeDownload").hidden && typeof window.transcribee?.download === "function"`,
     ),
   );
+  // The two buttons side by side, From YouTube… on the right.
+  const buttons = await js(
+    `(() => { const a = document.getElementById("welcomeOpen").getBoundingClientRect(); const b = document.getElementById("welcomeDownload").getBoundingClientRect(); return { sameRow: Math.abs(a.top - b.top) < 2, rightOf: b.left > a.right }; })()`,
+  );
+  check("From YouTube… sits to the right of Open", buttons.sameRow && buttons.rightOf, JSON.stringify(buttons));
+
+  // The welcome screen's gentle motion: the animations run, and move.
+  const running = () =>
+    js(`document.getAnimations().filter((a) => a.playState === "running").map((a) => a.animationName)`);
+  const welcomeMotion = () =>
+    js(
+      `[getComputedStyle(document.querySelector(".welcome .welcome-logo")).transform, getComputedStyle(document.querySelector(".welcome .logo-aura"), "::before").transform].join(" | ")`,
+    );
+  const names = await running();
+  check(
+    "the bee floats and its aura breathes",
+    names.includes("bee-float") && names.includes("aura-breathe"),
+    JSON.stringify(names),
+  );
+  const motionBefore = await welcomeMotion();
+  await sleep(700);
+  const motionAfter = await welcomeMotion();
+  check("…and they move", motionBefore !== motionAfter, `${motionBefore} → ${motionAfter}`);
+  await sleep(500);
+  check(
+    "the entrance played once, and is done",
+    (await js(`document.getElementById("welcome").classList.contains("settled")`)) &&
+      !(await running()).includes("rise-in"),
+  );
+  await dbg.sendCommand("Emulation.setEmulatedMedia", {
+    features: [{ name: "prefers-reduced-motion", value: "reduce" }],
+  });
+  await sleep(100);
+  const reduced = await running();
+  check(
+    "with reduced motion, the bee and aura stay still",
+    !reduced.includes("bee-float") && !reduced.includes("aura-breathe"),
+    JSON.stringify(reduced),
+  );
+  await dbg.sendCommand("Emulation.setEmulatedMedia", { features: [] });
+  await sleep(100);
   await shot("welcome.png");
   const opened = await js(
     `(() => { const input = document.getElementById("file"); let n = 0; const orig = input.click; input.click = () => n++; document.getElementById("welcomeOpen").click(); input.click = orig; return n; })()`,
@@ -71,11 +112,26 @@ module.exports = async function (h) {
     JSON.stringify(wm),
   );
   await shot("welcome-error.png");
-  await js(`window.dispatchEvent(new DragEvent("dragover", { cancelable: true }))`);
-  const dragBorder = await js(
-    `document.body.classList.contains("dragging") && getComputedStyle(document.querySelector(".welcome-drop")).borderTopColor`,
+  await js(
+    `(() => { const dt = new DataTransfer(); dt.items.add(new File([""], "song.wav", { type: "audio/wav" })); window.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, cancelable: true })); })()`,
   );
-  check("drag over highlights drop zone", dragBorder === "rgb(245, 179, 1)", dragBorder);
+  const dragPrompt = await js(
+    `document.body.classList.contains("dragging") && getComputedStyle(document.querySelector(".welcome-drop-prompt")).display !== "none" && document.getElementById("welcomeDropText").textContent`,
+  );
+  check("dragging a song over the window says what a drop opens", dragPrompt === "Drop to open this song", dragPrompt);
+  await sleep(300);
+  const dragLook = await js(
+    `(() => { const card = getComputedStyle(document.querySelector(".welcome-drop")); const ring = document.querySelector(".welcome-drop .drop-ring"); const rect = ring.querySelector("rect"); const offset = () => parseFloat(getComputedStyle(rect).strokeDashoffset); return { lifted: card.transform !== "none", ring: getComputedStyle(ring).opacity, marching: document.getAnimations().some((a) => a.animationName === "drop-march" && a.playState === "running"), offset: offset() }; })()`,
+  );
+  await sleep(200);
+  const offsetLater = await js(
+    `parseFloat(getComputedStyle(document.querySelector(".welcome-drop .drop-ring rect")).strokeDashoffset)`,
+  );
+  check(
+    "…the card lifts and its border marches",
+    dragLook.lifted && dragLook.ring === "1" && dragLook.marching && offsetLater !== dragLook.offset,
+    JSON.stringify({ ...dragLook, offsetLater }),
+  );
   await shot("welcome-drag.png");
   await js(`window.dispatchEvent(new DragEvent("dragleave", { relatedTarget: null }))`);
   check("drag leave clears highlight", !(await js(`document.body.classList.contains("dragging")`)));
@@ -98,7 +154,12 @@ module.exports = async function (h) {
   const widths = await js(
     `(() => { const w = document.querySelector("#waveform > div").shadowRoot.querySelector(".wrapper").getBoundingClientRect().width; return { wrapper: w, container: document.getElementById("waveform").clientWidth }; })()`,
   );
-  check("waveform drawn at full width", Math.abs(widths.wrapper - widths.container) < 4, JSON.stringify(widths));
+  // tone.wav is 20 s; a file opens zoomed in to 15 s.
+  check(
+    "waveform drawn zoomed in (15 of 20 s in view)",
+    Math.abs(widths.wrapper - (widths.container * 20) / 15) < 4,
+    JSON.stringify(widths),
+  );
   check("welcome error cleared from player", (await js(`document.getElementById("message").textContent`)) === "");
 
   await js(`window.__slowDecode = 800`);

@@ -1,9 +1,15 @@
 import { CONFIG } from "./config.js";
 import { clamp, formatTrackTime } from "./core/format.js";
+import { shapeLevels, shapeOverview, slicesPerWindow } from "./core/waveshape.js";
+import { defaultsOf } from "./prefs/fields.js";
+import waveformPrefs from "./prefs/sections/waveform.js";
+import { drawWaveform } from "./waveform-draw.js";
 
 /** @typedef {import("./core/timeline.js").Loop} Loop */
 /** @typedef {import("./core/timeline.js").LoopRegion} LoopRegion */
 /** @typedef {{ duration: number, width: number, offset: number }} View */
+/** @typedef {import("./core/parts.js").Levels} Levels */
+/** @typedef {import("./core/waveshape.js").Appearance} Appearance */
 
 /* =====================================================================
  * WAVEFORM
@@ -13,6 +19,15 @@ import { clamp, formatTrackTime } from "./core/format.js";
  * knowing, so the cursor drifted from playback. Clicks and drags here go
  * to onSeek, and the cursor only moves when the transport reports the
  * new position. Created lazily on the first file load.
+ *
+ * The drawing itself is ours (waveform-draw.js), from levels shaped by
+ * core/waveshape.js so every song is scaled alike: WaveSurfer is given an
+ * "index channel" ((i + 0.5) / N for each of the N levels) instead of
+ * peaks, and calls our renderFunction with the slice of it each canvas
+ * shows, which says which levels to draw. The minimap draws the same way,
+ * from an overview with its loud and quiet parts exaggerated
+ * (shapeOverview), so the song's sections are easy to find.
+ * setAppearance() changes the look (Settings › Waveform).
  *
  * The A–B loop is drawn as a <div part="loop-region"> inside WaveSurfer's
  * wrapper (styled from style.css with ::part), positioned in percent so it
@@ -28,16 +43,20 @@ import { clamp, formatTrackTime } from "./core/format.js";
  *
  * A thin hover line (<div part="hover-line">, with the time) follows the
  * mouse over the waveform while nothing is dragged: it sits exactly where
- * a click would seek to.
+ * a click would seek to, and stays under the mouse when the view moves
+ * beneath it (paging, zoom, scrolling), its time changing instead.
  *
  * The wheel on the waveform zooms, keeping the spot under the mouse in
  * place; the wheel on the minimap scrolls the view. After the view is
  * moved by hand (zoom, wheel, minimap),
  * following the playback cursor pauses until the cursor comes back into
  * view or resumeFollow() is called (on every seek), so you can look ahead
- * while it plays.
+ * while it plays. Seeks (clicks, arrow steps, marks) page the view to the
+ * cursor too, playing or not.
  *
  * Exposes: preload, init, load, setTime, follow, resumeFollow, setLoop,
+ *          setAppearance (the look, from Settings › Waveform),
+ *          getView / setView (the zoom and scroll, for project files),
  *          refreshColors (after the colour variables changed, e.g. a
  *          theme), and for the lanes: view, onView, timeAtClientX,
  *          clientXAt, wheel (an event handler), scrollNearEdge, holdFollow
@@ -51,7 +70,7 @@ import { clamp, formatTrackTime } from "./core/format.js";
  * @param {(loop: Loop) => void} options.onLoopChange A drag drew or adjusted the loop.
  */
 export function createWaveform({ container, minimapContainer, onSeek, onLoopChange }) {
-  const { maxZoomMultiplier } = CONFIG.waveform;
+  const { maxZoomMultiplier, initialViewSeconds } = CONFIG.waveform;
 
   let waveSurfer = null;
   let modulesPromise = null;
@@ -72,9 +91,17 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   /** @type {LoopRegion | null} */
   let loop = null; // as last set by setLoop()
   let loopElement = null;
-  let hoverLine = null; // { line, label }
+  let hoverLine = null; // { line, label, text, flip }
+  let hoverX = null; // pointer x of the mouse hovering the waveform (no drag), or null
   /** @type {Set<(view: View) => void>} */
   const viewListeners = new Set();
+  /** @type {Appearance} */
+  let appearance = /** @type {Appearance} */ (defaultsOf(waveformPrefs));
+  /** @type {Levels[] | null} */
+  let levels = null; // as loaded, one per channel
+  let shaped = null; // levels shaped for `appearance` (core/waveshape.js)
+  let loudnessWindow = 1; // slices per loudness window, for the levels loaded
+  let overview = null; // the minimap's (core/waveshape.js shapeOverview)
 
   // Loads the WaveSurfer code without creating anything on screen, so it
   // is safe to call at startup.
@@ -107,11 +134,9 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
         height: "auto",
         ...waveColors(),
         cursorWidth: 1, // thin, for precision (WaveSurfer shifts it by up to this)
-        // Rounded bars with small gaps: lighter than a solid fill.
-        barWidth: 2,
-        barGap: 1,
-        barRadius: 2,
-        normalize: true,
+        // Drawn and scaled here (see the top of the file).
+        renderFunction: renderWaveform,
+        normalize: false,
         interact: false, // seeking is handled by bindPointerSeek()
         dragToSeek: false,
         // Following the cursor is done by follow(); WaveSurfer's own
@@ -151,26 +176,84 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
 
   const minimapOptions = () => ({
     container: minimapContainer,
-    height: 46,
+    // Fills the minimap's card (its height is set in style.css).
+    height: "auto",
     waveColor: cssColor("--minimap-wave"),
     progressColor: cssColor("--minimap-progress"),
     cursorColor: cssColor("--cursor"),
     overlayColor: cssColor("--minimap-overlay"),
-    normalize: true,
+    renderFunction: renderMinimap,
+    normalize: false,
     interact: false,
     dragToSeek: false,
   });
 
-  // Redraws in the current colours, after they changed. The minimap plugin
-  // can't change colours once made, so it is replaced; its scrubbing looks
-  // up the minimap's elements on each drag, so it keeps working.
-  function refreshColors() {
+  /* ---------- Drawing ---------- */
+
+  // A renderFunction for WaveSurfer, called for each canvas: `channelData[0]`
+  // is the slice of the index channel the canvas shows, so it says which of
+  // the levels (from `levelsOf()`) to draw.
+  function renderFrom(levelsOf, lookOf, trackOf = () => undefined) {
+    return (channelData, ctx) => {
+      const index = channelData[0];
+      const drawn = levelsOf();
+      if (!drawn || !index?.length) return;
+      const start = Math.floor(index[0] * drawn.top.peak.length);
+      drawWaveform(ctx, drawn, start, index.length, lookOf(), trackOf());
+    };
+  }
+
+  // The waveform, in the chosen look. Its bars are laid out on the whole
+  // track, at WaveSurfer's pixel ratio (it never goes under 1).
+  const renderWaveform = renderFrom(
+    () => shaped,
+    () => appearance,
+    () => ({
+      trackWidth: waveSurfer.getWrapper().scrollWidth,
+      pixelRatio: Math.max(1, window.devicePixelRatio || 1),
+    }),
+  );
+
+  // The minimap: the overview, exaggerated to find your way, always as one
+  // filled shape.
+  /** @type {Appearance} */
+  const MINIMAP_LOOK = { style: "continuous", measure: "loudness", scale: "linear", stereo: "combined", height: 100 };
+  const renderMinimap = renderFrom(
+    () => overview,
+    () => MINIMAP_LOOK,
+  );
+
+  // (i + 0.5) / N for each level: within 0…1, so WaveSurfer leaves it as is.
+  function indexChannel(length) {
+    const index = new Float32Array(length);
+    for (let i = 0; i < length; i++) index[i] = (i + 0.5) / length;
+    return index;
+  }
+
+  // Redraws the waveform (with `options`, if any) and the minimap, keeping
+  // the scroll. The minimap plugin can't change once made, so it is
+  // replaced; its scrubbing looks up the minimap's elements on each drag,
+  // so it keeps working.
+  function redraw(options = {}) {
     if (!waveSurfer) return;
-    waveSurfer.setOptions(waveColors());
+    const scroll = waveSurfer.getScroll();
+    waveSurfer.setOptions(options);
     waveSurfer.unregisterPlugin(minimap);
     minimap = waveSurfer.registerPlugin(createMinimap());
     // The new minimap places its visible-range overlay on the next scroll.
-    setScroll(waveSurfer.getScroll());
+    setScroll(scroll);
+  }
+
+  // Redraws in the current colours, after they changed.
+  const refreshColors = () => redraw(waveColors());
+
+  // The look (Settings › Waveform): reshapes the levels and redraws.
+  /** @param {Record<string, any>} next The Settings › Waveform values (an Appearance). */
+  function setAppearance(next) {
+    appearance = /** @type {Appearance} */ ({ ...next });
+    if (!levels) return;
+    shaped = shapeLevels(levels, appearance, { window: loudnessWindow });
+    if (duration) redraw();
   }
 
   // Resolves to whether the waveform is available.
@@ -249,22 +332,26 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
 
       pointerId = event.pointerId;
       container.setPointerCapture(pointerId);
+      hoverX = null;
       renderHoverLine(null); // the drag shows the spot itself
       scrubbing = true;
       pendingX = event.clientX;
       applyPointer(); // a click seeks at once
     });
 
-    // Moves are applied once per frame. Without a drag, the hover line
-    // follows the mouse, and hovering near a loop edge shows the resize
-    // cursor.
+    // Without a drag, the hover line follows the mouse. pointerrawupdate
+    // comes as soon as the mouse moves, without waiting for the next frame
+    // as pointermove does, so the line keeps up better where there is one.
+    const hoverEvent = "onpointerrawupdate" in window ? "pointerrawupdate" : "pointermove";
+    container.addEventListener(hoverEvent, (/** @type {PointerEvent} */ event) => {
+      if (pointerId !== null) return;
+      hoverX = event.clientX;
+      refreshHover();
+    });
+
+    // Drag moves are applied once per frame.
     container.addEventListener("pointermove", (event) => {
-      if (event.pointerId !== pointerId) {
-        if (pointerId !== null) return;
-        renderHoverLine(event.clientX);
-        container.classList.toggle("near-loop-edge", loopEdgeAt(event.clientX) !== null);
-        return;
-      }
+      if (event.pointerId !== pointerId) return;
       pendingX = event.clientX;
       frame ||= requestAnimationFrame(applyPointer);
     });
@@ -277,6 +364,12 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       pointerId = null;
       drag = null;
       scrubbing = false;
+      // The hover line comes back at once if the mouse is still here.
+      const view = container.getBoundingClientRect();
+      if (event.type === "pointerup" && event.clientX >= view.left && event.clientX <= view.right) {
+        hoverX = event.clientX;
+        refreshHover();
+      }
 
       if (finished.mode === "seek") return;
       if (finished.draft) onLoopChange({ start: finished.draft.start, end: finished.draft.end });
@@ -286,7 +379,10 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     };
     container.addEventListener("pointerup", endDrag);
     container.addEventListener("pointercancel", endDrag);
-    container.addEventListener("pointerleave", () => renderHoverLine(null));
+    container.addEventListener("pointerleave", () => {
+      hoverX = null;
+      renderHoverLine(null);
+    });
   }
 
   // While dragging, this close to an edge of a zoomed view scrolls it (on
@@ -330,6 +426,8 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   function emitView() {
     const current = view();
     if (current) for (const listener of viewListeners) listener(current);
+    // The view moved under the mouse: the hover line stays under it.
+    if (hoverX !== null) refreshHover();
   }
 
   // Every scroll made here goes through these, which tell the lanes at
@@ -344,7 +442,10 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   /* ---------- Hover line ---------- */
 
   // Shows where a click at pointer `x` would seek to, with its time, or
-  // hides the line (null). Positioned in percent, like the loop.
+  // hides the line (null). It is moved with a transform, which doesn't
+  // lay the page out again, and all the measuring comes before any
+  // change, so following the mouse never waits on a layout. Being placed
+  // in px, it is placed again whenever the view changes (emitView).
   function renderHoverLine(x) {
     if (!waveSurfer) return;
     const wrapper = waveSurfer.getWrapper();
@@ -356,18 +457,35 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       line.ariaHidden = "true";
       line.append(label);
       wrapper.append(line);
-      hoverLine = { line, label };
+      hoverLine = { line, label, text: "", flip: false };
     }
 
     const { line, label } = hoverLine;
-    line.hidden = x === null || !duration;
-    if (line.hidden) return;
-    const time = timeAtClientX(x);
-    line.style.left = `${(time / duration) * 100}%`;
-    label.textContent = formatTrackTime(time);
+    if (x === null || !duration) {
+      line.hidden = true;
+      return;
+    }
+    const track = wrapper.getBoundingClientRect();
+    const right = container.getBoundingClientRect().right;
+    const offset = clamp(x - track.left, 0, track.width);
+    const text = formatTrackTime(track.width ? (offset / track.width) * duration : 0);
     // Near the right edge the time goes on the line's left, so it isn't cut off.
-    const nearRight = x > container.getBoundingClientRect().right - 90;
-    label.setAttribute("part", nearRight ? "hover-time hover-time-flip" : "hover-time");
+    const flip = x > right - 90;
+
+    if (line.hidden) line.hidden = false;
+    line.style.transform = `translateX(${offset}px)`;
+    if (text !== hoverLine.text) label.textContent = hoverLine.text = text;
+    if (flip !== hoverLine.flip) {
+      hoverLine.flip = flip;
+      label.setAttribute("part", flip ? "hover-time hover-time-flip" : "hover-time");
+    }
+  }
+
+  // Places the hover line at the mouse again, and shows the resize cursor
+  // when it is near a loop edge.
+  function refreshHover() {
+    renderHoverLine(hoverX);
+    container.classList.toggle("near-loop-edge", hoverX !== null && loopEdgeAt(hoverX) !== null);
   }
 
   /* ---------- Zoom / scroll ---------- */
@@ -417,8 +535,19 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   }
 
   // A wider window raises the fit-to-width zoom; never stay zoomed out past it.
+  // A taller or shorter one (or the stage giving the timeline more room)
+  // redraws: WaveSurfer only notices width changes, and would keep the
+  // old height.
   function bindResizeClamp() {
+    let height = container.clientHeight;
+    /** @type {ReturnType<typeof setTimeout> | undefined} */
+    let heightTimer;
     new ResizeObserver(() => {
+      if (container.clientHeight !== height) {
+        height = container.clientHeight;
+        clearTimeout(heightTimer);
+        heightTimer = setTimeout(() => duration && waveSurfer.setOptions({ height: "auto" }), 100);
+      }
       emitView();
       if (!duration || zoomLevel === null || zoomLevel >= fitZoom()) return;
       zoomLevel = null;
@@ -505,9 +634,10 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
 
   /* ---------- Public ---------- */
 
-  // Draws precomputed peaks (one Float32Array per channel), so WaveSurfer
-  // doesn't fetch and decode the file a second time.
-  async function load(peaks, trackDuration) {
+  // Draws the levels from decoding (one { peak, rms } per channel), so
+  // WaveSurfer doesn't fetch and decode the file a second time.
+  /** @param {Levels[]} trackLevels @param {number} trackDuration */
+  async function load(trackLevels, trackDuration) {
     duration = 0;
     zoomLevel = null;
     zoomAnchor = null;
@@ -517,28 +647,71 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     emitView();
     if (!waveSurfer) return;
 
-    await waveSurfer.load("", peaks, trackDuration);
-    waveSurfer.zoom(0);
+    levels = trackLevels;
+    loudnessWindow = slicesPerWindow(levels[0].peak.length, trackDuration);
+    shaped = shapeLevels(levels, appearance, { window: loudnessWindow });
+    overview = shapeOverview(levels, { window: loudnessWindow });
+    await waveSurfer.load("", [indexChannel(levels[0].peak.length)], trackDuration);
     waveSurfer.setTime(0);
     duration = trackDuration;
-    emitView();
+    followPaused = false;
+    // Start zoomed in on the beginning (see CONFIG.waveform.initialViewSeconds).
+    const fit = fitZoom();
+    const initial = clamp(waveSurfer.getWidth() / initialViewSeconds, fit, fit * maxZoomMultiplier);
+    zoomLevel = initial > fit ? initial : null;
+    waveSurfer.zoom(zoomLevel ?? 0);
+    setScroll(0);
+  }
+
+  // The zoom and scroll, in the track's terms (so they mean the same in a
+  // window of another size): how many seconds are in view (null: the
+  // whole track, fit to width) and the time at the left edge.
+  /** @returns {{ seconds: number | null, start: number } | null} */
+  function getView() {
+    if (!waveSurfer || !duration) return null;
+    const pxPerSecond = waveSurfer.getWrapper().scrollWidth / duration;
+    return {
+      seconds: zoomLevel === null ? null : waveSurfer.getWidth() / zoomLevel,
+      start: pxPerSecond > 0 ? waveSurfer.getScroll() / pxPerSecond : 0,
+    };
+  }
+
+  // Brings back a view from getView(), within the zoom limits.
+  /** @param {{ seconds?: number | null, start?: number }} saved */
+  function setView({ seconds = null, start = 0 }) {
+    if (!waveSurfer || !duration) return;
+    const fit = fitZoom();
+    const wanted = Number.isFinite(seconds) && seconds > 0 ? waveSurfer.getWidth() / seconds : fit;
+    const next = clamp(wanted, fit, fit * maxZoomMultiplier);
+    zoomLevel = next > fit ? next : null;
+    zoomAnchor = null;
+    waveSurfer.zoom(zoomLevel ?? 0);
+    const pxPerSecond = waveSurfer.getWrapper().scrollWidth / duration;
+    setScroll(clamp(Number.isFinite(start) ? start : 0, 0, duration) * pxPerSecond);
+    // The view stays where it was saved until the cursor comes into it.
+    followPaused = true;
   }
 
   // Keeps the cursor in view when zoomed in: once it leaves the visible
   // range, jump a page so it is at the left edge (no smooth scrolling).
-  // While following is paused, the view stays put until the cursor is
-  // back inside it.
-  function follow(time) {
+  // With `backward` (stepping back while paused), a cursor that left on
+  // the left lands at the right edge instead, so the next steps back stay
+  // in view. While following is paused, the view stays put until the
+  // cursor is back inside it.
+  function follow(time, { backward = false } = {}) {
     if (!duration || scrubbing) return;
 
     const cursorX = (time / duration) * waveSurfer.getWrapper().scrollWidth;
     const viewStart = waveSurfer.getScroll();
-    const inView = cursorX >= viewStart && cursorX <= viewStart + waveSurfer.getWidth();
+    const width = waveSurfer.getWidth();
+    const inView = cursorX >= viewStart && cursorX <= viewStart + width;
     if (followPaused) {
       if (inView) followPaused = false;
       return;
     }
-    if (!inView) scrollTo(() => waveSurfer.setScrollTime(time));
+    if (inView) return;
+    if (backward && cursorX < viewStart) setScroll(Math.max(0, cursorX - width));
+    else scrollTo(() => waveSurfer.setScrollTime(time));
   }
 
   return {
@@ -547,14 +720,18 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     load,
     follow,
     refreshColors,
+    setAppearance,
     resumeFollow: () => (followPaused = false),
     setTime: (time) => waveSurfer?.setTime(time),
     /** @param {LoopRegion | null} next */
     setLoop(next) {
       loop = next && { ...next };
       renderLoop();
+      if (hoverX !== null) refreshHover();
     },
     view,
+    getView,
+    setView,
     /** Calls `listener` with the view whenever it changes. @param {(view: View) => void} listener */
     onView(listener) {
       viewListeners.add(listener);

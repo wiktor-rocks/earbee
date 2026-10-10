@@ -67,19 +67,56 @@ async function createHarness() {
     chooseFolder: async () => (folderChoice.asked++, folderChoice.path),
     pages: () => BrowserWindow.getAllWindows().map((win) => win.webContents),
   });
-  // Downloads as main.js does them, but with the fake yt-dlp.
+  // Downloads as main.js does them, but with the fake yt-dlp. Search
+  // results' pictures come from a stand-in fetch (a 1×1 PNG for
+  // https://fake.test/…), and the browser is a list of what it was asked
+  // to open (externalOpens).
+  const PIXEL = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  const fakeFetch = async (url) =>
+    String(url).startsWith("https://fake.test/")
+      ? new Response(PIXEL, { headers: { "content-type": "image/png" } })
+      : new Response(null, { status: 404 });
+  const externalOpens = [];
   require(path.join(PROJECT, "electron", "downloader.js")).handleDownloads(ipcMain, {
+    fetch: fakeFetch,
+    openExternal: (url) => externalOpens.push(url),
     binDir: path.join(OUTPUT, "unused-bin"),
     saveDir: DOWNLOADS,
     prefs: () => prefsStore.get("downloads"),
     ytDlp: path.join(TESTS, "fake-yt-dlp.cjs"),
     share: mediaFiles.share,
   });
+  // Project files as main.js handles them, with stand-in dialogs: each
+  // answers what `projectDialogs` holds (save/locate: a path or null;
+  // confirm: "save" | "discard" | "cancel") and is recorded in `asked`.
+  const projectDialogs = { save: null, locate: null, confirm: "discard", asked: [] };
+  const { createProjectFiles, handleProjects } = require(path.join(PROJECT, "electron", "project-files.js"));
+  const answer = (kind) => async (_sender, detail) => (projectDialogs.asked.push([kind, detail]), projectDialogs[kind]);
+  const stubDialogs = {
+    save: answer("save"),
+    open: answer("open"),
+    locate: answer("locate"),
+    confirm: answer("confirm"),
+  };
+  const projectState = new Map();
+  handleProjects(ipcMain, createProjectFiles({ mediaFiles, dialogs: stubDialogs, appVersion: "test" }), {
+    mediaFiles,
+    dialogs: stubDialogs,
+    state: projectState,
+  });
   // As main.js does, except that a test can pretend the system has only
   // `memory.available` bytes left (null: the real figure).
   const memory = { available: null };
   const { availableMemory } = require(path.join(PROJECT, "electron", "system.js"));
   ipcMain.handle("system:available-memory", () => memory.available ?? availableMemory());
+  // Video window (src/features/video-window/): as main.js allows it, but
+  // hidden (an offscreen window.open window gets no size); videoWin() is
+  // the open one (or null).
+  const videoWindow = require(path.join(PROJECT, "electron", "video-window.js"));
+  videoWindow.handleVideoWindows(ipcMain);
   session.defaultSession.registerPreloadScript({
     type: "frame",
     filePath: path.join(PROJECT, "electron", "preload.js"),
@@ -97,6 +134,10 @@ async function createHarness() {
     },
   });
   win.webContents.setFrameRate(60);
+  videoWindow.allowVideoWindow(win, {
+    extraOptions: { show: false, webPreferences: { backgroundThrottling: false } },
+  });
+  const videoWin = () => BrowserWindow.getAllWindows().find((other) => other !== win && !other.isDestroyed()) ?? null;
   win.webContents.focus();
   const securityWarnings = [];
   win.webContents.on("console-message", (e) => {
@@ -120,7 +161,19 @@ async function createHarness() {
         break;
     }
     await sleep(300);
+    // A file opens zoomed in on its start; the topics assume the whole
+    // track in view, so note the opening view (06-zoom checks it) and zoom
+    // all the way out.
+    opened.view = await js(VIEW);
+    const { x, y } = await js(
+      `(() => { const r = document.getElementById("waveform").getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`,
+    );
+    for (let i = 0; i < 20; i++) wc.sendInputEvent({ type: "mouseWheel", x, y, deltaX: 0, deltaY: -3000 });
+    await sleep(300);
   }
+  // The whole waveform's left edge and width, the visible part's, and the scroll.
+  const VIEW = `(() => { const host = document.querySelector("#waveform > div").shadowRoot; const w = host.querySelector(".wrapper").getBoundingClientRect(); const c = document.getElementById("waveform").getBoundingClientRect(); return { wl: w.left, ww: w.width, cl: c.left, cw: c.width, scroll: host.querySelector(".scroll").scrollLeft }; })()`;
+  const opened = { view: null };
   function key(keyCode, modifiers = []) {
     wc.sendInputEvent({ type: "keyDown", keyCode, modifiers });
     wc.sendInputEvent({ type: "keyUp", keyCode, modifiers });
@@ -177,9 +230,9 @@ async function createHarness() {
     const l = await loopInfo();
     if (l.hidden) return null;
     const [a, b] = l.text
-      .replace("Loop ", "")
-      .split(" – ")
-      .map((t) => js(`__parseTime(${JSON.stringify(t)})`));
+      .replace("↻", "")
+      .split("–")
+      .map((t) => js(`__parseTime(${JSON.stringify(t.trim())})`));
     return { start: await a, end: await b, enabled: !l.disabled };
   };
   const sample = (ms) => js(`__sample(${ms})`);
@@ -203,6 +256,7 @@ async function createHarness() {
     js,
     dbg,
     openFile,
+    opened, // { view }: the waveform's view right after the last openFile
     key,
     rect,
     duration,
@@ -220,6 +274,10 @@ async function createHarness() {
     prefsFile,
     prefsStore,
     folderChoice,
+    projectDialogs,
+    externalOpens, // the links Open on YouTube passed to the system browser
+    projectState, // the page's unsaved state, as the main process hears it
+    videoWin, // the video window (src/features/video-window/), or null
     memory,
     check,
     sleep,

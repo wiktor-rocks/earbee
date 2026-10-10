@@ -1,0 +1,130 @@
+/* =====================================================================
+ * VIDEO WINDOW (src/features/video-window/)
+ * The button over the video, the main window's stage while the video is
+ * in its own window (the strip, then the timeline as for an audio file),
+ * and the video window's page. Loaded after style.css.
+ * ===================================================================== */
+
+/* ---------- The main window ---------- */
+
+.video-pane {
+  position: relative;
+}
+
+/* Over the picture's top-right corner, while the pointer is on it. */
+.video-popout-button {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  opacity: 0;
+  background: color-mix(in srgb, #000 55%, transparent);
+  color: #fff;
+}
+
+.video-pane:hover .video-popout-button,
+.video-popout-button:focus-visible {
+  opacity: 1;
+}
+
+.video-popout-button:hover {
+  background: color-mix(in srgb, #000 75%, transparent);
+  color: #fff;
+}
+
+/* The strip, then the timeline and minimap as for an audio file. */
+.stage.video-popped {
+  grid-template-rows: auto minmax(0, 1fr) 44px;
+}
+
+.video-away {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.video-away > span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-height: 719px) {
+  .stage.video-popped {
+    grid-template-rows: auto minmax(0, 1fr) 34px;
+  }
+}
+
+/* ---------- The video window's page ---------- */
+
+body.video-window {
+  height: 100vh;
+  overflow: hidden;
+  background: #000;
+}
+
+body.video-window:not(.awake) {
+  cursor: none;
+}
+
+.video-window .video-pane {
+  position: fixed;
+  inset: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+/* The time on the left, the buttons on the right, over the picture's top
+   while the pointer moves. */
+.video-window-controls {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  left: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.video-window.awake .video-window-controls {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.video-window-time {
+  margin-right: auto;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: color-mix(in srgb, #000 60%, transparent);
+  color: #fff;
+  font: 700 12px/1.2 var(--num);
+  font-variant-numeric: tabular-nums;
+}
+
+.video-window-controls button {
+  border-color: transparent;
+  background: color-mix(in srgb, #000 60%, transparent);
+  color: #fff;
+}
+
+.video-window-controls button:hover {
+  background: color-mix(in srgb, #000 80%, transparent);
+}
+
+.video-window-controls button.icon-only {
+  padding: 4px 6px;
+}
+
+.video-window-controls button[aria-pressed="true"] {
+  color: var(--accent);
+}

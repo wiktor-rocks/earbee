@@ -16,7 +16,7 @@ import {
   formatTrackTime,
   formatDuration,
 } from "../../src/core/format.js";
-import { downsamplePeaks, peaksPerSecondFor } from "../../src/core/peaks.js";
+import { downsampleLevels, peaksPerSecondFor } from "../../src/core/peaks.js";
 import { timelinePositionAt } from "../../src/core/timeline.js";
 
 describe("format", () => {
@@ -82,13 +82,28 @@ describe("files", () => {
 });
 
 describe("peaks", () => {
-  test("keeps the largest excursion of each block, either sign", () => {
+  test("each block's largest excursion (either sign) and its RMS", () => {
     const samples = Float32Array.from([0.1, -0.9, 0.2, 0.5, 0.4, -0.1, 0.3]);
+    const { peak, rms } = downsampleLevels(samples, 3);
     assert.deepEqual(
-      [...downsamplePeaks(samples, 3)].map((v) => +v.toFixed(2)),
-      [-0.9, 0.5, 0.3],
+      [...peak].map((v) => +v.toFixed(2)),
+      [0.9, 0.5, 0.3],
     );
-    assert.equal(downsamplePeaks(samples, 1), samples);
+    const rmsOf = (...values) => Math.sqrt(values.reduce((sum, v) => sum + v * v, 0) / values.length);
+    assert.deepEqual(
+      [...rms].map((v) => +v.toFixed(4)),
+      [rmsOf(0.1, -0.9, 0.2), rmsOf(0.5, 0.4, -0.1), rmsOf(0.3)].map((v) => +v.toFixed(4)),
+    );
+    for (let i = 0; i < peak.length; i++) assert.ok(rms[i] <= peak[i] + 1e-7);
+  });
+
+  test("a factor of 1 gives the magnitudes, in new arrays (they are transferred)", () => {
+    const samples = Float32Array.from([0.25, -0.5]);
+    const { peak, rms } = downsampleLevels(samples, 1);
+    assert.deepEqual([...peak], [0.25, 0.5]);
+    assert.deepEqual([...rms], [0.25, 0.5]);
+    assert.notEqual(peak.buffer, samples.buffer);
+    assert.notEqual(rms.buffer, peak.buffer);
   });
 
   test("peaks per second stay within the limits", () => {

@@ -6,13 +6,16 @@
  *
  *   group   the heading it's listed under ("Playback", "Marks", …)
  *   codes   KeyboardEvent.code values (physical keys, any layout)
+ *   ctrl    true if the shortcut is Ctrl (Cmd on a Mac) + the key (optional);
+ *           these also work in text fields
  *   shift   true if the shortcut is Shift + the key (optional)
  *   keys    labels for the shortcuts dialog, one per code
  *   down    called on key press, with the KeyboardEvent
  *   up      called on key release (optional), with the KeyboardEvent
  *   repeat  whether holding the key keeps firing `down`
- * Shortcuts only fire when a track is loaded and nothing (a load, a
- * dialog) blocks them.
+ *   anytime true if it works before a track is loaded (optional)
+ * Shortcuts only fire when a track is loaded (unless `anytime`) and
+ * nothing (a load, a dialog) blocks them.
  * ===================================================================== */
 
 import { hasAudio } from "../context.js";
@@ -22,7 +25,9 @@ import { dom, element, guarded } from "./dom.js";
  * @typedef {object} Shortcut
  * @property {string} group
  * @property {string[]} codes
+ * @property {boolean} [ctrl]
  * @property {boolean} [shift]
+ * @property {boolean} [anytime]
  * @property {string[]} keys
  * @property {string} description
  * @property {(event: KeyboardEvent) => void} down
@@ -30,14 +35,18 @@ import { dom, element, guarded } from "./dom.js";
  * @property {boolean} [repeat]
  */
 
-// Shortcuts are plain keys or Shift + key; presses with Ctrl, Alt or Meta
-// are left to the system. A release matches by key alone, so pressing
-// Shift while holding a play-while-held key can't leave it playing.
+// Shortcuts are plain keys, Shift + key, Ctrl + key or Ctrl + Shift + key
+// (Cmd for Ctrl on a Mac); other presses with Ctrl, and any with Alt, are
+// left to the system. A release matches by key alone, so pressing Shift
+// while holding a play-while-held key can't leave it playing.
 function findShortcut(shortcuts, event) {
-  if (event.ctrlKey || event.metaKey || event.altKey) return undefined;
+  if (event.altKey) return undefined;
+  const ctrl = event.ctrlKey || event.metaKey;
   const isRelease = event.type === "keyup";
   return shortcuts.find(
-    (shortcut) => shortcut.codes.includes(event.code) && (isRelease || Boolean(shortcut.shift) === event.shiftKey),
+    (shortcut) =>
+      shortcut.codes.includes(event.code) &&
+      (isRelease || (Boolean(shortcut.ctrl) === ctrl && Boolean(shortcut.shift) === event.shiftKey)),
   );
 }
 
@@ -56,17 +65,17 @@ const isKeyboardFocusedSlider = (target) =>
   target.tagName === "INPUT" && target.type === "range" && target !== clickedElement;
 
 function handleShortcutKey(shortcuts, isBlocked, event) {
-  if (isBlocked() || isTextField(event.target)) return;
+  if (isBlocked()) return;
   if (event.code.startsWith("Arrow") && isKeyboardFocusedSlider(event.target)) return;
 
   const shortcut = findShortcut(shortcuts, event);
-  if (!shortcut) return;
+  if (!shortcut || (isTextField(event.target) && !shortcut.ctrl)) return;
 
   // Also stops e.g. Space from clicking a focused button.
   event.preventDefault();
 
   const handler = event.type === "keydown" ? shortcut.down : shortcut.up;
-  if (!handler || !hasAudio()) return;
+  if (!handler || !(hasAudio() || shortcut.anytime)) return;
   if (event.type === "keydown" && event.repeat && !shortcut.repeat) return;
 
   guarded(handler)(event);
@@ -85,6 +94,7 @@ export function renderShortcutLegend(shortcuts) {
       );
     }
     const keys = element("span", { className: "shortcut-keys" });
+    if (shortcut.ctrl) keys.append(element("kbd", {}, "Ctrl"), "+");
     if (shortcut.shift) keys.append(element("kbd", {}, "Shift"), "+");
     shortcut.keys.forEach((key, i) => {
       if (i > 0) keys.append("/");
@@ -98,11 +108,12 @@ export function renderShortcutLegend(shortcuts) {
  * Starts listening for `shortcuts`; while isBlocked() is true, keys are left alone.
  * @param {Shortcut[]} shortcuts
  * @param {() => boolean} isBlocked
+ * @param {Window} [target] The window whose keys these are (another same-origin window can share them).
  */
-export function bindShortcuts(shortcuts, isBlocked) {
+export function bindShortcuts(shortcuts, isBlocked, target = window) {
   const handle = (event) => handleShortcutKey(shortcuts, isBlocked, event);
-  window.addEventListener("pointerdown", (event) => (clickedElement = event.target), { capture: true });
-  window.addEventListener("keydown", (event) => event.key === "Tab" && (clickedElement = null), { capture: true });
-  window.addEventListener("keydown", handle);
-  window.addEventListener("keyup", handle);
+  target.addEventListener("pointerdown", (event) => (clickedElement = event.target), { capture: true });
+  target.addEventListener("keydown", (event) => event.key === "Tab" && (clickedElement = null), { capture: true });
+  target.addEventListener("keydown", handle);
+  target.addEventListener("keyup", handle);
 }

@@ -18,6 +18,7 @@ const isAuto = (values) => values.choice === "auto";
 export default defineSection({
   id: "theme",
   title: "Theme",
+  icon: "palette",
   fields: [
     {
       key: "choice",

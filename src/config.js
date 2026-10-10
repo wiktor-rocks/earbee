@@ -96,7 +96,10 @@ export const CONFIG = {
 
   waveform: {
     // How far the mouse wheel can zoom in, relative to fit-to-width.
-    maxZoomMultiplier: 32,
+    maxZoomMultiplier: 48,
+    // A newly opened file starts zoomed in to show this many seconds from
+    // its start (or the whole track, if shorter), within the zoom limits.
+    initialViewSeconds: 15,
     // Peaks per second of audio in the drawing: enough for 2 per pixel at
     // maximum zoom on the widest possible window, within these limits.
     minPeaksPerSecond: 50,
