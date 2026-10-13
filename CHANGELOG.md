@@ -43,6 +43,28 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-13: A landing page for GitHub Pages
+
+- **What:** a one-page site for TranscriBee in `site/`. It covers what the app does, its keys and its colour themes, and has download buttons for Windows, macOS and Linux. The visitor's own system comes first ("Download for Linux"), marked "your system" among the three.
+- **Why:** the user wanted a landing page that can offer the built program from GitHub, in the app's look, that doesn't read as generated.
+- **How:**
+  - Plain HTML, CSS and one script, with no build step.
+  - **Look:** the app's own colours (TranscriBee, or TranscriBee Light on a light system), its fonts (Righteous for the wordmark and headings, Nunito for text; self-hosted copies in `site/fonts/`), its bee logo (large next to the wordmark in the top bar, smaller in the hero, where it hovers: a 5 s drift up and down with a slight tilt, while its round glow breathes; both stop with `prefers-reduced-motion`), a screenshot, and keycaps and waveform bars in the app's style. The theme swatches use each theme's real `bg` and `accent` from `src/themes/palettes.js`.
+  - **Dark or light:** the page follows the system (TranscriBee or TranscriBee Light). A sun/moon button in the top bar switches between the two and remembers the choice in `localStorage`; a small script in the head applies it before the page shows, so it doesn't flash. The light colours are in `style.css` twice, under the system's light mode and under `[data-theme="light"]`, so the page still follows the system without JavaScript.
+  - **Downloads:** `download.js` asks the GitHub API for the latest release of `REPO` and points each button at the first asset matching that system's pattern in `FILES` (`.exe`, `.dmg`, `.AppImage`), with its size.
+    - With no release (a 404), it says so and points to building from source.
+    - When GitHub can't be reached, or a release lacks a system's file, the buttons open the releases page.
+  - **Publishing:** `.github/workflows/pages.yml` publishes `site/` on GitHub Pages when it changes on `main`. This needs Settings › Pages › Source set to "GitHub Actions".
+- **Where:** `site/index.html`, `site/style.css`, `site/download.js` (`REPO` and `FILES` at the top: the only things to edit), `site/README.md`, `site/fonts/`, `site/img/` (the logo, the favicon from `assets/icon-512.png`, and `screenshot.webp`: the user's screenshot of a live concert video at 0.6× with a looped region, 1017 × 912, never shown wider than that), `.github/workflows/pages.yml`, `eslint.config.js` (browser globals for `site/`).
+- **Still to do:**
+  - Set `REPO` to the real repository.
+  - Add a macOS build target: `package.json` has none yet, so there is no `.dmg` to offer.
+- **Verified by:**
+  - Rendered in Electron at 1280 px (dark and light) and 390 px, with no sideways scrolling.
+  - The theme switch, in Electron: a click switches dark to light (colours, icon, `theme-color`), the choice survives a reload, and with no choice a light system gets the light theme.
+  - A copy pointed at a real Electron app's releases (`laurent22/joplin`): all three buttons got the right file and size, and Linux was detected.
+  - `npm run check`.
+
 ## 2026-10-13: A picture anywhere right after loading (proxy overview, parallel builders)
 
 - **What:** right after a video loads, dragging anywhere in it shows a blurry picture at once. That picture can be off by up to one keyframe gap (about 2 s in a typical YouTube H.264 download), until the full proxy reaches there. Loading takes a little longer for this: at most `overview.waitMs` (3 s) more. The full proxy now starts building while the file still loads, by up to three builders spread over the video.

@@ -1,0 +1,645 @@
+/* TranscriBee's landing page. Colours and fonts are the app's own
+   (style.css and src/themes/palettes.js at the top of the repository):
+   the TranscriBee theme, or TranscriBee Light on a light system. */
+
+@font-face {
+  font-family: "Righteous";
+  src: url("fonts/righteous-latin-400-normal.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Nunito";
+  src: url("fonts/nunito-latin-wght-normal.woff2") format("woff2-variations");
+  font-weight: 200 1000;
+  font-display: swap;
+}
+
+:root {
+  --bg: #0e1014;
+  --surface: #161920;
+  --surface-2: #1d212a;
+  --border: #2a2f3a;
+  --text: #e6e8ee;
+  --muted: #8b93a7;
+  --accent: #f5b301;
+  --accent-hover: #ffc52e;
+  --accent-ink: #1a1400;
+  --wave: #3b4252;
+  --start: #5fd38d;
+  --accent-text: var(--accent); /* amber as small text: darker on light */
+  --glow: color-mix(in srgb, var(--accent) 16%, transparent);
+
+  --display: "Righteous", system-ui, sans-serif;
+  --sans: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  --page: min(1120px, 100% - 32px);
+  color-scheme: dark;
+}
+
+/* TranscriBee Light: on a light system, or when chosen with the button in
+   the top bar (data-theme on <html>, set by the script in index.html's
+   head). The two blocks hold the same colours. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg: #f5f1e8;
+    --surface: #fffcf5;
+    --surface-2: #efe9dc;
+    --border: #ddd3bf;
+    --text: #1f1b14;
+    --muted: #6b6252;
+    --wave: #cfc5b0;
+    --start: #1f9d55;
+    --accent-text: #8a5d00;
+    --glow: color-mix(in srgb, var(--accent) 22%, transparent);
+    color-scheme: light;
+  }
+}
+:root[data-theme="light"] {
+  --bg: #f5f1e8;
+  --surface: #fffcf5;
+  --surface-2: #efe9dc;
+  --border: #ddd3bf;
+  --text: #1f1b14;
+  --muted: #6b6252;
+  --wave: #cfc5b0;
+  --start: #1f9d55;
+  --accent-text: #8a5d00;
+  --glow: color-mix(in srgb, var(--accent) 22%, transparent);
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 17px/1.6 var(--sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: inherit;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 3px;
+}
+a:hover {
+  color: var(--accent-text);
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+h1,
+h2,
+h3 {
+  font-family: var(--display);
+  font-weight: 400;
+  line-height: 1.1;
+  margin: 0;
+}
+
+code {
+  font: 0.86em var(--mono);
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--surface-2);
+}
+
+/* Keys look like the app's keycaps. */
+kbd {
+  display: inline-block;
+  min-width: 26px;
+  padding: 1px 7px;
+  border: 1px solid var(--border);
+  border-bottom-width: 3px;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: 700 13px/1.6 var(--sans);
+  text-align: center;
+}
+
+.wordmark {
+  font-family: var(--display);
+  font-size: 30px;
+  letter-spacing: 0.01em;
+}
+.wordmark b {
+  font-weight: 400;
+  color: var(--accent);
+}
+
+/* ---------- Top bar ---------- */
+
+.top {
+  width: var(--page);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 0;
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+}
+.brand:hover {
+  color: inherit;
+}
+.top nav {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  font-size: 15px;
+  font-weight: 600;
+}
+.top nav a {
+  text-decoration: none;
+  color: var(--muted);
+}
+.top nav a:hover {
+  color: var(--text);
+}
+
+/* Dark or light: shows the moon in the light theme, the sun in the dark. */
+.theme-switch {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  margin-left: -6px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.theme-switch:hover {
+  border-color: var(--muted);
+  color: var(--text);
+}
+.theme-switch svg {
+  width: 18px;
+  height: 18px;
+}
+.theme-switch .moon {
+  display: none;
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) .theme-switch .sun {
+    display: none;
+  }
+  :root:not([data-theme="dark"]) .theme-switch .moon {
+    display: block;
+  }
+}
+:root[data-theme="light"] .theme-switch .sun {
+  display: none;
+}
+:root[data-theme="light"] .theme-switch .moon {
+  display: block;
+}
+
+/* ---------- Hero ---------- */
+
+.hero {
+  width: var(--page);
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  align-items: center;
+  gap: 24px;
+  padding: 56px 0 40px;
+}
+.kicker {
+  margin: 0 0 14px;
+  color: var(--accent-text);
+  font-weight: 700;
+  font-size: 15px;
+}
+.hero h1 {
+  font-size: clamp(42px, 6.4vw, 76px);
+  letter-spacing: -0.01em;
+}
+.lede {
+  max-width: 34em;
+  margin: 22px 0 30px;
+  color: var(--muted);
+  font-size: 19px;
+}
+.cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.release-note {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.hero-bee {
+  position: relative;
+  display: grid;
+  place-items: center;
+}
+/* The app's welcome-screen glow behind the bee. */
+.hero-bee::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 420px;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  background: radial-gradient(closest-side, var(--glow), transparent);
+  animation: glow 5s ease-in-out infinite;
+}
+/* The bee hovers: drifts up and down, tilting a little (not with reduced
+   motion; see the end), and the glow breathes with it. */
+.hero-bee img {
+  position: relative;
+  width: min(100%, 230px);
+  height: auto;
+  transform: rotate(-4deg);
+  animation: hover 5s ease-in-out infinite;
+}
+@keyframes hover {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(-4deg);
+  }
+  30% {
+    transform: translate(3px, -10px) rotate(-1deg);
+  }
+  60% {
+    transform: translate(-2px, -4px) rotate(-6deg);
+  }
+}
+@keyframes glow {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  30% {
+    opacity: 1;
+  }
+}
+
+.button {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 12px 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: 700;
+  text-decoration: none;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.button:hover {
+  color: var(--text);
+  border-color: var(--muted);
+}
+.button small {
+  font-weight: 600;
+  opacity: 0.7;
+}
+.button.primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 18px;
+  padding: 14px 24px;
+}
+.button.primary:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+}
+.button.quiet {
+  background: none;
+  align-self: center;
+}
+
+/* ---------- Screenshot ---------- */
+
+.shot {
+  width: min(1017px, var(--page)); /* the screenshot's own width: never blown up */
+  margin: 0 auto;
+}
+.shot-frame {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow:
+    0 30px 80px -30px rgb(0 0 0 / 0.6),
+    0 0 0 6px color-mix(in srgb, var(--surface-2) 60%, transparent);
+}
+.shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.shot figcaption {
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+/* A waveform drawn by download.js, played up to the green start point. */
+.wave {
+  width: var(--page);
+  height: 64px;
+  margin: 72px auto 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.wave i {
+  flex: 1;
+  min-width: 1px;
+  border-radius: 1px;
+  background: var(--wave);
+}
+.wave i.played {
+  background: var(--accent);
+}
+.wave i.start {
+  background: var(--start);
+  height: 100% !important;
+}
+
+/* ---------- Sections ---------- */
+
+main > section:not(.hero) {
+  width: var(--page);
+  margin: 0 auto;
+  padding: 72px 0 0;
+}
+section h2 {
+  font-size: clamp(30px, 4vw, 42px);
+  margin-bottom: 28px;
+}
+
+.features {
+  margin: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  column-gap: 56px;
+}
+.features > div {
+  padding: 18px 0;
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: 11em 1fr;
+  gap: 16px;
+}
+.features dt {
+  font-weight: 800;
+}
+.features dd {
+  margin: 0;
+  color: var(--muted);
+}
+.features dd kbd {
+  font-size: 12px;
+  padding: 0 6px;
+}
+
+.keys {
+  display: grid;
+  grid-template-columns: 1fr 1.3fr;
+  gap: 48px;
+  align-items: start;
+}
+.keys-intro p {
+  color: var(--muted);
+  margin: 0;
+}
+.keylist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.keylist li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 11px 18px;
+}
+.keylist li + li {
+  border-top: 1px solid var(--border);
+}
+.keylist span {
+  margin-left: 12px;
+  color: var(--muted);
+}
+
+.themes > p {
+  max-width: 36em;
+  margin: -12px 0 24px;
+  color: var(--muted);
+}
+.swatches {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px;
+}
+.swatches li {
+  position: relative;
+  padding: 34px 12px 10px;
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: inset 0 0 0 1px rgb(127 127 127 / 0.22);
+}
+/* A little waveform in each theme's accent. */
+.swatches li::before {
+  content: "";
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  top: 12px;
+  height: 12px;
+  background: repeating-linear-gradient(90deg, var(--ac) 0 2px, transparent 2px 4px);
+  mask: linear-gradient(90deg, #000 45%, rgb(0 0 0 / 0.25) 45%);
+  clip-path: polygon(
+    0 40%,
+    8% 0,
+    15% 50%,
+    24% 10%,
+    33% 60%,
+    41% 20%,
+    50% 70%,
+    60% 0,
+    70% 40%,
+    80% 15%,
+    90% 55%,
+    100% 30%,
+    100% 100%,
+    0 100%
+  );
+}
+
+.download-intro {
+  margin: -12px 0 28px;
+  color: var(--muted);
+}
+.platforms {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+.platform {
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.platform h3 {
+  font-size: 26px;
+}
+.platform .file {
+  margin: 6px 0 18px;
+  color: var(--muted);
+  font-size: 15px;
+}
+.platform .hint {
+  margin: 16px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.platform .hint code {
+  display: inline-block;
+  white-space: nowrap;
+}
+/* The visitor's own system (download.js marks it). */
+.platform.mine {
+  border-color: var(--accent);
+}
+.platform.mine .button {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.platform.mine h3::after {
+  content: "your system";
+  margin-left: 10px;
+  vertical-align: middle;
+  color: var(--accent-text);
+  font: 700 12px var(--sans);
+}
+.elsewhere {
+  margin: 24px 0 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+footer {
+  width: var(--page);
+  margin: 96px auto 0;
+  padding: 28px 0 40px;
+  border-top: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 14px;
+}
+footer p {
+  margin: 0;
+}
+
+/* ---------- Narrow screens ---------- */
+
+@media (max-width: 860px) {
+  .hero {
+    grid-template-columns: 1fr;
+    padding-top: 24px;
+  }
+  .hero-bee {
+    order: -1;
+    justify-items: start;
+  }
+  .hero-bee img {
+    width: 100px;
+  }
+  .hero-bee::before {
+    left: 50px;
+    width: 220px;
+  }
+  .features,
+  .keys,
+  .platforms {
+    grid-template-columns: 1fr;
+  }
+  .keys {
+    gap: 24px;
+  }
+}
+
+@media (max-width: 560px) {
+  .brand img {
+    width: 42px;
+    height: auto;
+  }
+  .wordmark {
+    font-size: 25px;
+  }
+  .top nav a:not([href="#download"]) {
+    display: none;
+  }
+  .features > div {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+  .keylist li {
+    flex-wrap: wrap;
+  }
+  .keylist span {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+  .wave {
+    margin-top: 48px;
+    height: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .hero-bee img,
+  .hero-bee::before {
+    animation: none;
+  }
+}

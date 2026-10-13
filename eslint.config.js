@@ -153,6 +153,11 @@ module.exports = [
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {
+    // The landing page (site/, for GitHub Pages): a plain browser script.
+    files: ["site/**/*.js"],
+    languageOptions: { sourceType: "script", globals: globals.browser },
+  },
+  {
     // Unit tests: ES modules in Node.
     files: ["tests/**/*.mjs"],
     languageOptions: { sourceType: "module", globals: globals.node },
