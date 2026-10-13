@@ -353,7 +353,7 @@ kbd {
 
 .shot {
   width: min(1017px, var(--page)); /* the screenshot's own width: never blown up */
-  margin: 0 auto;
+  margin: 72px auto 0;
 }
 .shot-frame {
   border: 1px solid var(--border);
@@ -404,6 +404,10 @@ main > section:not(.hero) {
   width: var(--page);
   margin: 0 auto;
   padding: 72px 0 0;
+}
+/* Free comes right after the hero, so closer to it. */
+main > section.free {
+  padding-top: 32px;
 }
 section h2 {
   font-size: clamp(30px, 4vw, 42px);

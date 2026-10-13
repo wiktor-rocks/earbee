@@ -88,6 +88,7 @@ The architecture overview, the file map and a list of where to make common chang
   - `site/index.html`: the `.free-line` in the hero, and `section#free` with a `.free-list` of four items in two columns (one on phones), each marked by a short amber bar like the waveform's.
   - `site/download.js` links `data-link="licence"` to the repository's `LICENSE`, and its release text says "Free and open source, for good."
 - **Where:** `site/index.html`, `site/style.css`, `site/download.js`.
+- **Later the same day:** the user asked for the "Free. The whole thing." section near the top. It now comes right after the hero, before the screenshot (`main > section.free` sits 32 px under the hero; `.shot` gets 72 px above it).
 - **Verified by:** renders at 1280 px (dark) and 390 px (light); `npm run check`.
 
 ## 2026-10-13: Release builds for Windows, macOS and Linux, and CI
