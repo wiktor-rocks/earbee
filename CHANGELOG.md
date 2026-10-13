@@ -43,6 +43,17 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-13: A maintainer's guide
+
+- **What:** `docs/maintaining.md` explains how to keep working on ScriBee now that it's on GitHub:
+  - the two branches (`testing` to work on, `main` stable and public) and what runs on GitHub when;
+  - the everyday loop: pull, change and try, commit and push, then move `main` up to `testing`;
+  - putting out a version: `npm version`, the tag, the draft release, checking and publishing it;
+  - the website, what to do when CI fails, undoing things, working from another computer, other people's issues and pull requests, and updating libraries.
+- **Why:** the user asked for a guide to updating the code base, pulling and pushing, so they can keep maintaining it.
+- **Where:** `docs/maintaining.md`, linked from README.md's Development section and its file list.
+- **Verified by:** the commands are the ones used to publish 0.1.0. `npm run check`.
+
 ## 2026-10-13: A shorter README
 
 - **What:** README.md's "What it does" is now nine one-line points instead of a detailed manual of every feature, its keys and the layout.

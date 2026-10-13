@@ -42,6 +42,8 @@ MIT: see [LICENSE](LICENSE). ScriBee is built on Signalsmith Stretch, Mediabunny
 
 # Development
 
+**Maintaining it** (the branches, pulling and pushing, putting out a new version, when CI fails): see [docs/maintaining.md](docs/maintaining.md).
+
 ## Requirements
 
 - **Node.js** 22 or newer, and npm.
@@ -122,7 +124,8 @@ style.css          All styles; colour and font tokens at the top
 assets/            Logo and icons (generated from scribee-source.png
                    by scripts/make-images.py)
 scripts/           make-images.py
-docs/              diagnostics/: how long files load, measured
+docs/              maintaining.md: day-to-day git, releases, CI;
+                   diagnostics/: how long files load, measured
 site/              The landing page, for GitHub Pages (see its README.md)
 .github/           workflows/pages.yml: publishes site/ from main
 tests/
