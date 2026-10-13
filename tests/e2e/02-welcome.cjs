@@ -32,9 +32,12 @@ module.exports = async function (h) {
   // The welcome screen's gentle motion: the animations run, and move.
   const running = () =>
     js(`document.getAnimations().filter((a) => a.playState === "running").map((a) => a.animationName)`);
+  // How far the two animations are, by their own clocks. (Not their
+  // computed transform: on a virtual display without a compositor, such as
+  // CI's, that stays at the first keyframe while the animations run.)
   const welcomeMotion = () =>
     js(
-      `[getComputedStyle(document.querySelector(".welcome .welcome-logo")).transform, getComputedStyle(document.querySelector(".welcome .logo-aura"), "::before").transform].join(" | ")`,
+      `document.getAnimations().filter((a) => ["bee-float", "aura-breathe"].includes(a.animationName)).map((a) => Math.round(a.currentTime)).join(" | ")`,
     );
   const names = await running();
   check(

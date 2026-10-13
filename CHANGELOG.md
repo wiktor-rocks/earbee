@@ -84,6 +84,7 @@ The architecture overview, the file map and a list of where to make common chang
     - the e2e job installs ffmpeg and xvfb, and caches `tests/fixtures` by the hash of `make-fixtures.sh`;
     - it lifts Ubuntu's block on the user namespaces Chromium's sandbox needs;
     - it keeps the screenshots of a failed run.
+- **The first CI run on GitHub:** the quick checks passed. In the e2e job, 408 of 409 e2e checks passed. The one failure was `02-welcome`'s "…and they move", which compared the bee's and aura's computed `transform` 700 ms apart. On the runner's virtual display (no compositor) that stays at the first keyframe while the animations run. It now compares the animations' own clocks (`currentTime`), which is what "they move" means. It still passes locally.
 - **Where:** `package.json`, `.github/workflows/release.yml`, `.github/workflows/ci.yml`, `site/download.js` (`FILES`, `issues`), `site/index.html` (the macOS card), `site/style.css` (`.alt`), `README.md`.
 - **Verified by:**
   - `npm run build:linux` made `ScriBee-0.1.0-linux-x86_64.AppImage`.
