@@ -77,4 +77,20 @@ webFrame.executeJavaScript(`
       if (performance.now() - t0 < ms) requestAnimationFrame(tick); else resolve(out);
     })();
   });
+  // What the video canvas shows each frame: the position, the frame's
+  // time, and whether it is a proxy frame.
+  window.__sampleCanvas = (ms) => new Promise((resolve) => {
+    const out = [];
+    const t0 = performance.now();
+    (function tick() {
+      const { frameTime, proxy } = document.getElementById("videoCanvas").dataset;
+      out.push({
+        t: Math.round(performance.now() - t0),
+        pos: __parseTime(document.getElementById("trackTime").textContent),
+        frame: Number(frameTime),
+        proxy: proxy !== undefined,
+      });
+      if (performance.now() - t0 < ms) requestAnimationFrame(tick); else resolve(out);
+    })();
+  });
 `);

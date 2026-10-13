@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# Generates the test media in tests/fixtures (not committed: ~6 MB).
+# Generates the test media in tests/fixtures (not committed: ~12 MB).
 #   tone.wav      20 s, 440 Hz stereo tone
 #   counter.webm  20 s, 640x360 VP9 + Opus, frame number burned into the picture
+#   long-counter.webm
+#                 4 min, the same with a keyframe only every 20 s: dragging far
+#                 in, before the proxy is built there (e2e/08-video.cjs)
 #   bad.mp3       not audio at all, to test error handling
 #   dl-audio.m4a  6 s AAC in a fragmented ("DASH") MP4, like YouTube's audio
 #   dl-video.webm 6 s VP9 picture without sound, like YouTube's video
@@ -29,6 +32,11 @@ ffmpeg -v error -y \
   -f lavfi -i "sine=frequency=330:duration=20" \
   -vf "drawtext=text='%{frame_num}':fontsize=80:fontcolor=white:x=20:y=20:box=1:boxcolor=black" \
   -c:v libvpx-vp9 -deadline realtime -c:a libopus -shortest counter.webm
+ffmpeg -v error -y \
+  -f lavfi -i "testsrc2=size=640x360:rate=30:duration=240" \
+  -f lavfi -i "sine=frequency=330:duration=240" \
+  -vf "drawtext=text='%{frame_num}':fontsize=80:fontcolor=white:x=20:y=20:box=1:boxcolor=black" \
+  -c:v libvpx-vp9 -deadline realtime -b:v 150k -g 600 -c:a libopus -b:a 24k -shortest long-counter.webm
 printf 'not audio' > bad.mp3
 ffmpeg -v error -y -f lavfi -i "sine=frequency=523:duration=6" -ac 2 -c:a aac -b:a 128k \
   -movflags +frag_keyframe+empty_moov+default_base_moof dl-audio.m4a

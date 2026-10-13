@@ -43,6 +43,47 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-13: A picture anywhere right after loading (proxy overview, parallel builders)
+
+- **What:** right after a video loads, dragging anywhere in it shows a blurry picture at once. That picture can be off by up to one keyframe gap (about 2 s in a typical YouTube H.264 download), until the full proxy reaches there. Loading takes a little longer for this: at most `overview.waitMs` (3 s) more. The full proxy now starts building while the file still loads, by up to three builders spread over the video.
+- **Why:** after the fix below, the first jump to a new spot still waited for the sharp frame. The user was willing to trade a little loading time for a better experience, and chose this option: the overview plus parallel building.
+- **How:**
+  - **The overview:**
+    - The proxy's first job is to encode one low-res frame per keyframe of the video, each as a keyframe of its own. That's at most one per `spacingSeconds` and `maxFrames` in all, about 10 KB each.
+    - Keyframes decode without the frames before them, so this is cheap: the timestamps come from `EncodedPacketSink.getKeyPacket(…, { metadataOnly: true })` and the frames from `VideoSampleSink.samplesAtTimestamps`.
+    - It's built coarse to fine (every 32nd spot first, then the ones halfway between, …), so whatever is done when loading stops waiting is spread over the whole video.
+    - `frameAt` answers with the overview's frame at or before the time when no run covers it, and still sets the focus, so a builder moves there.
+    - `serveProxy` only draws a proxy frame that is nearer to the wanted time than the frame on screen, so a coarse frame never replaces a closer sharp one.
+  - **Starting during loading:** the proxy is created in `prepare`, not `show`, so it builds while the sound decodes. Loading then waits for the overview, up to `waitMs`, with "Preparing the picture N %". Its builder only gives way to its own video's sharp decoding. A canceled or failed load disposes it as before.
+  - **Parallel builders:**
+    - `nextRange` moved to the pure `proxy-plan.js`. A focus goes first, unless a builder reaches it within `leadSeconds`. Otherwise the biggest stretch nothing builds yet is taken: a free gap from its start, or the second half of a busy builder's part (shortening that builder's `to`, which it reads live).
+    - Runs that meet are joined even while one is still being built: a builder writes through its job's `run`, which `join` repoints.
+    - A range that finds no frames is kept as a blank, so it isn't planned again.
+- **Measured** (30 min of 720p H.264 with a keyframe every 2 s, 8 threads):
+  - Loading took 8.1 s instead of about 5 s: the sound decoded in 4.9 s, then the 3 s wait for the overview. By then 692 of its 900 frames were done; the rest followed within about 10 s.
+  - The full proxy took 210 s with 3 builders, against 234 s with 1. Parallel building gains little here: CPU was about 60% idle and the page's main thread too, so the shared limit is probably Chromium's per-page media pipeline. What the builders do add is coverage spread over the video early on. Moving them into Workers might scale better; that hasn't been tried.
+- **Where:** `src/video/proxy.js` (`buildOverview`, `overviewReady`, `overviewProgress`, `overviewCount`, `claim`, `builder`, `reachedEnd`, `join`, `frameAt`), the new `src/video/proxy-plan.js` (`nextRange`, `covers`, `reachedSoon`), `src/video/view.js` (`startProxy`, `overviewReady`, `serveProxy`, `markBuilt`/`showBuilt` with `data-proxy-overview`), `src/features/open-file.js` (`loadMediaFile`'s "overview" phase, `checkMemory`), `src/config.js` (`video.proxy.builders`, `video.proxy.overview`).
+- **Verified by:**
+  - The new `tests/unit/proxy-plan.test.mjs` (14 tests).
+  - New checks in `tests/e2e/08-video.cjs`: loading builds the overview (12 frames for `long-counter.webm`); the proxy is built in several places at once; a far drag right after loading shows a proxy picture within a keyframe gap 100% of the time. The earlier drag checks still pass.
+  - `tests/e2e/12-resources.cjs`: no codec leak with several builders.
+  - `npm test` in full (201 unit, 409 e2e, 21 smoke) and `npm run check`.
+  - The measurements above, from a temporary e2e topic (since removed).
+
+## 2026-10-13: The low-res picture while dragging, far into long videos
+
+- **What:** dragging on the waveform of a long video, far from its start, shows the blurry low-res picture (the proxy) again, so the picture follows the drag instead of lagging behind in sharp frames. The first jump to a new spot still waits for the sharp frame. After that, the proxy there is built within seconds, so scrubbing around that spot (including a few seconds back) is smooth. The rest of the video fills in afterwards.
+- **Why:** the user saw only laggy sharp frames when dragging, "sometimes". This wasn't a regression in the recent commits (the video code there only had renames), which is why going back to `main` didn't help. Measured in a test: every proxy request during a drag at 150–200 s of a 4-minute video failed with "not built yet", because the proxy was only built up to 30–50 s. It was built strictly from the start, and only while the sharp decoder was idle, so that never happens during a drag or playback. On a long video that takes minutes. So it worked near the start, or after waiting, and not elsewhere.
+- **How:**
+  - The proxy's chunks are now kept in runs: stretches built in one go, each starting with a keyframe, so decoding never crosses runs. Runs that come to touch are joined.
+  - A frame asked for where nothing is built becomes the builder's next focus. Once the asking settles (150 ms without a new miss, so a drag in progress doesn't restart decoding at a keyframe on every move), the builder stops the current stretch and builds from `CONFIG.video.proxy.leadSeconds` (5 s) before that spot. With no focus, it fills the first gap, front to back.
+  - Each stretch has its own encoder, and reads its frames with `sourceSink.samples(from, to)`.
+  - Two small fixes in reading: after a 250 ms timeout, the next request starts again at the keyframe (before, it could answer "already the latest frame" with nothing shown). A failed proxy decoder no longer clears a newer one.
+  - `dispose()` now ends the builder's sample reader and closes its encoder. A read of a disposed file throws, which ends `for await` without ending Mediabunny's reader, whose decoder then stayed open; the new test sequence exposed this.
+- **Where:** `src/video/proxy.js` (`nextRange`, `buildRange`, `join`, `runAt`, `built`, `frameAt`, `restartDecoder`, `dispose`), `src/video/view.js` (`show`: `onProgress` → `markBuilt`, the `data-proxy-built` attribute, kept across `attach`), `src/config.js` (`video.proxy.leadSeconds`), `tests/make-fixtures.sh` (`long-counter.webm`: 4 min, a keyframe every 20 s), `tests/preload.cjs` (`__sampleCanvas`), `tests/e2e/08-video.cjs` (the four new checks).
+- **Not changed, but noted:** the proxy is built on the main window's page, paced by `setTimeout`, and Electron's `backgroundThrottling` is on. While that window is minimized or hidden, the build slows to a crawl.
+- **Verified by:** the new checks in `TB_TOPICS=08` (the proxy is built where a drag went; dragging back there shows the proxy; the picture follows within 0.5 s 100% of the time; the sharp frame takes over after). With the old `src/`, the first failed ("not built", built only to ~30–50 s). `TB_TOPICS=08,12` four times without a codec leak, `npm test` in full, and `npm run check`.
+
 ## 2026-10-10: The welcome card no longer lifts on drag
 
 - **What:** dragging a file over the window no longer lifts the welcome card by 2 px. It stays in place. The soft shadow and the marching amber border still appear.

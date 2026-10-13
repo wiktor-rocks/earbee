@@ -22,11 +22,18 @@
  * One decode loop runs at a time and re-reads the target after every
  * frame, so rapid seeking never builds a backlog.
  *
- * Proxy: in the background (only while the main decoder is idle) the
- * whole video is re-encoded once at low resolution with a keyframe every
- * few frames (createVideoProxy). When the sharp frame for a position
- * isn't ready, the proxy frame for exactly that time is drawn instead,
- * at full frame rate, and the sharp frames take over once decoded.
+ * Proxy: from the moment a file is prepared (while it still loads), and
+ * then only while the main decoder is idle, the video is re-encoded at
+ * low resolution with a keyframe every few frames (createVideoProxy).
+ * First a coarse overview, one frame per keyframe, which loading waits
+ * for (overviewReady, at most a few seconds), then the whole video, by
+ * several builders at once; a position asked for that isn't built yet
+ * moves a builder there. When the sharp frame for a position isn't
+ * ready, the proxy frame for exactly that time is drawn instead (or the
+ * overview's nearest one, if that is nearer than what is on screen), at
+ * full frame rate, and the sharp frames take over once decoded. The
+ * canvas's data-proxy-built shows what is built, data-proxy-overview the
+ * overview's frames.
  *
  * Frames are decoded as lightweight VideoSamples; only the ones actually
  * drawn are painted, and every sample is closed as soon as it isn't
@@ -37,12 +44,14 @@
  * just slower), and a decoding failure is reported once per file through
  * onProblem.
  *
- * Exposes: preload, prepare, show, clear, discard,
+ * Exposes: preload, prepare, overviewReady, show, clear, discard,
  *          start, advance, showFrameAt, attach
  *   prepare(media) → { video, reason }: opens a file (a File, or a
  *   download's { name, url }; core/media.js) without touching the
  *   video on screen; `video` is null (with a reason) if it has no
  *   picture this app can decode. Never throws.
+ *   overviewReady(video, ms, signal, onProgress) waits (at most `ms`)
+ *   for a prepared video's proxy overview, reporting the share done.
  *   attach({ pane, canvas }) moves the picture to another pane and
  *   canvas, which may be in another same-origin window; the frame on
  *   screen is redrawn there and the old pane is hidden.
@@ -66,8 +75,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
   let resizeObserver;
 
   let modulePromise = null;
-  // On screen: { input, track, sink, proxySourceSink, packets,
-  //              firstTimestamp, proxy }
+  // On screen: { input, track, sink, packets, firstTimestamp, proxy }
   let current = null;
 
   // What the picture should do: follow playback, or show one frame.
@@ -115,7 +123,6 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
         return failed(input, `${track.codec?.toUpperCase() ?? "its"} video isn't supported`);
 
       const sink = new VideoSampleSink(track);
-      const proxySourceSink = new VideoSampleSink(track); // its own decoder
       const packets = new EncodedPacketSink(track); // for keyframe lookups
       const firstTimestamp = await track.getFirstTimestamp();
 
@@ -124,13 +131,61 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
       if (!first) return failed(input, "its video couldn't be decoded");
       first.close();
 
-      return {
-        video: { input, track, sink, proxySourceSink, packets, firstTimestamp, proxy: null },
-        reason: null,
-      };
+      const video = { input, track, sink, packets, firstTimestamp, proxy: null };
+      startProxy(video, VideoSampleSink, await track.computeDuration());
+      return { video, reason: null };
     } catch (error) {
       console.warn("Video prepare failed:", error);
       return failed(input, "its video couldn't be read");
+    }
+  }
+
+  // The proxy starts building at once, while the file still loads (its
+  // overview is what loading waits for: see overviewReady).
+  function startProxy(video, VideoSampleSink, duration) {
+    const proxy = createVideoProxy({
+      track: video.track,
+      makeSourceSink: () => new VideoSampleSink(video.track), // each with its own decoder
+      packets: video.packets,
+      duration,
+      onProgress: () => video === current && markBuilt(proxy),
+    });
+    video.proxy = proxy;
+    // Gives way to this video's own sharp decoding, not another's.
+    proxy
+      .build(() => looping && video === current)
+      .catch((error) => {
+        if (!video.discarded) console.warn("Video proxy failed:", error);
+      });
+  }
+
+  // Waits (at most `ms`, or until `signal` aborts) until the proxy's
+  // overview of a prepared video is done, so dragging anywhere shows a
+  // picture at once; reports the share done meanwhile.
+  /**
+   * @param {{ proxy: any } | null | undefined} video
+   * @param {number} ms
+   * @param {AbortSignal | undefined} signal
+   * @param {(share: number) => void} onProgress
+   */
+  async function overviewReady(video, ms, signal, onProgress) {
+    if (!video?.proxy || signal?.aborted) return;
+    let timeout;
+    let onAbort;
+    const progress = setInterval(() => onProgress(video.proxy.overviewProgress()), 100);
+    try {
+      await Promise.race([
+        video.proxy.overviewReady,
+        new Promise((resolve) => {
+          timeout = setTimeout(resolve, ms);
+          onAbort = resolve;
+          signal?.addEventListener("abort", onAbort, { once: true });
+        }),
+      ]);
+    } finally {
+      clearInterval(progress);
+      clearTimeout(timeout);
+      signal?.removeEventListener("abort", onAbort);
     }
   }
 
@@ -148,19 +203,14 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
 
   function show(video) {
     reset();
+    markBuilt(null);
     if (current && current !== video) discard(current);
     current = video;
     pane.hidden = false;
     onVisibilityChange(true);
     resizeCanvas();
     showFrameAt(0);
-
-    video.proxy = createVideoProxy({ track: video.track, sourceSink: video.proxySourceSink });
-    video.proxy
-      .build(() => looping)
-      .catch((error) => {
-        if (!video.discarded) console.warn("Video proxy failed:", error);
-      });
+    markBuilt(video.proxy); // what was built while it loaded
   }
 
   function clear() {
@@ -171,6 +221,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     onVisibilityChange(false);
     context2d.clearRect(0, 0, canvas.width, canvas.height);
     delete canvas.dataset.frameTime;
+    markBuilt(null);
   }
 
   function reset() {
@@ -219,6 +270,27 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     else delete canvas.dataset.proxy;
   }
 
+  // And data-proxy-built: the parts of `proxy` built so far, as
+  // "start–end" in seconds; data-proxy-overview: its overview's frames.
+  let builtText = null;
+  let overviewText = null;
+  function markBuilt(proxy) {
+    builtText =
+      proxy &&
+      proxy
+        .built()
+        .map(([start, end]) => `${start.toFixed(1)}–${end.toFixed(1)}`)
+        .join(" ");
+    overviewText = proxy && String(proxy.overviewCount());
+    showBuilt();
+  }
+  function showBuilt() {
+    if (builtText === null) delete canvas.dataset.proxyBuilt;
+    else canvas.dataset.proxyBuilt = builtText;
+    if (overviewText === null) delete canvas.dataset.proxyOverview;
+    else canvas.dataset.proxyOverview = overviewText;
+  }
+
   // The pane's own window: another screen may have another pixel ratio.
   const paneWindow = () => pane.ownerDocument.defaultView ?? window;
 
@@ -252,11 +324,14 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     context2d.clearRect(0, 0, canvas.width, canvas.height);
     delete canvas.dataset.frameTime;
     delete canvas.dataset.proxy;
+    delete canvas.dataset.proxyBuilt;
+    delete canvas.dataset.proxyOverview;
 
     ({ pane, canvas } = surface);
     context2d = canvas.getContext("2d");
     observePane();
     if (!current) return;
+    showBuilt();
 
     pane.hidden = false;
     resizeCanvas();
@@ -304,9 +379,12 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
         const frame = await video.proxy.frameAt(time);
         if (!frame) continue;
         try {
-          // Draw only if still useful: the sharp picture may have caught up.
+          // Draw only if still useful: the sharp picture may have caught up,
+          // or be nearer than this frame (one from the overview can be off
+          // by a keyframe gap).
           const wanted = mode === "playing" ? target : time;
-          if (video === current && wantsProxy(wanted)) drawProxy(frame);
+          const nearer = shownTime === null || Math.abs(frame.timestamp / 1e6 - wanted) < Math.abs(shownTime - wanted);
+          if (video === current && wantsProxy(wanted) && nearer) drawProxy(frame);
         } finally {
           frame.close();
         }
@@ -532,6 +610,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
   return {
     preload,
     prepare,
+    overviewReady,
     show,
     clear,
     discard,

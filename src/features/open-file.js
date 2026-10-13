@@ -92,7 +92,9 @@ async function availableMemory() {
 // wouldn't fit in memory, before decoding. Neither file is ever read whole,
 // so its size on disk doesn't matter.
 async function checkMemory(media, info, isVideo) {
-  const proxyBytes = isVideo ? (info.duration * CONFIG.video.proxy.bitrate) / 8 : 0;
+  const { bitrate, overview } = CONFIG.video.proxy;
+  const overviewFrames = Math.min(info.duration / overview.spacingSeconds, overview.maxFrames);
+  const proxyBytes = isVideo ? (info.duration * bitrate + overviewFrames * overview.bitrate) / 8 : 0;
   const needed = decodedBytes(info.duration, info.sampleRate, info.channels) + proxyBytes;
   const available = await availableMemory();
   if (!fitsInMemory(needed, available, CONFIG.audio.maxMemoryShare)) {
@@ -157,6 +159,14 @@ export async function loadMediaFile(media, signal) {
   setLoadingStatus("Loading");
 
   const prepared = await picture;
+  // Its proxy's overview, started while the sound decoded: then dragging
+  // anywhere shows a picture at once (see video/view.js). Waits a little
+  // at most; the rest is built in the background.
+  await timer.time("overview", () =>
+    player.videoView.overviewReady(prepared?.video, CONFIG.video.proxy.overview.waitMs, signal, (share) =>
+      setLoadingStatus(`Preparing the picture ${Math.floor(share * 100)} %`, true),
+    ),
+  );
   if (signal?.aborted) {
     player.videoView.discard(prepared?.video);
     throw new DOMException("Loading was canceled.", "AbortError");

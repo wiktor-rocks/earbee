@@ -1,9 +1,26 @@
-// Video: the picture follows playback and loop wraps.
+// Video: the picture follows playback, loop wraps and drags (the proxy,
+// its overview and its builders).
 // Part of the end-to-end run (see run.cjs); `h` is the harness.
 const path = require("path");
 
 module.exports = async function (h) {
-  const { js, openFile, key, drag, shot, loopInfo, loopRange, sample, ensurePaused, check, sleep, FIXTURES } = h;
+  const {
+    js,
+    wc,
+    openFile,
+    key,
+    drag,
+    rect,
+    xAt,
+    shot,
+    loopInfo,
+    loopRange,
+    sample,
+    ensurePaused,
+    check,
+    sleep,
+    FIXTURES,
+  } = h;
   let loop, s;
 
   await openFile(path.join(FIXTURES, "counter.webm"));
@@ -35,4 +52,84 @@ module.exports = async function (h) {
   const syncedShare = sync.filter((v) => v < 0.1).length / sync.length;
   check("video stays synced in loop (≥90% within 100 ms)", syncedShare >= 0.9, `${(syncedShare * 100).toFixed(1)}%`);
   await shot("video-loop.png");
+
+  // A long video, dragged far in right after opening: its proxy isn't
+  // built there yet (its builders start at the start, a half and a
+  // quarter), so the overview answers, and a builder moves there (and a
+  // little before). Dragging back then shows the proxy, while the
+  // sharp decoder has to start again at the keyframe before (one every 20 s
+  // in long-counter.webm, at 180 s here).
+  const openedAt = Date.now();
+  await openFile(path.join(FIXTURES, "long-counter.webm"));
+  const loadMs = Date.now() - openedAt;
+  const { y } = await rect();
+  // A drag with the mouse from `from` to `to` (seconds) over about `ms`,
+  // sampling the picture meanwhile and for `after` ms more.
+  async function scrub(from, to, ms, after) {
+    const [x1, x2] = [await xAt(from), await xAt(to)];
+    const steps = Math.round(ms / 40);
+    await js(`window.__scrub = __sampleCanvas(${ms + after}); 0`); // not awaited: it samples during the drag
+    wc.sendInputEvent({ type: "mouseDown", x: x1, y: Math.round(y), button: "left", clickCount: 1 });
+    for (let i = 1; i <= steps; i++) {
+      wc.sendInputEvent({
+        type: "mouseMove",
+        x: Math.round(x1 + ((x2 - x1) * i) / steps),
+        y: Math.round(y),
+        button: "left",
+      });
+      await sleep(40);
+    }
+    wc.sendInputEvent({ type: "mouseUp", x: x2, y: Math.round(y), button: "left", clickCount: 1 });
+    return js(`window.__scrub`);
+  }
+  const builtParts = () => js(`document.getElementById("videoCanvas").dataset.proxyBuilt ?? ""`);
+  const covers = (parts, from, to) =>
+    parts.split(" ").some((part) => {
+      const [start, end] = part.split("–").map(Number);
+      return start <= from && end >= to;
+    });
+
+  // Loading waited for the overview (one frame per keyframe: 12 here), and
+  // several builders have started, spread over the video.
+  const overviewFrames = Number(await js(`document.getElementById("videoCanvas").dataset.proxyOverview ?? 0`));
+  check("loading builds the proxy's overview", overviewFrames >= 10, `${overviewFrames} frames, load ${loadMs} ms`);
+  const early = await builtParts();
+  check("the proxy is built in several places at once", early.split(" ").length >= 2, `built: ${early}`);
+
+  // Far in, beyond the proxy: the overview answers at once, within one
+  // keyframe gap (20 s) of where the drag is.
+  s = await scrub(150, 200, 1600, 0);
+  const far = s.filter((q) => q.t > 200);
+  const near = far.filter((q) => Math.abs(q.frame - q.pos) <= 20).length / far.length;
+  check(
+    "a far drag shows a picture at once (≥90% within a keyframe gap)",
+    s.some((q) => q.proxy) && near >= 0.9,
+    `${(near * 100).toFixed(0)}%, built then: ${early}`,
+  );
+  let parts = "";
+  for (let i = 0; i < 60 && !covers(parts, 196, 205); i++) {
+    await sleep(100);
+    parts = await builtParts();
+  }
+  check("the proxy is built where a drag went", covers(parts, 196, 205), `built: ${parts}`);
+
+  s = await scrub(200, 196, 1000, 2500);
+  const dragging = s.filter((q) => q.t > 200 && q.t < 1000);
+  const following = dragging.filter((q) => Math.abs(q.frame - q.pos) < 0.5).length / dragging.length;
+  check(
+    "dragging back there shows the proxy",
+    s.some((q) => q.proxy),
+    `built: ${parts}`,
+  );
+  check(
+    "the picture follows the drag (≥70% within 0.5 s)",
+    following >= 0.7,
+    `${(following * 100).toFixed(0)}%, e.g. ${JSON.stringify(dragging[Math.floor(dragging.length / 2)])}`,
+  );
+  const end = s.at(-1);
+  check(
+    "the sharp frame takes over after the drag",
+    !end.proxy && Math.abs(end.frame - end.pos) < 0.05,
+    JSON.stringify(end),
+  );
 };

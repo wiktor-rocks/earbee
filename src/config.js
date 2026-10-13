@@ -91,6 +91,23 @@ export const CONFIG = {
       // frame is on screen) so the proxy, not the busy sharp decoder, gets
       // the CPU first and the picture responds at once.
       headStartMs: 60,
+      // A frame asked for where the proxy isn't built yet moves the building
+      // there, starting this many seconds before it, so small steps back
+      // are covered too (see video/proxy.js).
+      leadSeconds: 5,
+      // Builders at once (at most half the CPU threads): each re-encodes
+      // its own part of the video, so the whole of it is ready sooner.
+      builders: 3,
+      // A coarse overview built first, while the file loads: one frame per
+      // keyframe of the video (cheap: keyframes decode on their own), so
+      // dragging anywhere shows a picture at once, off by up to one
+      // keyframe gap, before the proxy reaches there.
+      overview: {
+        spacingSeconds: 1, // at most one frame per this many seconds
+        maxFrames: 1500, // and this many in all (wider spacing on long videos)
+        waitMs: 3000, // loading waits this long at most, after the sound
+        bitrate: 80_000, // bits per frame; ≈ 10 KB each
+      },
     },
   },
 
