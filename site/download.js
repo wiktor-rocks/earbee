@@ -47,6 +47,7 @@ async function fillDownloads() {
   setLinks("repo", repoUrl);
   setLinks("releases", `${repoUrl}/releases`);
   setLinks("issues", `${repoUrl}/issues`);
+  setLinks("licence", `${repoUrl}/blob/main/LICENSE`);
   // Until the release is known, every button goes to the releases page.
   for (const download of Object.keys(FILES)) setLinks(download, releasesUrl);
   if (mine) {
@@ -72,8 +73,9 @@ async function fillDownloads() {
   }
 
   const date = new Date(release.published_at).toLocaleDateString(undefined, { dateStyle: "medium" });
-  setText("[data-release]", `Version ${release.tag_name.replace(/^v/, "")} · ${date} · free`);
-  setText("[data-release-long]", `Version ${release.tag_name.replace(/^v/, "")}, released ${date}. Free.`);
+  const version = release.tag_name.replace(/^v/, "");
+  setText("[data-release]", `Version ${version} · ${date} · Windows, macOS and Linux`);
+  setText("[data-release-long]", `Version ${version}, released ${date}. Free and open source, for good.`);
   for (const [download, pattern] of Object.entries(FILES)) {
     const asset = release.assets.find((candidate) => pattern.test(candidate.name));
     if (!asset) continue; // no build for it in this release: its button stays on the release page

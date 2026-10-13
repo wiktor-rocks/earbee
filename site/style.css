@@ -248,8 +248,17 @@ kbd {
   flex-wrap: wrap;
   gap: 12px;
 }
+/* Free and open source: said plainly, right under the download button. */
+.free-line {
+  margin: 18px 0 0;
+  font-size: 16px;
+}
+.free-line strong {
+  color: var(--accent-text);
+}
+
 .release-note {
-  margin: 14px 0 0;
+  margin: 6px 0 0;
   color: var(--muted);
   font-size: 14px;
 }
@@ -509,6 +518,41 @@ section h2 {
   );
 }
 
+/* Free, the whole thing: four plain promises in two columns. */
+.free-intro {
+  max-width: 36em;
+  margin: -12px 0 24px;
+  color: var(--muted);
+}
+.free-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  column-gap: 56px;
+}
+.free-list li {
+  padding: 16px 0 16px 18px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  position: relative;
+}
+/* A short amber bar marks each, like the played part of a waveform. */
+.free-list li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 22px;
+  width: 4px;
+  height: 14px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.free-list strong {
+  color: var(--text);
+}
+
 .download-intro {
   margin: -12px 0 28px;
   color: var(--muted);
@@ -610,7 +654,8 @@ footer p {
   }
   .features,
   .keys,
-  .platforms {
+  .platforms,
+  .free-list {
     grid-template-columns: 1fr;
   }
   .keys {

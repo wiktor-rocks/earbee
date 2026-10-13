@@ -43,6 +43,24 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-13: The landing page says plainly that ScriBee is free and open source
+
+- **What:** the landing page makes clear that ScriBee is fully free and open source:
+  - **Under the download button:** "Free, for good, and open source. No trial, no subscription, no account, no ads."
+  - **A new section, "Free. The whole thing.", before Download:**
+    - every feature is in the download;
+    - no trial, nothing expires;
+    - no subscription and no paid "Pro" version;
+    - no account, no ads, no tracking;
+    - open source under the MIT licence, with links to the code and the licence.
+  - **The download section and the footer** say "free and open source" too.
+- **Why:** the user asked for the page to stress that the program is fully free to use, with no trials or subscriptions, and open source.
+- **How:**
+  - `site/index.html`: the `.free-line` in the hero, and `section#free` with a `.free-list` of four items in two columns (one on phones), each marked by a short amber bar like the waveform's.
+  - `site/download.js` links `data-link="licence"` to the repository's `LICENSE`, and its release text says "Free and open source, for good."
+- **Where:** `site/index.html`, `site/style.css`, `site/download.js`.
+- **Verified by:** renders at 1280 px (dark) and 390 px (light); `npm run check`.
+
 ## 2026-10-13: Release builds for Windows, macOS and Linux, and CI
 
 - **What:**
