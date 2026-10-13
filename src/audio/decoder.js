@@ -160,6 +160,9 @@ async function decodeInWorkers(media, options) {
     if (!keep) {
       console.warn(`The ${parts.length} parts of “${media.name}” don't join; decoding it in one part.`);
       results = null; // not kept alive while the track decodes again
+      // Nor these workers (and their memory): `finally` would only end
+      // them after the retry.
+      for (const worker of workers.splice(0)) worker.terminate();
       return decodeInWorkers(media, { ...options, workers: 1 });
     }
     const { pieces, levels, frames } = joinParts(results, keep, plan.peakFactor);

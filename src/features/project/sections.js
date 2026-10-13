@@ -17,7 +17,8 @@
 // A section missing from a file keeps the defaults; one the app doesn't
 // know (from a newer version) is ignored, and kept out of the next save.
 import { CONFIG } from "../../config.js";
-import { marks, player, settings } from "../../context.js";
+import { eqGains, marks, player, settings } from "../../context.js";
+import { clamp } from "../../core/format.js";
 import { MARKS_VERSION } from "../../marks/index.js";
 import { setEqEnabled, setSetting, setStepSize } from "../../ui/controls.js";
 import { resetMarks } from "../marks.js";
@@ -35,7 +36,7 @@ import { getLoopRegion, getStartPoint, setLoopRegion, setStartPoint } from "../p
 
 const SOUND_SLIDERS = ["speed", "volume", "semitones", "cents"];
 const finite = (value) => Number.isFinite(value);
-const timeIn = (value, duration) => (finite(value) ? Math.min(Math.max(value, 0), duration) : null);
+const timeIn = (value, duration) => (finite(value) ? clamp(value, 0, duration) : null);
 
 /** @type {Section[]} */
 export const SECTIONS = [
@@ -47,7 +48,7 @@ export const SECTIONS = [
     capture: () => ({
       ...Object.fromEntries(SOUND_SLIDERS.map((key) => [key, settings[key]])),
       eqEnabled: settings.eqEnabled,
-      eq: Object.fromEntries(CONFIG.eq.bands.map((band) => [band.id, settings[band.id]])),
+      eq: eqGains(),
     }),
     restore(data) {
       // setSetting keeps each value inside its slider's range.

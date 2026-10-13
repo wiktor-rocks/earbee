@@ -291,13 +291,14 @@ app.whenReady().then(async () => {
     chrome: process.versions.chrome,
   };
 
-  // As main.js does, so the app's preload finds its handlers.
+  // As main.js does, so the app's preload finds its handlers: the
+  // settings, and the available memory (the app's memory check). Projects
+  // aren't needed; registering a media file for one just fails quietly.
   nativeTheme.themeSource = "dark";
-  const prefsStore = require(path.join(PROJECT, "electron", "prefs-store.js")).createPrefsStore(
-    path.join(app.getPath("userData"), "prefs.json"),
-  );
-  const { createThemeView } = require(path.join(PROJECT, "electron", "prefs-store.js"));
-  require(path.join(PROJECT, "electron", "prefs-store.js")).handlePrefs(ipcMain, prefsStore, {
+  const { createPrefsStore, createThemeView, handlePrefs } = require(path.join(PROJECT, "electron", "prefs-store.js"));
+  require(path.join(PROJECT, "electron", "system.js")).handleSystem(ipcMain);
+  const prefsStore = createPrefsStore(path.join(app.getPath("userData"), "prefs.json"));
+  handlePrefs(ipcMain, prefsStore, {
     initialTheme: createThemeView(prefsStore, nativeTheme).initial,
     defaultPaths: {},
     chooseFolder: async () => null,

@@ -40,6 +40,7 @@ const searchSources = require("../src/search/sources.js");
 
 const RELEASES = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/";
 const UPDATE_EVERY_MS = 24 * 60 * 60 * 1000;
+const STALE_WORK_MS = 24 * 60 * 60 * 1000; // a work folder this old was left behind
 const STALL_MS = 30_000; // give up on GitHub after this long without data
 
 // yt-dlp format selectors: "a/b" means a, else b; "x,y" downloads both.
@@ -147,8 +148,7 @@ function removeStaleWorkFolders() {
     for (const name of fs.readdirSync(os.tmpdir())) {
       if (!name.startsWith("transcribee-download-")) continue;
       const folder = path.join(os.tmpdir(), name);
-      if (Date.now() - fs.statSync(folder).mtimeMs > UPDATE_EVERY_MS)
-        fs.rmSync(folder, { recursive: true, force: true });
+      if (Date.now() - fs.statSync(folder).mtimeMs > STALE_WORK_MS) fs.rmSync(folder, { recursive: true, force: true });
     }
   } catch (error) {
     console.warn("Couldn't clean up old download folders:", error);
@@ -238,11 +238,26 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
   }
 
   // Makes sure yt-dlp is there and reasonably fresh. A search and a
-  // download share one setup: whoever comes second waits for it.
+  // download share one setup, which runs as a job of its own: canceling
+  // `job` (e.g. a new search replacing the one that started the setup)
+  // only stops waiting for it, so whoever else waits still gets it. Its
+  // progress goes to everyone waiting.
   let preparing = null;
+  const waitingForSetup = new Set(); // their onProgress
   function prepare(job, onProgress) {
-    preparing ??= setUp(job, onProgress).finally(() => (preparing = null));
-    return preparing;
+    waitingForSetup.add(onProgress);
+    preparing ??= setUp({ child: null, canceled: false, abort: new AbortController() }, (progress) => {
+      for (const listener of waitingForSetup) listener(progress);
+    }).finally(() => (preparing = null));
+    let onAbort;
+    const canceled = new Promise((resolve) => {
+      onAbort = resolve;
+      job.abort.signal.addEventListener("abort", onAbort, { once: true });
+    });
+    return Promise.race([preparing, canceled]).finally(() => {
+      waitingForSetup.delete(onProgress);
+      job.abort.signal.removeEventListener("abort", onAbort);
+    });
   }
 
   async function setUp(job, onProgress) {

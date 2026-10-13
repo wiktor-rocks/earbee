@@ -108,7 +108,7 @@ function moveBetweenTabs(event) {
   tab.click();
 }
 
-export function openSettings(button) {
+function openSettings(button) {
   if (dialog.open) return;
   opener = button;
   message.textContent = "";

@@ -21,6 +21,7 @@ module.exports = async function (h) {
     shot,
     check,
     sleep,
+    near,
   } = h;
   let s;
 
@@ -116,7 +117,6 @@ module.exports = async function (h) {
   // The start point: where Space plays from.
   const startAt = () => js(`__parseTime(document.getElementById("startPoint").textContent.replace("▶", "").trim())`);
   const lineX = () => js(`document.querySelector("#timelineGuides .guide-start").getBoundingClientRect().left + 0.5`);
-  const near = (a, b, within = 0.06) => Math.abs(a - b) <= within;
 
   await click(5);
   check(

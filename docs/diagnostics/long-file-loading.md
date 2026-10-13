@@ -392,17 +392,17 @@ With streaming, the compressed file is no longer read into memory, so the limit 
 
 ## How it was measured
 
-- **`tests/diagnostics/make-long-media.sh`** generates the media above into `tests/output/long-media/` (not committed, about 2 GB) with ffmpeg. It skips files that already exist.
-- **`tests/diagnostics/profile-load.cjs`** makes one measurement in a fresh Electron process. It loads the real `index.html` with the real preload and theme store, as the e2e harness does. Then it:
+- **`tests/diagnostics/make-long-media.sh`** generates the media above into `tests/output/long-media/` (not committed, about 1.9 GB) with ffmpeg. It skips files that already exist.
+- **`tests/diagnostics/profile-load.cjs`** makes one measurement in a fresh Electron process. It loads the real `index.html` with the real preload and settings store (`electron/prefs-store.js`), as the e2e harness does. Then it:
   - puts the file in the app's file input (DevTools protocol `DOM.setFileInputFiles`), the same path as a user choosing a file;
   - samples `/proc/<pid>/status` (`VmRSS` + `VmSwap`) of the renderer, and of every Electron process, every 50 ms, plus `/proc/meminfo` for the system;
   - runs a 16 ms heartbeat on the page; a gap over 100 ms counts as a freeze;
   - waits for Play to be enabled (loaded), an error to be logged (error shown), the renderer to die, or 15 min;
   - for loaded files, presses Play and checks that the time moves.
 
-  The other modes (`decode`, `decode-native`, `stream`, `stream-discard`) run the same decode code in isolation on the page.
+  The other modes (`decode`, `decode-native`, `stream`, `stream-discard`, `workers`, `seams`) run the same decode code in isolation on the page: `workers` decodes in parallel parts, and `seams` also checks where the parts join.
 
-- **`tests/diagnostics/run.cjs`** runs the whole plan (each run in its own process and profile, optionally inside `systemd-run --user --scope -p MemoryMax=… -p MemorySwapMax=0`). It writes one JSON per run, with a 250 ms memory timeline, plus `results.json` and a summary table. A run takes about half an hour (the two video runs wait about 7 minutes each for the proxy). `node tests/diagnostics/run.cjs <text>` runs only the ids containing `<text>`.
+- **`tests/diagnostics/run.cjs`** runs the whole plan (each run in its own process and profile, optionally inside `systemd-run --user --scope -p MemoryMax=… -p MemorySwapMax=0`). It writes one JSON per run, with a 250 ms memory timeline, plus `results.json` and a summary table. A run takes about 40 minutes (the two video runs wait about 7 minutes each for the proxy). `node tests/diagnostics/run.cjs <text>` runs only the ids containing `<text>`.
 - **Caveats:**
   - Summing the resident memory of every process counts shared pages more than once, so "all processes" figures are upper bounds; the renderer figure is the reliable one.
   - Timings vary by a few per cent between runs: the 10-minute MP3 took 4.6 and 4.3 s in two runs, the 1-hour MP3 25.7, 24.4 and 25.0 s in three.

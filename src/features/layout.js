@@ -7,6 +7,7 @@
  * ===================================================================== */
 
 import { dom, onClick } from "../ui/dom.js";
+import { readStored, store } from "../ui/storage.js";
 
 export function openShortcuts() {
   if (!dom.shortcutsDialog.open) dom.shortcutsDialog.showModal();
@@ -23,20 +24,12 @@ function showSidebar(shown) {
 }
 
 function bindSidebarToggle() {
-  // Browser storage can be missing or refuse; then the sidebar just shows.
-  try {
-    showSidebar(localStorage.getItem(SIDEBAR_KEY) !== "true");
-  } catch {
-    showSidebar(true);
-  }
+  // Without browser storage the sidebar just shows.
+  showSidebar(readStored(SIDEBAR_KEY) !== "true");
   onClick(dom.sidebarToggle, () => {
     const shown = dom.sidebar.hidden;
     showSidebar(shown);
-    try {
-      localStorage.setItem(SIDEBAR_KEY, String(!shown));
-    } catch {
-      // Not remembered; it still works for this session.
-    }
+    store(SIDEBAR_KEY, String(!shown));
   });
 }
 

@@ -31,6 +31,7 @@ const needed = [
   "loud-beats.wav",
   "stereo-left.wav",
   "verse-chorus.wav",
+  "long-counter.webm",
 ];
 
 if (!needed.every((name) => fs.existsSync(path.join(fixtures, name)))) {
@@ -48,7 +49,9 @@ const run = spawnSync(electron, [path.join(tests, "run.cjs"), `--user-data-dir=$
   env,
 });
 fs.rmSync(profile, { recursive: true, force: true });
+// A null status means Electron died (a crash, out of memory): a failure.
+if (run.status !== 0) process.exit(run.status ?? 1);
 
 // Then the real app, main.js included (see smoke.cjs).
 const smoke = spawnSync(process.execPath, [path.join(tests, "smoke.cjs")], { stdio: "inherit", env });
-process.exit(run.status || smoke.status || 0);
+process.exit(smoke.status ?? 1);

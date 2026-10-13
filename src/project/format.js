@@ -19,7 +19,7 @@
 // frame around them. A newer `version` is refused rather than misread; it
 // changes only when the frame itself does.
 
-export const PROJECT_FORMAT = "transcribee-project";
+const PROJECT_FORMAT = "transcribee-project";
 export const PROJECT_VERSION = 1;
 export const PROJECT_EXTENSION = "tbee";
 // The longest header read; anything longer isn't a project.

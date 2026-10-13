@@ -279,7 +279,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
       proxy &&
       proxy
         .built()
-        .map(([start, end]) => `${start.toFixed(1)}–${end.toFixed(1)}`)
+        .map(([from, to]) => `${from.toFixed(1)}–${to.toFixed(1)}`)
         .join(" ");
     overviewText = proxy && String(proxy.overviewCount());
     showBuilt();

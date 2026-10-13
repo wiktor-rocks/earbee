@@ -1,6 +1,7 @@
 // Downloading a link (YouTube): the From YouTube dialog (index.html; it
-// looks like Settings), pasting a link, and progress on the loading screen. Words instead of a link search (below),
-// and the result picked downloads like a link. The download itself runs in the main process
+// looks like Settings), pasting a link, and progress on the loading
+// screen. Words instead of a link search (below), and the result picked
+// downloads like a link. The download itself runs in the main process
 // (electron/downloader.js), reached through window.transcribee
 // (electron/preload.js); the file then opens like any other.
 import { AppError } from "../core/errors.js";
@@ -14,7 +15,6 @@ import { isLoading, withLoading } from "./open-file.js";
 import { confirmUnsaved, loadMedia } from "./project/index.js";
 
 /**
- * The bridge preload.js exposes; missing outside Electron.
  * @typedef {object} DownloadProgress
  * @property {"setup" | "update" | "download" | "join"} stage
  * @property {number} [part]  1-based; video downloads picture, then sound
@@ -29,18 +29,29 @@ import { confirmUnsaved, loadMedia } from "./project/index.js";
  *   chapters: { start: number, end: number, title: string }[] }
  *   | { ok: false, canceled: boolean, error: string }} DownloadResult
  *
+ * @typedef {import("../search/sources.js").SearchResult} SearchResult
+ * @typedef {{ ok: true, searchId: number, results: SearchResult[], more: boolean }
+ *   | { ok: false, canceled: boolean, error: string }} SearchAnswer
+ *
+ * The part of window.transcribee (electron/preload.js) used here; missing
+ * outside Electron, and then there's no downloading or searching at all.
  * @typedef {object} DownloadBridge
  * @property {(url: string, kind: string) => Promise<DownloadResult>} download
  * @property {() => Promise<void>} cancelDownload
  * @property {(callback: (progress: DownloadProgress) => void) => () => void} onDownloadProgress
+ * @property {(text: string, source: string, page: number) => Promise<SearchAnswer>} search
+ * @property {() => Promise<void>} cancelSearch
+ * @property {(callback: (thumbnail: { searchId: number, index: number, src: string }) => void) => () => void} onThumbnail
+ * @property {(url: string) => Promise<boolean>} openExternal
  */
-const downloads = /** @type {DownloadBridge | undefined} */ (/** @type {any} */ (window).transcribee);
+const bridge = /** @type {DownloadBridge | undefined} */ (/** @type {any} */ (window).transcribee);
 
 /**
+ * What a download (or, setting up yt-dlp, a search) is doing, in words.
  * @param {DownloadProgress} progress
- * @param {string} kind
+ * @param {string} [kind] "audio" or "video"
  */
-function describeDownload({ stage, part = 1, parts = 1, fraction, eta }, kind) {
+function describeDownload({ stage, part = 1, parts = 1, fraction, eta }, kind = "audio") {
   const percent = fraction == null ? "" : ` ${Math.floor(fraction * 100)} %`;
   if (stage === "setup") return `Setting up the downloader (first time only)…${percent}`;
   if (stage === "update") return "Updating the downloader…";
@@ -52,19 +63,19 @@ function describeDownload({ stage, part = 1, parts = 1, fraction, eta }, kind) {
 // Downloads `url` (in the main process) and opens the file. Canceling just
 // returns to what was there before.
 async function downloadLink(url, kind) {
-  if (!downloads || !(await confirmUnsaved())) return;
+  if (!bridge || !(await confirmUnsaved())) return;
   const withChapters = dom.downloadChapters.checked; // as the dialog was left
   return withLoading(url, async (signal) => {
     setLoadingStatus(describeDownload({ stage: "download", fraction: 0 }, kind), true);
-    const cancel = () => downloads.cancelDownload();
+    const cancel = () => bridge.cancelDownload();
     signal.addEventListener("abort", cancel);
-    const stopListening = downloads.onDownloadProgress((progress) => {
+    const stopListening = bridge.onDownloadProgress((progress) => {
       setLoadingStatus(describeDownload(progress, kind), progress.stage !== "join");
       if (progress.title) dom.loadingFileName.textContent = dom.overlayTitle.textContent = progress.title;
     });
     let result;
     try {
-      result = await downloads.download(url, kind);
+      result = await bridge.download(url, kind);
     } finally {
       stopListening();
       signal.removeEventListener("abort", cancel);
@@ -87,9 +98,9 @@ async function downloadLink(url, kind) {
 
 // Starts on the kind set in Settings › Downloads, and says where the file
 // will go and the best video quality, from there too.
-export function openDownloadDialog(url = "") {
+function openDownloadDialog(url = "") {
   // Not over another dialog (Settings) or while something loads.
-  if (!downloads || isLoading() || document.querySelector("dialog[open]")) return;
+  if (!bridge || isLoading() || document.querySelector("dialog[open]")) return;
   const { kind, folder, maxHeight, chapters } = getPrefs("downloads");
   dom.downloadChapters.checked = chapters;
   dom.downloadUrl.value = url;
@@ -104,7 +115,7 @@ export function openDownloadDialog(url = "") {
 }
 
 export function bindDownloads() {
-  if (!downloads) return; // not in Electron: no download buttons
+  if (!bridge) return; // not in Electron: no download buttons
   dom.welcomeDownload.hidden = false;
   dom.downloadButton.hidden = false;
   onClick(dom.welcomeDownload, () => openDownloadDialog());
@@ -157,22 +168,7 @@ export function bindDownloads() {
 // the pictures and hands them over as data: URLs: the page never touches
 // the network. The sites are src/search/sources.js.
 
-/**
- * @typedef {import("../search/sources.js").SearchResult} SearchResult
- * @typedef {{ ok: true, searchId: number, results: SearchResult[], more: boolean }
- *   | { ok: false, canceled: boolean, error: string }} SearchAnswer
- *
- * The part of window.transcribee (electron/preload.js) used here.
- * @typedef {object} SearchBridge
- * @property {(text: string, source: string, page: number) => Promise<SearchAnswer>} search
- * @property {() => Promise<void>} cancelSearch
- * @property {(callback: (thumbnail: { searchId: number, index: number, src: string }) => void) => () => void} onThumbnail
- * @property {(callback: (progress: { stage: string, fraction?: number | null }) => void) => () => void} onDownloadProgress
- * @property {(url: string) => Promise<boolean>} openExternal
- */
-const bridge = /** @type {SearchBridge | undefined} */ (/** @type {any} */ (window).transcribee);
-
-export const looksLikeLink = (text) => /^https?:\/\/\S+$/i.test(text.trim());
+const looksLikeLink = (text) => /^https?:\/\/\S+$/i.test(text.trim());
 
 // The search on screen: its words, site and last page; and, by the
 // main process's searchId, the pictures still to come for each page.
@@ -227,20 +223,19 @@ function buildRow(result) {
   open.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#i-external" /></svg>`;
   open.title = `Open on ${source}`;
   open.setAttribute("aria-label", open.title);
-  onClick(open, () => bridge?.openExternal(result.url));
+  onClick(open, () => bridge.openExternal(result.url));
 
   return { row: element("li", {}, choose, open), picture };
 }
 
-/* ---------- Searching ---------- */
+/* ---------- Running a search ---------- */
 
 /**
  * Searches for `text` (page 1: a new list) or shows the next page.
  * @param {string} text
  * @param {number} [page]
  */
-export async function searchFor(text, page = 1) {
-  if (!bridge) return;
+async function searchFor(text, page = 1) {
   const source = sourceById(dom.searchSource.value) ?? SEARCH_SOURCES[0];
   const mine = ++latest;
   current = { text, source: source.id, page };
@@ -254,15 +249,17 @@ export async function searchFor(text, page = 1) {
   showStatus(`Searching ${source.name}…`);
 
   // The first search also sets up the downloader, which can take a while.
-  const stopListening = bridge.onDownloadProgress(({ stage, fraction }) => {
-    if (mine !== latest) return;
-    const percent = fraction == null ? "" : ` ${Math.floor(fraction * 100)} %`;
-    if (stage === "setup") showStatus(`Setting up the downloader (first time only)…${percent}`);
-    else if (stage === "update") showStatus("Updating the downloader…");
+  const stopListening = bridge.onDownloadProgress((progress) => {
+    if (mine !== latest || !["setup", "update"].includes(progress.stage)) return;
+    showStatus(describeDownload(progress));
   });
   let answer;
   try {
     answer = await bridge.search(text, source.id, page);
+  } catch (error) {
+    // The bridge itself failed (it answers failures as { ok: false }).
+    console.warn("Search failed:", error);
+    answer = { ok: false, error: "The search failed. Try again." };
   } finally {
     stopListening();
   }
@@ -296,22 +293,22 @@ function showPicture(searchId, index, src) {
 }
 
 /** Stops a search still running and forgets its answer. */
-export function cancelSearch() {
+function cancelSearch() {
   latest++;
-  bridge?.cancelSearch();
+  bridge.cancelSearch();
 }
 
 /* ---------- The dialog ---------- */
 
 // Download for a link, Search for words (and then where to search).
-export function updateSearchMode() {
-  const isLink = looksLikeLink(dom.downloadUrl.value) || !bridge;
+function updateSearchMode() {
+  const isLink = looksLikeLink(dom.downloadUrl.value);
   dom.downloadSubmit.textContent = isLink ? "Download" : "Search";
   dom.searchSource.hidden = isLink;
 }
 
 // The dialog opens empty, on the site last searched.
-export function resetSearch() {
+function resetSearch() {
   cancelSearch();
   current = { text: "", source: "", page: 0 };
   dom.searchResults.replaceChildren();
@@ -325,12 +322,11 @@ export function resetSearch() {
 /**
  * @param {(result: SearchResult) => void} onPick A result was chosen (download it).
  */
-export function bindSearch(onPick) {
+function bindSearch(onPick) {
   pick = onPick;
   dom.searchSource.replaceChildren(
     ...SEARCH_SOURCES.map((source) => element("option", { value: source.id }, source.name)),
   );
-  if (!bridge) return;
   dom.downloadUrl.addEventListener("input", updateSearchMode);
   bridge.onThumbnail(({ searchId, index, src }) => showPicture(searchId, index, src));
   onClick(dom.searchMore, () => searchFor(current.text, current.page + 1));

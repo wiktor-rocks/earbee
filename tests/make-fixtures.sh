@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Generates the test media in tests/fixtures (not committed: ~12 MB).
+# Generates the test media in tests/fixtures (not committed: ~17 MB).
 #   tone.wav      20 s, 440 Hz stereo tone
 #   counter.webm  20 s, 640x360 VP9 + Opus, frame number burned into the picture
 #   long-counter.webm

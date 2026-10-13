@@ -6,9 +6,8 @@
 const path = require("path");
 
 module.exports = async function (h) {
-  const { wc, js, openFile, key, xAt, rect, click, shot, pos, ensurePaused, check, sleep, FIXTURES } = h;
+  const { wc, js, openFile, key, xAt, rect, click, shot, pos, ensurePaused, check, sleep, near, FIXTURES } = h;
   const shadow = `document.querySelector("#waveform > div").shadowRoot`;
-  const near = (a, b, within = 0.06) => Math.abs(a - b) <= within;
 
   // The list, as shown: [{ id, name, start, end, selected }].
   const listed = () =>

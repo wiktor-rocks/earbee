@@ -13,6 +13,7 @@ module.exports = async function (h) {
     dbg,
     key,
     click,
+    slide,
     ensurePaused,
     check,
     sleep,
@@ -42,10 +43,6 @@ module.exports = async function (h) {
     }
     await sleep(300);
   }
-  const slide = (id, value) =>
-    js(
-      `(() => { const s = document.getElementById("${id}"); s.value = "${value}"; s.dispatchEvent(new Event("input")); })()`,
-    );
   // Everything a project brings back, as shown.
   const session = () =>
     js(`(() => {

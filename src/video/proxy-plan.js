@@ -20,7 +20,7 @@
 //     from its start, or the second half of a busy job's remaining part
 //     (if that half is at least minSplitSeconds long).
 
-const EPSILON = 1e-4; // s; times closer than this are the same
+export const EPSILON = 1e-4; // s; times closer than this are the same
 
 export const covers = (run, time) =>
   (run.first || run.start <= time + EPSILON) && (run.last || time <= run.end + EPSILON);

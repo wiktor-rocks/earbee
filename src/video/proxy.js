@@ -1,12 +1,13 @@
 import { CONFIG } from "../config.js";
-import { nextRange, reachedSoon } from "./proxy-plan.js";
+import { EPSILON, covers, nextRange, reachedSoon } from "./proxy-plan.js";
 
 // Low-resolution proxy of one video (see CONFIG.video.proxy). Built from
 // the source with WebCodecs, kept in memory as encoded chunks, and read
 // back with its own small decoder.
 //   build(isBusy)    builds the overview, then the whole proxy; pauses
 //                    while isBusy() is true
-//   overviewReady    a promise, settled once the overview is complete
+//   overviewReady    a promise, settled once the overview is done (or has
+//                    failed, or can't be built, or the proxy is disposed)
 //   overviewProgress() → 0…1, how much of the overview is done
 //   frameAt(time)    → VideoFrame for `time` (caller closes it), or null if
 //                    nothing is built there or it is the frame last returned
@@ -41,7 +42,6 @@ export function createVideoProxy({ track, makeSourceSink, packets, duration, onP
   // Even dimensions keep every encoder happy.
   const height = 2 * Math.max(1, Math.round((width * track.displayHeight) / track.displayWidth / 2));
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-  const EPSILON = 1e-4; // s; timestamps closer than this are the same
   const known = Number.isFinite(duration) && duration > 0; // the length (else Infinity below)
   if (!known) duration = Infinity;
 
@@ -74,7 +74,7 @@ export function createVideoProxy({ track, makeSourceSink, packets, duration, onP
 
   // The run that has the frame shown at `time`, if any.
   const runAt = (time) =>
-    runs.find((run) => (run.first || runStart(run) <= time + EPSILON) && (run.last || time <= runEnd(run) + EPSILON));
+    runs.find((run) => covers({ start: runStart(run), end: runEnd(run), first: run.first, last: run.last }, time));
 
   const built = () => runs.map((run) => [runStart(run), runEnd(run)]);
 
@@ -281,9 +281,9 @@ export function createVideoProxy({ track, makeSourceSink, packets, duration, onP
         if (disposed) return;
         if (metadata?.decoderConfig) decoderConfig = metadata.decoderConfig;
         const time = chunk.timestamp / 1e6;
-        const duration = (chunk.duration ?? 1e6 / maxFps) / 1e6;
+        const length = (chunk.duration ?? 1e6 / maxFps) / 1e6;
         const { run } = job; // may have been joined into another meanwhile
-        run.chunks.push({ time, end: time + duration, key: chunk.type === "key", chunk });
+        run.chunks.push({ time, end: time + length, key: chunk.type === "key", chunk });
         if (!runs.includes(run)) {
           const index = runs.findIndex((other) => runStart(other) > time);
           runs.splice(index < 0 ? runs.length : index, 0, run);

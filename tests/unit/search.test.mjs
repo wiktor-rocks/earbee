@@ -2,6 +2,7 @@
 // (src/search/sources.js), and the downloader's search and pictures
 // (electron/downloader.js) against the fake yt-dlp.
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import { createRequire } from "node:module";
 import os from "node:os";
@@ -205,5 +206,42 @@ describe("the downloader's search (fake yt-dlp)", () => {
     assert.equal(await downloader.fetchThumbnail("https://x.test/page.html"), null, "not an image");
     assert.equal(await downloader.fetchThumbnail("http://x.test/a.png"), null, "not https");
     assert.equal(await downloader.fetchThumbnail(null), null);
+  });
+});
+
+// The real setup (no `ytDlp` given): yt-dlp is fetched once, shared by
+// whoever needs it. Here a stand-in "yt-dlp" (a shell script printing
+// nothing, so a search finds nothing) is served by a fake fetch, which
+// holds the file back until told.
+describe("the downloader's yt-dlp setup", { skip: process.platform === "win32" }, () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "transcribee-setup-test-"));
+  after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const script = Buffer.from("#!/bin/sh\nexit 0\n");
+  const sha = crypto.createHash("sha256").update(script).digest("hex");
+  const sums = ["yt-dlp_linux", "yt-dlp_linux_aarch64", "yt-dlp_macos"].map((name) => `${sha}  ${name}`).join("\n");
+  let release;
+  const held = new Promise((resolve) => (release = resolve));
+  let asked = 0; // times the file itself was fetched
+  const fetch = async (url, { signal } = {}) => {
+    if (url.endsWith("SHA2-256SUMS")) return new Response(sums);
+    asked++;
+    await Promise.race([
+      held,
+      new Promise((_, reject) => signal?.addEventListener("abort", () => reject(signal.reason))),
+    ]);
+    return new Response(script);
+  };
+  const downloader = createDownloader({ binDir: folder, saveDir: folder, fetch });
+
+  test("a new search doesn't cancel the setup the one it replaces started", async () => {
+    const progress = [];
+    const first = downloader.search("first", "youtube", 1, () => {});
+    await new Promise((resolve) => setTimeout(resolve, 50)); // the setup is fetching yt-dlp
+    const second = downloader.search("second", "youtube", 1, (step) => progress.push(step.stage));
+    await assert.rejects(first, DownloadCanceled);
+    release();
+    assert.deepEqual(await second, { results: [], more: false });
+    assert.equal(asked, 1, "fetched once");
+    assert.ok(progress.includes("setup"), "the second search hears the setup's progress");
   });
 });

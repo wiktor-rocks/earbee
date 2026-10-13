@@ -100,13 +100,13 @@ const transportButtons = () => [dom.playButton, dom.stopButton, dom.stepBackButt
 // the welcome screen is up. An error means something failed (red); a
 // notice means something works only partly (neutral). Confirmations that
 // something worked are notifications instead (notify, ui/toast.js).
-export function showMessage(text, kind) {
+function showMessage(text, kind) {
   const line = dom.app.hidden ? dom.welcomeMessage : dom.message;
   line.textContent = text;
   line.classList.toggle("notice", kind === "notice");
 }
 
-export const showError = (text) => showMessage(text, "error");
+const showError = (text) => showMessage(text, "error");
 export const showNotice = (text) => showMessage(text, "notice");
 export const clearMessage = () => showMessage("", "notice");
 
@@ -234,4 +234,4 @@ export function element(tag, props = {}, ...children) {
 }
 
 // A click handler whose failures are shown to the user (see guarded).
-export const onClick = (element, handler) => element.addEventListener("click", guarded(handler));
+export const onClick = (target, handler) => target.addEventListener("click", guarded(handler));

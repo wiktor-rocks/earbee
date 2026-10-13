@@ -6,7 +6,9 @@
 // Every change, from the Settings dialog, the palette menu or another
 // window, reaches onPrefsChange() listeners, so whatever shows a setting
 // just listens. The sections themselves are declared in src/prefs.
+import { createEmitter } from "../core/emitter.js";
 import { getSection, normalizePrefsFile, resetValue, setValue } from "../prefs/index.js";
+import { readStored, store } from "./storage.js";
 
 /**
  * @typedef {{ ok: boolean, values?: Record<string, any>, error?: string, canceled?: boolean }} PrefsAnswer
@@ -28,22 +30,13 @@ export const hasMainProcess = Boolean(bridge);
 export const defaultPaths = bridge?.defaultPaths ?? {};
 
 let values = normalizePrefsFile(bridge ? bridge.values : readLocal());
-/** @type {Map<string, Set<(values: Record<string, any>) => void>>} */
-const listeners = new Map();
+const listeners = createEmitter(); // one event per section id
 
 function readLocal() {
   try {
-    return JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null");
+    return JSON.parse(readStored(STORAGE_KEY) ?? "null");
   } catch {
-    return null;
-  }
-}
-
-function writeLocal() {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(values));
-  } catch {
-    // storage unavailable: the settings last for this session
+    return null; // not JSON: the defaults
   }
 }
 
@@ -51,16 +44,23 @@ function writeLocal() {
 function update(id, next) {
   if (JSON.stringify(next) === JSON.stringify(values[id])) return;
   values = { ...values, [id]: next };
-  for (const listener of listeners.get(id) ?? []) listener(next);
+  listeners.emit(id, next);
 }
 
 // Shows `next` at once, then sends the change to the main process and
-// takes what it kept; if it refuses, puts the old values back and rejects.
+// takes what it kept; if it refuses (or the bridge fails), puts the old
+// values back and rejects.
 async function change(id, next, send) {
   const before = values[id];
   update(id, next);
-  if (!bridge) return writeLocal();
-  const answer = await send();
+  if (!bridge) return store(STORAGE_KEY, JSON.stringify(values));
+  let answer;
+  try {
+    answer = await send();
+  } catch (error) {
+    update(id, before);
+    throw error;
+  }
   if (answer.ok) return update(id, answer.values);
   update(id, before);
   throw new Error(answer.error);
@@ -75,9 +75,7 @@ export const getPrefs = (id) => values[id];
  * @param {(values: Record<string, any>) => void} listener
  */
 export function onPrefsChange(id, listener) {
-  if (!listeners.has(id)) listeners.set(id, new Set());
-  listeners.get(id).add(listener);
-  return () => listeners.get(id).delete(listener);
+  return listeners.on(id, listener);
 }
 
 /**

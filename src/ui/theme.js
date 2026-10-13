@@ -7,13 +7,13 @@
 // The preload has usually applied the saved theme already, before the
 // page rendered (no flash); applying it again here is harmless and makes
 // the page work without the preload too.
+import { createEmitter } from "../core/emitter.js";
 import { cssVariables, resolveTheme } from "../themes/index.js";
 import { getPrefs, onPrefsChange } from "./prefs.js";
 
 /** @typedef {import("../themes/index.js").Theme} Theme */
 const darkQuery = window.matchMedia("(prefers-color-scheme: dark)");
-/** @type {Set<(theme: Theme) => void>} */
-const listeners = new Set();
+const events = createEmitter(); // "change", with the new theme
 
 /** @type {Theme | null} */
 let current = null;
@@ -26,7 +26,7 @@ function apply(theme) {
   root.dataset.theme = theme.id;
   const changed = current?.id !== theme.id;
   current = theme;
-  if (changed) for (const listener of listeners) listener(theme);
+  if (changed) events.emit("change", theme);
 }
 
 const applyPrefs = () => apply(resolveTheme(getPrefs("theme"), darkQuery.matches));
@@ -37,12 +37,9 @@ export function followThemePrefs() {
   onPrefsChange("theme", applyPrefs);
 }
 
-export const currentTheme = () => current;
-
 /** @param {(theme: Theme) => void} listener Called after the theme changed. */
 export function onThemeChange(listener) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
+  return events.on("change", listener);
 }
 
 // "Automatic" follows the system's dark / light setting as it changes.

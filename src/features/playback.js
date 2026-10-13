@@ -5,12 +5,12 @@
  * ===================================================================== */
 
 import { CONFIG } from "../config.js";
-import { player, settings } from "../context.js";
+import { hasAudio, player, settings } from "../context.js";
 import { formatTrackTime } from "../core/format.js";
 import { cycleStepSize } from "../ui/controls.js";
 import { dom, guarded, onClick, renderLoopInfo, reportError } from "../ui/dom.js";
 
-export function play() {
+function play() {
   // Only needed if the system suspended the audio; scheduled playback
   // simply waits on the audio clock until it runs.
   player.engine.resume()?.catch(reportError);
@@ -19,7 +19,7 @@ export function play() {
 
 // `event` (optional) is the key or click that asked for it: pausing uses its
 // timestamp to stop exactly at what was being heard at that moment.
-export const pause = (event) => player.transport.pause(event?.timeStamp);
+const pause = (event) => player.transport.pause(event?.timeStamp);
 // Stop also marks where it was stopped (the stop point), from what was
 // being heard at the key press, before the cursor goes back to 0.
 export function stop(event) {
@@ -48,7 +48,7 @@ const startPoint = () => player.transport.playStartFor(returnPoint ?? player.tra
 // Shows the start point: the green line on the waveform and the minimap,
 // and the readout in the transport bar.
 function showStartPoint() {
-  const loaded = player.transport.duration > 0;
+  const loaded = hasAudio();
   const time = loaded ? startPoint() : null;
   player.timeline.setStartPoint(time);
   dom.startPointButton.hidden = !loaded;

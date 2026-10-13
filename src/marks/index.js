@@ -1,20 +1,17 @@
 // The marks on the open track: points and regions with a label and a
 // colour: what a mark is and its saved form, then the store. Pure (no
-// DOM): the page keeps one store (context.js) and draws it (waveform.js,
-// features/marks.js).
+// DOM): the page keeps one store (context.js), drawn by the timeline's
+// marks lane (timeline.js) and listed by features/marks.js.
 //
-// For now marks last for the session. A TranscriBee file that saves them
-// would plug in at three places: toJSON() gives what to save, reset() with
-// the saved form brings them back when its track opens, and "change" (once
-// per edit) says when there's something new to save.
+// Project files save them (features/project/sections.js, the "marks"
+// section): toJSON() gives what to save, reset() with the saved form
+// brings them back, and "change" (once per edit) marks unsaved changes.
 import { createEmitter } from "../core/emitter.js";
+import { clamp } from "../core/format.js";
 import { DEFAULT_MARK_COLOR, MARK_COLORS } from "../themes/index.js";
 
 /* ---------- What a mark is, and its saved form ---------- */
 
-// What a mark is, and its saved form. Pure (no DOM), so the main process
-// can use it too, e.g. to check the marks in a TranscriBee file it reads.
-//
 // The saved form is versioned: { version: 1, marks: [mark, …] }. A newer
 // version is refused rather than misread; when the format changes, bump
 // MARKS_VERSION and teach parseMarks() to read the older versions.
@@ -44,7 +41,7 @@ export class MarksFormatError extends Error {}
 const ID = /^[\w-]{1,40}$/;
 const COLORS = new Set(MARK_COLORS.map((color) => color.id));
 
-const clampTime = (time, duration) => Math.min(Math.max(time, 0), duration > 0 ? duration : Infinity);
+const clampTime = (time, duration) => clamp(time, 0, duration > 0 ? duration : Infinity);
 
 /**
  * A complete, valid mark from `raw`, or null if it can't be one. Times are
@@ -55,7 +52,7 @@ const clampTime = (time, duration) => Math.min(Math.max(time, 0), duration > 0 ?
  * @param {MarkLimits} limits
  * @returns {Mark | null}
  */
-export function normalizeMark(raw, { duration, minSeconds }) {
+function normalizeMark(raw, { duration, minSeconds }) {
   if (!raw || typeof raw !== "object" || typeof raw.id !== "string" || !ID.test(raw.id)) return null;
   if (!Number.isFinite(raw.start) || (raw.end !== null && raw.end !== undefined && !Number.isFinite(raw.end)))
     return null;
@@ -75,17 +72,17 @@ export function normalizeMark(raw, { duration, minSeconds }) {
 }
 
 /** @param {Mark} mark */
-export const isRegion = (mark) => mark.end !== null;
+const isRegion = (mark) => mark.end !== null;
 
 /** By start, then a point before the regions starting there, then by end. */
-export const sortMarks = (/** @type {Mark[]} */ marks) =>
+const sortMarks = (/** @type {Mark[]} */ marks) =>
   [...marks].sort((a, b) => a.start - b.start || (a.end ?? -1) - (b.end ?? -1));
 
 /**
  * The saved form of `marks`.
  * @param {Mark[]} marks
  */
-export const serializeMarks = (marks) => ({
+const serializeMarks = (marks) => ({
   version: MARKS_VERSION,
   marks: marks.map(({ id, start, end, label, color }) => ({ id, start, end, label, color })),
 });
@@ -218,7 +215,7 @@ export function createMarks({ minSeconds = 0.05 } = {}) {
     /** The first mark starting after `time`. @param {number} time */
     next: (time) => marks.find((mark) => mark.start > time + SAME_TIME) ?? null,
 
-    /** The saved form (see format.js). */
+    /** The saved form (see serializeMarks above). */
     toJSON: () => serializeMarks(marks),
 
     /** "change", with the new list, after every edit and reset. */

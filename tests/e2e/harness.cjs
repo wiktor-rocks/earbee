@@ -19,6 +19,7 @@ const check = (name, ok, detail = "") => {
   console.log(`${ok ? "PASS" : "FAIL"} ${name} ${detail}`);
 };
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const near = (a, b, within = 0.06) => Math.abs(a - b) <= within;
 
 // Call before app is ready.
 function prepare() {
@@ -57,8 +58,7 @@ async function createHarness() {
   nativeTheme.themeSource = "dark";
   const prefsFile = path.join(OUTPUT, "prefs.json");
   fs.rmSync(prefsFile, { force: true });
-  const { createPrefsStore, handlePrefs } = require(path.join(PROJECT, "electron", "prefs-store.js"));
-  const { createThemeView } = require(path.join(PROJECT, "electron", "prefs-store.js"));
+  const { createPrefsStore, createThemeView, handlePrefs } = require(path.join(PROJECT, "electron", "prefs-store.js"));
   const prefsStore = createPrefsStore(prefsFile);
   const folderChoice = { path: null, asked: 0 };
   handlePrefs(ipcMain, prefsStore, {
@@ -97,7 +97,6 @@ async function createHarness() {
   const answer = (kind) => async (_sender, detail) => (projectDialogs.asked.push([kind, detail]), projectDialogs[kind]);
   const stubDialogs = {
     save: answer("save"),
-    open: answer("open"),
     locate: answer("locate"),
     confirm: answer("confirm"),
   };
@@ -151,10 +150,22 @@ async function createHarness() {
   dbg.attach("1.3");
   await dbg.sendCommand("Emulation.setFocusEmulationEnabled", { enabled: true });
 
-  async function openFile(file) {
+  // Chooses `file` in the page's (hidden) file input, as the Open dialog
+  // would; openFile also waits for it to load.
+  async function setFiles(file) {
     const { root } = await dbg.sendCommand("DOM.getDocument");
     const { nodeId } = await dbg.sendCommand("DOM.querySelector", { nodeId: root.nodeId, selector: "#file" });
     await dbg.sendCommand("DOM.setFileInputFiles", { nodeId, files: [file] });
+  }
+
+  // Moves the slider with this id to `value`, as dragging it would.
+  const slide = (id, value) =>
+    js(
+      `(() => { const s = document.getElementById("${id}"); s.value = "${value}"; s.dispatchEvent(new Event("input")); })()`,
+    );
+
+  async function openFile(file) {
+    await setFiles(file);
     for (let i = 0; i < 200; i++) {
       await sleep(50);
       if (await js(`document.getElementById("loadingOverlay").hidden && !document.getElementById("play").disabled`))
@@ -261,6 +272,7 @@ async function createHarness() {
     wc,
     js,
     dbg,
+    setFiles,
     openFile,
     opened, // { view }: the waveform's view right after the last openFile
     key,
@@ -269,6 +281,7 @@ async function createHarness() {
     xAt,
     click,
     drag,
+    slide,
     shot,
     pos,
     loopInfo,
@@ -289,7 +302,7 @@ async function createHarness() {
     memory,
     check,
     sleep,
-    PROJECT,
+    near, // a and b within `within` seconds of each other
     FIXTURES,
     OUTPUT,
     DOWNLOADS,

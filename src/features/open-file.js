@@ -4,11 +4,11 @@
  * session it starts (or the project it belongs to), are features/project's.
  * Nothing about the current media changes until the new file has
  * decoded, so a bad file (or Cancel) leaves the previous song or video
- * playable, with its settings. A file that opens starts fresh: no loop,
- * and the default speed, pitch, volume and EQ (the step size stays).
- * The audio is decoded in chunks off the main thread (audio/decoder.js),
- * with progress; a track that wouldn't fit in the available memory is
- * refused before decoding. For video files the picture is prepared in
+ * playable, with its settings. A file that opens starts fresh: no loop or
+ * marks, and the default speed, pitch, volume and EQ (the step size
+ * stays). The audio is decoded in chunks off the main thread
+ * (audio/decoder.js), with progress; a track that wouldn't fit in the
+ * available memory is refused before decoding (see checkMemory). For video files the picture is prepared in
  * parallel; a picture that can't be shown is a notice, not an error.
  * ===================================================================== */
 
@@ -47,7 +47,7 @@ let loading = null;
 
 export const isLoading = () => loading !== null;
 
-export const cancelLoading = () => loading?.abort();
+const cancelLoading = () => loading?.abort();
 
 const isAbort = (error) => error instanceof DOMException && error.name === "AbortError";
 
@@ -89,7 +89,8 @@ async function availableMemory() {
 }
 
 // Refuses a file whose decoded sound (plus, for a video, its proxy)
-// wouldn't fit in memory, before decoding. Neither file is ever read whole,
+// wouldn't fit in memory, before decoding (after it, on the fallback
+// that decodes the whole file at once: audio/decoder.js). Neither file is ever read whole,
 // so its size on disk doesn't matter.
 async function checkMemory(media, info, isVideo) {
   const { bitrate, overview } = CONFIG.video.proxy;
@@ -99,7 +100,8 @@ async function checkMemory(media, info, isVideo) {
   const available = await availableMemory();
   if (!fitsInMemory(needed, available, CONFIG.audio.maxMemoryShare)) {
     throw new AppError(
-      `“${media.name}” is too long to open: its sound needs about ${formatMemory(needed)} of memory, ` +
+      `“${media.name}” is too long to open: its ${isVideo ? "sound and picture need" : "sound needs"} ` +
+        `about ${formatMemory(needed)} of memory, ` +
         `and ${formatMemory(available)} is available. Closing other programs may help.`,
     );
   }
@@ -253,7 +255,7 @@ export function bindFileInput(open) {
     const file = dom.fileInput.files?.[0];
     // Clear it so choosing the same file again still fires "change".
     dom.fileInput.value = "";
-    guarded(open)(file);
+    if (!loading) guarded(open)(file); // one file at a time (the loading screen is up)
   });
 }
 
@@ -300,6 +302,8 @@ export function bindFileDrop(open) {
   window.addEventListener("drop", (event) => {
     event.preventDefault();
     stop();
-    guarded(open)(event.dataTransfer?.files?.[0]);
+    // Not while another file loads: before asking about unsaved changes
+    // or opening a project, not just when loading would refuse it.
+    if (!loading) guarded(open)(event.dataTransfer?.files?.[0]);
   });
 }

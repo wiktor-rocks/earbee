@@ -74,8 +74,10 @@ function rememberWindowState(win, name = "window-state") {
 //              turns "always on top" on and off through the preload.
 //
 // Self-contained: removing the feature means deleting this part, its
-// lines marked "Video window (" in main.js and preload.js, and putting
-// back main.js's `setWindowOpenHandler(() => ({ action: "deny" }))`.
+// lines marked "Video window (" (main.js, preload.js, src/app.js and the
+// tests: run.cjs, smoke.cjs, e2e/harness.cjs, 01-static-ui.cjs, and
+// 18-video-window.cjs whole), and putting back main.js's
+// `setWindowOpenHandler(() => ({ action: "deny" }))`.
 const FRAME_NAME = "transcribee-video"; // the page's window.open name
 const STATE_NAME = "video-window-state";
 const MIN_SIZE = { width: 240, height: 135 };

@@ -42,8 +42,10 @@ function createPrefsStore(file, { legacyThemeFile } = {}) {
     try {
       stored = JSON.parse(fs.readFileSync(file, "utf8"));
     } catch (error) {
-      if (error.code !== "ENOENT") console.warn("Couldn't read the settings; using the defaults:", error.message);
-      if (error.code !== "ENOENT") stored = {}; // unreadable: the defaults, no import
+      if (error.code !== "ENOENT") {
+        console.warn("Couldn't read the settings; using the defaults:", error.message);
+        stored = {}; // unreadable: the defaults, no import
+      }
     }
     return prefs.normalizePrefsFile(upgrade(stored, legacyThemeFile));
   }

@@ -81,7 +81,8 @@ src/               The page (ES modules, no build step), in layers:
   config.js          every tunable number
   audio/             engine.js (Web Audio + Signalsmith), transport.js,
                      decoder.js + decode-worker.js (parallel decoding)
-  video/             view.js, proxy.js
+  video/             view.js (the picture), proxy.js (its low-res copy for
+                     dragging), proxy-plan.js (where the proxy builds next)
   waveform.js        WaveSurfer: zoom, the loop region; its view (zoom,
                      scroll) for the lanes. waveform-draw.js draws it
                      (shaped by core/waveshape.js)
@@ -89,34 +90,43 @@ src/               The page (ES modules, no build step), in layers:
                      marks lane, guide lines; follows the waveform's view
   context.js         settings, the track's marks, the shared components (`player`)
   ui/                dom.js, controls.js, shortcuts.js, theme.js, prefs.js,
-                     pref-fields.js, toast.js (notifications)
+                     pref-fields.js, menu.js (popover menus), storage.js
+                     (browser storage), toast.js (notifications)
   features/          playback.js (and the A–B loop), marks.js, open-file.js,
                      download.js (and search), settings.js (and the theme
-                     menu), layout.js,
+                     menu), file-menu.js, layout.js, big-video.js,
                      project/ (index.js: save and open; sections.js: what is saved),
                      video-window/ (the video in its own window; self-contained)
   app.js             entry point: creates and wires everything
   vendor/            Signalsmith Stretch, patched (see its README.md)
+  package.json       just "type": "module", so the main process can require()
+                     the shared modules (search/, prefs/, project/)
 index.html         The page: welcome screen, loading screen, player
 style.css          All styles; colour and font tokens at the top
 assets/            Logo and icons (generated from transcribee-source.png
                    by scripts/make-images.py)
+scripts/           make-images.py
+docs/              diagnostics/: how long files load, measured
+site/              The landing page, for GitHub Pages (see its README.md)
+.github/           workflows/pages.yml: publishes site/ from main
 tests/
   unit/              node:test unit tests (core, transport, decoding parts,
                      downloader, media files, system, themes, prefs, marks,
-                     project files, search)
+                     project files, search, the waveform's drawing and
+                     shaping, the video proxy's plan)
   run.cjs            end-to-end runner: e2e/harness.cjs plus topic files
-  e2e/               01-static-ui.cjs … 16-projects.cjs
+  e2e/               01-static-ui.cjs … 19-big-video.cjs
   smoke.cjs          the real app: security, window state, the bridge
   preload.cjs        page instrumentation for the e2e tests
   fake-yt-dlp.cjs    stands in for yt-dlp, so downloads test offline
   launch.cjs, make-fixtures.sh
+  diagnostics/       measuring long-file loading (npm run diagnose:loading)
 CHANGELOG.md       What changed, why, how and where, newest first
 ```
 
 **Start with the comment at the top of `src/app.js`.** It maps how the parts fit together (engine, transport, waveform, video, UI), lists the files and their layers, and says where to make common changes: speed presets, EQ bands, step sizes, shortcuts, colours, new features.
 
-**Layers.** In `src/`, a file only imports from the layers above it: `core` → `config` → `audio` / `video` / `waveform` / `timeline` → `context` → `ui` → `features` → `app.js`. `npm run lint` fails on an import that goes the other way, or on an import cycle. So `core/`, `audio/transport.js` and the rest of the lower layers stay free of the UI, and can be unit-tested in plain Node.
+**Layers.** In `src/`, a file only imports from the layers above it: `core`, `themes`, `search` → `prefs`, `marks`, `project` → `config` → `audio` / `video` / `waveform` / `timeline` → `context` → `ui` → `features` → `app.js` (the zones are in `eslint.config.js`). `npm run lint` fails on an import that goes the other way, or on an import cycle. So `core/`, `audio/transport.js` and the rest of the lower layers stay free of the UI, and can be unit-tested in plain Node.
 
 **Adding a setting.** Settings are declared in `src/prefs/index.js`, one `defineSection()` per section (a tab in the dialog). Add a field to its section: its `key`, `type` (`choice`, `boolean`, `number` or `folder`), `label`, optional `help` and `default`. The Settings dialog shows it, and the main process checks and saves it in `prefs.json`. The page reads it with `getPrefs("section")` and follows changes with `onPrefsChange` (`src/ui/prefs.js`); the main process uses `store.get` and `store.onChange` (`electron/prefs-store.js`). A new section is another `defineSection()` there, listed in `SECTIONS`. The formats are described at the top of `src/prefs/fields.js`.
 

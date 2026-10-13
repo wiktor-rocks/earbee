@@ -19,7 +19,7 @@ export const settings = {
 
 // The open track's marks (points and regions; src/marks). Change them
 // through the actions in features/marks.js, which keep the waveform and
-// the marks list in step. What a TranscriBee file would save and restore.
+// the marks list in step. Project files save and restore them.
 export const marks = createMarks({ minSeconds: CONFIG.marks.minSeconds });
 
 export const totalSemitones = () => settings.semitones + settings.cents / 100;

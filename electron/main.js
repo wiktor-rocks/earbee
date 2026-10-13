@@ -59,10 +59,13 @@ async function logGpuInfo() {
   console.log("Active GPU:", activeGpu ?? info.gpuDevice);
 }
 
-// Development only: reload the window when a source file changes.
+// Development only: reload the window when a source file changes. Not for
+// what tests, builds and the landing page write or hold (this replaces
+// electron-reload's own list, so node_modules and dotfiles are repeated).
 if (!app.isPackaged) {
   require("electron-reload")(ROOT, {
     electron: require(path.join(ROOT, "node_modules", "electron")),
+    ignored: [/node_modules|[/\\]\./, /[/\\](dist|site|tests[/\\](output|fixtures))([/\\]|$)/],
   });
 }
 
@@ -84,14 +87,6 @@ const projectDialogs = {
       properties: ["showOverwriteConfirmation", "createDirectory"],
     });
     return canceled || !filePath ? null : filePath;
-  },
-  async open(sender) {
-    const { canceled, filePaths } = await withOwner(sender, dialog.showOpenDialog, {
-      title: "Open project",
-      filters: PROJECT_FILTERS,
-      properties: ["openFile"],
-    });
-    return canceled || !filePaths.length ? null : filePaths[0];
   },
   async locate(sender, name, defaultPath) {
     const { canceled, filePaths } = await withOwner(sender, dialog.showOpenDialog, {
@@ -116,11 +111,18 @@ const projectDialogs = {
   },
 };
 
+// The app's own windows (not the video window, which stays black).
+const mainWindows = new Set();
+
 function createWindow() {
-  const { maximized, ...bounds } = loadWindowState(MIN_SIZE, DEFAULT_BOUNDS);
+  // (The saved state also has the video window's alwaysOnTop: not for this one.)
+  const { x, y, width, height, maximized } = loadWindowState(MIN_SIZE, DEFAULT_BOUNDS);
   const icon = path.join(ROOT, "assets", "icon-512.png");
   const win = new BrowserWindow({
-    ...bounds,
+    x,
+    y,
+    width,
+    height,
     minWidth: MIN_SIZE.width,
     minHeight: MIN_SIZE.height,
     title: "TranscriBee",
@@ -134,6 +136,8 @@ function createWindow() {
     },
   });
   if (maximized) win.maximize();
+  mainWindows.add(win);
+  win.on("closed", () => mainWindows.delete(win));
 
   // The page never navigates or opens windows; a dropped file or a stray
   // link must not replace the app.
@@ -154,17 +158,16 @@ app.whenReady().then(() => {
   });
   themeView = createThemeView(prefsStore, nativeTheme);
   const followTheme = () => {
-    for (const win of BrowserWindow.getAllWindows()) win.setBackgroundColor(themeView.current().colors.bg);
+    for (const win of mainWindows) win.setBackgroundColor(themeView.current().colors.bg);
   };
   handlePrefs(ipcMain, prefsStore, {
     initialTheme: themeView.initial,
     defaultPaths: { "downloads.folder": downloadsFolder },
     async chooseFolder(sender, defaultPath) {
-      const owner = BrowserWindow.fromWebContents(sender);
-      const options = { defaultPath, properties: /** @type {const} */ (["openDirectory", "createDirectory"]) };
-      const { canceled, filePaths } = owner
-        ? await dialog.showOpenDialog(owner, options)
-        : await dialog.showOpenDialog(options);
+      const { canceled, filePaths } = await withOwner(sender, dialog.showOpenDialog, {
+        defaultPath,
+        properties: ["openDirectory", "createDirectory"],
+      });
       return canceled || !filePaths.length ? null : filePaths[0];
     },
     pages: () => BrowserWindow.getAllWindows().map((win) => win.webContents),
@@ -183,7 +186,8 @@ app.whenReady().then(() => {
     prefs: () => prefsStore.get("downloads"),
     fetch: net.fetch, // follows the system's proxy settings
     share: mediaFiles.share,
-    openExternal: (url) => shell.openExternal(url), // a search result, in the browser
+    // A search result, in the browser (no browser: just a warning).
+    openExternal: (url) => shell.openExternal(url).catch((error) => console.warn("Couldn't open the link:", error)),
   });
   createWindow();
 

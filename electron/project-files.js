@@ -8,11 +8,11 @@
 //                   from the File itself), so a project can link to it;
 //                   answers its URL, as a download's (media-files.js)
 //   open            a project file the user dropped or chose (path from the
-//                   File, again), or open-dialog: the native Open dialog.
-//                   Its media is served by URL: a slice of the project when
-//                   it's inside, else the linked file, looked for next to the
-//                   project first (where it was relative to it), then where
-//                   it was; if it's in neither, the user is asked where it is.
+//                   File, again). Its media is served by URL: a slice of the
+//                   project when it's inside, else the linked file, looked
+//                   for next to the project first (where it was relative to
+//                   it), then where it was; if it's in neither, the user is
+//                   asked where it is.
 //   save            the header the page sends, plus the media's bytes when
 //                   it goes inside, written to a temporary file then renamed
 //                   over the target, so a crash never leaves half a file.
@@ -107,7 +107,6 @@ async function replaceFile(from, to) {
 /**
  * @typedef {object} ProjectDialogs The native dialogs, passed in (the tests answer them themselves).
  * @property {(sender: any, defaultPath: string) => Promise<string | null>} save Save as: a path, or null if canceled.
- * @property {(sender: any) => Promise<string | null>} open A project to open, or null.
  * @property {(sender: any, name: string, defaultPath: string) => Promise<string | null>} locate Where a missing media file is, or null.
  * @property {(sender: any, name: string) => Promise<"save" | "discard" | "cancel">} confirm Unsaved changes: what to do.
  */
@@ -215,12 +214,6 @@ function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
       if (embed) mediaFiles.update(mediaUrl, { path: target, offset: headerBytes.length + 1, size, name: source.name });
       return { ok: true, path: target, name: path.basename(target), embedded: embed, linkable };
     },
-
-    /** The native Open dialog, then open(). @param {any} sender */
-    async openDialog(sender) {
-      const chosen = await dialogs.open(sender);
-      return chosen ? this.open(sender, chosen) : { ok: false, canceled: true };
-    },
   };
 }
 
@@ -259,7 +252,6 @@ function handleProjects(ipcMain, projectFiles, { mediaFiles, dialogs, state }) {
     }),
   );
   ipcMain.handle("project:open", (event, file) => answer(() => projectFiles.open(event.sender, String(file ?? ""))));
-  ipcMain.handle("project:open-dialog", (event) => answer(() => projectFiles.openDialog(event.sender)));
   ipcMain.handle("project:save", (event, request) =>
     answer(() =>
       projectFiles.save(event.sender, {

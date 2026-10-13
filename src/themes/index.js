@@ -30,7 +30,7 @@ export const MARK_COLORS = [
 export const DEFAULT_MARK_COLOR = MARK_COLORS[0].id;
 
 /** @param {string} id */
-export const markColorVariable = (id) => `--mark-${id}`;
+const markColorVariable = (id) => `--mark-${id}`;
 
 /**
  * @typedef {object} Theme
@@ -48,7 +48,7 @@ export const markColorVariable = (id) => `--mark-${id}`;
  */
 
 // TranscriBee, and TranscriBee Light for Automatic in light mode.
-export const DEFAULT_THEME = THEMES.find((theme) => theme.id === "transcribee");
+const DEFAULT_THEME = THEMES.find((theme) => theme.id === "transcribee");
 
 /** @type {ThemePrefs} */
 export const DEFAULT_PREFS = { choice: DEFAULT_THEME.id, dark: DEFAULT_THEME.id, light: "transcribee-light" };
@@ -136,7 +136,7 @@ export function parseHex(hex) {
 const toHex = (rgb) => `#${rgb.map((c) => Math.round(c).toString(16).padStart(2, "0")).join("")}`;
 
 /** `a` moved toward `b` by `amount` (0–1), in sRGB. */
-export const mix = (a, b, amount) => {
+const mix = (a, b, amount) => {
   const [from, to] = [parseHex(a), parseHex(b)];
   return toHex(from.map((c, i) => c + (to[i] - c) * amount));
 };

@@ -4,8 +4,8 @@ TranscriBee is an Electron app for transcribing music. You open a song or a vide
 
 **Files**
 
-- `electron/`: the Electron main process: `main.js` (window, security), `window-state.js`, `theme-store.js`, `downloader.js` (yt-dlp), `media-files.js` (serving downloads to the page), `system.js` and `preload.js` (the page's bridge to them).
-- `src/`: the page, as ES modules in layers. `core/`, `themes/` → `prefs/`, `marks/` → `config.js` → `audio/`, `video/`, `waveform.js`, `timeline.js` → `context.js` → `ui/` → `features/` → `app.js`.
+- `electron/`: the Electron main process: `main.js` (window, security), `windows.js` (window state, the video window), `prefs-store.js` (settings and the colour theme), `downloader.js` (yt-dlp), `media-files.js` (serving downloads to the page), `project-files.js` (.tbee files), `system.js` and `preload.js` (the page's bridge to them).
+- `src/`: the page, as ES modules in layers. `core/`, `themes/`, `search/` → `prefs/`, `marks/`, `project/` → `config.js` → `audio/`, `video/`, `waveform.js`, `timeline.js` → `context.js` → `ui/` → `features/` → `app.js`.
 - `index.html` and `style.css`: the page and its look.
 - `assets/`: the logo and icons; `scripts/make-images.py` makes them from the source image.
 - `tests/`: unit tests (`unit/`), end-to-end tests (`run.cjs` + `e2e/`) and the smoke test; all run with `npm test`.
@@ -42,6 +42,72 @@ The architecture overview, the file map and a list of where to make common chang
 | `tests/run.cjs` (one sequence)           | `tests/run.cjs` + `tests/e2e/`                                                           |
 
 ---
+
+## 2026-10-13: Clean-up before main: small bugs, dead code, docs
+
+- **What:** a general clean-up of the whole codebase before `testing` went to `main`. Small bugs fixed, unused code removed, a few duplicated helpers merged, and out-of-date docs and comments brought up to date. Visible changes:
+  - toasts and search pictures fade again;
+  - the × on a mark row has its intended size;
+  - the welcome screen's corner buttons react to hover;
+  - long theme names and the start and stop chips end in "…" when cut off;
+  - in the shortcuts dialog only the list scrolls;
+  - a short window's minimap is smaller for videos too.
+- **Why:** the user asked for a general clean-up and check before committing to `main`. It came from a read-only audit in three parts: `src/`; `electron/`, tests and tooling; and the markup and CSS. The user chose to fix the bugs, remove the dead code, fix the docs, and merge only the mechanical duplicates.
+- **How (bugs):**
+  - **The test launcher** (`tests/launch.cjs`) didn't list `long-counter.webm`, so a checkout with the older fixtures never made it and topic 08 failed. It also ran the smoke test after a failed e2e run, and took a crashed run (`null` status) for a pass.
+  - **The yt-dlp setup** (`electron/downloader.js` `prepare`) ran as the job of whoever started it. So a new search, which cancels the old one, also canceled the setup the new search was waiting for. It now runs as a job of its own: canceling only stops waiting, and its progress reaches everyone waiting. The update stamp is still written after a failed update, so that offline every search doesn't retry it, with a 60 s timeout.
+  - **Main process** (`electron/main.js`):
+    - a failed `shell.openExternal` is caught;
+    - theme changes no longer repaint the video window's black background (only `mainWindows`);
+    - the video window's `alwaysOnTop` no longer leaks into the main window's options;
+    - `electron-reload` ignores `dist/`, `site/`, `tests/output/` and `tests/fixtures/`.
+  - **Opening files** (`features/open-file.js`): a file chosen or dropped while another loads is ignored before it asks about unsaved changes or opens a project. The memory message says "its sound and picture need" for videos, whose figure includes the proxy.
+  - **The page:**
+    - a search whose bridge call itself fails shows an error instead of staying on "Searching…" (`features/download.js`);
+    - a failed settings save puts the old values back, and one failing settings listener no longer stops the rest (`ui/prefs.js`, now on `createEmitter`);
+    - the shortcut and focus state (`clickedElement`, `tabbing`) is kept per window, not shared between the main window and the video window (`ui/shortcuts.js`);
+    - a parallel decode whose parts don't join ends its workers before decoding again in one part (`audio/decoder.js`).
+  - **CSS** (`style.css`):
+    - The toast and thumbnail transitions now get past the base rule that cancels all animations (`!important`, as the other exceptions have).
+    - `button.mark-remove` now beats `button.small`.
+    - `.welcome-corner .theme-button:hover`.
+    - `.welcome-message.notice` keeps 14 px.
+    - A short-window rule for `.stage.has-video`, placed so big video and the popped-out layout still win.
+    - The shortcuts dialog is a flex column.
+    - `.chip-button` is a block, and `.theme-name > span` has its own ellipsis.
+  - **Diagnostics:** `profile-load.cjs` registers `handleSystem`, so measurements include the memory check.
+- **How (dead code and duplicates):**
+  - **The project "Open" dialog** was unused end to end. Removed: the preload's `openDialog`, the `project:open-dialog` handler, `openDialog`, `dialogs.open` and the harness stub.
+  - **Unused exports:** `export` was dropped from 26 functions only used in their own file. `ui/theme.js` `currentTheme`, `engine.sampleRate()` and `waveform.view` were removed.
+  - **Shared helpers:**
+    - `src/ui/storage.js` (`readStored`, `store`) replaces three localStorage try/catch copies.
+    - `core/format.js` `clamp` replaces three hand-written clamps.
+    - `createEmitter` replaces the listener lists in `ui/prefs.js`, `ui/theme.js` and `waveform.js`.
+    - `hasAudio` and `eqGains` from `context.js` are used where they were copied.
+    - One `describeDownload` gives the downloader status for searches too.
+    - The proxy's `EPSILON` and `covers` come from `proxy-plan.js`.
+  - **Test helpers:** `setFiles`, `slide` and `near` live in the harness.
+  - **`features/download.js`:** one bridge constant and typedef, no unreachable `!bridge` checks.
+  - **Small items:** a few shadowed names were renamed.
+- **How (docs):**
+  - README.md: the file list, the layers, the unit tests and the e2e topics.
+  - The CHANGELOG header's file list.
+  - The `src/app.js` file map and notes (settings saved in projects; `SOUND_SLIDERS` for a new slider).
+  - The `style.css` section index and comments.
+  - Stale comments in `marks/index.js`, `context.js`, `features/marks.js` (`drawWaveform` is now `drawMarks`), `transport.js`, `shortcuts.js`, `palettes.js`, `windows.js`, `proxy.js` and `open-file.js`.
+  - `tests/run.cjs`, the fixture sizes, and `docs/diagnostics/long-file-loading.md`.
+- **Left as is, on purpose:**
+  - the four time formatters and the icon builders;
+  - merging CSS rules and renaming the Save dialog's `download-*` classes;
+  - the `$()` lookups outside `dom.js`;
+  - a shared decode error class (errors cross the worker boundary as plain data);
+  - the two `require("./windows")` lines in `main.js`: the second carries the "Video window (" removal marker.
+- **Where:** see the lists above. The new files are `src/ui/storage.js` and the setup test in `tests/unit/search.test.mjs`.
+- **Verified by:**
+  - **The new unit test** "a new search doesn't cancel the setup the one it replaces started": it fails with the old `downloader.js` and passes now.
+  - **The full `npm test`:** 202 unit and 409 e2e checks passed. The smoke test's known-flaky theme check failed once and passed twice on its own.
+  - **`npm run check`.**
+  - **Screenshots:** the mark row's ×, a toast, the transport chips and the theme menu.
 
 ## 2026-10-13: A landing page for GitHub Pages
 

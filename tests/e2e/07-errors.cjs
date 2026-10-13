@@ -7,16 +7,12 @@ const fs = require("fs");
 const path = require("path");
 
 module.exports = async function (h) {
-  const { js, dbg, openFile, shot, loopInfo, key, pos, ensurePaused, memory, check, sleep, FIXTURES } = h;
+  const { js, setFiles, openFile, slide, shot, loopInfo, key, pos, ensurePaused, memory, check, sleep, FIXTURES } = h;
 
   // What the sound settings show, and changing them as a user would.
   const settings = () =>
     js(
       `({ speed: speedValue.textContent, volume: volumeValue.textContent, semitones: semitoneValue.textContent, cents: centValue.textContent, eqLow: eqLowValue.textContent, eq: eqToggle.textContent, step: stepSize.textContent })`,
-    );
-  const slide = (id, value) =>
-    js(
-      `(() => { const s = document.getElementById("${id}"); s.value = "${value}"; s.dispatchEvent(new Event("input")); })()`,
     );
   const defaults = await settings();
   await slide("speed", 0.5);
@@ -82,16 +78,11 @@ module.exports = async function (h) {
   async function waitForOverlay() {
     for (let i = 0; i < 100 && (await state()).overlay; i++) await sleep(50);
   }
-  async function setFile(file) {
-    const { root } = await dbg.sendCommand("DOM.getDocument");
-    const { nodeId } = await dbg.sendCommand("DOM.querySelector", { nodeId: root.nodeId, selector: "#file" });
-    await dbg.sendCommand("DOM.setFileInputFiles", { nodeId, files: [file] });
-  }
 
   // Cancel during a (slowed) load: the current file stays, with its settings.
   await slide("speed", 0.5);
   await js(`window.__slowDecode = 1500`);
-  await setFile(path.join(FIXTURES, "counter.webm"));
+  await setFiles(path.join(FIXTURES, "counter.webm"));
   await sleep(400);
   let during = await state();
   check(

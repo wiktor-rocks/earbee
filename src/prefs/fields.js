@@ -25,6 +25,8 @@
 //            path (`fromPage: false`).
 // Any field may have visibleWhen(values): shown only when it returns true.
 
+import { clamp } from "../core/format.js";
+
 /**
  * @typedef {object} Option
  * @property {string | number} value
@@ -59,7 +61,7 @@ const INVALID = Symbol("invalid");
 
 // Each type's check: the value, cleaned up, or INVALID.
 /** @type {Record<string, { normalize: (value: any, field: Field) => any, fromPage?: boolean }>} */
-export const TYPES = {
+const TYPES = {
   choice: {
     normalize: (value, field) => (field.options.some((option) => option.value === value) ? value : INVALID),
   },
@@ -70,7 +72,7 @@ export const TYPES = {
     normalize(value, { min = -Infinity, max = Infinity, step }) {
       if (typeof value !== "number" || !Number.isFinite(value)) return INVALID;
       const stepped = step ? Math.round(value / step) * step : value;
-      return Math.min(max, Math.max(min, stepped));
+      return clamp(stepped, min, max);
     },
   },
   folder: {

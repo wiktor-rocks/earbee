@@ -84,7 +84,6 @@ contextBridge.exposeInMainWorld("transcribee", {
     registerMedia: (file) => ipcRenderer.invoke("project:register-media", pathOf(file)),
     // { path, name, sections, media: { name, url }, embedded, linkable, relinked }
     open: (file) => ipcRenderer.invoke("project:open", pathOf(file)),
-    openDialog: () => ipcRenderer.invoke("project:open-dialog"),
     // { file (null: ask), mediaUrl, embed, duration, sections } → { path, name, embedded, linkable }
     save: (request) => ipcRenderer.invoke("project:save", request),
     // "save" | "discard" | "cancel"

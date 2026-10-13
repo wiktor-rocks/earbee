@@ -1,4 +1,5 @@
 import { CONFIG } from "./config.js";
+import { createEmitter } from "./core/emitter.js";
 import { clamp, formatTrackTime } from "./core/format.js";
 import { shapeLevels, shapeOverview, slicesPerWindow } from "./core/waveshape.js";
 import { defaultsOf, waveformSection as waveformPrefs } from "./prefs/index.js";
@@ -58,7 +59,7 @@ import { drawWaveform } from "./waveform-draw.js";
  *          getView / setView (the zoom and scroll, for project files),
  *          lockFit (the whole track in view, no zooming, for big video),
  *          refreshColors (after the colour variables changed, e.g. a
- *          theme), and for the lanes: view, onView, timeAtClientX,
+ *          theme), and for the lanes: onView, timeAtClientX,
  *          clientXAt, wheel (an event handler), scrollNearEdge, holdFollow
  * ===================================================================== */
 
@@ -99,8 +100,7 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   let loopElement = null;
   let hoverLine = null; // { line, label, text, flip }
   let hoverX = null; // pointer x of the mouse hovering the waveform (no drag), or null
-  /** @type {Set<(view: View) => void>} */
-  const viewListeners = new Set();
+  const viewEvents = createEmitter(); // "view", after the view changed
   /** @type {Appearance} */
   let appearance = /** @type {Appearance} */ (defaultsOf(waveformPrefs));
   /** @type {Levels[] | null} */
@@ -371,8 +371,8 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       drag = null;
       scrubbing = false;
       // The hover line comes back at once if the mouse is still here.
-      const view = container.getBoundingClientRect();
-      if (event.type === "pointerup" && event.clientX >= view.left && event.clientX <= view.right) {
+      const box = container.getBoundingClientRect();
+      if (event.type === "pointerup" && event.clientX >= box.left && event.clientX <= box.right) {
         hoverX = event.clientX;
         refreshHover();
       }
@@ -395,9 +395,9 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   // the lanes too).
   function scrollNearEdge(x) {
     const edgePx = 30;
-    const view = container.getBoundingClientRect();
-    if (x > view.right - edgePx) setScroll(waveSurfer.getScroll() + edgePx);
-    else if (x < view.left + edgePx) setScroll(waveSurfer.getScroll() - edgePx);
+    const box = container.getBoundingClientRect();
+    if (x > box.right - edgePx) setScroll(waveSurfer.getScroll() + edgePx);
+    else if (x < box.left + edgePx) setScroll(waveSurfer.getScroll() - edgePx);
   }
 
   /* ---------- Loop region ---------- */
@@ -433,7 +433,7 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
 
   function emitView() {
     const current = view();
-    if (current) for (const listener of viewListeners) listener(current);
+    if (current) viewEvents.emit("view", current);
     // The view moved under the mouse: the hover line stays under it.
     if (hoverX !== null) refreshHover();
   }
@@ -777,13 +777,12 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       renderLoop();
       if (hoverX !== null) refreshHover();
     },
-    view,
     getView,
     setView,
     lockFit,
     /** Calls `listener` with the view whenever it changes. @param {(view: View) => void} listener */
     onView(listener) {
-      viewListeners.add(listener);
+      return viewEvents.on("view", listener);
     },
     timeAtClientX: (x) => (duration ? timeAtClientX(x) : 0),
     clientXAt,

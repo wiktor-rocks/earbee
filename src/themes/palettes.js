@@ -130,7 +130,7 @@ const oneDark = {
 };
 
 // Gruvbox Dark (morhetz): bg0_h / bg0 backgrounds, fg text, bright orange
-// accent, blue loop, red errors; the dark counterpart of gruvbox-light.js.
+// accent, blue loop, red errors; the dark counterpart of Gruvbox Light.
 // The errors' red is lightened a touch (from #fb4934) to read as text on the
 // panels, and the start and stop points use Gruvbox's own green and red (the
 // defaults sit too near the blue loop and the orange accent).
@@ -160,7 +160,7 @@ const gruvboxDark = {
 
 // Solarized Dark (Ethan Schoonover): base03 / base02 panels, base1 text,
 // cyan accent, violet loop, red errors; the dark counterpart of
-// solarized-light.js. The text is base1 a touch lighter, and the red is
+// Solarized Light. The text is base1 a touch lighter, and the red is
 // lightened, both to read on the panels. https://ethanschoonover.com/solarized/
 /** @type {Theme} */
 const solarizedDark = {
@@ -184,7 +184,7 @@ const solarizedDark = {
 };
 
 // Catppuccin Mocha: Mantle / Base / Surface0 backgrounds, Text, Mauve accent,
-// Sapphire loop, Red errors; the dark counterpart of catppuccin-latte.js.
+// Sapphire loop, Red errors; the dark counterpart of Catppuccin Latte.
 // The loop is Sapphire rather than Latte's Teal, which sat too near Mauve.
 // https://catppuccin.com/palette
 /** @type {Theme} */
@@ -234,7 +234,7 @@ const tokyoNight = {
 };
 
 // TranscriBee Light: the app's own theme for light mode, amber on honey
-// paper, the light counterpart of transcribee.js. The amber is the dark
+// paper, the light counterpart of TranscriBee. The amber is the dark
 // theme's own yellow, so the brand colour is the same in both (it's soft on
 // the pale panels; tests/unit/themes.test.mjs exempts it from the 3:1 check).
 /** @type {Theme} */
@@ -355,7 +355,7 @@ const gruvboxLight = {
 };
 
 // One Light (Atom): blue accent (darkened a little, so the light text on it
-// reads), purple loop, red errors; the light counterpart of one-dark.js. The
+// reads), purple loop, red errors; the light counterpart of One Dark. The
 // loop is purple rather than One Dark's green, which sat too near the start
 // point's green. https://github.com/atom/atom/tree/master/packages/one-light-syntax
 /** @type {Theme} */
@@ -379,7 +379,7 @@ const oneLight = {
   },
 };
 
-// Tokyo Night Day (enkia): the light counterpart of tokyo-night.js. Blue
+// Tokyo Night Day (enkia): the light counterpart of Tokyo Night. Blue
 // accent, green loop, teal start point, red errors. The palette is pale, so
 // the text, comment grey (the muted text), blue and red are darkened to read
 // on it. https://github.com/enkia/tokyo-night-vscode-theme

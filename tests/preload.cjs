@@ -57,7 +57,6 @@ webFrame.executeJavaScript(`
     constructor(...args) { super(...args); window.__contexts.push(this); }
   };
   window.__parseTime = (text) => {
-    const [m, s] = text.split(" / ")[0].split(":").slice(-2);
     const parts = text.split(" / ")[0].split(":").map(Number);
     return parts.reduce((acc, v) => acc * 60 + v, 0);
   };

@@ -10,6 +10,7 @@
  *           these also work in text fields
  *   shift   true if the shortcut is Shift + the key (optional)
  *   keys    labels for the shortcuts dialog, one per code
+ *   description  what it does, for the shortcuts dialog
  *   down    called on key press, with the KeyboardEvent
  *   up      called on key release (optional), with the KeyboardEvent
  *   repeat  whether holding the key keeps firing `down`
@@ -58,15 +59,14 @@ export const isTextField = (target) =>
 // A slider reached with Tab keeps its arrow keys, for keyboard-only use.
 // A slider that was clicked doesn't: after dragging the speed, ← / → still
 // step the cursor. (:focus-visible can't tell these apart: Chromium turns
-// it on for the focused element as soon as any key is pressed.)
-let clickedElement = null; // last element pressed with the pointer; Tab clears it
-
-const isKeyboardFocusedSlider = (target) =>
+// it on for the focused element as soon as any key is pressed.) Each
+// window bound keeps its own clickedElement (see bindShortcuts).
+const isKeyboardFocusedSlider = (target, clickedElement) =>
   target.tagName === "INPUT" && target.type === "range" && target !== clickedElement;
 
-function handleShortcutKey(shortcuts, isBlocked, event) {
+function handleShortcutKey(shortcuts, isBlocked, event, clickedElement) {
   if (isBlocked()) return;
-  if (event.code.startsWith("Arrow") && isKeyboardFocusedSlider(event.target)) return;
+  if (event.code.startsWith("Arrow") && isKeyboardFocusedSlider(event.target, clickedElement)) return;
 
   const shortcut = findShortcut(shortcuts, event);
   if (!shortcut || (isTextField(event.target) && !shortcut.ctrl)) return;
@@ -111,7 +111,8 @@ export function renderShortcutLegend(shortcuts) {
  * @param {Window} [target] The window whose keys these are (another same-origin window can share them).
  */
 export function bindShortcuts(shortcuts, isBlocked, target = window) {
-  const handle = (event) => handleShortcutKey(shortcuts, isBlocked, event);
+  let clickedElement = null; // last element pressed with the pointer here; Tab clears it
+  const handle = (event) => handleShortcutKey(shortcuts, isBlocked, event, clickedElement);
   target.addEventListener("pointerdown", (event) => (clickedElement = event.target), { capture: true });
   target.addEventListener("keydown", (event) => event.key === "Tab" && (clickedElement = null), { capture: true });
   target.addEventListener("keydown", handle);
@@ -131,10 +132,8 @@ export function bindShortcuts(shortcuts, isBlocked, target = window) {
  * focus is left alone until the next pointer press.
  * ===================================================================== */
 
-let tabbing = false; // a Tab since the last pointer press
-
-/** @param {Document} doc */
-function releaseFocus(doc) {
+/** @param {Document} doc @param {boolean} tabbing */
+function releaseFocus(doc, tabbing) {
   const focused = /** @type {HTMLElement | null} */ (doc.activeElement);
   if (tabbing || !focused || focused === doc.body || isTextField(focused)) return;
   if (focused.closest("dialog[open], :popover-open")) return;
@@ -144,8 +143,9 @@ function releaseFocus(doc) {
 /** @param {Window} [target] The window to look after (another same-origin window can be handed in). */
 export function bindFocus(target = window) {
   const doc = target.document;
+  let tabbing = false; // a Tab in this window since its last pointer press
   // After the click (and whatever it opened or focused) has happened.
-  const releaseSoon = () => setTimeout(() => releaseFocus(doc));
+  const releaseSoon = () => setTimeout(() => releaseFocus(doc, tabbing));
   target.addEventListener("pointerdown", () => (tabbing = false), { capture: true });
   target.addEventListener("keydown", (event) => event.key === "Tab" && (tabbing = true), { capture: true });
   target.addEventListener("pointerup", releaseSoon, { capture: true });

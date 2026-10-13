@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 
 module.exports = async function (h) {
-  const { js, dbg, shot, check, sleep, FIXTURES } = h;
+  const { js, dbg, setFiles, shot, check, sleep, FIXTURES } = h;
 
   const screens = () =>
     js(
@@ -76,13 +76,8 @@ module.exports = async function (h) {
     js(
       `({ screen: !document.getElementById("loadingScreen").hidden, overlay: !document.getElementById("loadingOverlay").hidden, welcome: !document.getElementById("welcome").hidden, name: document.getElementById("loadingFileName").textContent, pulse: getComputedStyle(document.querySelector("#loadingScreen .logo-aura"), "::before").animationName })`,
     );
-  async function setFile(file) {
-    const { root } = await dbg.sendCommand("DOM.getDocument");
-    const { nodeId } = await dbg.sendCommand("DOM.querySelector", { nodeId: root.nodeId, selector: "#file" });
-    await dbg.sendCommand("DOM.setFileInputFiles", { nodeId, files: [file] });
-  }
   await js(`window.__slowDecode = 800`);
-  await setFile(path.join(FIXTURES, "bad.mp3"));
+  await setFiles(path.join(FIXTURES, "bad.mp3"));
   await sleep(300);
   let ls = await loadState();
   check("first load: loading screen replaces welcome", ls.screen && !ls.welcome && !ls.overlay, JSON.stringify(ls));
@@ -163,7 +158,7 @@ module.exports = async function (h) {
   check("welcome error cleared from player", (await js(`document.getElementById("message").textContent`)) === "");
 
   await js(`window.__slowDecode = 800`);
-  await setFile(path.join(FIXTURES, "tone.wav"));
+  await setFiles(path.join(FIXTURES, "tone.wav"));
   await sleep(300);
   ls = await loadState();
   check(

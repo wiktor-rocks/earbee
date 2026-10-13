@@ -30,6 +30,7 @@
 import { player } from "../../context.js";
 import { formatTrackTime } from "../../core/format.js";
 import { $, dom, element, onClick, showNotice } from "../../ui/dom.js";
+import { readStored, store } from "../../ui/storage.js";
 import { onThemeChange } from "../../ui/theme.js";
 
 /* ---------- The video window's page ----------
@@ -179,22 +180,14 @@ let bindKeys = () => {};
 /** @type {HTMLElement} */
 let strip;
 
-// Browser storage can be missing or refuse; then the video starts here.
+// Without browser storage the video starts here.
 function readWantOut() {
-  try {
-    return localStorage.getItem(POPPED_KEY) === "true";
-  } catch {
-    return false;
-  }
+  return readStored(POPPED_KEY) === "true";
 }
 
 function setWantOut(out) {
   wantOut = out;
-  try {
-    localStorage.setItem(POPPED_KEY, String(out));
-  } catch {
-    // Not remembered; it still works for this session.
-  }
+  store(POPPED_KEY, String(out));
 }
 
 /* ---------- Out and back ---------- */

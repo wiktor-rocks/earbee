@@ -22,13 +22,13 @@ const rows = new Map();
 
 /* ---------- Drawing ---------- */
 
-function drawWaveform() {
+function drawMarks() {
   const pending = pendingStart === null ? null : { start: pendingStart, end: player.transport.position };
   player.timeline.setMarks(marks.list(), { selected, pending });
 }
 
 function show() {
-  drawWaveform();
+  drawMarks();
   renderList();
 }
 
@@ -86,13 +86,13 @@ export function markRegion(event) {
   const time = player.transport.positionAt(event.timeStamp);
   if (pendingStart === null) {
     pendingStart = time;
-    drawWaveform();
+    drawMarks();
     return;
   }
   const region = marks.addRegion(pendingStart, time);
   pendingStart = null;
   if (region) selectMark(region.id);
-  else drawWaveform();
+  else drawMarks();
 }
 
 // Shift+← / Shift+→. While playing, "previous" skips a mark just passed,
@@ -123,7 +123,7 @@ export function cancelMarking() {
 }
 
 /**
- * A drag on the waveform moved a mark.
+ * A drag in the timeline's marks lane moved a mark.
  * @param {string} id @param {{ start: number, end: number | null }} times
  */
 export const moveMark = (id, times) => marks.update(id, times);
@@ -216,6 +216,6 @@ export function bindMarks() {
     show();
   });
   // The region being marked grows with the cursor.
-  player.transport.on("position", () => pendingStart !== null && drawWaveform());
+  player.transport.on("position", () => pendingStart !== null && drawMarks());
   renderList();
 }

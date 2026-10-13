@@ -139,7 +139,7 @@ export function setEqEnabled(enabled) {
   applyEq();
 }
 
-export function resetPitch() {
+function resetPitch() {
   setSetting("semitones", CONFIG.semitones.initial);
   setSetting("cents", CONFIG.cents.initial);
 }
@@ -152,7 +152,7 @@ export function resetSoundSettings() {
   setEqEnabled(CONFIG.eq.enabledInitially);
 }
 
-export function resetEq() {
+function resetEq() {
   for (const band of CONFIG.eq.bands) setSetting(band.id, CONFIG.eq.gain.initial);
 }
 

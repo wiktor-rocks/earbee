@@ -10,7 +10,7 @@ import { AppError } from "../core/errors.js";
  * Signalsmith → EQ chain → master volume → limiter → speakers.
  *
  * Exposes: init, useSampleRate, loadPieces, schedule, setVolume, setEq,
- *          now, outputDelay, sampleRate, resume
+ *          now, outputDelay, resume
  * Values set before init() are remembered and applied when the graph
  * is built, so settings can change before any audio is loaded.
  *
@@ -122,7 +122,6 @@ export function createAudioEngine({ onError }) {
     useSampleRate,
     schedule,
     loadPieces,
-    sampleRate: () => context?.sampleRate ?? 0,
     now: () => context?.currentTime ?? 0,
     // Time from audio leaving the graph to it reaching the speakers.
     outputDelay: () => (context ? (context.baseLatency || 0) + (context.outputLatency || 0) : 0),

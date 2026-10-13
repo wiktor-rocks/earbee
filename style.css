@@ -4,12 +4,16 @@
  *   1 Tokens       colours, fonts, sizes (the page's code reads some of them)
  *   2 Base         element defaults; no animations except a few
  *   3 Controls     buttons, sliders, keys
- *   4 Screens      welcome, loading screen, loading overlay,
- *                  download dialog
- *   5 Player       the layout (top bar; the workspace: stage and
- *                  transport, marks sidebar; the sound dock), the
- *                  timeline, EQ bands, the shortcuts dialog, and how
+ *   4 Screens      welcome, loading screen, loading overlay; the dialogs
+ *                  (From YouTube and its search, Save project, Settings),
+ *                  the colour-theme and File menus, the loader bars, and
+ *                  the animations off for reduced motion
+ *   5 Player       the drop overlay, the layout (top bar; the workspace:
+ *                  stage and transport, marks sidebar; the sound dock),
+ *                  the timeline, minimap, transport, EQ bands,
+ *                  notifications, the shortcuts dialog, big video, and how
  *                  it adapts to small windows
+ * (More :root tokens for big video sit with it, in section 5.)
  * ============================================================ */
 
 /* ============================================================
@@ -36,7 +40,8 @@
   --aura-mid: color-mix(in srgb, var(--accent) 12%, transparent);
   --aura-shadow: color-mix(in srgb, var(--accent) 45%, transparent);
 
-  /* Read by src/waveform.js for the waveform drawing */
+  /* The waveform and minimap colours (the first five are read by
+     src/waveform.js for its drawing; the rest are used here) */
   --wave: #3b4252;
   --wave-progress: var(--accent);
   --minimap-wave: #343a48;
@@ -89,12 +94,14 @@
 
 /* ============================================================
  * 2. BASE
- * No animations or transitions, except (all in section 4, each marked
- * !important to get past this rule, and all off for reduced motion): the
- * loader bars, the loading screen's pulsing aura, and on the welcome
- * screen its entrance, the floating bee and breathing aura, and the
- * drop indicator (the card's lift, the marching ring, the player's
- * drop overlay); and the Settings switches' sliding knob (section 4).
+ * No animations or transitions, except a few, each marked !important to
+ * get past this rule and all off for reduced motion (the block at the
+ * end of section 4): the loader bars, the loading screen's pulsing aura,
+ * on the welcome screen its entrance, the floating bee and breathing
+ * aura, and the drop indicator's marching ring; the Settings switches'
+ * sliding knob and search results' pictures fading in (section 4); the
+ * player's drop overlay and notifications sliding in and out
+ * (section 5).
  * ============================================================ */
 
 *,
@@ -331,7 +338,8 @@ kbd {
 /* ============================================================
  * 4. SCREENS
  * Welcome (until the first file loads), the loading screen that
- * replaces it during that load, and the overlay for later loads.
+ * replaces it during that load, and the overlay for later loads; then
+ * the dialogs and menus, which open over either.
  * ============================================================ */
 
 /* ---------- Welcome screen ---------- */
@@ -625,6 +633,11 @@ body.dragging .welcome-hint {
   text-align: center;
 }
 
+/* A notice there is as large as an error (.message.notice is smaller). */
+.welcome-message.notice {
+  font-size: 14px;
+}
+
 /* ---------- Loading screen (first file) ---------- */
 
 .loading-screen {
@@ -861,7 +874,7 @@ body.dragging .welcome-hint {
   background: var(--surface-2);
   object-fit: cover;
   opacity: 0;
-  transition: opacity 0.2s;
+  transition: opacity 0.2s !important; /* fades in once loaded */
 }
 
 .search-thumb.loaded {
@@ -1437,7 +1450,7 @@ body.dragging .welcome-hint {
   }
 }
 
-/* ---------- Colour-theme menu ---------- */
+/* ---------- Menus (colour theme, File), and the welcome corner ---------- */
 
 /* The gear (Settings) and the palette, top right of the welcome screen:
    there they stand on their own, so they keep a surface. */
@@ -1445,6 +1458,10 @@ body.dragging .welcome-hint {
   border-color: var(--hairline);
   background: var(--surface-2);
   color: var(--text);
+}
+
+.welcome-corner .theme-button:hover {
+  background: var(--surface-hover);
 }
 
 .welcome-corner {
@@ -1563,12 +1580,17 @@ body.dragging .welcome-hint {
   text-overflow: ellipsis;
 }
 
+/* The name and its detail each end in an ellipsis when cut off. */
+.theme-name > span,
 .theme-name small {
   overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.theme-name small {
   color: var(--muted);
   font-size: 11px;
   font-weight: 400;
-  text-overflow: ellipsis;
 }
 
 /* Four squares: background, panel, accent, loop. Automatic's shows its
@@ -1648,7 +1670,8 @@ body.dragging .welcome-hint {
   html .drop-card,
   html .pref-switch,
   html .pref-switch::after,
-  html .toast {
+  html .toast,
+  html .search-thumb {
     transition: none !important;
   }
 
@@ -1721,7 +1744,8 @@ body.dragging .drop-card {
   height: 22px;
 }
 
-/* A card: the timeline, the transport, the sidebar, the dock. */
+/* A card: the timeline, the transport, the sidebar, the dock, the video
+   pane and the minimap (some set their own radius or background). */
 .timeline,
 .transport,
 .sidebar,
@@ -1778,7 +1802,7 @@ body.dragging .drop-card {
   height: 40px;
 }
 
-/* Its sections (the name, the file buttons, the open file, the tools)
+/* Its sections (the name, the File menu, the open file, the tools)
    are set apart by thin lines. */
 .topbar > * + * {
   padding-left: 14px;
@@ -1879,6 +1903,14 @@ body.dragging .drop-card {
    take 48 px), then the minimap. */
 .stage.has-video {
   grid-template-rows: minmax(0, 1fr) minmax(170px, 40%) 44px;
+}
+
+/* A short window's smaller minimap (as for songs, at the end of the
+   file). Here, so big video and the popped-out layout still win. */
+@media (max-height: 719px) {
+  .stage.has-video {
+    grid-template-rows: minmax(0, 1fr) minmax(170px, 40%) 34px;
+  }
 }
 
 .video-pane {
@@ -2237,8 +2269,9 @@ body.dragging .drop-card {
 
 /* ---------- Transport bar ---------- */
 
-/* The buttons, the time (large), any message, then the chips: where Space
-   plays from, the loop, the step size. Always one row: wrapping would
+/* The buttons, the step size, the time (large), any message, then the
+   chips: where Space plays from, where playback stopped, the loop. Always
+   one row: wrapping would
    make the bar taller and take that height from the waveform. When room
    runs out the message gives way first, then the chips (cut off with an
    ellipsis; their tooltips have them in full). */
@@ -2365,9 +2398,10 @@ button.step-size:hover {
   margin-left: auto;
 }
 
-/* Small rounded readouts; the start point's is a button. They shrink,
+/* Small rounded readouts; the start and stop points' are buttons. They shrink,
    cut off, rather than wrap the transport (see .transport). */
 .chip-button {
+  display: block; /* not a button's inline-flex: an ellipsis needs a block */
   min-width: 0;
   overflow: hidden;
   padding: 4px 10px;
@@ -2538,8 +2572,9 @@ button.step-size:hover {
   text-decoration: underline;
 }
 
-/* × shows on the row under the pointer, the selected one, or with focus. */
-.mark-remove {
+/* × shows on the row under the pointer, the selected one, or with focus.
+   (button. to win over button.small, which it also is.) */
+button.mark-remove {
   grid-area: remove;
   width: 26px;
   height: 26px;
@@ -2780,10 +2815,10 @@ button.step-size:hover {
   font: 600 12px/1.4 var(--sans);
   cursor: pointer;
   pointer-events: auto;
-  animation: toast-in 0.18s ease-out;
+  animation: toast-in 0.18s ease-out !important;
   transition:
     opacity 0.2s,
-    transform 0.2s;
+    transform 0.2s !important;
 }
 
 .toast small {
@@ -2821,8 +2856,15 @@ button.step-size:hover {
   background: var(--overlay-bg);
 }
 
+/* Only the groups scroll, under the header. */
+.shortcuts-dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
 /* The groups in two columns, each kept whole. */
 .shortcut-groups {
+  min-height: 0;
   padding: 8px 22px 20px;
   overflow: auto;
   columns: 2 300px;

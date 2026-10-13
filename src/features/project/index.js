@@ -12,7 +12,7 @@
 // opening something else or closing the window asks first.
 //
 // Outside Electron (no bridge) media files still open; there is no saving.
-import { marks, player } from "../../context.js";
+import { hasAudio, marks, player } from "../../context.js";
 import { AppError } from "../../core/errors.js";
 import { isProjectName } from "../../project/format.js";
 import { dom, guarded, onClick, reportError, showNotice } from "../../ui/dom.js";
@@ -58,7 +58,7 @@ const session = {
 /* ---------- Capturing and restoring ---------- */
 
 /** Every section's saved form, versioned. */
-export const captureProject = () =>
+const captureProject = () =>
   Object.fromEntries(SECTIONS.map((section) => [section.id, { ...section.capture(), version: section.version }]));
 
 // What counts for unsaved changes: the sections that dirty.
@@ -70,7 +70,7 @@ const dirtyingState = () =>
  * @param {Record<string, any>} saved
  * @param {number} duration
  */
-export function restoreProject(saved, duration) {
+function restoreProject(saved, duration) {
   const notices = [];
   for (const section of SECTIONS) {
     const data = saved[section.id];
@@ -89,8 +89,6 @@ export function restoreProject(saved, duration) {
 
 /* ---------- Unsaved changes ---------- */
 
-const hasMedia = () => player.transport.duration > 0;
-
 function renderTitle() {
   const name = session.name ?? session.mediaName;
   document.title = name ? `TranscriBee — ${name}${session.dirty ? " •" : ""}` : "TranscriBee";
@@ -99,7 +97,7 @@ function renderTitle() {
 }
 
 function checkDirty() {
-  const dirty = Boolean(bridge) && hasMedia() && (session.saved === null || dirtyingState() !== session.saved);
+  const dirty = Boolean(bridge) && hasAudio() && (session.saved === null || dirtyingState() !== session.saved);
   if (dirty === session.dirty) return;
   session.dirty = dirty;
   renderTitle();
@@ -225,7 +223,7 @@ async function openProjectFile(file) {
  * @param {boolean} embed
  */
 async function writeProject(file, embed) {
-  if (!bridge || !hasMedia()) return false;
+  if (!bridge || !hasAudio()) return false;
   if (!session.mediaUrl)
     throw new AppError(`“${session.mediaName}” isn't a file on this computer, so a project can't name it.`);
   const result = await bridge.save({
@@ -253,7 +251,7 @@ async function writeProject(file, embed) {
 // The Save As dialog: link to the media, or put it inside; then the
 // native Save dialog. Resolves true once it's saved.
 export function saveProjectAs() {
-  if (!bridge || !hasMedia()) return Promise.resolve(false);
+  if (!bridge || !hasAudio()) return Promise.resolve(false);
   const { saveModeLink: link, saveModeEmbed: inside } = dom;
   link.disabled = !session.linkable;
   (session.embedded || !session.linkable ? inside : link).checked = true;

@@ -28,7 +28,7 @@ import { timelinePositionAt } from "../core/timeline.js";
  *     there: it starts at the loop start instead.
  *
  * Exposes: play, pause, stop, seek, retune, load, setLoop, on,
- *          playStartFor, state, playing, position, duration
+ *          playStartFor, positionAt, state, playing, position, duration
  *   playStartFor(from) is where play() would start with the cursor at
  *   `from` (the start of the track after its end; the loop start outside
  *   an active loop), so a view can show where playback will start.

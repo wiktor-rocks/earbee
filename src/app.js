@@ -36,7 +36,8 @@
  *              (Mediabunny + WebCodecs) and draws the frame at the transport
  *              position. No second clock, so it can't drift from the audio.
  *   settings   The player's controls (speed, pitch, volume, EQ, step):
- *              plain values for this session, in context.js.
+ *              plain values in context.js, saved in project files (the
+ *              "sound" section).
  *   marks      Points and regions on the open track, with a label and a
  *              colour: the store (src/marks, kept in context.js) is changed
  *              by features/marks.js, which redraws the timeline and the
@@ -48,7 +49,8 @@
  *              in src/project; reading and writing in the main process
  *              (electron/project-files.js). Unsaved changes show a • in the
  *              title and are asked about before they'd be lost.
- *   prefs      The user's Settings (theme, downloads), kept between runs by
+ *   prefs      The user's Settings (general, theme, waveform, downloads),
+ *              kept between runs by
  *              the main process (electron/prefs-store.js) and changed in the
  *              Settings dialog. Declared per section in src/prefs; the
  *              dialog and every check are generated from the declarations.
@@ -80,7 +82,8 @@
  *                  everything else (the main process uses it too)
  *   search/        Where the download dialog searches (sources.js) and what
  *                  a result is; pure, shared with the main process
- *   prefs/         Settings sections (index.js: theme, waveform, downloads)
+ *   prefs/         Settings sections (index.js: general, theme, waveform,
+ *                  downloads)
  *                  and the field types (fields.js); pure, shared with the
  *                  main process
  *   marks/         What a mark is, its saved form, and the store
@@ -89,7 +92,8 @@
  *                  and media; pure, shared with the main process
  *   config.js      CONFIG: every tunable number
  *   audio/         engine.js, transport.js, decoder.js (+ decode-worker.js)
- *   video/         view.js (the picture), proxy.js (low-res copy for seeking)
+ *   video/         view.js (the picture), proxy.js (low-res copy for seeking),
+ *                  proxy-plan.js (where that copy is built next)
  *   waveform.js    The waveform, zoom, minimap, loop; its view for the lanes.
  *                  waveform-draw.js draws it (bars, continuous, two-tone)
  *   timeline.js    The lanes: ruler, start/stop points, marks; guide lines
@@ -97,18 +101,22 @@
  *                  components above, once created
  *   ui/            dom.js (elements, messages, rendering, loading screens),
  *                  controls.js (sliders, chips, EQ), shortcuts.js (key
- *                  handling, giving focus back), theme.js (applying a theme), prefs.js (the
- *                  settings: values, changes, listeners), pref-fields.js
- *                  (one Settings control per field type), toast.js
+ *                  handling, giving focus back), theme.js (applying a
+ *                  theme), prefs.js (the settings: values, changes,
+ *                  listeners), pref-fields.js (one Settings control per
+ *                  field type), menu.js (popover menus), storage.js
+ *                  (browser storage that never throws), toast.js
  *                  (notifications: small confirmations, notify())
  *   features/      playback.js (and the A–B loop), marks.js (actions,
  *                  selection, the marks list), open-file.js, download.js
  *                  (and searching in the download dialog), settings.js
- *                  (the Settings dialog and the theme menu), layout.js (the
- *                  shortcuts dialog), project/ (saving and opening project
+ *                  (the Settings dialog and the theme menu), file-menu.js
+ *                  (the File menu), layout.js (the shortcuts dialog, the
+ *                  sidebar toggle), project/ (saving and opening project
  *                  files: index.js; what they save: sections.js),
- *                  video-window/ (the video in a window of its own;
- *                  self-contained, its wiring marked "Video window ("),
+ *                  video-window/ (the video in a window of its own, with
+ *                  its own video-window.css; self-contained, its wiring
+ *                  marked "Video window ("),
  *                  big-video.js (the picture large, the rest put away;
  *                  its wiring marked "Big video (")
  *   app.js         This file: creates and wires the components, the
@@ -124,8 +132,10 @@
  *                             and the scale labels under them are generated.
  *   New slider setting        Add a range to CONFIG, a value to `settings`
  *                             (context.js), an entry to SLIDERS
- *                             (ui/controls.js), and an <input type="range">
- *                             plus readout to index.html.
+ *                             (ui/controls.js), an <input type="range">
+ *                             plus readout to index.html, and its key to
+ *                             SOUND_SLIDERS (features/project/sections.js)
+ *                             so project files save it.
  *   New keyboard shortcut     Add an entry to SHORTCUTS (below), with its
  *                             group; the shortcuts dialog (?) lists it.
  *   Layout and look           style.css: the tokens at the top (colours,

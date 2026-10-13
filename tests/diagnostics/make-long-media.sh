@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Generates long media for the loading diagnostics (profile-load.cjs) in
-# tests/output/long-media (not committed: about 1.5 GB). Skips files that
+# tests/output/long-media (not committed: about 1.9 GB). Skips files that
 # already exist. Needs ffmpeg (with libmp3lame, libopus and libx264).
 #   mp3-{10,30,60,90,120}min.mp3  192 kb/s stereo, 44.1 kHz (a typical song rip)
 #   aac-{30,45,60}min.m4a      128 kb/s stereo AAC, 44.1 kHz (YouTube-like audio)
