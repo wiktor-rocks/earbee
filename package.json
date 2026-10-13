@@ -6,6 +6,7 @@
   "author": "Wiktor Wieczorkiewicz",
   "license": "MIT",
   "main": "electron/main.js",
+  "desktopName": "scribee.desktop",
   "scripts": {
     "start": "electron .",
     "start:gpu-info": "electron . --gpu-info",
@@ -21,7 +22,8 @@
     "typecheck": "tsc -p jsconfig.json",
     "build:dir": "electron-builder --linux --dir",
     "build:linux": "electron-builder --linux",
-    "build:win": "electron-builder --win"
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac"
   },
   "keywords": [
     "music",
@@ -52,6 +54,8 @@
     "appId": "com.scribee.app",
     "productName": "ScriBee",
     "icon": "assets/icon-512.png",
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
+    "publish": null,
     "files": [
       "electron/**",
       "index.html",
@@ -64,12 +68,27 @@
     "linux": {
       "target": "AppImage",
       "executableName": "scribee",
-      "category": "Audio"
+      "category": "Audio",
+      "syncDesktopName": true
     },
     "win": {
       "signAndEditExecutable": false,
       "target": "portable",
       "icon": "assets/icon.ico"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.music",
+      "identity": "-",
+      "hardenedRuntime": false
     }
   }
 }

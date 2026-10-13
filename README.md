@@ -64,19 +64,19 @@ MIT: see [LICENSE](LICENSE). ScriBee is built on Signalsmith Stretch, Mediabunny
 
 ## Commands
 
-| Command                                      | What it does                                                                                                                                          |
-| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm install`                                | Install dependencies                                                                                                                                  |
-| `npm start`                                  | Run the app (reloads on file changes)                                                                                                                 |
-| `npm run start:gpu-info` / `start:no-gpu`    | Run with GPU diagnostics / with software rendering                                                                                                    |
-| `npm test`                                   | Unit tests, then end-to-end tests (`tests/run.cjs`), then a smoke test of the real app (`tests/smoke.cjs`)                                            |
-| `npm run test:unit`                          | Unit tests only: plain Node, about a second                                                                                                           |
-| `TB_TOPICS=02,10 npx electron tests/run.cjs` | Only some end-to-end topics (by number); later topics may need what earlier ones loaded                                                               |
-| `npm run check`                              | Formatting (Prettier), lint (ESLint, including the import layering in `src/`) and type check (TypeScript on JSDoc)                                    |
-| `npm run diagnose:loading`                   | Linux: measure loading of long files (10 min – 2 h) and write raw results to `tests/output/diagnostics/`; see `docs/diagnostics/long-file-loading.md` |
-| `npm run format`                             | Format all files                                                                                                                                      |
-| `npm run build:dir`                          | Unpacked Linux build in `dist/linux-unpacked`                                                                                                         |
-| `npm run build:linux` / `build:win`          | Linux AppImage / Windows portable `.exe`                                                                                                              |
+| Command                                           | What it does                                                                                                                                                                                      |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm install`                                     | Install dependencies                                                                                                                                                                              |
+| `npm start`                                       | Run the app (reloads on file changes)                                                                                                                                                             |
+| `npm run start:gpu-info` / `start:no-gpu`         | Run with GPU diagnostics / with software rendering                                                                                                                                                |
+| `npm test`                                        | Unit tests, then end-to-end tests (`tests/run.cjs`), then a smoke test of the real app (`tests/smoke.cjs`)                                                                                        |
+| `npm run test:unit`                               | Unit tests only: plain Node, about a second                                                                                                                                                       |
+| `TB_TOPICS=02,10 npx electron tests/run.cjs`      | Only some end-to-end topics (by number); later topics may need what earlier ones loaded                                                                                                           |
+| `npm run check`                                   | Formatting (Prettier), lint (ESLint, including the import layering in `src/`) and type check (TypeScript on JSDoc)                                                                                |
+| `npm run diagnose:loading`                        | Linux: measure loading of long files (10 min – 2 h) and write raw results to `tests/output/diagnostics/`; see `docs/diagnostics/long-file-loading.md`                                             |
+| `npm run format`                                  | Format all files                                                                                                                                                                                  |
+| `npm run build:dir`                               | Unpacked Linux build in `dist/linux-unpacked`                                                                                                                                                     |
+| `npm run build:linux` / `build:win` / `build:mac` | Linux AppImage / Windows portable `.exe` / macOS `.dmg` for Apple Silicon and Intel (on a Mac; signed ad hoc), in `dist/`. Releases are built by `.github/workflows/release.yml` on a version tag |
 
 To test a packaged build:
 

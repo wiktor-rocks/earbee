@@ -5,14 +5,18 @@
 //
 // REPO: the GitHub repository ("user/name") whose releases are offered.
 const REPO = "OWNER/scribee";
-// FILES: how to tell each system's file apart among a release's assets
-// (the first asset whose name matches is offered). These match
-// electron-builder's usual names: ScriBee 1.0.0.exe (portable),
-// ScriBee-1.0.0-arm64.dmg, ScriBee-1.0.0.AppImage.
+// FILES: how to tell each download apart among a release's assets (the
+// first asset whose name matches is offered). They match the names in
+// package.json's build.artifactName: ScriBee-0.1.0-win-x64.exe,
+// ScriBee-0.1.0-mac-arm64.dmg, ScriBee-0.1.0-mac-x64.dmg,
+// ScriBee-0.1.0-linux-x86_64.AppImage. `mac` is Apple Silicon, the one
+// offered to every Mac visitor; `macIntel` is the second link on the
+// macOS card.
 const FILES = {
-  windows: /\.exe$/i,
-  mac: /\.dmg$/i,
-  linux: /\.AppImage$/i,
+  windows: /-win-x64\.exe$/i,
+  mac: /-mac-arm64\.dmg$/i,
+  macIntel: /-mac-x64\.dmg$/i,
+  linux: /-linux-x86_64\.AppImage$/i,
 };
 // ---------------------------------------------------------------
 
@@ -42,8 +46,9 @@ async function fillDownloads() {
   const mine = detectSystem();
   setLinks("repo", repoUrl);
   setLinks("releases", `${repoUrl}/releases`);
+  setLinks("issues", `${repoUrl}/issues`);
   // Until the release is known, every button goes to the releases page.
-  for (const system of Object.keys(NAMES)) setLinks(system, releasesUrl);
+  for (const download of Object.keys(FILES)) setLinks(download, releasesUrl);
   if (mine) {
     document.querySelector(`[data-platform="${mine}"]`)?.classList.add("mine");
     setText('[data-label="mine"]', `Download for ${NAMES[mine]}`);
@@ -69,12 +74,12 @@ async function fillDownloads() {
   const date = new Date(release.published_at).toLocaleDateString(undefined, { dateStyle: "medium" });
   setText("[data-release]", `Version ${release.tag_name.replace(/^v/, "")} · ${date} · free`);
   setText("[data-release-long]", `Version ${release.tag_name.replace(/^v/, "")}, released ${date}. Free.`);
-  for (const [system, pattern] of Object.entries(FILES)) {
+  for (const [download, pattern] of Object.entries(FILES)) {
     const asset = release.assets.find((candidate) => pattern.test(candidate.name));
     if (!asset) continue; // no build for it in this release: its button stays on the release page
-    setLinks(system, asset.browser_download_url);
-    setText(`[data-size="${system}"]`, megabytes(asset.size));
-    if (system === mine) {
+    setLinks(download, asset.browser_download_url);
+    setText(`[data-size="${download}"]`, megabytes(asset.size));
+    if (download === mine) {
       setLinks("mine", asset.browser_download_url);
       setText('[data-size="mine"]', megabytes(asset.size));
     }

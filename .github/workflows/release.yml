@@ -1,0 +1,82 @@
+# Builds ScriBee for Linux, Windows and macOS when a version tag (v0.1.0,
+# …) is pushed, and puts the files in a draft GitHub Release. Publishing
+# the draft (on GitHub, or `gh release edit <tag> --draft=false`) makes it
+# the latest release, which the landing page (site/) offers.
+#
+# The checks and unit tests run once, on Linux (some tests assume a POSIX
+# system). The macOS builds are signed ad hoc only (package.json: "-"),
+# not by Apple: enough for Apple Silicon to run them, after the user
+# allows it once.
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            script: build:linux
+          - os: windows-latest
+            script: build:win
+          - os: macos-latest
+            script: build:mac
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - if: runner.os == 'Linux'
+        run: npm run check && npm run test:unit
+      - run: npm run ${{ matrix.script }}
+      - name: Check the ad-hoc signatures
+        if: runner.os == 'macOS'
+        run: |
+          find dist -maxdepth 2 -name "ScriBee.app" -print0 |
+            xargs -0 -n1 codesign --verify --deep --strict --verbose=2
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scribee-${{ runner.os }}
+          path: |
+            dist/*.AppImage
+            dist/*.exe
+            dist/*.dmg
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: files
+          merge-multiple: true
+      - name: Write the release notes
+        run: |
+          cat > notes.md <<NOTES
+          ScriBee ${GITHUB_REF_NAME#v}: a player for transcribing music by ear.
+
+          **Downloads:**
+          - **Windows:** the \`win-x64.exe\`, a portable app. Windows may warn about an unrecognised app the first time; choose *More info*, then *Run anyway*.
+          - **macOS:** the \`mac-arm64.dmg\` (Apple Silicon) or \`mac-x64.dmg\` (Intel). It isn't signed by Apple: the first time, right-click it and choose *Open*, or allow it in System Settings › Privacy & Security. *Not yet tried on a Mac; please report how it does.*
+          - **Linux:** the \`linux-x86_64.AppImage\`. Make it executable (\`chmod +x\`) and run it.
+
+          What changed: see [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/CHANGELOG.md).
+          NOTES
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          name: ScriBee ${{ github.ref_name }}
+          body_path: notes.md
+          files: files/*
+          fail_on_unmatched_files: true

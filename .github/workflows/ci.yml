@@ -1,0 +1,48 @@
+# Checks every push and pull request: formatting, lint and types, and the
+# unit tests. On main (and on demand) also the end-to-end and smoke tests,
+# in a virtual display, with the test media cached between runs.
+name: CI
+
+on:
+  push:
+    branches: [main, testing]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run test:unit
+
+  e2e:
+    if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install ffmpeg (test media) and a virtual display
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg xvfb
+      # Ubuntu blocks the user namespaces Chromium's sandbox needs.
+      - run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - uses: actions/cache@v4
+        with:
+          path: tests/fixtures
+          key: fixtures-${{ hashFiles('tests/make-fixtures.sh') }}
+      - run: xvfb-run -a npm test
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-output
+          path: tests/output/*.png

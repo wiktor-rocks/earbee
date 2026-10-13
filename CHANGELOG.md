@@ -43,6 +43,37 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-13: Release builds for Windows, macOS and Linux, and CI
+
+- **What:**
+  - **Release builds:** pushing a version tag (`v0.1.0`) builds ScriBee on GitHub for Windows (portable `.exe`), macOS (`.dmg` for Apple Silicon and for Intel) and Linux (`.AppImage`), and puts them in a draft GitHub Release to check and publish.
+  - **CI:** every push and pull request runs `npm run check` and the unit tests. On `main` (and on demand) the e2e and smoke tests run too, in a virtual display.
+  - **The landing page:** it offers the new file names, and on the macOS card an Apple Silicon button and an Intel link, with how to open an app Apple hasn't signed. The Mac builds say they haven't been tried on a Mac yet.
+- **Why:** to publish the project. The user chose all three systems and has no Mac to test on.
+- **How:**
+  - **`package.json`:**
+    - `build.artifactName` is `${productName}-${version}-${os}-${arch}.${ext}`, which gives `ScriBee-0.1.0-linux-x86_64.AppImage`, `…-win-x64.exe`, `…-mac-arm64.dmg` and `…-mac-x64.dmg`. The landing page's `FILES` match these.
+    - A `mac` target: dmg for arm64 and x64, `identity: "-"` (ad-hoc signing, which Apple Silicon needs to run it at all) and `hardenedRuntime: false` (which ad-hoc signing needs, per electron-builder).
+    - `publish: null`, since the workflow uploads the files.
+    - `desktopName` with `linux.syncDesktopName`, so Linux desktops tie the window to its icon.
+    - A `build:mac` script.
+  - **`release.yml`:**
+    - a matrix over ubuntu, windows and macos;
+    - the checks and unit tests run on Linux only (some tests assume POSIX);
+    - `codesign --verify` checks the Mac apps;
+    - a final job writes the notes and makes the draft release (`softprops/action-gh-release`).
+  - **`ci.yml`:**
+    - the e2e job installs ffmpeg and xvfb, and caches `tests/fixtures` by the hash of `make-fixtures.sh`;
+    - it lifts Ubuntu's block on the user namespaces Chromium's sandbox needs;
+    - it keeps the screenshots of a failed run.
+- **Where:** `package.json`, `.github/workflows/release.yml`, `.github/workflows/ci.yml`, `site/download.js` (`FILES`, `issues`), `site/index.html` (the macOS card), `site/style.css` (`.alt`), `README.md`.
+- **Verified by:**
+  - `npm run build:linux` made `ScriBee-0.1.0-linux-x86_64.AppImage`.
+  - `tests/smoke.cjs` passed against the packaged app (`TB_APP_BINARY=dist/linux-unpacked/scribee`, 21 checks).
+  - The landing page was tried against a fake release with the four file names: each button got its file and size, and the Linux visitor got the AppImage.
+  - `npm run check` and `npm run test:unit`.
+  - The workflows themselves run once the repository is on GitHub.
+
 ## 2026-10-13: A licence, third-party notices and a README for the public
 
 - **What:** ScriBee is MIT-licensed (`LICENSE`). `THIRD_PARTY_NOTICES.md` lists what it's built on, with each licence. README.md now starts with what a visitor needs: the logo, what the app is, a screenshot, Download (with the first-run steps for the unsigned Windows and macOS builds), the feature list, Build from source and Licence. The developer docs follow under "Development".
