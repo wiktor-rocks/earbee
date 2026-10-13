@@ -80,7 +80,7 @@ The architecture overview, the file map and a list of where to make common chang
 - **Why:** to publish the project on GitHub. The user chose MIT.
 - **How:**
   - **Licences:** all are compatible with MIT. Signalsmith Stretch (MIT) is vendored with one fix. Mediabunny (MPL-2.0) is used unmodified from npm, so its file-level copyleft asks nothing more. wavesurfer.js is BSD-3-Clause, and Righteous and Nunito are OFL-1.1. yt-dlp (the Unlicense) isn't shipped: it's downloaded on first use.
-  - **README links:** they use `OWNER` until the GitHub repository exists.
+  - **README links:** they point at `github.com/wiktor-rocks/scribee` and `wiktor-rocks.github.io/scribee`, as do the landing page's `REPO` and `package.json`'s `homepage`, `repository` and `bugs`.
 - **Where:** `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`.
 - **Verified by:** `npm run check`; the README read through as it renders.
 

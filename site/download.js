@@ -4,7 +4,7 @@
 // ---- To point the page at your releases, edit these two: ----
 //
 // REPO: the GitHub repository ("user/name") whose releases are offered.
-const REPO = "OWNER/scribee";
+const REPO = "wiktor-rocks/scribee";
 // FILES: how to tell each download apart among a release's assets (the
 // first asset whose name matches is offered). They match the names in
 // package.json's build.artifactName: ScriBee-0.1.0-win-x64.exe,
