@@ -78,7 +78,7 @@ function rememberWindowState(win, name = "window-state") {
 // tests: run.cjs, smoke.cjs, e2e/harness.cjs, 01-static-ui.cjs, and
 // 18-video-window.cjs whole), and putting back main.js's
 // `setWindowOpenHandler(() => ({ action: "deny" }))`.
-const FRAME_NAME = "transcribee-video"; // the page's window.open name
+const FRAME_NAME = "scribee-video"; // the page's window.open name
 const STATE_NAME = "video-window-state";
 const MIN_SIZE = { width: 240, height: 135 };
 const DEFAULT_BOUNDS = { width: 640, height: 360 };

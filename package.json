@@ -1,8 +1,10 @@
 {
-  "name": "transcribee",
-  "productName": "TranscriBee",
-  "version": "1.0.0",
+  "name": "scribee",
+  "productName": "ScriBee",
+  "version": "0.1.0",
   "description": "A music-transcription player: slow down, pitch-shift, EQ and loop songs and videos, and step through them with the keyboard.",
+  "author": "Wiktor Wieczorkiewicz",
+  "license": "MIT",
   "main": "electron/main.js",
   "scripts": {
     "start": "electron .",
@@ -28,8 +30,6 @@
     "slow-down",
     "electron"
   ],
-  "author": "Wiktor Wieczorkiewicz",
-  "license": "ISC",
   "private": true,
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -49,8 +49,8 @@
     "wavesurfer.js": "^8.0.1"
   },
   "build": {
-    "appId": "com.transcribee.app",
-    "productName": "TranscriBee",
+    "appId": "com.scribee.app",
+    "productName": "ScriBee",
     "icon": "assets/icon-512.png",
     "files": [
       "electron/**",
@@ -63,7 +63,7 @@
     ],
     "linux": {
       "target": "AppImage",
-      "executableName": "transcribee",
+      "executableName": "scribee",
       "category": "Audio"
     },
     "win": {

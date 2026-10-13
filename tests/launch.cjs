@@ -40,7 +40,7 @@ if (!needed.every((name) => fs.existsSync(path.join(fixtures, name)))) {
 }
 
 const electron = require("electron"); // path to the Electron binary
-const profile = fs.mkdtempSync(path.join(os.tmpdir(), "transcribee-test-"));
+const profile = fs.mkdtempSync(path.join(os.tmpdir(), "scribee-test-"));
 const env = { ...process.env };
 delete env.ELECTRON_RUN_AS_NODE;
 

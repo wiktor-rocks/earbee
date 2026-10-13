@@ -1,8 +1,8 @@
-// Project files (.tbee): saving the session (the open song or video's
+// Project files (.sbee): saving the session (the open song or video's
 // marks, sound settings, loop and place) and opening it back. What is
 // saved is the list in sections.js; the file itself is src/project/format.js;
 // reading and writing it, in the main process (electron/project-files.js),
-// reached through window.transcribee.project (electron/preload.js).
+// reached through window.scribee.project (electron/preload.js).
 //
 // Every file opened here (media or project) starts a session: untitled
 // for a media file, named after the project for a project. It has
@@ -41,7 +41,7 @@ import { SECTIONS } from "./sections.js";
  * @property {(callback: () => void) => () => void} onSaveThenClose
  * @property {() => void} close
  */
-const bridge = /** @type {ProjectBridge | undefined} */ (/** @type {any} */ (window).transcribee?.project);
+const bridge = /** @type {ProjectBridge | undefined} */ (/** @type {any} */ (window).scribee?.project);
 
 // The session: what is open, and what was last saved.
 const session = {
@@ -77,7 +77,7 @@ function restoreProject(saved, duration) {
     if (!data || typeof data !== "object") continue;
     try {
       if (Number.isInteger(data.version) && data.version > section.version)
-        throw new AppError(`${section.label} were saved by a newer TranscriBee`);
+        throw new AppError(`${section.label} were saved by a newer ScriBee`);
       section.restore(data, { duration });
     } catch (error) {
       console.warn(`Couldn't restore the project's "${section.id}":`, error);
@@ -91,7 +91,7 @@ function restoreProject(saved, duration) {
 
 function renderTitle() {
   const name = session.name ?? session.mediaName;
-  document.title = name ? `TranscriBee — ${name}${session.dirty ? " •" : ""}` : "TranscriBee";
+  document.title = name ? `ScriBee — ${name}${session.dirty ? " •" : ""}` : "ScriBee";
   dom.saveButton.classList.toggle("unsaved", session.dirty);
   dom.fileMenuButton.classList.toggle("unsaved", session.dirty);
 }
@@ -201,7 +201,7 @@ export async function openFile(file) {
 
 /** @param {File} file */
 async function openProjectFile(file) {
-  if (!bridge) throw new AppError("Projects can only be opened in the TranscriBee app.");
+  if (!bridge) throw new AppError("Projects can only be opened in the ScriBee app.");
   const opened = await bridge.open(file);
   if (!opened.ok) {
     if (opened.error) throw new AppError(opened.error);

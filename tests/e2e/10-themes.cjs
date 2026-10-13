@@ -25,14 +25,14 @@ module.exports = async function (h) {
     })()`);
 
   await ensurePaused();
-  check("starts with the default theme", (await themeId()) === "transcribee" && (await variable("--bg")) === "#0e1014");
+  check("starts with the default theme", (await themeId()) === "scribee" && (await variable("--bg")) === "#0e1014");
 
   // The menu: opens on the current theme, keeps shortcuts away, arrows move.
   await js(`document.getElementById("themeButton").click()`);
   await sleep(150);
   check(
     "palette button opens the theme menu on the current theme",
-    (await menuOpen()) && (await js(`document.activeElement.dataset.choice`)) === "transcribee",
+    (await menuOpen()) && (await js(`document.activeElement.dataset.choice`)) === "scribee",
   );
   check(
     "menu lists Automatic and every theme",
@@ -176,7 +176,7 @@ module.exports = async function (h) {
   await dbg.sendCommand("Emulation.setEmulatedMedia", { features: [] });
 
   // Back to the default for the rest of the run.
-  await pick("transcribee");
+  await pick("scribee");
   await sleep(300);
   wc.focus();
   check("back to the default theme", (await variable("--bg")) === "#0e1014");

@@ -18,7 +18,7 @@
 //              (also prefs-store.js) is one section: applied by the preload
 //              before the page renders, and the window background.
 //              Downloads read theirs for each download.
-//   Projects   TranscriBee files (.tbee) with a session's marks and
+//   Projects   ScriBee files (.sbee) with a session's marks and
 //              settings (project-files.js): opened and saved through the
 //              preload, with the native dialogs below. Closing the window
 //              with unsaved changes asks first (guardClose).
@@ -30,6 +30,7 @@
 //              `npm run start:no-gpu` forces software rendering;
 //              `npm run start:gpu-info` logs what the GPU is doing.
 const { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, protocol, shell } = require("electron");
+const fs = require("fs");
 const path = require("path");
 const { handleDownloads } = require("./downloader");
 const { createMediaFiles, registerMediaScheme } = require("./media-files");
@@ -45,6 +46,28 @@ const MIN_SIZE = { width: 900, height: 640 };
 const DEFAULT_BOUNDS = { width: 1200, height: 800 };
 
 registerMediaScheme(protocol); // must happen before the app is ready
+
+// The app was called TranscriBee until 0.1.0: once, on a start under its
+// new name, its settings folder (prefs.json, the window states, the
+// page's storage) comes along, over whatever a first start already made
+// there (nothing has opened those files yet: the app isn't ready). A
+// copy, so going back to an older version still works; a marker file
+// says it's done.
+function adoptOldSettings() {
+  const current = app.getPath("userData");
+  const old = path.join(app.getPath("appData"), "TranscriBee");
+  const marker = path.join(current, "adopted-transcribee-settings");
+  // Not for a folder given on the command line (the smoke test's profile).
+  if (app.commandLine.hasSwitch("user-data-dir")) return;
+  if (!fs.existsSync(old) || fs.existsSync(marker)) return;
+  try {
+    fs.cpSync(old, current, { recursive: true, force: true });
+    fs.writeFileSync(marker, "");
+  } catch (error) {
+    console.warn("Couldn't copy the settings from TranscriBee:", error);
+  }
+}
+adoptOldSettings();
 
 app.on("child-process-gone", (_event, details) => {
   if (details.type === "GPU") {
@@ -77,7 +100,7 @@ const projectState = new Map(); // each page's unsaved changes (project-files.js
 // The native dialogs for project files, over the window that asked.
 const owner = (sender) => BrowserWindow.fromWebContents(sender);
 const withOwner = (sender, show, options) => (owner(sender) ? show(owner(sender), options) : show(options));
-const PROJECT_FILTERS = [{ name: "TranscriBee projects", extensions: ["tbee"] }];
+const PROJECT_FILTERS = [{ name: "ScriBee projects", extensions: ["sbee"] }];
 const projectDialogs = {
   async save(sender, defaultPath) {
     const { canceled, filePath } = await withOwner(sender, dialog.showSaveDialog, {
@@ -125,7 +148,7 @@ function createWindow() {
     height,
     minWidth: MIN_SIZE.width,
     minHeight: MIN_SIZE.height,
-    title: "TranscriBee",
+    title: "ScriBee",
     icon,
     backgroundColor: themeView.current().colors.bg, // the page background, so opening doesn't flash
     webPreferences: {
@@ -152,7 +175,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   const userData = app.getPath("userData");
-  const downloadsFolder = path.join(app.getPath("downloads"), "TranscriBee");
+  const downloadsFolder = path.join(app.getPath("downloads"), "ScriBee");
   const prefsStore = createPrefsStore(path.join(userData, "prefs.json"), {
     legacyThemeFile: path.join(userData, "theme.json"),
   });

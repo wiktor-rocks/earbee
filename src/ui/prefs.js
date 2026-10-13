@@ -1,6 +1,6 @@
 // The settings on the page's side: the values, changing them, and hearing
 // about changes. The main process keeps the copy that counts (prefs.json,
-// electron/prefs-store.js), reached through window.transcribee.prefs;
+// electron/prefs-store.js), reached through window.scribee.prefs;
 // outside Electron the values are kept in localStorage instead.
 //
 // Every change, from the Settings dialog, the palette menu or another
@@ -21,8 +21,8 @@ import { readStored, store } from "./storage.js";
  * @property {(section: string, key: string) => Promise<PrefsAnswer>} chooseFolder
  * @property {(callback: (change: { section: string, values: Record<string, any> }) => void) => () => void} onChanged
  */
-const bridge = /** @type {PrefsBridge | undefined} */ (/** @type {any} */ (window).transcribee?.prefs);
-const STORAGE_KEY = "transcribee.prefs";
+const bridge = /** @type {PrefsBridge | undefined} */ (/** @type {any} */ (window).scribee?.prefs);
+const STORAGE_KEY = "scribee.prefs";
 
 /** Whether the main process keeps the settings (false in a plain browser). */
 export const hasMainProcess = Boolean(bridge);

@@ -1,4 +1,4 @@
-// Project files (.tbee): the format (src/project/format.js) and reading and
+// Project files (.sbee): the format (src/project/format.js) and reading and
 // writing them in the main process (electron/project-files.js), with the
 // media inside or linked, served in slices (electron/media-files.js).
 import assert from "node:assert/strict";
@@ -27,15 +27,15 @@ describe("the format", () => {
     const sections = { marks: { version: 1, marks: [] }, future: { version: 9, anything: true } };
     const text = serializeProject({ media: { ...MEDIA, embedded: false }, sections, appVersion: "1.2.3" });
     const data = JSON.parse(text);
-    assert.equal(data.format, "transcribee-project");
+    assert.equal(data.format, "scribee-project");
     assert.equal(data.version, PROJECT_VERSION);
     assert.equal(data.savedWith, "1.2.3");
     assert.deepEqual(parseProject(text), { media: { ...MEDIA, embedded: false }, sections });
   });
 
   test("a newer project, something else, or no media: refused", () => {
-    const header = (fields) => JSON.stringify({ format: "transcribee-project", version: 1, media: MEDIA, ...fields });
-    assert.throws(() => parseProject(header({ version: PROJECT_VERSION + 1 })), /newer TranscriBee/);
+    const header = (fields) => JSON.stringify({ format: "scribee-project", version: 1, media: MEDIA, ...fields });
+    assert.throws(() => parseProject(header({ version: PROJECT_VERSION + 1 })), /newer ScriBee/);
     assert.throws(() => parseProject(header({ format: "other" })), ProjectFormatError);
     assert.throws(() => parseProject(header({ media: { path: "/x" } })), ProjectFormatError);
     assert.throws(() => parseProject("{ not json"), ProjectFormatError);
@@ -44,7 +44,7 @@ describe("the format", () => {
 
   test("odd fields are cleaned up, missing sections are none", () => {
     const text = JSON.stringify({
-      format: "transcribee-project",
+      format: "scribee-project",
       version: 1,
       media: { name: "a.wav", path: 5, size: -1, duration: "x", embedded: "yes" },
     });
@@ -57,12 +57,12 @@ describe("the format", () => {
   test("the header ends at the first NUL", () => {
     assert.equal(findHeaderEnd(new Uint8Array([123, 125, 0, 1, 0])), 2);
     assert.equal(findHeaderEnd(new Uint8Array([123, 125])), -1);
-    assert.ok(isProjectName("Song.TBEE") && !isProjectName("song.mp3"));
+    assert.ok(isProjectName("Song.SBEE") && !isProjectName("song.mp3"));
   });
 });
 
 describe("main process", () => {
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "transcribee-project-test-"));
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "scribee-project-test-"));
   after(() => fs.rmSync(folder, { recursive: true, force: true }));
   const bytes = Buffer.from(Array.from({ length: 300 }, (_, i) => i % 251));
   const mediaFile = path.join(folder, "media", "Song [x].m4a");
@@ -86,7 +86,7 @@ describe("main process", () => {
     );
 
   test("a new project is offered under the media's name", () => {
-    assert.equal(projectNameFor("Song [x].m4a"), "Song [x].tbee");
+    assert.equal(projectNameFor("Song [x].m4a"), "Song [x].sbee");
   });
 
   test("saved linked: plain JSON naming the media, absolute and relative", async () => {
@@ -94,9 +94,9 @@ describe("main process", () => {
     answers.save = path.join(folder, "projects", "linked"); // the extension is added
     fs.mkdirSync(path.join(folder, "projects"));
     const saved = await projects.save(null, { file: null, mediaUrl, embed: false, duration: 2, sections });
-    const target = path.join(folder, "projects", "linked.tbee");
-    assert.deepEqual(saved, { ok: true, path: target, name: "linked.tbee", embedded: false, linkable: true });
-    assert.deepEqual(answers.asked.at(-1), ["save", path.join(path.dirname(mediaFile), "Song [x].tbee")]);
+    const target = path.join(folder, "projects", "linked.sbee");
+    assert.deepEqual(saved, { ok: true, path: target, name: "linked.sbee", embedded: false, linkable: true });
+    assert.deepEqual(answers.asked.at(-1), ["save", path.join(path.dirname(mediaFile), "Song [x].sbee")]);
     const { media, sections: back } = parseProject(fs.readFileSync(target, "utf8"));
     assert.deepEqual(media, {
       name: "Song [x].m4a",
@@ -107,7 +107,7 @@ describe("main process", () => {
       embedded: false,
     });
     assert.deepEqual(back, sections);
-    assert.deepEqual(fs.readdirSync(path.join(folder, "projects")), ["linked.tbee"], "no temporary file left behind");
+    assert.deepEqual(fs.readdirSync(path.join(folder, "projects")), ["linked.sbee"], "no temporary file left behind");
 
     const opened = await projects.open(null, target);
     assert.equal(opened.ok, true);
@@ -118,7 +118,7 @@ describe("main process", () => {
 
   test("saved with the media inside: served as a slice of the project, even after saving over it", async () => {
     const mediaUrl = mediaFiles.share(mediaFile);
-    const target = path.join(folder, "inside.tbee");
+    const target = path.join(folder, "inside.sbee");
     const saved = await projects.save(null, { file: target, mediaUrl, embed: true, duration: 2, sections });
     assert.equal(saved.embedded, true);
     assert.equal(saved.linkable, true, "the media was still its own file");
@@ -153,8 +153,8 @@ describe("main process", () => {
     fs.mkdirSync(path.join(moved, "media"));
     const copy = path.join(moved, "media", "Song [x].m4a");
     fs.copyFileSync(mediaFile, copy);
-    fs.copyFileSync(path.join(folder, "projects", "linked.tbee"), path.join(moved, "projects", "linked.tbee"));
-    const candidates = mediaCandidates(path.join(moved, "projects", "linked.tbee"), {
+    fs.copyFileSync(path.join(folder, "projects", "linked.sbee"), path.join(moved, "projects", "linked.sbee"));
+    const candidates = mediaCandidates(path.join(moved, "projects", "linked.sbee"), {
       name: "Song [x].m4a",
       path: mediaFile,
       relativePath: path.join("..", "media", "Song [x].m4a"),
@@ -166,7 +166,7 @@ describe("main process", () => {
   test("media gone: the user is asked where it is", async () => {
     const gone = path.join(folder, "gone.m4a");
     fs.writeFileSync(gone, bytes);
-    const target = path.join(folder, "gone.tbee");
+    const target = path.join(folder, "gone.sbee");
     await projects.save(null, { file: target, mediaUrl: mediaFiles.share(gone), embed: false, duration: 2, sections });
     fs.rmSync(gone);
 
@@ -181,7 +181,7 @@ describe("main process", () => {
   });
 
   test("not a project: refused", async () => {
-    const fake = path.join(folder, "fake.tbee");
+    const fake = path.join(folder, "fake.sbee");
     fs.writeFileSync(fake, "hello");
     await assert.rejects(projects.open(null, fake), ProjectFormatError);
     await assert.rejects(projects.open(null, mediaFile), ProjectFormatError);

@@ -5,13 +5,13 @@
 
 /** @typedef {import("./index.js").Theme} Theme */
 
-// TranscriBee: the app's own dark theme, amber on graphite.
+// ScriBee: the app's own dark theme, amber on graphite.
 // style.css :root holds the same values as the fallback (a unit test keeps
 // them equal).
 /** @type {Theme} */
-const transcribee = {
-  id: "transcribee",
-  name: "TranscriBee",
+const scribee = {
+  id: "scribee",
+  name: "ScriBee",
   scheme: "dark",
   colors: {
     bg: "#0e1014",
@@ -233,14 +233,14 @@ const tokyoNight = {
   },
 };
 
-// TranscriBee Light: the app's own theme for light mode, amber on honey
-// paper, the light counterpart of TranscriBee. The amber is the dark
+// ScriBee Light: the app's own theme for light mode, amber on honey
+// paper, the light counterpart of ScriBee. The amber is the dark
 // theme's own yellow, so the brand colour is the same in both (it's soft on
 // the pale panels; tests/unit/themes.test.mjs exempts it from the 3:1 check).
 /** @type {Theme} */
-const transcribeeLight = {
-  id: "transcribee-light",
-  name: "TranscriBee Light",
+const scribeeLight = {
+  id: "scribee-light",
+  name: "ScriBee Light",
   scheme: "light",
   colors: {
     bg: "#f5f1e8",
@@ -433,7 +433,7 @@ const everforestLight = {
 // Dark themes first, then light ones; the menu lists them in this order.
 /** @type {Theme[]} */
 export const THEMES = [
-  transcribee,
+  scribee,
   monokai,
   dracula,
   nord,
@@ -442,7 +442,7 @@ export const THEMES = [
   solarizedDark,
   catppuccinMocha,
   tokyoNight,
-  transcribeeLight,
+  scribeeLight,
   solarizedLight,
   catppuccinLatte,
   githubLight,

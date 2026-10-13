@@ -4,11 +4,11 @@
 // ---- To point the page at your releases, edit these two: ----
 //
 // REPO: the GitHub repository ("user/name") whose releases are offered.
-const REPO = "OWNER/transcribee";
+const REPO = "OWNER/scribee";
 // FILES: how to tell each system's file apart among a release's assets
 // (the first asset whose name matches is offered). These match
-// electron-builder's usual names: TranscriBee 1.0.0.exe (portable),
-// TranscriBee-1.0.0-arm64.dmg, TranscriBee-1.0.0.AppImage.
+// electron-builder's usual names: ScriBee 1.0.0.exe (portable),
+// ScriBee-1.0.0-arm64.dmg, ScriBee-1.0.0.AppImage.
 const FILES = {
   windows: /\.exe$/i,
   mac: /\.dmg$/i,
@@ -102,7 +102,7 @@ function drawWave() {
   wave.replaceChildren(...bars);
 }
 
-// The button in the top bar: switches between TranscriBee's dark and light
+// The button in the top bar: switches between ScriBee's dark and light
 // themes, and remembers the choice (until then, the system's is used).
 function setUpThemeSwitch() {
   const root = document.documentElement;

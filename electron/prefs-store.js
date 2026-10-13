@@ -2,7 +2,7 @@
 // counts, kept in prefs.json in the user-data folder. The sections and the
 // checks are the page's (src/prefs, ES modules), loaded here with require().
 //
-// The page reaches it through the preload (window.transcribee.prefs): it
+// The page reaches it through the preload (window.scribee.prefs): it
 // reads every value at startup, asks to change one, and hears about every
 // change, whoever made it. Everything the page sends is checked here, and a
 // folder path is only ever set by the folder picker below, never sent by

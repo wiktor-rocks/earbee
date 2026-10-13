@@ -11,14 +11,14 @@ const require = createRequire(import.meta.url);
 const { createPrefsStore } = require("../../electron/prefs-store.js");
 const { videoFormat } = require("../../electron/downloader.js");
 
-const folder = () => fs.mkdtempSync(path.join(os.tmpdir(), "transcribee-prefs-"));
+const folder = () => fs.mkdtempSync(path.join(os.tmpdir(), "scribee-prefs-"));
 const read = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 
 describe("prefs store", () => {
   test("first run: the defaults, and no file until something changes", () => {
     const file = path.join(folder(), "prefs.json");
     const store = createPrefsStore(file);
-    assert.equal(store.get("theme").choice, "transcribee");
+    assert.equal(store.get("theme").choice, "scribee");
     assert.equal(store.get("downloads").folder, null);
     assert.equal(fs.existsSync(file), false);
   });
@@ -29,7 +29,7 @@ describe("prefs store", () => {
     const saved = read(file);
     assert.equal(saved.version, 1);
     assert.equal(saved.downloads.maxHeight, 720);
-    assert.equal(saved.theme.choice, "transcribee");
+    assert.equal(saved.theme.choice, "scribee");
     assert.equal(createPrefsStore(file).get("downloads").maxHeight, 720);
     assert.deepEqual(fs.readdirSync(path.dirname(file)), ["prefs.json"]); // no temporary file left
   });
@@ -39,14 +39,14 @@ describe("prefs store", () => {
     fs.writeFileSync(path.join(dir, "prefs.json"), "{ not json");
     fs.writeFileSync(path.join(dir, "theme.json"), JSON.stringify({ choice: "nord" }));
     const store = createPrefsStore(path.join(dir, "prefs.json"), { legacyThemeFile: path.join(dir, "theme.json") });
-    assert.equal(store.get("theme").choice, "transcribee");
+    assert.equal(store.get("theme").choice, "scribee");
   });
 
   test("invalid stored values become defaults; valid ones are kept", () => {
     const file = path.join(folder(), "prefs.json");
     fs.writeFileSync(file, JSON.stringify({ version: 1, theme: { choice: "gone" }, downloads: { kind: "video" } }));
     const store = createPrefsStore(file);
-    assert.equal(store.get("theme").choice, "transcribee");
+    assert.equal(store.get("theme").choice, "scribee");
     assert.equal(store.get("downloads").kind, "video");
   });
 

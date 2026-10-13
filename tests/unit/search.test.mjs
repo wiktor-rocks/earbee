@@ -125,7 +125,7 @@ describe("normalizeResult", () => {
 
 describe("the downloader's search (fake yt-dlp)", () => {
   fs.mkdirSync(path.join(TESTS, "output"), { recursive: true });
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "transcribee-search-test-"));
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "scribee-search-test-"));
   after(() => fs.rmSync(folder, { recursive: true, force: true }));
   const pixel = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
   const fetch = async (url) => {
@@ -214,7 +214,7 @@ describe("the downloader's search (fake yt-dlp)", () => {
 // nothing, so a search finds nothing) is served by a fake fetch, which
 // holds the file back until told.
 describe("the downloader's yt-dlp setup", { skip: process.platform === "win32" }, () => {
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "transcribee-setup-test-"));
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "scribee-setup-test-"));
   after(() => fs.rmSync(folder, { recursive: true, force: true }));
   const script = Buffer.from("#!/bin/sh\nexit 0\n");
   const sha = crypto.createHash("sha256").update(script).digest("hex");

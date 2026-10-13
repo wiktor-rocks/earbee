@@ -94,7 +94,7 @@ for (const [mode, file, limit, workers] of PLAN) {
 
   const out = path.join(OUTPUT, `${id}.json`);
   fs.rmSync(out, { force: true });
-  const profile = fs.mkdtempSync(path.join(os.tmpdir(), "transcribee-diag-"));
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), "scribee-diag-"));
   const command = [electron, path.join(__dirname, "profile-load.cjs"), `--user-data-dir=${profile}`];
   const limited = limit
     ? ["systemd-run", ["--user", "--scope", "--quiet", "-p", `MemoryMax=${limit}`, "-p", "MemorySwapMax=0", ...command]]

@@ -13,7 +13,7 @@ export function openShortcuts() {
   if (!dom.shortcutsDialog.open) dom.shortcutsDialog.showModal();
 }
 
-const SIDEBAR_KEY = "transcribee.sidebarHidden";
+const SIDEBAR_KEY = "scribee.sidebarHidden";
 
 // Hides or shows the marks sidebar; the timeline takes its width.
 function showSidebar(shown) {

@@ -1,8 +1,8 @@
-// The page's only ways out of its sandbox, exposed as window.transcribee:
+// The page's only ways out of its sandbox, exposed as window.scribee:
 //   - downloading a link, or searching by keywords (see downloader.js); the page hides its download
 //     buttons when this is missing (e.g. opened in a plain browser);
 //   - the memory available for a track (see system.js);
-//   - project files (.tbee; see project-files.js): opening, saving, and
+//   - project files (.sbee; see project-files.js): opening, saving, and
 //     whether there are unsaved changes; a File's path is found here, so
 //     the page never names a path itself;
 //   - the settings (see prefs-store.js): read at startup, changed one at a
@@ -49,7 +49,7 @@ if (initialTheme?.variables) {
   }
 }
 
-contextBridge.exposeInMainWorld("transcribee", {
+contextBridge.exposeInMainWorld("scribee", {
   // Resolves to { ok: true, name, path, url } or { ok: false, canceled, error };
   // `url` serves the saved file in pieces (media-files.js).
   download: (url, kind) => ipcRenderer.invoke("download:start", String(url), String(kind)),

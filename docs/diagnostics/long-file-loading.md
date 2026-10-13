@@ -377,7 +377,7 @@ Until recommendation 1 lands, or as a safety net after it:
 
 ### 4. Handle a crashed renderer
 
-`electron/main.js` has no `render-process-gone` handler. If the renderer is killed (out of memory, or a GPU fault), the window goes blank. Add a handler that reloads the page and shows a message (e.g. "TranscriBee ran out of memory opening that file").
+`electron/main.js` has no `render-process-gone` handler. If the renderer is killed (out of memory, or a GPU fault), the window goes blank. Add a handler that reloads the page and shows a message (e.g. "ScriBee ran out of memory opening that file").
 
 ### 5. Revisit `CONFIG.maxFileBytes` (2 GB)
 

@@ -38,8 +38,8 @@ function handleRendererCrash(win, dialog) {
     console.error(`Page process gone: ${details.reason} (exit code ${details.exitCode})`);
     await dialog.showMessageBox(win, {
       type: "error",
-      title: "TranscriBee",
-      message: "TranscriBee stopped unexpectedly and will start again.",
+      title: "ScriBee",
+      message: "ScriBee stopped unexpectedly and will start again.",
       detail:
         details.reason === "oom"
           ? "It ran out of memory. A very long file may need more memory than is available."

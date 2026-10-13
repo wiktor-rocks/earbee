@@ -37,7 +37,7 @@ async function createHarness() {
       details.url.startsWith("devtools:") ||
       details.url.startsWith("data:") ||
       details.url.startsWith("blob:") ||
-      details.url.startsWith("transcribee-media:");
+      details.url.startsWith("scribee-media:");
     if (!ok) blocked.push(details.url);
     cb({ cancel: !ok });
   });

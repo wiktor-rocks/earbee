@@ -1,4 +1,4 @@
-// Project files (.tbee): saving a session (marks, sound settings, loop,
+// Project files (.sbee): saving a session (marks, sound settings, loop,
 // step, place, zoom) linked to its media or with it inside, opening it
 // back, unsaved changes (the • in the title, the question before they're
 // lost), and a project whose media moved with it.
@@ -153,7 +153,7 @@ module.exports = async function (h) {
   check("the main process hears about unsaved changes", projectState.get(wc.id)?.dirty === true);
 
   // Ctrl+S, the first time: Save As (link to the media), then where.
-  const linked = path.join(folder, "Tone session.tbee");
+  const linked = path.join(folder, "Tone session.sbee");
   projectDialogs.save = linked;
   key("S", ["control"]);
   await sleep(200);
@@ -163,7 +163,7 @@ module.exports = async function (h) {
   );
   await js(`saveForm.requestSubmit()`);
   await sleep(500);
-  check("…then where, offering the media's name", projectDialogs.asked.at(-1)?.[1]?.endsWith("tone.tbee"));
+  check("…then where, offering the media's name", projectDialogs.asked.at(-1)?.[1]?.endsWith("tone.sbee"));
   check("the project is written", fs.existsSync(linked));
   const saved = JSON.parse(fs.readFileSync(linked, "utf8"));
   check(
@@ -182,7 +182,7 @@ module.exports = async function (h) {
   await shot("project-saved-toast.png");
   check(
     "after saving, the title names the project and nothing is unsaved",
-    (await title()) === "TranscriBee — Tone session.tbee" && projectState.get(wc.id)?.dirty === false,
+    (await title()) === "ScriBee — Tone session.sbee" && projectState.get(wc.id)?.dirty === false,
     await title(),
   );
   await click(4);
@@ -202,7 +202,7 @@ module.exports = async function (h) {
   check("…with nothing unsaved", !(await unsaved()), await title());
   check(
     "opening a project says so in a notification",
-    (await toasts()).some((t) => t.text === "Opened “Tone session.tbee”"),
+    (await toasts()).some((t) => t.text === "Opened “Tone session.sbee”"),
     JSON.stringify(await toasts()),
   );
 
@@ -233,13 +233,13 @@ module.exports = async function (h) {
   await open(tone);
   check(
     "Cancel at “Save the changes?” keeps the project open",
-    (await title()) === "TranscriBee — Tone session.tbee •" && projectDialogs.asked.at(-1)?.[0] === "confirm",
+    (await title()) === "ScriBee — Tone session.sbee •" && projectDialogs.asked.at(-1)?.[0] === "confirm",
     await title(),
   );
   projectDialogs.confirm = "discard";
 
   // Save As with the media inside (Ctrl+Shift+S): one file that works anywhere.
-  const inside = path.join(folder, "Inside.tbee");
+  const inside = path.join(folder, "Inside.sbee");
   projectDialogs.save = inside;
   key("S", ["control", "shift"]);
   await sleep(200);
@@ -283,10 +283,10 @@ module.exports = async function (h) {
     path: "/nowhere/copy.wav",
     relativePath: path.join("..", "fixtures", "copy.wav"),
   };
-  fs.writeFileSync(path.join(moved, "Moved.tbee"), JSON.stringify(project));
+  fs.writeFileSync(path.join(moved, "Moved.sbee"), JSON.stringify(project));
   fs.mkdirSync(path.join(moved, "projects"));
-  fs.renameSync(path.join(moved, "Moved.tbee"), path.join(moved, "projects", "Moved.tbee"));
-  await open(path.join(moved, "projects", "Moved.tbee"));
+  fs.renameSync(path.join(moved, "Moved.sbee"), path.join(moved, "projects", "Moved.sbee"));
+  await open(path.join(moved, "projects", "Moved.sbee"));
   check(
     "a moved project finds its media by where it was relative to it",
     (await js(`fileName.textContent`)) === "copy.wav" && (await session()).marks.length === 2,
@@ -295,7 +295,7 @@ module.exports = async function (h) {
   // Gone, and not found: the user is asked, and Cancel leaves things as they were.
   fs.rmSync(copy);
   projectDialogs.locate = null;
-  await open(path.join(moved, "projects", "Moved.tbee"));
+  await open(path.join(moved, "projects", "Moved.sbee"));
   check(
     "media that's gone: asked where it is; Cancel changes nothing",
     projectDialogs.asked.at(-1)?.[0] === "locate" && (await js(`fileName.textContent`)) === "copy.wav",

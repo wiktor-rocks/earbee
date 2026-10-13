@@ -44,7 +44,7 @@ module.exports = async function (h) {
       );
     };
     const savedFiles = () => (fs.existsSync(DOWNLOADS) ? fs.readdirSync(DOWNLOADS).sort() : []);
-    const workDirs = () => fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith("transcribee-download-"));
+    const workDirs = () => fs.readdirSync(os.tmpdir()).filter((name) => name.startsWith("scribee-download-"));
     const workDirsBefore = workDirs();
 
     // The dialog: opens focused, refuses a non-link, blocks shortcuts, closes on Escape.
@@ -97,7 +97,7 @@ module.exports = async function (h) {
     let u = await ui();
     const audioName = "Test Song “Quotes” Slashes [fakeId123].m4a";
     check("downloaded audio opens in the player", u.file === audioName, JSON.stringify(u));
-    check("window title names the download", (await js(`document.title`)) === `TranscriBee — ${audioName}`);
+    check("window title names the download", (await js(`document.title`)) === `ScriBee — ${audioName}`);
     check("downloaded audio has its full length", Math.abs((await duration()) - 6) < 0.1, `${await duration()}`);
     check(
       "a notification says where it was saved, the transport bar stays clear",

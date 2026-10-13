@@ -1,9 +1,9 @@
-// Project files (.tbee) on the main-process side: reading, writing, and
+// Project files (.sbee) on the main-process side: reading, writing, and
 // finding the media they belong to. What a project file is, is in
 // src/project/format.js (shared with the page); what goes in its sections
 // is the page's business (src/features/project/).
 //
-// The page reaches this through the preload (window.transcribee.project):
+// The page reaches this through the preload (window.scribee.project):
 //   register-media  a media file the user opened (the preload finds its path
 //                   from the File itself), so a project can link to it;
 //                   answers its URL, as a download's (media-files.js)
@@ -54,7 +54,7 @@ async function readHeader(file) {
       chunks.push(chunk.subarray(0, bytesRead));
       read += bytesRead;
     }
-    if (read < fileSize) throw new project.ProjectFormatError("This isn't a TranscriBee project.");
+    if (read < fileSize) throw new project.ProjectFormatError("This isn't a ScriBee project.");
     return { text: Buffer.concat(chunks).toString("utf8"), mediaOffset: null, fileSize };
   } finally {
     await handle.close();
@@ -84,10 +84,10 @@ async function isFile(file) {
   }
 }
 
-/** The target with the .tbee extension. @param {string} file */
+/** The target with the .sbee extension. @param {string} file */
 const withExtension = (file) => (project.isProjectName(file) ? file : `${file}.${project.PROJECT_EXTENSION}`);
 
-/** The name a new project is offered under: the media's, as .tbee. @param {string} name */
+/** The name a new project is offered under: the media's, as .sbee. @param {string} name */
 const projectNameFor = (name) => `${path.parse(name).name || "Untitled"}.${project.PROJECT_EXTENSION}`;
 
 // Renames `from` over `to`. On Windows a file still open for reading (the
@@ -134,7 +134,7 @@ function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
      * @param {string} file
      */
     async open(sender, file) {
-      if (!project.isProjectName(file)) throw new project.ProjectFormatError("This isn't a TranscriBee project.");
+      if (!project.isProjectName(file)) throw new project.ProjectFormatError("This isn't a ScriBee project.");
       const header = await readHeader(file);
       const { media, sections } = project.parseProject(header.text);
       const opened = { ok: true, path: file, name: path.basename(file), sections, embedded: media.embedded };
@@ -238,7 +238,7 @@ function handleProjects(ipcMain, projectFiles, { mediaFiles, dialogs, state }) {
         error?.code === "ENOENT"
           ? "That file isn't there any more."
           : error?.code === "EACCES" || error?.code === "EPERM"
-            ? "TranscriBee isn't allowed to write there."
+            ? "ScriBee isn't allowed to write there."
             : String(error?.message ?? error);
       return { ok: false, error: message };
     }

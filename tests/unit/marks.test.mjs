@@ -160,6 +160,6 @@ describe("the saved form", () => {
     const limits = { duration: 30, minSeconds: 0.05 };
     assert.throws(() => parseMarks({ marks: [] }, limits), MarksFormatError);
     assert.throws(() => parseMarks("[]", limits), MarksFormatError);
-    assert.throws(() => parseMarks({ version: MARKS_VERSION + 1, marks: [] }, limits), /newer TranscriBee/);
+    assert.throws(() => parseMarks({ version: MARKS_VERSION + 1, marks: [] }, limits), /newer ScriBee/);
   });
 });

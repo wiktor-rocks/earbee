@@ -96,9 +96,9 @@ const serializeMarks = (marks) => ({
  */
 export function parseMarks(data, limits) {
   if (!data || typeof data !== "object" || !Number.isInteger(data.version) || !Array.isArray(data.marks))
-    throw new MarksFormatError("These aren't marks TranscriBee can read.");
+    throw new MarksFormatError("These aren't marks ScriBee can read.");
   if (data.version > MARKS_VERSION)
-    throw new MarksFormatError("These marks were saved by a newer TranscriBee; update it to open them.");
+    throw new MarksFormatError("These marks were saved by a newer ScriBee; update it to open them.");
   const seen = new Set();
   const marks = [];
   for (const raw of data.marks) {

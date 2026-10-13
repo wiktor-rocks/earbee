@@ -1,4 +1,4 @@
-"""Generates the app's images from assets/transcribee-source.png.
+"""Generates the app's images from assets/scribee-source.png.
 
     python3 scripts/make-images.py
 
@@ -15,7 +15,7 @@ from pathlib import Path
 from PIL import Image
 
 assets = Path(__file__).resolve().parent.parent / "assets"
-source = Image.open(assets / "transcribee-source.png").convert("RGBA")
+source = Image.open(assets / "scribee-source.png").convert("RGBA")
 
 
 def fit_square(image, size):

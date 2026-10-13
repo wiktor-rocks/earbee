@@ -58,8 +58,8 @@ describe("files", () => {
     assert.ok(isVideoFile({ name: "clip.bin", type: "video/quicktime" }, extensions));
     assert.ok(!isVideoFile({ name: "song.m4a", type: "audio/mp4" }, extensions));
     // A download, served by URL: no type, so by extension.
-    assert.ok(isVideoFile({ name: "clip.mp4", url: "transcribee-media://t/clip.mp4" }, extensions));
-    assert.ok(!isVideoFile({ name: "song.m4a", url: "transcribee-media://t/song.m4a" }, extensions));
+    assert.ok(isVideoFile({ name: "clip.mp4", url: "scribee-media://t/clip.mp4" }, extensions));
+    assert.ok(!isVideoFile({ name: "song.m4a", url: "scribee-media://t/song.m4a" }, extensions));
   });
 
   test("a File is read as a Blob, a download by its URL", () => {
@@ -75,7 +75,7 @@ describe("files", () => {
     }
     const file = new File(["x"], "song.mp3");
     assert.equal(/** @type {any} */ (mediaSource(file, { BlobSource, UrlSource })).blob, file);
-    const download = { name: "song.m4a", url: "transcribee-media://t/song.m4a" };
+    const download = { name: "song.m4a", url: "scribee-media://t/song.m4a" };
     assert.equal(/** @type {any} */ (mediaSource(download, { BlobSource, UrlSource })).url, download.url);
   });
 });

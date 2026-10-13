@@ -115,19 +115,19 @@ const near = (a, b) => Math.abs(a - b) <= 40; // window decorations differ betwe
 /* ---------- The checks ---------- */
 
 (async () => {
-  const profile = fs.mkdtempSync(path.join(os.tmpdir(), "transcribee-smoke-"));
+  const profile = fs.mkdtempSync(path.join(os.tmpdir(), "scribee-smoke-"));
   const stateFile = path.join(profile, "window-state.json");
 
   try {
     // First start: defaults, security, then closing saves the state.
     let sizesObservable = true;
     await session(profile, async (page) => {
-      check("window title", (await page.evaluate("document.title")) === "TranscriBee");
+      check("window title", (await page.evaluate("document.title")) === "ScriBee");
       check("welcome screen shown", await page.evaluate(`!document.getElementById("welcome").hidden`));
       check(
         "download bridge from preload.js, From YouTube shown",
         await page.evaluate(
-          `typeof window.transcribee?.download === "function" && !document.getElementById("welcomeDownload").hidden`,
+          `typeof window.scribee?.download === "function" && !document.getElementById("welcomeDownload").hidden`,
         ),
       );
 
@@ -153,7 +153,7 @@ const near = (a, b) => Math.abs(a - b) <= 40; // window decorations differ betwe
       check(
         "the video window may open",
         (await page.evaluate(
-          `(() => { const win = window.open("", "transcribee-video"); return win !== null && !win.closed; })()`,
+          `(() => { const win = window.open("", "scribee-video"); return win !== null && !win.closed; })()`,
         )) === true,
       );
 
@@ -179,7 +179,7 @@ const near = (a, b) => Math.abs(a - b) <= 40; // window decorations differ betwe
       await session(profile, async (page) => {
         const size = await windowSize(page);
         if (sizesObservable) check(name, expect(size), JSON.stringify(size));
-        else check(`${name}: app starts`, (await page.evaluate("document.title")) === "TranscriBee");
+        else check(`${name}: app starts`, (await page.evaluate("document.title")) === "ScriBee");
       });
     };
     const base = saved ?? { x: 0, y: 0, width: 1200, height: 800, maximized: false };
@@ -212,7 +212,7 @@ const near = (a, b) => Math.abs(a - b) <= 40; // window decorations differ betwe
     await session(profile, async (page) => {
       const imported = await page.evaluate(`document.documentElement.dataset.theme`);
       check("theme.json from before Settings is imported", imported === "dracula", imported);
-      await page.evaluate(`transcribee.prefs.set("theme", "choice", "nord")`);
+      await page.evaluate(`scribee.prefs.set("theme", "choice", "nord")`);
     });
     await session(profile, async (page) => {
       const applied = await page.evaluate(

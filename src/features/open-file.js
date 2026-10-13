@@ -82,7 +82,7 @@ function peakFactorFor({ duration, sampleRate }) {
 // Memory the system has available (main process), or null if unknown.
 async function availableMemory() {
   try {
-    return (await /** @type {any} */ (window).transcribee?.availableMemory?.()) ?? null;
+    return (await /** @type {any} */ (window).scribee?.availableMemory?.()) ?? null;
   } catch {
     return null;
   }
@@ -202,7 +202,7 @@ export async function loadMediaFile(media, signal) {
   dom.fileMeta.textContent = `${formatDuration(decoded.duration)} · ${kind}${isVideo ? " video" : ""}`;
   dom.fileInfo.classList.toggle("video", isVideo);
   dom.fileInfo.classList.add("loaded");
-  document.title = `TranscriBee — ${media.name}`; // also the window title
+  document.title = `ScriBee — ${media.name}`; // also the window title
   timer.done();
 
   const notices = [];
@@ -260,7 +260,7 @@ export function bindFileInput(open) {
 }
 
 // What a dragged file looks like before it's dropped: only its type is
-// readable then, not its name, so a project (.tbee) is just "file".
+// readable then, not its name, so a project (.sbee) is just "file".
 /** @param {DataTransfer} transfer */
 function dragged(transfer) {
   const files = [...transfer.items].filter((item) => item.kind === "file");

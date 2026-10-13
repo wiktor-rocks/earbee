@@ -106,7 +106,7 @@ function buildVideoWindow(win, { onBringBack }) {
   const controls = element("div", { className: "video-window-controls" }, time);
 
   // "Always on top" needs the app (a browser can't do it).
-  const api = /** @type {any} */ (window).transcribee?.videoWindow;
+  const api = /** @type {any} */ (window).scribee?.videoWindow;
   if (api) {
     const pin = element(
       "button",
@@ -161,8 +161,8 @@ function buildVideoWindow(win, { onBringBack }) {
 
 /* ---------- Popping out and back ---------- */
 
-const POPPED_KEY = "transcribee.videoPopped";
-const WINDOW_NAME = "transcribee-video"; // the one electron/windows.js allows
+const POPPED_KEY = "scribee.videoPopped";
+const WINDOW_NAME = "scribee-video"; // the one electron/windows.js allows
 
 const stage = $("stage");
 const docked = {

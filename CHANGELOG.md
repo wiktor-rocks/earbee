@@ -1,10 +1,10 @@
-# TranscriBee: change log
+# ScriBee: change log
 
-TranscriBee is an Electron app for transcribing music. You open a song or a video, slow it down, shift its pitch, EQ it, loop a passage, and step through it with the keyboard.
+ScriBee is an Electron app for transcribing music. You open a song or a video, slow it down, shift its pitch, EQ it, loop a passage, and step through it with the keyboard.
 
 **Files**
 
-- `electron/`: the Electron main process: `main.js` (window, security), `windows.js` (window state, the video window), `prefs-store.js` (settings and the colour theme), `downloader.js` (yt-dlp), `media-files.js` (serving downloads to the page), `project-files.js` (.tbee files), `system.js` and `preload.js` (the page's bridge to them).
+- `electron/`: the Electron main process: `main.js` (window, security), `windows.js` (window state, the video window), `prefs-store.js` (settings and the colour theme), `downloader.js` (yt-dlp), `media-files.js` (serving downloads to the page), `project-files.js` (.sbee files), `system.js` and `preload.js` (the page's bridge to them).
 - `src/`: the page, as ES modules in layers. `core/`, `themes/`, `search/` → `prefs/`, `marks/`, `project/` → `config.js` → `audio/`, `video/`, `waveform.js`, `timeline.js` → `context.js` → `ui/` → `features/` → `app.js`.
 - `index.html` and `style.css`: the page and its look.
 - `assets/`: the logo and icons; `scripts/make-images.py` makes them from the source image.
@@ -42,6 +42,24 @@ The architecture overview, the file map and a list of where to make common chang
 | `tests/run.cjs` (one sequence)           | `tests/run.cjs` + `tests/e2e/`                                                           |
 
 ---
+
+## 2026-10-13: TranscriBee is now ScriBee (0.1.0)
+
+- **What:** the app is called **ScriBee** everywhere: window titles, the wordmark (Scri**Bee**, with "Bee" in the accent colour), the theme names (ScriBee, ScriBee Light), messages, the landing page and the docs. Project files are now `.sbee`; existing `.tbee` files don't open any more (rename them: the content is the same). The version is 0.1.0, the first one meant for publishing, under the MIT licence. On its first start under the new name, the app copies its old settings folder (prefs.json, window positions, the page's storage). So the window opens where it was and the settings stay, except the colour theme and the sidebar and video-window choices, whose ids changed.
+- **Why:** before publishing on GitHub. "TranscriBee" sat close to bugbakery's transcribee (a speech-to-text editor) and Seventh String's Transcribe!. The user chose ScriBee: scribe + bee, the bee logo unchanged. A search found no app, music software or GitHub project with that name. The user chose `.sbee` only, without keeping `.tbee`.
+- **How:**
+  - Every name was changed by rule (the history entries below keep the old ones): `TranscriBee` → `ScriBee`, `transcribee` → `scribee`, `.tbee` → `.sbee`.
+  - So also:
+    - the bridge (`window.scribee`) and the media URL scheme (`scribee-media://`);
+    - the video window's frame name;
+    - the localStorage keys and the temp-folder prefixes;
+    - the theme ids (`scribee`, `scribee-light`) and the project format id (`scribee-project`);
+    - the package (`name`, `appId: com.scribee.app`, `executableName`);
+    - the default download folder (`~/Downloads/ScriBee`);
+    - `assets/scribee-source.png`.
+  - `electron/main.js` `adoptOldSettings()` copies `…/TranscriBee` over the new settings folder once, before the app is ready (nothing has opened those files yet), and leaves a marker file, `adopted-transcribee-settings`. It does this even when a first start already made the new folder: on this machine, `npm start`'s auto-reload restarted the app under the new name during the rename. It's skipped for a folder given with `--user-data-dir`, so the smoke test's throwaway profile never gets the real settings. A copy, so an older version still finds its own.
+- **Where:** 51 files, the main ones being `package.json`, `src/project/format.js` (`PROJECT_EXTENSION`), `src/themes/palettes.js`, `electron/preload.js`, `electron/media-files.js`, `index.html`, `site/`, `README.md` and the tests.
+- **Verified by:** the full `npm test` (202 unit, 409 e2e, 21 smoke) and `npm run check`. `adoptOldSettings` was run on its own against temporary folders: it does nothing with `--user-data-dir`, copies once over a fresh folder, and leaves later changes alone. `git grep -i -e transcribee -e tbee` finds the old names only in this CHANGELOG's history and in the vendored Signalsmith code (where "tbee" is part of minified code).
 
 ## 2026-10-13: Clean-up before main: small bugs, dead code, docs
 

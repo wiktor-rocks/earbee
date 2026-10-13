@@ -1,4 +1,4 @@
-// What a project file (.tbee) saves: one section per part of a session.
+// What a project file (.sbee) saves: one section per part of a session.
 // THE place to change it. To save something new, add a section here:
 //
 //   id        its key in the file's "sections"; never change it

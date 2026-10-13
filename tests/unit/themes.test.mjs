@@ -52,8 +52,8 @@ describe("every theme", () => {
       atLeast(4.5, "--danger", "--bg", "--surface");
       atLeast(4.5, "--accent-ink", "--accent", "--accent-hover");
       atLeast(4.5, "--cursor", "--surface");
-      // TranscriBee Light keeps the dark theme's yellow on purpose (one brand colour).
-      if (theme.id !== "transcribee-light") atLeast(3, "--accent", "--surface");
+      // ScriBee Light keeps the dark theme's yellow on purpose (one brand colour).
+      if (theme.id !== "scribee-light") atLeast(3, "--accent", "--surface");
       atLeast(3, "--loop", "--surface");
       atLeast(3, "--start", "--surface");
       atLeast(3, "--stop", "--surface");
@@ -94,7 +94,7 @@ describe("cssVariables", () => {
   });
 
   test("a theme's own value wins over the derived one", () => {
-    assert.equal(cssVariables(getTheme("transcribee"))["--surface-hover"], "#262b36");
+    assert.equal(cssVariables(getTheme("scribee"))["--surface-hover"], "#262b36");
   });
 });
 
@@ -116,12 +116,12 @@ describe("picking a theme", () => {
   });
 });
 
-test("style.css defaults are the TranscriBee theme", () => {
+test("style.css defaults are the ScriBee theme", () => {
   // The page's fallback (before or without JavaScript) must look like the
   // default theme.
   const css = readFileSync(new URL("../../style.css", import.meta.url), "utf8");
   const root = css.slice(css.indexOf(":root {"), css.indexOf("}", css.indexOf(":root {")));
-  for (const [variable, value] of Object.entries(cssVariables(getTheme("transcribee")))) {
+  for (const [variable, value] of Object.entries(cssVariables(getTheme("scribee")))) {
     const match = new RegExp(`${variable}:\\s*([^;]+);`).exec(root);
     assert.ok(match, `${variable} missing from :root`);
     assert.equal(match[1].trim().toLowerCase(), value, variable);
