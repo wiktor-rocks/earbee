@@ -74,11 +74,15 @@ module.exports = async function (h) {
     // The video window, its controls woken by the pointer.
     const child = videoWin();
     for (const x of [200, 210, 220]) child.webContents.sendInputEvent({ type: "mouseMove", x, y: 150 });
-    await sleep(300);
-    check(
-      "moving the pointer shows the video window's controls",
-      await inWindow(`document.body.classList.contains("awake")`),
-    );
+    // Within a few seconds (input reaches an offscreen window late on a
+    // slow machine, like CI's).
+    const awake = () => inWindow(`document.body.classList.contains("awake")`);
+    let woken = false;
+    for (let waited = 0; waited < 3000 && !woken; waited += 100) {
+      await sleep(100);
+      woken = await awake();
+    }
+    check("moving the pointer shows the video window's controls", woken);
     child.webContents.invalidate();
     await sleep(200);
     fs.writeFileSync(path.join(OUTPUT, "video-window.png"), (await child.capturePage()).toPNG());
