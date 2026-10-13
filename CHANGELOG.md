@@ -43,6 +43,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-13: A licence, third-party notices and a README for the public
+
+- **What:** ScriBee is MIT-licensed (`LICENSE`). `THIRD_PARTY_NOTICES.md` lists what it's built on, with each licence. README.md now starts with what a visitor needs: the logo, what the app is, a screenshot, Download (with the first-run steps for the unsigned Windows and macOS builds), the feature list, Build from source and Licence. The developer docs follow under "Development".
+- **Why:** to publish the project on GitHub. The user chose MIT.
+- **How:**
+  - **Licences:** all are compatible with MIT. Signalsmith Stretch (MIT) is vendored with one fix. Mediabunny (MPL-2.0) is used unmodified from npm, so its file-level copyleft asks nothing more. wavesurfer.js is BSD-3-Clause, and Righteous and Nunito are OFL-1.1. yt-dlp (the Unlicense) isn't shipped: it's downloaded on first use.
+  - **README links:** they use `OWNER` until the GitHub repository exists.
+- **Where:** `LICENSE`, `THIRD_PARTY_NOTICES.md`, `README.md`.
+- **Verified by:** `npm run check`; the README read through as it renders.
+
 ## 2026-10-13: TranscriBee is now ScriBee (0.1.0)
 
 - **What:** the app is called **ScriBee** everywhere: window titles, the wordmark (Scri**Bee**, with "Bee" in the accent colour), the theme names (ScriBee, ScriBee Light), messages, the landing page and the docs. Project files are now `.sbee`; existing `.tbee` files don't open any more (rename them: the content is the same). The version is 0.1.0, the first one meant for publishing, under the MIT licence. On its first start under the new name, the app copies its old settings folder (prefs.json, window positions, the page's storage). So the window opens where it was and the settings stay, except the colour theme and the sidebar and video-window choices, whose ids changed.

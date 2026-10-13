@@ -1,0 +1,15 @@
+# Third-party software
+
+ScriBee itself is MIT-licensed (see [LICENSE](LICENSE)). It is built on, and its releases include, the following. Each keeps its own licence.
+
+| What                                                                                             | Used for                                      | Licence                                             | Where                                                                                                |
+| ------------------------------------------------------------------------------------------------ | --------------------------------------------- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| [Signalsmith Stretch](https://signalsmith-audio.co.uk/code/stretch/) 1.3.2, by Signalsmith Audio | Changing speed and pitch                      | MIT                                                 | Copied into `src/vendor/signalsmith-stretch/`, with one fix (described in its README.md there)       |
+| [Mediabunny](https://mediabunny.dev), by Vanilagy                                                | Reading media files; decoding audio and video | MPL-2.0                                             | Used unmodified, from npm; its source is at <https://github.com/Vanilagy/mediabunny>                 |
+| [wavesurfer.js](https://wavesurfer.xyz), by katspaugh and contributors                           | The waveform                                  | BSD-3-Clause                                        | Unmodified, from npm                                                                                 |
+| [Righteous](https://fonts.google.com/specimen/Righteous), by Astigmatic                          | The logo and headings                         | SIL Open Font License 1.1                           | From npm (`@fontsource/righteous`); also in `site/fonts/`                                            |
+| [Nunito](https://github.com/googlefonts/nunito), by the Nunito Project Authors                   | Everything else                               | SIL Open Font License 1.1                           | From npm (`@fontsource-variable/nunito`); also in `site/fonts/`                                      |
+| [Electron](https://www.electronjs.org), with Chromium and Node.js                                | The app around the page                       | MIT (Chromium and Node.js under their own licences) | The releases include Electron's `LICENSE` and `LICENSES.chromium.html`                               |
+| [yt-dlp](https://github.com/yt-dlp/yt-dlp)                                                       | Downloading and searching (From YouTube…)     | The Unlicense                                       | Not included: ScriBee downloads it from yt-dlp's GitHub releases on first use and checks its SHA-256 |
+
+The full licence texts of the npm packages are in each package's folder under `node_modules/` (and inside the app's `resources/app.asar` in a release).

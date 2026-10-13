@@ -1,6 +1,20 @@
+<p align="center"><img src="assets/logo.webp" width="140" alt="" /></p>
+
 # ScriBee
 
-A desktop player for transcribing music by ear. Open a song or a video, slow it down without changing the pitch (or shift the pitch without changing the speed), loop a passage, and step through it with the keyboard.
+A desktop player for transcribing music by ear. Open a song or a video, slow it down without changing the pitch (or shift the pitch without changing the speed), loop a passage, and step through it with the keyboard. For Windows, macOS and Linux; free and open source (MIT).
+
+![ScriBee playing a live video at 0.6×, looping a marked part](site/img/screenshot.webp)
+
+## Download
+
+Get the latest version from the [releases page](https://github.com/OWNER/scribee/releases/latest), or from [the website](https://OWNER.github.io/scribee/).
+
+- **Windows:** `ScriBee-…-win-x64.exe`, a portable app: nothing to install. Windows may warn about an unrecognised app the first time; choose **More info**, then **Run anyway**.
+- **macOS:** `ScriBee-…-mac-arm64.dmg` (Apple Silicon) or `…-mac-x64.dmg` (Intel). Drag it to Applications. It isn't signed by Apple, so the first time, right-click it and choose **Open**. On recent macOS: try to open it, then go to System Settings › Privacy & Security and choose **Open Anyway**. _The macOS builds haven't been tried on a Mac yet; please [report](https://github.com/OWNER/scribee/issues) how they do._
+- **Linux:** `ScriBee-…-linux-x86_64.AppImage`. Make it executable (`chmod +x ScriBee-*.AppImage`) and run it.
+
+## What it does
 
 - **Speed** from 0.25× to 3× with presets, and **pitch** shift in semitones and cents. Both use [Signalsmith Stretch](https://signalsmith-audio.co.uk/code/stretch/).
 - **A–B loop.** Shift+drag on the waveform, drag the edges to adjust, or use `[` `]` `L`.
@@ -25,6 +39,22 @@ A desktop player for transcribing music by ear. Open a song or a video, slow it 
 **The layout.** The waveform takes all the spare height; the marks sidebar is on the right, and speed, pitch, volume and EQ sit in one dock along the bottom (the EQ's bands open in a popover from **Bands**). The page itself never scrolls. The sidebar always stays in view, so the window can take half a screen (about 960 px wide) and still show everything: under 1100 px it gets narrower. In a short window (under 720 px) the dock gets more compact. The smallest window is 900 × 640.
 
 **Keyboard shortcuts:** the **?** button in the top bar (or the `?` key) lists every key, by group.
+
+## Build from source
+
+With [Node.js](https://nodejs.org) 22 or newer:
+
+```sh
+npm install
+npm start            # run it
+npm run build:linux  # or build:win, build:mac: the app for your system, in dist/
+```
+
+## Licence
+
+MIT: see [LICENSE](LICENSE). ScriBee is built on Signalsmith Stretch, Mediabunny, wavesurfer.js, Electron and the Righteous and Nunito fonts, each under its own licence: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+# Development
 
 ## Requirements
 
