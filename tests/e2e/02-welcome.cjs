@@ -45,16 +45,25 @@ module.exports = async function (h) {
     names.includes("bee-float") && names.includes("aura-breathe"),
     JSON.stringify(names),
   );
+  // They advance within a few seconds (a slow machine, like CI's, can take
+  // a while to draw its first frames, and the clocks wait for those).
   const motionBefore = await welcomeMotion();
-  await sleep(700);
-  const motionAfter = await welcomeMotion();
+  let motionAfter = motionBefore;
+  for (let waited = 0; waited < 5000 && motionAfter === motionBefore; waited += 250) {
+    await sleep(250);
+    motionAfter = await welcomeMotion();
+  }
   check("…and they move", motionBefore !== motionAfter, `${motionBefore} → ${motionAfter}`);
-  await sleep(500);
-  check(
-    "the entrance played once, and is done",
+  // The entrance ends on its own (within a few seconds, on a slow machine).
+  const settled = async () =>
     (await js(`document.getElementById("welcome").classList.contains("settled")`)) &&
-      !(await running()).includes("rise-in"),
-  );
+    !(await running()).includes("rise-in");
+  let done = await settled();
+  for (let waited = 0; waited < 5000 && !done; waited += 250) {
+    await sleep(250);
+    done = await settled();
+  }
+  check("the entrance played once, and is done", done);
   await dbg.sendCommand("Emulation.setEmulatedMedia", {
     features: [{ name: "prefers-reduced-motion", value: "reduce" }],
   });
