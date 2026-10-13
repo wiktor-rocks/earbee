@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-13: A shorter README
+
+- **What:** README.md's "What it does" is now nine one-line points instead of a detailed manual of every feature, its keys and the layout.
+- **Why:** the user found it too extensive for a README.
+- **How:** the details were dropped, not moved. The app's **?** dialog lists every key, and this CHANGELOG has the full behaviour. Download, Build from source, Licence and the Development docs are unchanged.
+- **Where:** `README.md`.
+- **Verified by:** `npm run check`.
+
 ## 2026-10-13: The landing page says plainly that ScriBee is free and open source
 
 - **What:** the landing page makes clear that ScriBee is fully free and open source:
