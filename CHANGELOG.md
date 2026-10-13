@@ -43,6 +43,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-13: Issue forms: feature request and bug report
+
+- **What:** **New issue** on GitHub now offers two forms. The website is offered as a link next to them, and blank issues are still allowed.
+  - **Feature request:** what ScriBee should do, when you'd use it, how it might work, and your system. It gets the `enhancement` label.
+  - **Bug report:** what happened, how to make it happen, the ScriBee version, and your system. It gets the `bug` label.
+- **Why:** the user asked for a feature-request form; a bug report form goes with it.
+- **How:** GitHub issue forms (`.github/ISSUE_TEMPLATE/*.yml`). They take effect from `main`.
+- **Where:** `.github/ISSUE_TEMPLATE/feature_request.yml`, `bug_report.yml`, `config.yml`.
+- **Verified by:** the YAML parses, and `npm run check` (Prettier).
+
 ## 2026-10-13: A maintainer's guide
 
 - **What:** `docs/maintaining.md` explains how to keep working on ScriBee now that it's on GitHub:

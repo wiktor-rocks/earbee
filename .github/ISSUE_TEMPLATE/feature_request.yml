@@ -1,0 +1,46 @@
+name: Feature request
+description: Something ScriBee could do to help you transcribe.
+title: "Feature: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the idea. The more you say about *what you're transcribing* and *where you get stuck*, the easier it is to get right.
+  - type: textarea
+    id: what
+    attributes:
+      label: What would you like ScriBee to do?
+      placeholder: 'e.g. "Loop the last 2 seconds with one key."'
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: When would you use it?
+      description: What you're working on, and what's hard about it today.
+      placeholder: 'e.g. "Learning bebop solos from records: I keep re-dragging the loop for short phrases."'
+    validations:
+      required: true
+  - type: textarea
+    id: how
+    attributes:
+      label: How might it work?
+      description: Optional. Keys, buttons, how another app does it, a sketch.
+  - type: dropdown
+    id: system
+    attributes:
+      label: Your system
+      options:
+        - Windows
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux
+        - Doesn't matter
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Before you send it
+      options:
+        - label: I looked through the existing issues, and this isn't one of them.
+          required: true

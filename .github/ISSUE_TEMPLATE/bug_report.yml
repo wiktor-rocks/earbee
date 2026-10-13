@@ -1,0 +1,46 @@
+name: Bug report
+description: Something in ScriBee doesn't work as it should.
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: And what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: How to make it happen
+      description: The steps, from opening the app. Say what kind of file it was (MP3, MP4 video, a YouTube download, …).
+      placeholder: |
+        1. Open a song (MP3, 4 min)
+        2. Set the speed to 0.5×
+        3. …
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ScriBee version
+      description: In the file name you downloaded (ScriBee-0.1.0-…), or on the Releases page.
+      placeholder: "0.1.0"
+    validations:
+      required: true
+  - type: dropdown
+    id: system
+    attributes:
+      label: Your system
+      options:
+        - Windows
+        - macOS (Apple Silicon)
+        - macOS (Intel)
+        - Linux
+    validations:
+      required: true
+  - type: textarea
+    id: more
+    attributes:
+      label: Anything else
+      description: Screenshots, error messages (the red text in the transport bar), your system's version.
