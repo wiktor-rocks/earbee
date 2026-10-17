@@ -158,10 +158,11 @@ function find() {
   const prepared = new Worker(new URL("../audio/beat-worker.js", import.meta.url), { type: "module" });
   worker = prepared;
 
+  // Forgets any beats found so far too (their lines, the beat step, the
+  // clicks), so nothing is left that the chip no longer accounts for.
   const fail = (reason) => {
-    stopWorker();
-    beats.status = "idle";
-    renderBeatInfo();
+    if (mine !== search) return; // stopped meanwhile, or a new file
+    resetBeats(media);
     showNotice(`Couldn't find the beats in “${name}”: ${reason}.`);
   };
   prepared.onmessage = ({ data }) => {

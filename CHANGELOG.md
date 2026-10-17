@@ -43,6 +43,18 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-17: Two beat-finding edge cases
+
+- **What:**
+  - Pressing B just as the beat model's process stops for being idle now uses the model as usual. Before, that search fell back to the simple beat finder (no bars).
+  - If a beat search fails partway, the beats found so far are forgotten with it: their lines, the beat or bar step, and the clicks. Before, the lines stayed on the waveform while the chip said "Find the beats" again.
+- **Why:** both turned up in a review of `testing` before merging it into `main`. Neither had been seen in use; the user asked for them fixed first.
+- **How:**
+  - **The model's process:** `kill()` returns before the process exits, and `child` stayed set until its `exit` event, so a window sent in between went to the dying process and failed. Now the idle stop (`stop`) forgets the process as it kills it, so the next window starts a new one. Each process keeps its own `pending` requests, so a late `exit` from the old one fails only its own (none), not the new one's.
+  - **A failed search:** `fail` now calls `resetBeats(media)`, which also stops the search and puts a beat or bar step back to the default. It does nothing for a search that's no longer the latest (`mine !== search`), so a late failure can't wipe a newer file's beats.
+- **Where:** `electron/beat-model.js` (`createBeatModel`: `start`, `stop`, `run`); `src/features/beats.js` (`find`'s `fail`).
+- **Verified by:** new `tests/unit/beat-model.test.mjs` with a fake utility process: it starts on the first window; it stops after a minute idle, never while a window runs; a window sent while an idle process is still exiting goes to a new process and is answered (this test fails on the old code); a process that dies fails only its own windows. `npm run check`, the unit tests (269), `tests/e2e/20-beats.cjs` (41) and the smoke test (28). Making a search fail partway would need a fault in the model's answers, which the tests can't inject, so the second fix was checked by reading the code.
+
 ## 2026-10-17: Twelve speed presets, finer at the slow end
 
 - **What:** the Speed group has 12 preset buttons instead of 8: 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.75, 0.8, 0.9 and 1×. The group is now two columns: the title and the slider on the left, the presets on the right, their first row level with the "Speed" title. The presets sit in two rows of six; under 1100 px wide, three rows of four.

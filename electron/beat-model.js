@@ -25,45 +25,60 @@ const MODEL = unpacked(path.join(__dirname, "..", "models", "beat-this-small.onn
 const SCRIPT = path.join(__dirname, "beat-model-process.js");
 
 function createBeatModel(utilityProcess) {
-  let child = null;
+  let child = null; // { process, pending: id → resolve }, while one runs
   let idleTimer = null;
   let nextId = 1;
-  const pending = new Map(); // id → resolve
 
   function start() {
-    child = utilityProcess.fork(SCRIPT, [MODEL], { serviceName: "EarBee beat model" });
-    child.on("message", (message) => {
-      const resolve = pending.get(message?.id);
-      pending.delete(message?.id);
+    const started = {
+      process: utilityProcess.fork(SCRIPT, [MODEL], { serviceName: "EarBee beat model" }),
+      pending: new Map(),
+    };
+    started.process.on("message", (message) => {
+      const resolve = started.pending.get(message?.id);
+      started.pending.delete(message?.id);
       resolve?.(message.ok ? { ok: true, beat: message.beat, downbeat: message.downbeat } : message);
     });
-    child.on("exit", (code) => {
-      child = null;
-      for (const resolve of pending.values()) resolve({ ok: false, error: `the beat model stopped (${code})` });
-      pending.clear();
+    // Only this process's own requests fail with it: a process stopped
+    // for being idle may exit after a new one has started.
+    started.process.on("exit", (code) => {
+      if (child === started) child = null;
+      for (const resolve of started.pending.values()) resolve({ ok: false, error: `the beat model stopped (${code})` });
+      started.pending.clear();
     });
+    return started;
+  }
+
+  // Forgotten as it's stopped, so a window that comes before it has
+  // exited starts a new process instead of going to the dying one.
+  function stop() {
+    clearTimeout(idleTimer);
+    const stopping = child;
+    child = null;
+    stopping?.process.kill();
   }
 
   function stopWhenIdle() {
     clearTimeout(idleTimer);
-    idleTimer = setTimeout(() => child?.kill(), IDLE_MS);
+    idleTimer = setTimeout(stop, IDLE_MS);
   }
 
   return {
     /** @param {Float32Array} input */
     run(input) {
-      if (!child) start();
+      child ??= start();
       clearTimeout(idleTimer);
       const id = nextId++;
+      const current = child;
       return new Promise((resolve) => {
-        pending.set(id, (answer) => {
-          if (!pending.size) stopWhenIdle();
+        current.pending.set(id, (answer) => {
+          if (child && !child.pending.size) stopWhenIdle();
           resolve(answer);
         });
-        child.postMessage({ id, input });
+        current.process.postMessage({ id, input });
       });
     },
-    stop: () => child?.kill(),
+    stop,
   };
 }
 
