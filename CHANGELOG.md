@@ -56,7 +56,7 @@ The architecture overview, the file map and a list of where to make common chang
     - On its first start, EarBee takes over ScriBee's settings: the theme, the window, the download folder and the rest.
     - Project files are now `.ebee`. Rename a `.sbee` file to `.ebee` to open it; the content is the same.
     - New downloads go to `Downloads/EarBee`, unless you chose another folder.
-  - **Good to know:** the beat model adds about 45 MB to the download. Intel Macs can't run it, so they find beats with the simple finder, without bars.
+  - **Good to know:** the beat model makes the downloads about 25–30 MB larger (about 45 MB once unpacked; the Intel Mac build 8 MB, without ONNX Runtime). Intel Macs can't run it, so they find beats with the simple finder, without bars.
 - **Why:** the user asked for a new release of what was on `testing`, and chose 0.2.0 (new features, while 1.0.0 waits until the Mac builds have been tried).
 - **How:** `npm version 0.2.0 --no-git-tag-version`, then `main` moved up to `testing` and tagged `v0.2.0`, which builds the release (docs/maintaining.md, "Putting out a new version").
 - **Where:** `package.json`, `package-lock.json`.
