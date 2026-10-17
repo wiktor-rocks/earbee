@@ -74,3 +74,65 @@ describe("bars across canvases", () => {
     });
   }
 });
+
+// The continuous shape's top edge on each canvas, as [x, y] in its own
+// pixels, for a track of `values` levels.
+function drawShapes(ratio, values) {
+  const levels = Float32Array.from({ length: values }, (_, i) => 0.2 + 0.7 * Math.abs(Math.sin(i / 37)));
+  const look = { ...LOOK, style: "continuous" };
+  const both = { top: { peak: levels, rms: levels }, bottom: { peak: levels, rms: levels } };
+  const canvases = [];
+  for (let left = 0; left < TRACK_CSS; left += CANVAS_CSS) {
+    const width = Math.min(CANVAS_CSS, TRACK_CSS - left);
+    const canvas = { width: Math.round(width * ratio), height: Math.round(HEIGHT_CSS * ratio), style: {} };
+    const points = [];
+    const ctx = {
+      canvas,
+      beginPath() {},
+      moveTo: (x, y) => points.push([x, y]),
+      lineTo: (x, y) => points.push([x, y]),
+      closePath() {},
+      fill() {},
+    };
+    const start = Math.floor((left / TRACK_CSS) * values);
+    const end = Math.floor(((left + width) / TRACK_CSS) * values);
+    drawWaveform(/** @type {any} */ (ctx), both, start, end - start, look, { pixelRatio: ratio });
+    // The top edge runs left to right; the bottom comes back.
+    const turn = points.findIndex((point, i) => i > 0 && point[0] <= points[i - 1][0]);
+    canvases.push({ width: canvas.width, top: points.slice(0, turn) });
+  }
+  return canvases;
+}
+
+// The top edge's height at `x`, between the points either side.
+function heightAt(top, x) {
+  const after = top.findIndex(([px]) => px >= x);
+  const [x0, y0] = top[after - 1];
+  const [x1, y1] = top[after];
+  return y0 + ((y1 - y0) * (x - x0)) / (x1 - x0);
+}
+
+describe("the continuous shape across canvases", () => {
+  // Several levels per pixel (5000), and zoomed in past one per pixel (600).
+  for (const values of [5000, 600]) {
+    for (const ratio of [1, 1.25, 2]) {
+      test(`${values} levels at ${ratio * 100} %: it runs on across each seam`, () => {
+        const canvases = drawShapes(ratio, values);
+        for (let k = 1; k < canvases.length; k++) {
+          const before = heightAt(canvases[k - 1].top, canvases[k - 1].width);
+          const after = heightAt(canvases[k].top, 0);
+          assert.ok(Math.abs(before - after) <= 1, `seam ${k}: ${before} vs ${after}`);
+        }
+      });
+    }
+  }
+
+  test("its edge slopes from column to column: no flat steps", () => {
+    const [first] = drawShapes(2, 600);
+    const xs = first.top.map(([x]) => x);
+    assert.ok(
+      xs.every((x, i) => i === 0 || x > xs[i - 1]),
+      "one point per column, left to right",
+    );
+  });
+});

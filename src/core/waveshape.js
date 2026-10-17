@@ -160,9 +160,12 @@ export function shapeOverview(levels, { window = 1 } = {}) {
 
 /**
  * The value of each of `columns` columns showing `count` values of
- * `series` from `start` (see rangeLevel for `combine`). Zoomed in past one
- * value per column, a column shows the value it falls on, so there are no
- * gaps.
+ * `series` from `start` (see rangeLevel for `combine`). Both may be
+ * fractional, and may reach past the slice a canvas shows (the drawing
+ * asks for a column beyond each edge): columns read the whole series, and
+ * past its ends repeat its first or last value. Zoomed in past one value
+ * per column, a column takes the value at its middle, interpolated
+ * between its neighbours, so the shape slopes instead of stepping.
  * @param {ArrayLike<number>} series
  * @param {number} start
  * @param {number} count
@@ -171,14 +174,30 @@ export function shapeOverview(levels, { window = 1 } = {}) {
  */
 export function columnLevels(series, start, count, columns, combine = "max") {
   const out = new Float32Array(Math.max(0, columns));
-  const last = Math.min(series.length, start + count) - 1;
-  if (last < start) return out;
+  if (!series.length || !(count > 0)) return out;
+  const perColumn = count / columns;
+  // A hair over, so a boundary that is a whole index in theory isn't
+  // floored one short by rounding (start − perColumn + perColumn ≠ start).
+  const index = (at) => Math.floor(at + 1e-9);
   for (let c = 0; c < out.length; c++) {
-    const from = start + Math.floor((c * count) / columns);
-    const to = Math.min(last + 1, start + Math.floor(((c + 1) * count) / columns));
-    out[c] = to <= from ? series[Math.min(from, last)] : rangeLevel(series, from, to, combine);
+    const from = Math.max(0, index(start + c * perColumn));
+    const to = Math.min(series.length, index(start + (c + 1) * perColumn));
+    out[c] =
+      perColumn >= 1 && to > from
+        ? rangeLevel(series, from, to, combine)
+        : levelAt(series, start + (c + 0.5) * perColumn - 0.5);
   }
   return out;
+}
+
+// The value at a fractional index, between its two neighbours (the first
+// or last value outside the series).
+function levelAt(series, at) {
+  const last = series.length - 1;
+  const position = at < 0 ? 0 : at > last ? last : at;
+  const i = Math.floor(position);
+  const next = i < last ? series[i + 1] : series[i];
+  return series[i] + (next - series[i]) * (position - i);
 }
 
 /**

@@ -179,15 +179,29 @@ describe("column levels", () => {
     assert.equal(columnLevels(one, 0, 4, 1)[0], 1); // "max" by default
   });
 
-  test("zoomed in past one value per column: no gaps", () => {
-    const columns = columnLevels(series, 2, 2, 8); // 0.2 and 0.9 over 8 columns
-    assert.equal(columns.length, 8);
+  test("zoomed in past one value per column: interpolated, so the shape slopes instead of stepping", () => {
+    // 0.2 and 0.9 over 8 columns; the edges lean towards the neighbours
+    // outside the slice (0.5 before, 0.3 after).
+    const columns = [...columnLevels(series, 2, 2, 8)].map((v) => +v.toFixed(4));
+    assert.deepEqual(columns, [0.3125, 0.2375, 0.2875, 0.4625, 0.6375, 0.8125, 0.825, 0.675]);
     assert.ok(
-      columns.every((v) => v === series[2] || v === series[3]),
-      [...columns].join(),
+      columns.every((v, i) => i === 0 || v !== columns[i - 1]),
+      "no flat steps",
     );
-    assert.equal(columns[0], series[2]);
-    assert.equal(columns[7], series[3]);
+  });
+
+  test("a fractional start, and columns past the ends of the series", () => {
+    assert.deepEqual(
+      [...columnLevels(series, 1.5, 4, 2)].map((v) => +v.toFixed(2)),
+      [0.5, 0.9],
+    );
+    const wide = columnLevels(series, -2, 12, 6); // one column before the start, one after the end
+    assert.equal(+wide[0].toFixed(2), 0.1, "before the start: the first value");
+    assert.equal(wide[5], 0, "after the end: the last value");
+    assert.deepEqual(
+      [...wide.subarray(1, 5)].map((v) => +v.toFixed(2)),
+      [0.5, 0.9, 0.4, 0.8],
+    );
   });
 });
 

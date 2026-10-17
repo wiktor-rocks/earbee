@@ -43,6 +43,17 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-17: A smoother continuous waveform
+
+- **What:** the Continuous and Peak + loudness shapes, and the minimap, have smooth sloping outlines instead of a blocky, pixelated edge. Zoomed in past the drawn detail, they slope between levels instead of stepping. Bars are unchanged.
+- **Why:** the user found the continuous waveform blocky and low-resolution.
+- **How:** the canvases were already at the screen's full resolution. The edge itself was the problem: every pixel column was drawn as a flat step, with a sharp vertical jump to the next column on a pixel boundary. Nothing was anti-aliased, so the edge looked like a staircase. Zoomed in, a level was repeated across several columns, making wider steps. Now:
+  - the outline is a line through the middle of each column, which the canvas smooths;
+  - when a column holds less than one level, `columnLevels` interpolates between the two nearest levels instead of repeating one;
+  - each canvas also draws one column past either edge, read from the whole track, so the line runs on into the next canvas without a jump. `columnLevels` therefore takes fractional `start`/`count` and reads past the slice, repeating the first or last value beyond the track's ends.
+- **Where:** `src/waveform-draw.js` (`drawWaveform`, `fillShape`); `src/core/waveshape.js` (`columnLevels`, `levelAt`).
+- **Verified by:** `waveshape.test.mjs`: interpolated columns with no flat runs, and a fractional start with columns past the ends. `waveform-draw.test.mjs`: the shape's edge meets within 1 px at every seam, at 100, 125 and 200 %, with several levels per pixel and with fewer than one, and slopes from column to column. All of these fail on the old code. `npm run test:unit` (211 pass) and `npm run check` pass, as do the waveform e2e tests (topic 17).
+
 ## 2026-10-17: Bug hunt: four fixes
 
 A read-through of the risky code (transport, marks, timeline, projects, opening files, decoder, main process, downloader) for real bugs.

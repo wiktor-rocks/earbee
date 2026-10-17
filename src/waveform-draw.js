@@ -12,7 +12,7 @@ import { columnLevels, combineFor, rangeLevel } from "./core/waveshape.js";
  * the two tones.
  *
  *   bars        rounded bars with small gaps (light, the default)
- *   continuous  one filled shape, a column per pixel
+ *   continuous  one filled shape, its outline through every pixel column
  *   twoTone     the peaks as a pale shape around the loudness, solid
  *
  * Bars and continuous show the loudness or the peaks (`measure`). The top
@@ -20,9 +20,10 @@ import { columnLevels, combineFor, rangeLevel } from "./core/waveshape.js";
  * left above and right below).
  *
  * WaveSurfer draws a zoomed-in track on several canvases side by side. The
- * shapes fill each canvas column by column, so they meet at its edges;
- * the bars are laid out on the whole track instead (see fillBars), so
- * their gaps stay even where two canvases meet.
+ * shapes reach one column past each edge of a canvas, read from the whole
+ * track, so they run on into the next canvas; the bars are laid out on
+ * the whole track instead (see fillBars), so their gaps stay even where
+ * two canvases meet.
  * ===================================================================== */
 
 const BAR_WIDTH = 2; // CSS px
@@ -50,8 +51,12 @@ export function drawWaveform(ctx, shaped, start, count, appearance, track = {}) 
     return;
   }
 
-  // The shapes: a value per pixel column.
-  const columnsOf = (side, of) => columnLevels(shaped[side][of], start, count, canvas.width, combineFor(of));
+  // The shapes: a value per pixel column, plus the column just outside
+  // each edge (from the neighbouring canvases' values), so the outline
+  // runs on to where the next canvas picks it up.
+  const perColumn = count / canvas.width;
+  const columnsOf = (side, of) =>
+    columnLevels(shaped[side][of], start - perColumn, count + 2 * perColumn, canvas.width + 2, combineFor(of));
   if (appearance.style === "twoTone") {
     ctx.globalAlpha = PEAK_ALPHA;
     fillShape(ctx, columnsOf("top", "peak"), columnsOf("bottom", "peak"), ratio);
@@ -106,25 +111,21 @@ function fillBars(ctx, shaped, kind, ratio, trackWidth) {
   ctx.fill();
 }
 
-// One closed shape: along the top edge, back along the bottom, at least
-// half a pixel either side of the middle.
+// One closed shape: a line through the middle of every column, along the
+// top edge and back along the bottom, at least half a pixel either side
+// of the middle. Lines between the middles slope (and are smoothed by the
+// canvas), where flat steps a column wide looked blocky. The first and
+// last values are the columns just outside the canvas, which it clips.
 function fillShape(ctx, top, bottom, ratio) {
   const { width, height } = ctx.canvas;
   const half = height / 2;
-  const step = width / top.length;
+  const step = width / (top.length - 2);
   const least = ratio / 2;
+  const x = (i) => (i - 0.5) * step; // the middle of column i − 1
   ctx.beginPath();
-  ctx.moveTo(0, half - Math.max(least, top[0] * half));
-  for (let c = 0; c < top.length; c++) {
-    const y = half - Math.max(least, top[c] * half);
-    ctx.lineTo(c * step, y);
-    ctx.lineTo((c + 1) * step, y);
-  }
-  for (let c = bottom.length - 1; c >= 0; c--) {
-    const y = half + Math.max(least, bottom[c] * half);
-    ctx.lineTo((c + 1) * step, y);
-    ctx.lineTo(c * step, y);
-  }
+  ctx.moveTo(x(0), half - Math.max(least, top[0] * half));
+  for (let i = 1; i < top.length; i++) ctx.lineTo(x(i), half - Math.max(least, top[i] * half));
+  for (let i = bottom.length - 1; i >= 0; i--) ctx.lineTo(x(i), half + Math.max(least, bottom[i] * half));
   ctx.closePath();
   ctx.fill();
 }
