@@ -63,7 +63,7 @@ async function fillDownloads() {
     });
     if (response.status === 404) {
       setText("[data-release]", "No release yet: build it from source below.");
-      setText("[data-release-long]", "There's no release yet. Until there is, build it from source (below).");
+      setText("[data-release-long]", "No release yet. Build it from source (below).");
       return;
     }
     if (!response.ok) return; // rate-limited or offline: the links still go to the releases page
@@ -75,7 +75,7 @@ async function fillDownloads() {
   const date = new Date(release.published_at).toLocaleDateString(undefined, { dateStyle: "medium" });
   const version = release.tag_name.replace(/^v/, "");
   setText("[data-release]", `Version ${version} · ${date} · Windows, macOS and Linux`);
-  setText("[data-release-long]", `Version ${version}, released ${date}. Free and open source, for good.`);
+  setText("[data-release-long]", `Version ${version}, released ${date}.`);
   for (const [download, pattern] of Object.entries(FILES)) {
     const asset = release.assets.find((candidate) => pattern.test(candidate.name));
     if (!asset) continue; // no build for it in this release: its button stays on the release page
@@ -109,29 +109,64 @@ function drawWave() {
   wave.replaceChildren(...bars);
 }
 
+const root = document.documentElement;
+const systemLight = matchMedia("(prefers-color-scheme: light)");
+// The page's mode: the one chosen with the button in the top bar, else the
+// system's.
+const currentMode = () => root.dataset.theme ?? (systemLight.matches ? "light" : "dark");
+
+// The screenshot and the clips are recorded in both of EarBee's themes
+// (scripts/record-site-media.cjs) and show the page's mode. The
+// screenshot's <picture> follows the system by itself; a mode chosen with
+// the button overrides its media query. A clip gets its file here, and
+// its poster, the .webp beside it.
+function showModeMedia() {
+  const mode = currentMode();
+  for (const source of document.querySelectorAll(".shot picture source")) {
+    source.media = mode === "light" ? "all" : "not all";
+  }
+  for (const video of document.querySelectorAll("video[data-dark]")) {
+    const file = video.dataset[mode];
+    if (video.getAttribute("src") === file) continue;
+    video.poster = file.replace(/\.mp4$/, ".webp");
+    video.src = file;
+  }
+}
+
 // The button in the top bar: switches between EarBee's dark and light
 // themes, and remembers the choice (until then, the system's is used).
 function setUpThemeSwitch() {
-  const root = document.documentElement;
-  const systemLight = matchMedia("(prefers-color-scheme: light)");
-  const current = () => root.dataset.theme ?? (systemLight.matches ? "light" : "dark");
-  const showColour = () =>
+  const showMode = () => {
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute("content", current() === "light" ? "#f5f1e8" : "#0e1014");
-  showColour();
-  systemLight.addEventListener("change", showColour);
+      ?.setAttribute("content", currentMode() === "light" ? "#f5f1e8" : "#0e1014");
+    showModeMedia();
+  };
+  showMode();
+  systemLight.addEventListener("change", showMode);
   document.querySelector(".theme-switch")?.addEventListener("click", () => {
-    root.dataset.theme = current() === "light" ? "dark" : "light";
+    root.dataset.theme = currentMode() === "light" ? "dark" : "light";
     try {
       localStorage.setItem("theme", root.dataset.theme);
     } catch {
       // not remembered (private window, blocked storage): fine for this visit
     }
-    showColour();
+    showMode();
   });
 }
 
+// The clips play by themselves, silent and looping. With reduced motion
+// they stay still (their poster) and get controls instead.
+function calmClips() {
+  if (!matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  for (const video of document.querySelectorAll(".clip video")) {
+    video.autoplay = false;
+    video.pause();
+    video.controls = true;
+  }
+}
+
+calmClips(); // before the clips get their files, so they don't start
 setUpThemeSwitch();
 fillDownloads();
 drawWave();

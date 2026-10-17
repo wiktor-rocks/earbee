@@ -108,6 +108,19 @@ h3 {
   font-weight: 400;
   line-height: 1.1;
   margin: 0;
+  text-wrap: balance;
+}
+/* No lone word on a paragraph's last line. */
+p,
+li,
+dd {
+  text-wrap: pretty;
+}
+/* A key combination (Shift + ]) stays on one line: one box, as nowrap
+   alone still lets a line break between the keycaps' boxes. */
+.combo {
+  display: inline-block;
+  white-space: nowrap;
 }
 
 code {
@@ -248,17 +261,8 @@ kbd {
   flex-wrap: wrap;
   gap: 12px;
 }
-/* Free and open source: said plainly, right under the download button. */
-.free-line {
-  margin: 18px 0 0;
-  font-size: 16px;
-}
-.free-line strong {
-  color: var(--accent-text);
-}
-
 .release-note {
-  margin: 6px 0 0;
+  margin: 16px 0 0;
   color: var(--muted);
   font-size: 14px;
 }
@@ -349,10 +353,39 @@ kbd {
   align-self: center;
 }
 
+/* On a phone or tablet ("phone" on <html>, set in index.html's head),
+   which can't run EarBee, this note takes the download buttons' place. */
+.phone-note {
+  display: none;
+  max-width: 30em;
+  margin: 0;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-left: 4px solid var(--accent);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 16px;
+}
+.phone-note strong {
+  color: var(--text);
+}
+.phone-note .button {
+  display: flex;
+  justify-content: center;
+  margin-top: 14px;
+}
+.phone .phone-note {
+  display: block;
+}
+.phone .cta {
+  display: none;
+}
+
 /* ---------- Screenshot ---------- */
 
 .shot {
-  width: min(1017px, var(--page)); /* the screenshot's own width: never blown up */
+  width: min(1017px, var(--page)); /* at most this wide, a little under the screenshot's own 1280 px */
   margin: 72px auto 0;
 }
 .shot-frame {
@@ -364,6 +397,7 @@ kbd {
     0 30px 80px -30px rgb(0 0 0 / 0.6),
     0 0 0 6px color-mix(in srgb, var(--surface-2) 60%, transparent);
 }
+.shot picture,
 .shot img {
   display: block;
   width: 100%;
@@ -413,6 +447,101 @@ section h2 {
   font-size: clamp(30px, 4vw, 42px);
   margin-bottom: 28px;
 }
+/* From What it does on, a short amber bar above each section's title. */
+.what h2::before,
+.keys h2::before,
+.themes h2::before,
+.download h2::before {
+  content: "";
+  display: block;
+  width: 36px;
+  height: 4px;
+  margin-bottom: 16px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+/* The line under a section's title. */
+.section-intro {
+  max-width: 36em;
+  margin: -12px 0 28px;
+  color: var(--muted);
+}
+
+/* ---------- Beats and looping by the bar ---------- */
+
+.beats h2 {
+  font-size: clamp(32px, 4.6vw, 52px);
+}
+/* A clip and its text side by side, the clip on the left (or, .flip, on
+   the right); one under the other on narrow screens, clip first. */
+.spotlight {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  align-items: center;
+  gap: 48px;
+  margin-top: 56px;
+}
+.spotlight.flip {
+  grid-template-columns: 1fr 1.3fr;
+}
+.spotlight.flip .clip {
+  order: 2;
+}
+.spotlight h3 {
+  font-size: clamp(24px, 2.6vw, 30px);
+}
+.spotlight-text > p {
+  margin: 14px 0 0;
+  color: var(--muted);
+}
+.spotlight kbd {
+  font-size: 12px;
+  padding: 0 6px;
+}
+/* A list with amber ticks, like the played part of a waveform. */
+.ticks {
+  list-style: none;
+  margin: 18px 0 0;
+  padding: 0;
+}
+.ticks li {
+  position: relative;
+  padding: 8px 0 8px 20px;
+  border-top: 1px solid var(--border);
+  font-size: 16px;
+}
+.ticks li::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 15px;
+  width: 4px;
+  height: 13px;
+  border-radius: 2px;
+  background: var(--accent);
+}
+.small-print {
+  font-size: 14px;
+}
+
+/* A clip's frame: the video at its own shape (--ratio, width / height),
+   framed like the screenshot. */
+.clip {
+  position: relative;
+  aspect-ratio: var(--ratio, 16 / 10);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  overflow: hidden;
+  background: var(--surface);
+  box-shadow: 0 24px 60px -30px rgb(0 0 0 / 0.55);
+}
+.clip video,
+.clip img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
 
 .features {
   margin: 0;
@@ -421,11 +550,23 @@ section h2 {
   column-gap: 56px;
 }
 .features > div {
+  position: relative;
   padding: 18px 0;
   border-top: 1px solid var(--border);
   display: grid;
   grid-template-columns: 11em 1fr;
   gap: 16px;
+}
+/* Each item's rule starts amber, like the played part of a waveform. */
+.features > div::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: -1px;
+  width: 40px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
 }
 .features dt {
   font-weight: 800;
@@ -458,24 +599,27 @@ section h2 {
   background: var(--surface);
 }
 .keylist li {
-  display: flex;
+  display: grid;
+  grid-template-columns: 6.6em 1fr;
   align-items: center;
-  gap: 6px;
-  padding: 11px 18px;
+  gap: 12px;
+  padding: 10px 18px;
+}
+.keylist .k {
+  display: flex;
+  gap: 4px;
+}
+.keylist kbd {
+  min-width: 24px;
+  padding: 1px 6px;
 }
 .keylist li + li {
   border-top: 1px solid var(--border);
 }
-.keylist span {
-  margin-left: 12px;
+.keylist .k + span {
   color: var(--muted);
 }
 
-.themes > p {
-  max-width: 36em;
-  margin: -12px 0 24px;
-  color: var(--muted);
-}
 .swatches {
   list-style: none;
   margin: 0;
@@ -523,11 +667,6 @@ section h2 {
 }
 
 /* Free, the whole thing: four plain promises in two columns. */
-.free-intro {
-  max-width: 36em;
-  margin: -12px 0 24px;
-  color: var(--muted);
-}
 .free-list {
   list-style: none;
   margin: 0;
@@ -557,10 +696,6 @@ section h2 {
   color: var(--text);
 }
 
-.download-intro {
-  margin: -12px 0 28px;
-  color: var(--muted);
-}
 .platforms {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -580,9 +715,14 @@ section h2 {
   color: var(--muted);
   font-size: 15px;
 }
+.platform-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
 /* A second download beside the button (the Intel Mac's). */
 .platform .alt {
-  margin-left: 14px;
   color: var(--muted);
   font-size: 15px;
   font-weight: 700;
@@ -622,6 +762,9 @@ section h2 {
   color: var(--muted);
   font-size: 15px;
 }
+.elsewhere code {
+  white-space: nowrap;
+}
 
 footer {
   width: var(--page);
@@ -638,36 +781,86 @@ footer p {
   margin: 0;
 }
 
-/* ---------- Narrow screens ---------- */
+/* ---------- Narrower screens ----------
+   Under 1100 px the download buttons fill their cards; under 1000 px the
+   top bar drops its least-needed links; under 860 px (tablets) the hero's
+   bee goes and everything goes to one column, clips above their text; under
+   600 px (phones) spacing and type tighten, the h1 wraps by itself, and
+   the top bar keeps the brand, Download and the theme switch. */
+
+/* Three narrow download cards: every download a full-width button, the
+   Mac's two one under the other, rather than wrapping as they fit. */
+@media (max-width: 1100px) {
+  .platform .button,
+  .platform .alt {
+    display: flex;
+    align-items: baseline;
+    justify-content: center;
+    gap: 8px;
+    width: 100%;
+  }
+  .platform-buttons {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .platform .alt {
+    padding: 10px 20px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    text-decoration: none;
+  }
+  .platform .alt:hover {
+    border-color: var(--muted);
+  }
+}
+
+@media (max-width: 999px) {
+  .top nav a[href="#keys"],
+  .top nav a[data-link="repo"] {
+    display: none;
+  }
+}
 
 @media (max-width: 860px) {
   .hero {
     grid-template-columns: 1fr;
     padding-top: 24px;
   }
+  /* The bee in the top bar is enough here. */
   .hero-bee {
-    order: -1;
-    justify-items: start;
-  }
-  .hero-bee img {
-    width: 100px;
-  }
-  .hero-bee::before {
-    left: 50px;
-    width: 220px;
+    display: none;
   }
   .features,
   .keys,
   .platforms,
-  .free-list {
+  .free-list,
+  .spotlight,
+  .spotlight.flip {
     grid-template-columns: 1fr;
+  }
+  .spotlight {
+    gap: 22px;
+    margin-top: 44px;
+  }
+  .spotlight.flip .clip {
+    order: 0;
   }
   .keys {
     gap: 24px;
   }
+  .shot {
+    margin-top: 48px;
+  }
 }
 
-@media (max-width: 560px) {
+@media (max-width: 600px) {
+  body {
+    font-size: 16px;
+  }
+  .top {
+    padding: 12px 0;
+  }
   .brand img {
     width: 42px;
     height: auto;
@@ -675,23 +868,77 @@ footer p {
   .wordmark {
     font-size: 25px;
   }
-  .top nav a:not([href="#download"]) {
+  .top nav {
+    gap: 10px;
+  }
+  .top nav a:not(.nav-download) {
     display: none;
+  }
+  /* A button-sized target for a thumb. */
+  .top nav .nav-download {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--text);
+  }
+  .theme-switch {
+    width: 44px;
+    height: 44px;
+    margin-left: 0;
+  }
+  .hero h1 br {
+    display: none;
+  }
+  .hero h1 {
+    font-size: clamp(36px, 10.5vw, 48px);
+  }
+  .lede {
+    font-size: 17px;
+    margin: 18px 0 24px;
+  }
+  .beats h2 br {
+    display: none;
+  }
+  main > section:not(.hero) {
+    padding-top: 56px;
+  }
+  section h2 {
+    margin-bottom: 20px;
+  }
+  .section-intro {
+    margin: -6px 0 22px;
   }
   .features > div {
     grid-template-columns: 1fr;
     gap: 4px;
   }
   .keylist li {
-    flex-wrap: wrap;
+    grid-template-columns: 7em 1fr;
+    gap: 10px;
+    padding: 10px 14px;
+    font-size: 15px;
   }
-  .keylist span {
-    margin-left: 0;
-    flex-basis: 100%;
+  .platform {
+    padding: 20px;
   }
   .wave {
     margin-top: 48px;
     height: 40px;
+  }
+  footer {
+    margin-top: 64px;
+    align-items: flex-start;
+  }
+}
+
+/* A narrow window on a computer: the download buttons take the width. */
+@media (max-width: 480px) {
+  .cta .button {
+    flex: 1 1 100%;
+    justify-content: center;
   }
 }
 

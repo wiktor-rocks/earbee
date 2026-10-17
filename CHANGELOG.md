@@ -43,6 +43,24 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-17: The landing page: beats and loops, demos from the app, phones
+
+- **What:**
+  - **A section on the beats** ("It hears the beat. You loop the bar."): finding the beats and bars, and looping a bar then the next, each beside a looping clip of the app. "What it does" gains "Beats and bars", the keys list gains `B`, `\`, `=` `-` and Shift+`[` `]`, and the credits add Beat This! and ONNX Runtime. The top bar's "Beats" link goes to the new section.
+  - **A new screenshot and two clips, recorded from the app**, each in a dark (EarBee) and a light (EarBee Light) version, with the Peak + loudness waveform. The page shows the version for its mode, and swaps them when the mode changes. The old screenshot, which still said "TranscriBee", is gone.
+  - **Shorter, concrete text** throughout: one idea per sentence, the key and what it does.
+  - **Phones and small screens:** a phone or tablet is told that EarBee is a desktop app instead of being offered a download; the top bar keeps the logo, a thumb-sized Download button and the theme switch; the hero's big bee is hidden under 860 px; key combinations and the build command don't break across lines; headings and paragraphs avoid a lone last word; under 1100 px every download is a full-width button, so the Mac card's two sit one under the other.
+  - **A little amber in the second half:** a short bar above each section title from "What it does" on, and an amber start to each divider line in "What it does".
+  - The hero's "Free and open source" line is gone; the Free section right below says it in full.
+- **Why:** the user asked for the page to talk about the 0.2.0 features with screenshots and clips, in plainer words, and to work on phones; then for the details above as they reviewed it on a local server.
+- **How:**
+  - **The demos:** a stock concert video (Pexels 16803490, whose own soundtrack is silent) with 19 s of "Rock City Ransom" by Ragnar Random (OpenGameArt, CC0) under it. `scripts/record-site-media.cjs` drives the real app offscreen through the e2e harness: each scene opens the file, zooms the waveform in and presses real keys; the clips' frames come from the offscreen window's paint events and go to ffmpeg at 30 fps. It records every scene in both themes and writes `site/img/clip-*-{dark,light}.{mp4,webp}` and `screenshot-{dark,light}.webp`, 1.4 MB together.
+  - **Which version shows:** the screenshot is a `<picture>` whose `<source>` follows the system; the clips name their files in `data-dark` / `data-light`. `showModeMedia` in `download.js` gives each the page's mode (a mode chosen with the button overrides the system's), at load, on the button, and when the system changes. Without JavaScript the screenshot still shows.
+  - **Phones:** the head script adds `phone` to `<html>` on a phone or tablet (including an iPad that reports itself as a Mac), which swaps the hero's buttons for the note, before the page shows.
+  - The section's order is back to the original: the Free section sits right after the hero, as its own spacing assumes.
+- **Where:** `site/index.html`, `site/style.css`, `site/download.js` (`showModeMedia`, `currentMode`, `calmClips`), `site/README.md` (the demos, and how to make them again), `site/img/`; new `scripts/record-site-media.cjs`; `eslint.config.js` (`scripts/**/*.cjs` as Node).
+- **Verified by:** `npm run check`. The page rendered offscreen at 390, 600, 768, 1024, 1280 and 1600 px, dark and light, with nothing wider than the window. In a browser: a dark system gets the dark set, playing; the theme button swaps everything to light; a light system gets the light set; with reduced motion the clips stay paused on their posters, with controls. Every recorded frame was looked at for leftover hover labels and notifications.
+
 ## 2026-10-17: Version 0.2.0
 
 - **What:** EarBee 0.2.0, the first release under the new name. Details are in the entries below, back to "A splash window while the app starts".
