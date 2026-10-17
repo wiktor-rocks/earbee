@@ -9,3 +9,6 @@ tests/output/
 # Local editor / assistant settings
 .claude/settings.local.json
 .claude/.cc-writes/
+
+# Notes kept on this computer only (open threads between sessions)
+FOR-TOMORROW.md

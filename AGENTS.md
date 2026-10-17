@@ -11,6 +11,7 @@ A desktop player for transcribing music (Electron). There's no build step: the p
 
 ## Read first
 
+0. **`FOR-TOMORROW.md`, if it exists:** the owner's open threads from earlier sessions, what's in flight and what's to decide. It's kept on the owner's computer only (git ignores it), so it may be missing. Check it before starting, and keep it current: add what you leave half-done, with the next step, and delete what you finish. Never commit it.
 1. **The comment at the top of `src/app.js`:** the architecture, every file and its role, and "COMMON CHANGES", which says where to make the usual changes.
 2. **[docs/glossary.md](docs/glossary.md):** the app's words ("start point", "region", "Peak + loudness", "the dock") and their names in the code.
 3. **Imports only go downward** through the page's layers: `core`, `themes`, `search` → `prefs`, `marks`, `project` → `config` → `audio`, `video`, `waveform`, `timeline` → `context` → `ui` → `features` → `app.js`. ESLint enforces it (`eslint.config.js`); a forbidden import fails `npm run check`.

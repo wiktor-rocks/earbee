@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-18: FOR-TOMORROW.md, the open threads between sessions (local only)
+
+- **What:** a file kept on the user's computer only, `FOR-TOMORROW.md` at the top of the folder (git ignores it), for what's still important but not done: in flight, to decide, not tried yet, parked ideas, good to know. Each entry says what it is, why it matters and the next step. AGENTS.md lists it first under "Read first", so an assistant starting fresh (after the context was cleared) checks it, and keeps it current.
+- **Why:** the user clears the assistant's context between working sessions and wants the open threads to survive that, on their own computer, not on GitHub.
+- **How:** it's a plain file the user can read and edit, not an assistant's private notes. `.gitignore` lists it, so it's never committed; AGENTS.md says to read it if it exists, and never to commit it. Finished threads are deleted from it; the CHANGELOG keeps the record. It starts with: CI on the ETXTBSY fix (and moving `main` after), the local-only `backup/testing-2026-10-12` branch, the beat model on Intel Macs, `npm audit`'s findings, the untried Mac builds, the blog and right-click ideas, e2e topics leaning on earlier ones, and where the demo sources are kept.
+- **Where:** `.gitignore`; `AGENTS.md` ("Read first"). The file itself is local.
+- **Verified by:** `npm run format:check`; `git check-ignore` confirms git ignores the file, and no commit contains it.
+
 ## 2026-10-18: yt-dlp starts even when its file is briefly busy (ETXTBSY)
 
 - **What:** starting yt-dlp no longer fails with "spawn ETXTBSY" just after it was set up. That was rare in the app, but frequent in CI: one unit test ("a new search doesn't cancel the setup…") failed on four pushes in a day, sometimes several times running, and each time the job had to be re-run.
