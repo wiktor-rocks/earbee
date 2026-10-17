@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-18: The local to-do list becomes a scratchpad
+
+- **What:** `local/TODO.md` is now `local/SCRATCHPAD.md`: loose notes, ideas and things to do or try, with no checkboxes or format to keep. AGENTS.md names it, and says to check it with FOR-TOMORROW.md at the start of a session.
+- **Why:** the user wanted a free-form scratchpad rather than a to-do list.
+- **How:** the file was renamed and its items kept as plain notes; `local/README.md` and `local/FOR-TOMORROW.md` (both local) point to it.
+- **Where:** `AGENTS.md` ("Read first"). The files themselves are local.
+- **Verified by:** `npm run format:check`; nothing from `local/` shows in `git status`.
+
 ## 2026-10-18: A local/ folder for notes, with a to-do list
 
 - **What:** a `local/` folder at the top of the repo that git ignores, for files that stay on the user's computer. It holds `FOR-TOMORROW.md` (moved in from the top), a new `TODO.md` checklist and a short `README.md` saying what the folder is. AGENTS.md now points to both notes files there.
