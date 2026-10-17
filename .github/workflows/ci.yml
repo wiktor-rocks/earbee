@@ -1,11 +1,12 @@
-# Checks every push and pull request: formatting, lint and types, and the
-# unit tests. On main (and on demand) also the end-to-end and smoke tests,
-# in a virtual display, with the test media cached between runs.
+# Checks every push (to main, testing and the exp/ experiment branches)
+# and pull request: formatting, lint and types, and the unit tests. On main
+# (and on demand) also the end-to-end and smoke tests, in a virtual display,
+# with the test media cached between runs.
 name: CI
 
 on:
   push:
-    branches: [main, testing]
+    branches: [main, testing, "exp/**"]
   pull_request:
   workflow_dispatch:
 

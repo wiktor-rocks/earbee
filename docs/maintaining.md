@@ -6,17 +6,18 @@ The commands are for a terminal in the project folder.
 ## How it's set up
 
 - **The code** is on GitHub at [wiktor-rocks/earbee](https://github.com/wiktor-rocks/earbee). Your copy talks to it as `origin`, over SSH.
-- **Two branches:**
+- **Branches:**
   - `testing` is where you work. Push to it as often as you like.
   - `main` is the stable version. It's what people see on GitHub, and what the website is published from. It only moves forward to where `testing` is, once that's tested.
+  - `exp/<idea>` (say, `exp/tuner`) is for trying an idea that might not work out. Each idea gets its own branch, made from `testing`. If it works, it's merged into `testing`; if not, the branch is deleted. See [Trying an idea](#trying-an-idea-an-experiment-branch).
 - **Automatic on GitHub** (the [Actions tab](https://github.com/wiktor-rocks/earbee/actions) shows every run):
 
-  | When                                  | What runs                                                                           | How long         |
-  | ------------------------------------- | ----------------------------------------------------------------------------------- | ---------------- |
-  | Any push to `testing` or `main`       | **CI:** formatting, lint, types, unit tests                                         | about 1 minute   |
-  | A push to `main`                      | **CI** also runs the end-to-end and smoke tests                                     | about 10 minutes |
-  | A push to `main` that changes `site/` | **Landing page:** republishes [the website](https://wiktor-rocks.github.io/earbee/) | under a minute   |
-  | Pushing a version tag (`v0.2.0`)      | **Release:** builds Windows, macOS and Linux, and makes a draft release             | about 15 minutes |
+  | When                                              | What runs                                                                           | How long         |
+  | ------------------------------------------------- | ----------------------------------------------------------------------------------- | ---------------- |
+  | Any push to `testing`, `main` or an `exp/` branch | **CI:** formatting, lint, types, unit tests                                         | about 1 minute   |
+  | A push to `main`                                  | **CI** also runs the end-to-end and smoke tests                                     | about 10 minutes |
+  | A push to `main` that changes `site/`             | **Landing page:** republishes [the website](https://wiktor-rocks.github.io/earbee/) | under a minute   |
+  | Pushing a version tag (`v0.2.0`)                  | **Release:** builds Windows, macOS and Linux, and makes a draft release             | about 15 minutes |
 
 - **Every change gets a CHANGELOG.md entry** (what, why, how, where, verified by), newest first.
 
@@ -69,6 +70,67 @@ git checkout testing   # back to work
 git checkout testing
 git merge main
 ```
+
+## Trying an idea: an experiment branch
+
+When you want to try something that might not work out, give it its own branch. `testing` stays as it was while you try, and if the idea fails, you delete the branch and nothing of it is left. One branch per idea: two ideas, two branches.
+
+### Start one
+
+```sh
+git checkout testing
+git pull                       # start from the latest testing
+git checkout -b exp/tuner      # a new branch, "exp/" and a short name, starting where testing is
+git push -u origin exp/tuner   # put it on GitHub too; -u makes later git push / git pull use it
+```
+
+### Work on it
+
+The same as on `testing`: change things, `npm start` to try them, commit, `git push`. CI checks each push (the 1-minute checks). Don't write a CHANGELOG entry yet; that comes when the idea goes into `testing`.
+
+### Keep it up to date (if it takes a while)
+
+```sh
+git checkout exp/tuner
+git merge testing              # bring in what's new on testing since you started
+git push
+```
+
+### It worked: bring it into `testing`
+
+```sh
+git checkout testing
+git pull
+git merge exp/tuner            # all of the experiment's commits come along
+npm test                       # everything still passes?
+```
+
+Add the CHANGELOG entry for the new feature, commit it, and `git push`. Then delete the experiment, which is now part of `testing`:
+
+```sh
+git branch -d exp/tuner              # -d only deletes a branch that's been merged
+git push origin --delete exp/tuner   # and on GitHub
+```
+
+From here it goes to `main` the usual way, with `testing`. Never merge an experiment into `main` directly.
+
+### It didn't work: throw it away
+
+```sh
+git checkout testing
+git branch -D exp/tuner              # -D deletes it even though it was never merged
+git push origin --delete exp/tuner   # and on GitHub
+```
+
+Or keep it for later reference: an unused branch costs nothing.
+
+### Finding your way
+
+- `git branch --show-current`: which branch you're on.
+- `git branch`: all your branches. `git branch -r` lists the ones on GitHub.
+- `git log --oneline testing..exp/tuner`: the commits on the experiment that aren't on `testing` yet.
+
+**A merge conflict** means both branches changed the same lines, and git asks you which to keep. `git status` lists the files; in each, keep the right lines between the `<<<<<<<` and `>>>>>>>` markers and delete the markers, then `git add` the files and `git commit`. To give up instead, `git merge --abort` puts everything back as it was.
 
 ## Putting out a new version
 
@@ -133,6 +195,7 @@ It's `site/`, plain HTML, CSS and one script; see [site/README.md](../site/READM
 | Undo the last commit, if you haven't pushed it (keeping the changes) | `git reset --soft HEAD~1`                                              |
 | Undo a commit you already pushed                                     | `git revert <commit>`, which adds a commit that reverses it; then push |
 | See what changed, and when                                           | `git log --oneline`, `git show <commit>`                               |
+| Throw away an experiment branch                                      | `git branch -D exp/<idea>`, and `git push origin --delete exp/<idea>`  |
 
 **Never `git push --force` to `main`.** It rewrites the public history for everyone who has a copy.
 

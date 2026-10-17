@@ -43,7 +43,7 @@ MIT: see [LICENSE](LICENSE). EarBee is built on Signalsmith Stretch, Mediabunny,
 
 # Development
 
-**Maintaining it** (the branches, pulling and pushing, putting out a new version, when CI fails): see [docs/maintaining.md](docs/maintaining.md).
+**Maintaining it** (the branches, trying an idea on its own `exp/` branch, pulling and pushing, putting out a new version, when CI fails): see [docs/maintaining.md](docs/maintaining.md).
 
 ## Requirements
 

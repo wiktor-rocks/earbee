@@ -43,6 +43,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-17: Experiments on their own branches
+
+- **What:** a third kind of branch, for trying ideas that might not work out: `exp/<idea>` (say, `exp/tuner`), one per idea, made from `testing`. If the idea works, the whole branch is merged into `testing` and deleted; if not, it's just deleted. `docs/maintaining.md` has a new section, "Trying an idea: an experiment branch", with the commands for starting one, keeping it up to date, bringing it into `testing`, throwing it away, finding your way and handling a merge conflict. CI checks every `exp/` branch too.
+- **Why:** the user wanted a place to experiment without cluttering `testing`. They compared one permanent `experiments` branch (good commits cherry-picked into `testing`) with a branch per idea, and chose the branch per idea: an idea that works comes back with one merge, and a failed one leaves nothing behind.
+- **How:**
+  - The rules: one idea per branch; `git merge testing` to keep a long one up to date (no rebasing pushed work); the CHANGELOG entry is written when the idea is merged into `testing`, not on the experiment; an experiment reaches `main` only through `testing`.
+  - CI's push trigger is `[main, testing, "exp/**"]`, so experiments get the 1-minute checks (formatting, lint, types, unit tests). The e2e tests, the website and releases stay with `main` and tags. GitHub reads the workflow from the pushed commit, so new experiments made from `testing` get it without `main` moving.
+- **Where:** `docs/maintaining.md` ("How it's set up", the new section, "Undoing things"), `README.md` (the pointer to it), `.github/workflows/ci.yml`.
+- **Verified by:** `npm run format:check`. A throwaway `exp/ci-check` branch, made, pushed and deleted with the documented commands, got its CI run.
+
 ## 2026-10-17: The landing page: beats and loops, demos from the app, phones
 
 - **What:**
