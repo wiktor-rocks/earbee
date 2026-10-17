@@ -43,6 +43,17 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-17: Version 0.1.1
+
+- **What:** ScriBee 0.1.1, a small release on top of 0.1.0. Details are in the three entries below.
+  - **New:** Enter plays from where playback last stopped (Space plays from where it last started). The windows no longer have a menu bar.
+  - **Better:** the continuous waveforms (Continuous, Peak + loudness, the minimap) have a smooth outline instead of a blocky one.
+  - **Fixed:** a newly opened file starts at 0, not where the previous one was left. After saving a project with the media inside, Save As no longer offers to link the media, which failed. Ctrl+S while renaming a mark saves the new name. A download's time left never reads "0:60".
+- **Why:** the user asked for a very minor release of what was on `testing`. It is 0.1.1 rather than 0.2.0 because the new keys and the missing menu bar are small.
+- **How:** `npm version 0.1.1 --no-git-tag-version`, then `main` moved up to `testing` and tagged `v0.1.1`, which builds the release (docs/maintaining.md, "Putting out a new version").
+- **Where:** `package.json`, `package-lock.json`.
+- **Verified by:** the full `npm test` before `main` moved; the release builds; the smoke test run against the built Linux AppImage.
+
 ## 2026-10-17: Enter plays from the stop point; no menu bar
 
 - **Enter plays from where playback last stopped.**
