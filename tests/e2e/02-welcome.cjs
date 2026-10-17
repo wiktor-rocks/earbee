@@ -21,7 +21,7 @@ module.exports = async function (h) {
   check("Open button has focus", await js(`document.activeElement.id === "welcomeOpen"`));
   check(
     "From YouTube buttons shown (download bridge present)",
-    await js(`!document.getElementById("welcomeDownload").hidden && typeof window.scribee?.download === "function"`),
+    await js(`!document.getElementById("welcomeDownload").hidden && typeof window.earbee?.download === "function"`),
   );
   // The two buttons side by side, From YouTube… on the right.
   const buttons = await js(
@@ -153,7 +153,7 @@ module.exports = async function (h) {
   check("dropped file opens the player", !sc.welcome && sc.app, JSON.stringify(sc));
   check(
     "window title names the file",
-    (await js(`document.title`)) === "ScriBee — tone.wav",
+    (await js(`document.title`)) === "EarBee — tone.wav",
     await js(`document.title`),
   );
   const widths = await js(

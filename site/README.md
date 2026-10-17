@@ -1,6 +1,6 @@
 # The landing page
 
-ScriBee's page for GitHub Pages: plain HTML, CSS and one script, with no
+EarBee's page for GitHub Pages: plain HTML, CSS and one script, with no
 build step. Open `index.html` in a browser to see it.
 
 **Publishing.** `.github/workflows/pages.yml` publishes this folder whenever
@@ -21,7 +21,7 @@ instead.
 **Files**
 
 - `index.html`: the page; `style.css`: its look, in the app's own colours
-  (ScriBee, or ScriBee Light on a light system).
+  (EarBee, or EarBee Light on a light system).
 - `fonts/`: Righteous and Nunito, the app's fonts (from `node_modules/@fontsource*`).
 - `img/logo.webp`: the bee, from `assets/`; `img/favicon.png`: from
   `assets/icon-512.png`.

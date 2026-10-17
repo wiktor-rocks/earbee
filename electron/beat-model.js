@@ -31,7 +31,7 @@ function createBeatModel(utilityProcess) {
   const pending = new Map(); // id → resolve
 
   function start() {
-    child = utilityProcess.fork(SCRIPT, [MODEL], { serviceName: "ScriBee beat model" });
+    child = utilityProcess.fork(SCRIPT, [MODEL], { serviceName: "EarBee beat model" });
     child.on("message", (message) => {
       const resolve = pending.get(message?.id);
       pending.delete(message?.id);

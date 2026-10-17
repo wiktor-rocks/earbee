@@ -1,5 +1,5 @@
 name: Bug report
-description: Something in ScriBee doesn't work as it should.
+description: Something in EarBee doesn't work as it should.
 labels: ["bug"]
 body:
   - type: textarea
@@ -23,8 +23,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: ScriBee version
-      description: In the file name you downloaded (ScriBee-0.1.0-…), or on the Releases page.
+      label: EarBee version
+      description: In the file name you downloaded (EarBee-0.1.0-…), or on the Releases page.
       placeholder: "0.1.0"
     validations:
       required: true

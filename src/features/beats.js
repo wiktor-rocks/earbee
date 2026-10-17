@@ -43,11 +43,11 @@ import { getPrefs, onPrefsChange, setPref } from "../ui/prefs.js";
 import { notify } from "../ui/toast.js";
 
 /**
- * The part of window.scribee (electron/preload.js) used here; missing
+ * The part of window.earbee (electron/preload.js) used here; missing
  * outside Electron.
  * @typedef {{ beatWindow(input: Float32Array): Promise<{ ok: true, beat: Float32Array, downbeat: Float32Array } | { ok: false, error: string }> }} BeatBridge
  */
-const bridge = /** @type {BeatBridge | undefined} */ (/** @type {any} */ (window).scribee);
+const bridge = /** @type {BeatBridge | undefined} */ (/** @type {any} */ (window).earbee);
 
 // Decoding and the spectrogram are this share of the progress; the model the rest.
 const PREPARING = 0.25;

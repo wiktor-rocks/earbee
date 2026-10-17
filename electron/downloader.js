@@ -1,7 +1,7 @@
 // Downloads a song or a video from a link (YouTube, or any site yt-dlp
 // supports) for the page. It runs in the main process: the page is
 // sandboxed and has no network access. The page reaches it through
-// preload.js (window.scribee).
+// preload.js (window.earbee).
 //
 //   yt-dlp    Does the downloading. Fetched from its GitHub releases on first
 //             use into <userData>/bin, checked against the release's SHA-256
@@ -15,7 +15,7 @@
 //             files; joining them in yt-dlp would need ffmpeg.
 //   Joining   Mediabunny copies the streams, without re-encoding, into one
 //             ordinary file in the folder set in Settings (by default
-//             ~/Downloads/ScriBee): .mp4 for video, .m4a
+//             ~/Downloads/EarBee): .mp4 for video, .m4a
 //             (or .ogg) for audio. Audio is rewritten too, because YouTube's
 //             .m4a is a "DASH" file that not every player opens.
 //   One link, one video: a playlist or search page gets its first video
@@ -146,7 +146,7 @@ function fileNameFor(title, id, extension) {
 function removeStaleWorkFolders() {
   try {
     for (const name of fs.readdirSync(os.tmpdir())) {
-      if (!name.startsWith("scribee-download-")) continue;
+      if (!name.startsWith("earbee-download-")) continue;
       const folder = path.join(os.tmpdir(), name);
       if (Date.now() - fs.statSync(folder).mtimeMs > STALE_WORK_MS) fs.rmSync(folder, { recursive: true, force: true });
     }
@@ -481,7 +481,7 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
     const link = checkUrl(url);
     const job = { child: null, canceled: false, abort: new AbortController() };
     current = job;
-    const work = fs.mkdtempSync(path.join(os.tmpdir(), "scribee-download-"));
+    const work = fs.mkdtempSync(path.join(os.tmpdir(), "earbee-download-"));
     try {
       await prepare(job, onProgress);
       if (job.canceled) throw new DownloadCanceled();

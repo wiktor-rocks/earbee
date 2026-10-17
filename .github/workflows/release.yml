@@ -1,4 +1,4 @@
-# Builds ScriBee for Linux, Windows and macOS when a version tag (v0.1.0,
+# Builds EarBee for Linux, Windows and macOS when a version tag (v0.1.0,
 # …) is pushed, and puts the files in a draft GitHub Release. Publishing
 # the draft (on GitHub, or `gh release edit <tag> --draft=false`) makes it
 # the latest release, which the landing page (site/) offers. Started by
@@ -46,11 +46,11 @@ jobs:
       - name: Check the ad-hoc signatures
         if: runner.os == 'macOS'
         run: |
-          find dist -maxdepth 2 -name "ScriBee.app" -print0 |
+          find dist -maxdepth 2 -name "EarBee.app" -print0 |
             xargs -0 -n1 codesign --verify --deep --strict --verbose=2
       - uses: actions/upload-artifact@v4
         with:
-          name: scribee-${{ runner.os }}
+          name: earbee-${{ runner.os }}
           path: |
             dist/*.AppImage
             dist/*.exe
@@ -68,7 +68,7 @@ jobs:
       - name: Write the release notes
         run: |
           cat > notes.md <<NOTES
-          ScriBee ${GITHUB_REF_NAME#v}: a player for transcribing music by ear.
+          EarBee ${GITHUB_REF_NAME#v}: a player for transcribing music by ear.
 
           **Downloads:**
           - **Windows:** the \`win-x64.exe\`, a portable app. Windows may warn about an unrecognised app the first time; choose *More info*, then *Run anyway*.
@@ -80,7 +80,7 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           draft: true
-          name: ScriBee ${{ github.ref_name }}
+          name: EarBee ${{ github.ref_name }}
           body_path: notes.md
           files: files/*
           fail_on_unmatched_files: true

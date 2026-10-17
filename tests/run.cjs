@@ -1,4 +1,4 @@
-// End-to-end tests for ScriBee. Run with `npm test` (see launch.cjs).
+// End-to-end tests for EarBee. Run with `npm test` (see launch.cjs).
 //
 // How it works
 //   - The app's real index.html is loaded in an offscreen Electron window

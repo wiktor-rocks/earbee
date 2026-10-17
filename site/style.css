@@ -1,6 +1,6 @@
-/* ScriBee's landing page. Colours and fonts are the app's own
+/* EarBee's landing page. Colours and fonts are the app's own
    (style.css and src/themes/palettes.js at the top of the repository):
-   the ScriBee theme, or ScriBee Light on a light system. */
+   the EarBee theme, or EarBee Light on a light system. */
 
 @font-face {
   font-family: "Righteous";
@@ -37,7 +37,7 @@
   color-scheme: dark;
 }
 
-/* ScriBee Light: on a light system, or when chosen with the button in
+/* EarBee Light: on a light system, or when chosen with the button in
    the top bar (data-theme on <html>, set by the script in index.html's
    head). The two blocks hold the same colours. */
 @media (prefers-color-scheme: light) {

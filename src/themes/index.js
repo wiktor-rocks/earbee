@@ -47,11 +47,11 @@ const markColorVariable = (id) => `--mark-${id}`;
  * @property {string} light The theme "auto" uses in light mode.
  */
 
-// ScriBee, and ScriBee Light for Automatic in light mode.
-const DEFAULT_THEME = THEMES.find((theme) => theme.id === "scribee");
+// EarBee, and EarBee Light for Automatic in light mode.
+const DEFAULT_THEME = THEMES.find((theme) => theme.id === "earbee");
 
 /** @type {ThemePrefs} */
-export const DEFAULT_PREFS = { choice: DEFAULT_THEME.id, dark: DEFAULT_THEME.id, light: "scribee-light" };
+export const DEFAULT_PREFS = { choice: DEFAULT_THEME.id, dark: DEFAULT_THEME.id, light: "earbee-light" };
 
 // Each role and the CSS variable it sets. Optional roles are derived from
 // the others when a theme leaves them out (see DERIVED).

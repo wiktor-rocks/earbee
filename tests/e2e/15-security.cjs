@@ -14,7 +14,7 @@ module.exports = async function (h) {
     // Downloads are served by a private URL (electron/media-files.js); a
     // URL the app didn't hand out serves nothing.
     const statuses = await js(
-      `Promise.all(["scribee-media://00000000-0000-0000-0000-000000000000/x.mp3", "scribee-media://etc/passwd", "scribee-media://localhost/etc/passwd"].map((url) => fetch(url).then((r) => r.status, () => "refused")))`,
+      `Promise.all(["earbee-media://00000000-0000-0000-0000-000000000000/x.mp3", "earbee-media://etc/passwd", "earbee-media://localhost/etc/passwd"].map((url) => fetch(url).then((r) => r.status, () => "refused")))`,
     );
     check(
       "only downloads are served by the media URL (404 otherwise)",

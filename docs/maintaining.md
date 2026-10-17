@@ -1,22 +1,22 @@
-# Maintaining ScriBee
+# Maintaining EarBee
 
-How to change ScriBee, keep GitHub up to date, and put out new versions.
+How to change EarBee, keep GitHub up to date, and put out new versions.
 The commands are for a terminal in the project folder.
 
 ## How it's set up
 
-- **The code** is on GitHub at [wiktor-rocks/scribee](https://github.com/wiktor-rocks/scribee). Your copy talks to it as `origin`, over SSH.
+- **The code** is on GitHub at [wiktor-rocks/earbee](https://github.com/wiktor-rocks/earbee). Your copy talks to it as `origin`, over SSH.
 - **Two branches:**
   - `testing` is where you work. Push to it as often as you like.
   - `main` is the stable version. It's what people see on GitHub, and what the website is published from. It only moves forward to where `testing` is, once that's tested.
-- **Automatic on GitHub** (the [Actions tab](https://github.com/wiktor-rocks/scribee/actions) shows every run):
+- **Automatic on GitHub** (the [Actions tab](https://github.com/wiktor-rocks/earbee/actions) shows every run):
 
-  | When                                  | What runs                                                                            | How long         |
-  | ------------------------------------- | ------------------------------------------------------------------------------------ | ---------------- |
-  | Any push to `testing` or `main`       | **CI:** formatting, lint, types, unit tests                                          | about 1 minute   |
-  | A push to `main`                      | **CI** also runs the end-to-end and smoke tests                                      | about 10 minutes |
-  | A push to `main` that changes `site/` | **Landing page:** republishes [the website](https://wiktor-rocks.github.io/scribee/) | under a minute   |
-  | Pushing a version tag (`v0.2.0`)      | **Release:** builds Windows, macOS and Linux, and makes a draft release              | about 15 minutes |
+  | When                                  | What runs                                                                           | How long         |
+  | ------------------------------------- | ----------------------------------------------------------------------------------- | ---------------- |
+  | Any push to `testing` or `main`       | **CI:** formatting, lint, types, unit tests                                         | about 1 minute   |
+  | A push to `main`                      | **CI** also runs the end-to-end and smoke tests                                     | about 10 minutes |
+  | A push to `main` that changes `site/` | **Landing page:** republishes [the website](https://wiktor-rocks.github.io/earbee/) | under a minute   |
+  | Pushing a version tag (`v0.2.0`)      | **Release:** builds Windows, macOS and Linux, and makes a draft release             | about 15 minutes |
 
 - **Every change gets a CHANGELOG.md entry** (what, why, how, where, verified by), newest first.
 
@@ -90,11 +90,11 @@ git merge main
 4. **Tag it and push the tag:**
 
    ```sh
-   git tag -a v0.2.0 main -m "ScriBee 0.2.0"
+   git tag -a v0.2.0 main -m "EarBee 0.2.0"
    git push origin v0.2.0
    ```
 
-5. **Wait for the build** (about 15 minutes; Mac machines can be queued a while). It makes a **draft** release, which only you can see, under [Releases](https://github.com/wiktor-rocks/scribee/releases).
+5. **Wait for the build** (about 15 minutes; Mac machines can be queued a while). It makes a **draft** release, which only you can see, under [Releases](https://github.com/wiktor-rocks/earbee/releases).
 6. **Check the draft.** It should have four files: `win-x64.exe`, `mac-arm64.dmg`, `mac-x64.dmg` and `linux-x86_64.AppImage`. Download the one for your system and try it.
 7. **Publish it,** with **Edit › Publish release** on GitHub, or:
 
@@ -142,8 +142,8 @@ It's `site/`, plain HTML, CSS and one script; see [site/README.md](../site/READM
 - **On another computer:**
 
   ```sh
-  git clone git@github.com:wiktor-rocks/scribee.git
-  cd scribee
+  git clone git@github.com:wiktor-rocks/earbee.git
+  cd earbee
   npm install
   git checkout testing
   ```
@@ -151,7 +151,7 @@ It's `site/`, plain HTML, CSS and one script; see [site/README.md](../site/READM
   `npm test` creates the test media the first time, which needs ffmpeg and takes a few minutes. Add that computer's SSH key on GitHub first (Settings › SSH and GPG keys).
 
 - **Issues and pull requests from others:**
-  - People report problems under [Issues](https://github.com/wiktor-rocks/scribee/issues).
+  - People report problems under [Issues](https://github.com/wiktor-rocks/earbee/issues).
   - A pull request is someone's proposed change; CI checks it automatically.
   - To merge one, use **Merge** on GitHub. Then, locally, `git checkout main && git pull`, and bring it into `testing` with `git checkout testing && git merge main`.
 - **Updating libraries:** `npm outdated` lists what's newer. `npm update` takes the compatible updates. Then run `npm test` and commit `package.json` and `package-lock.json`. Update Electron (`npm install electron@latest --save-dev`) on its own, and test the app by hand too.

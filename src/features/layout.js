@@ -13,7 +13,8 @@ export function openShortcuts() {
   if (!dom.shortcutsDialog.open) dom.shortcutsDialog.showModal();
 }
 
-const SIDEBAR_KEY = "scribee.sidebarHidden";
+const SIDEBAR_KEY = "earbee.sidebarHidden";
+const OLD_SIDEBAR_KEY = "scribee.sidebarHidden"; // the app's old name (ScriBee, until 0.1.1)
 
 // Hides or shows the marks sidebar; the timeline takes its width.
 function showSidebar(shown) {
@@ -25,7 +26,7 @@ function showSidebar(shown) {
 
 function bindSidebarToggle() {
   // Without browser storage the sidebar just shows.
-  showSidebar(readStored(SIDEBAR_KEY) !== "true");
+  showSidebar((readStored(SIDEBAR_KEY) ?? readStored(OLD_SIDEBAR_KEY)) !== "true");
   onClick(dom.sidebarToggle, () => {
     const shown = dom.sidebar.hidden;
     showSidebar(shown);

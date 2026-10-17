@@ -2,7 +2,7 @@
 // looks like Settings), pasting a link, and progress on the loading
 // screen. Words instead of a link search (below), and the result picked
 // downloads like a link. The download itself runs in the main process
-// (electron/downloader.js), reached through window.scribee
+// (electron/downloader.js), reached through window.earbee
 // (electron/preload.js); the file then opens like any other.
 import { AppError } from "../core/errors.js";
 import { formatCount, formatDuration, formatEta } from "../core/format.js";
@@ -33,7 +33,7 @@ import { confirmUnsaved, loadMedia } from "./project/index.js";
  * @typedef {{ ok: true, searchId: number, results: SearchResult[], more: boolean }
  *   | { ok: false, canceled: boolean, error: string }} SearchAnswer
  *
- * The part of window.scribee (electron/preload.js) used here; missing
+ * The part of window.earbee (electron/preload.js) used here; missing
  * outside Electron, and then there's no downloading or searching at all.
  * @typedef {object} DownloadBridge
  * @property {(url: string, kind: string) => Promise<DownloadResult>} download
@@ -44,7 +44,7 @@ import { confirmUnsaved, loadMedia } from "./project/index.js";
  * @property {(callback: (thumbnail: { searchId: number, index: number, src: string }) => void) => () => void} onThumbnail
  * @property {(url: string) => Promise<boolean>} openExternal
  */
-const bridge = /** @type {DownloadBridge | undefined} */ (/** @type {any} */ (window).scribee);
+const bridge = /** @type {DownloadBridge | undefined} */ (/** @type {any} */ (window).earbee);
 
 /**
  * What a download (or, setting up yt-dlp, a search) is doing, in words.

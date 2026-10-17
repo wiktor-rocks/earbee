@@ -1,13 +1,13 @@
-// What a ScriBee project file (.sbee) is. Pure (no DOM), so the main
+// What a EarBee project file (.ebee) is. Pure (no DOM), so the main
 // process uses it too (electron/project-files.js) to read and write them.
 //
-// A .sbee file is a UTF-8 JSON header, optionally followed by one NUL byte
+// A .ebee file is a UTF-8 JSON header, optionally followed by one NUL byte
 // and the media's own bytes (a project "with the media inside"). Without
 // the media it is plain JSON, readable and editable; JSON never contains a
 // raw NUL, so the header ends at the first one.
 //
 //   {
-//     "format": "scribee-project",
+//     "format": "earbee-project",
 //     "version": 1,
 //     "savedWith": "1.0.0",
 //     "media": { "name", "path", "relativePath", "size", "duration", "embedded" },
@@ -19,9 +19,9 @@
 // frame around them. A newer `version` is refused rather than misread; it
 // changes only when the frame itself does.
 
-const PROJECT_FORMAT = "scribee-project";
+const PROJECT_FORMAT = "earbee-project";
 export const PROJECT_VERSION = 1;
-export const PROJECT_EXTENSION = "sbee";
+export const PROJECT_EXTENSION = "ebee";
 // The longest header read; anything longer isn't a project.
 export const MAX_HEADER_BYTES = 16 * 1024 * 1024;
 // Separates the header from the media's bytes, in a project with the media inside.
@@ -96,12 +96,12 @@ export function parseProject(text) {
   try {
     data = JSON.parse(text);
   } catch {
-    throw new ProjectFormatError("This isn't a ScriBee project, or it is damaged.");
+    throw new ProjectFormatError("This isn't a EarBee project, or it is damaged.");
   }
   if (!isObject(data) || data.format !== PROJECT_FORMAT || !Number.isInteger(data.version))
-    throw new ProjectFormatError("This isn't a ScriBee project.");
+    throw new ProjectFormatError("This isn't a EarBee project.");
   if (data.version > PROJECT_VERSION)
-    throw new ProjectFormatError("This project was saved by a newer ScriBee; update it to open it.");
+    throw new ProjectFormatError("This project was saved by a newer EarBee; update it to open it.");
   return { media: normalizeMedia(data.media), sections: isObject(data.sections) ? data.sections : {} };
 }
 

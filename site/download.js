@@ -4,12 +4,12 @@
 // ---- To point the page at your releases, edit these two: ----
 //
 // REPO: the GitHub repository ("user/name") whose releases are offered.
-const REPO = "wiktor-rocks/scribee";
+const REPO = "wiktor-rocks/earbee";
 // FILES: how to tell each download apart among a release's assets (the
 // first asset whose name matches is offered). They match the names in
-// package.json's build.artifactName: ScriBee-0.1.0-win-x64.exe,
-// ScriBee-0.1.0-mac-arm64.dmg, ScriBee-0.1.0-mac-x64.dmg,
-// ScriBee-0.1.0-linux-x86_64.AppImage. `mac` is Apple Silicon, the one
+// package.json's build.artifactName: EarBee-0.1.0-win-x64.exe,
+// EarBee-0.1.0-mac-arm64.dmg, EarBee-0.1.0-mac-x64.dmg,
+// EarBee-0.1.0-linux-x86_64.AppImage. `mac` is Apple Silicon, the one
 // offered to every Mac visitor; `macIntel` is the second link on the
 // macOS card.
 const FILES = {
@@ -109,7 +109,7 @@ function drawWave() {
   wave.replaceChildren(...bars);
 }
 
-// The button in the top bar: switches between ScriBee's dark and light
+// The button in the top bar: switches between EarBee's dark and light
 // themes, and remembers the choice (until then, the system's is used).
 function setUpThemeSwitch() {
   const root = document.documentElement;

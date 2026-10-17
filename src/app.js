@@ -1,6 +1,6 @@
 // @ts-check
 /* =====================================================================
- * ScriBee: the page's entry point. Read this first.
+ * EarBee: the page's entry point. Read this first.
  *
  * A music-transcription player: open a song or a video, slow it down,
  * shift its pitch, EQ it, mark points and regions on it, and step through
@@ -42,7 +42,7 @@
  *              colour: the store (src/marks, kept in context.js) is changed
  *              by features/marks.js, which redraws the timeline and the
  *              marks list. Versioned, and saved in project files.
- *   project    A project file (.sbee) saves the session: the marks, the
+ *   project    A project file (.ebee) saves the session: the marks, the
  *              sound settings, the loop, where you were and the zoom, and
  *              links to the song or video (or has it inside). One section
  *              per part (features/project/sections.js); the file's frame
@@ -61,7 +61,7 @@
  *   over the player (setLoading in ui/dom.js).
  *
  *   Links (YouTube) are downloaded by the main process
- *   (electron/downloader.js), reached through window.scribee
+ *   (electron/downloader.js), reached through window.earbee
  *   (electron/preload.js). The page shows the progress, then opens the
  *   downloaded file like any other (features/download.js), reading it from
  *   disk by a private URL (electron/media-files.js), never whole. Words
@@ -203,7 +203,7 @@
  *                             --mark-* defaults in style.css; the unit tests
  *                             check each is visible on every theme.
  *   Saving something new in   Add a section to SECTIONS (features/project/
- *   project files (.sbee)     sections.js): capture() and restore(), its own
+ *   project files (.ebee)     sections.js): capture() and restore(), its own
  *                             version, and whether changing it is an unsaved
  *                             change. When its saved form changes, bump its
  *                             version and teach restore() the old one. The
@@ -630,7 +630,7 @@ function start() {
   // failed first file brings the screen back.
   setTimeout(() => dom.welcome.classList.add("settled"), 1000);
   // The window stays hidden behind a splash until now (electron/windows.js).
-  /** @type {any} */ (window).scribee?.ready?.();
+  /** @type {any} */ (window).earbee?.ready?.();
 }
 
 start();

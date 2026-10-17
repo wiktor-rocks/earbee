@@ -31,7 +31,7 @@ module.exports = async function (h) {
         timeline: document.querySelector(".timeline").getBoundingClientRect().height,
         wave: document.getElementById("waveform").clientHeight,
         drawn: host.querySelector(".scroll").clientHeight,
-        sidebarKey: localStorage.getItem("scribee.sidebarHidden"),
+        sidebarKey: localStorage.getItem("earbee.sidebarHidden"),
       };
     })()`);
   const isNormal = (l) => !l.big && l.topbar && l.dock && l.minimap && l.timeline >= 170;

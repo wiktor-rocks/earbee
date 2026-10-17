@@ -1,10 +1,10 @@
-# ScriBee: change log
+# EarBee: change log
 
-ScriBee is an Electron app for transcribing music. You open a song or a video, slow it down, shift its pitch, EQ it, loop a passage, and step through it with the keyboard.
+EarBee is an Electron app for transcribing music. You open a song or a video, slow it down, shift its pitch, EQ it, loop a passage, and step through it with the keyboard.
 
 **Files**
 
-- `electron/`: the Electron main process: `main.js` (window, security), `windows.js` (window state, the splash, the video window), `prefs-store.js` (settings and the colour theme), `downloader.js` (yt-dlp), `media-files.js` (serving downloads to the page), `project-files.js` (.sbee files), `system.js` and `preload.js` (the page's bridge to them).
+- `electron/`: the Electron main process: `main.js` (window, security), `windows.js` (window state, the splash, the video window), `prefs-store.js` (settings and the colour theme), `downloader.js` (yt-dlp), `media-files.js` (serving downloads to the page), `project-files.js` (.ebee files), `system.js` and `preload.js` (the page's bridge to them).
 - `src/`: the page, as ES modules in layers. `core/`, `themes/`, `search/` → `prefs/`, `marks/`, `project/` → `config.js` → `audio/`, `video/`, `waveform.js`, `timeline.js` → `context.js` → `ui/` → `features/` → `app.js`.
 - `index.html` and `style.css`: the page and its look.
 - `assets/`: the logo and icons; `scripts/make-images.py` makes them from the source image.
@@ -42,6 +42,19 @@ The architecture overview, the file map and a list of where to make common chang
 | `tests/run.cjs` (one sequence)           | `tests/run.cjs` + `tests/e2e/`                                                           |
 
 ---
+
+## 2026-10-17: ScriBee is now EarBee
+
+- **What:** the app is called **EarBee** everywhere: window titles, the wordmark (Ear**Bee**, "Bee" in the accent colour), the splash, the theme names (EarBee, EarBee Light), messages, the landing page, the GitHub templates and the docs. Project files are now `.ebee`; existing `.sbee` files don't open any more (rename them: the content is the same). Downloads go to `~/Downloads/EarBee` unless another folder was chosen. On its first start under the new name, the app copies ScriBee's settings folder, and this time nothing resets: the colour theme, the sidebar and the video-window choice all carry over.
+- **Why:** the user renamed the app. ScriBee 0.1.0 and 0.1.1 are published, so people's settings had to come along. The user chose `.ebee` only (no reading `.sbee`), and links to `wiktor-rocks/earbee`; the user renames the GitHub repo themselves.
+- **How:**
+  - Every name was changed by rule (the history entries below keep the old ones): `ScriBee` → `EarBee`, `scribee` → `earbee`, `.sbee` → `.ebee`, `Scri<b>Bee</b>` → `Ear<b>Bee</b>`. So also the bridge (`window.earbee`), the media URL scheme (`earbee-media://`), the video window's frame name, the localStorage keys, the temp-folder prefixes, the theme ids (`earbee`, `earbee-light`), the project format id (`earbee-project`), the package (`name`, `appId: com.earbee.app`, `executableName`, the repo URLs), `site/download.js`'s `REPO`, and `assets/earbee-source.png`.
+  - **Settings folder:** `adoptOldSettings()` now copies `…/ScriBee` (marker `adopted-scribee-settings`), with the same rules as before. The TranscriBee step is gone: that name was never published.
+  - **Theme:** prefs.json goes to version 2. `upgrade()` maps `scribee` → `earbee` and `scribee-light` → `earbee-light` in `choice`, `dark` and `light`, before the values are normalized (an unknown id would fall back to the default).
+  - **Sidebar and video window:** the page reads its new localStorage key and falls back to the old one (`scribee.sidebarHidden`, `scribee.videoPopped`), which the copied folder brings along.
+  - Not done: `site/img/screenshot.webp` still shows an older wordmark ("TranscriBee") and needs a new screenshot.
+- **Where:** 73 files, the main ones being `package.json`, `electron/main.js` (`adoptOldSettings`), `electron/prefs-store.js` (`upgrade`, `RENAMED_THEMES`), `src/features/layout.js`, `src/features/video-window/index.js`, `src/project/format.js`, `src/themes/palettes.js`, `index.html`, `electron/splash.html`, `site/`, `.github/`, `README.md` and the tests.
+- **Verified by:** `npm run check` and the full `npm test` (264 unit, 455 e2e, 28 smoke), with a new unit test for the version 1 → 2 theme step. `adoptOldSettings` was run on its own against temporary folders: it does nothing with `--user-data-dir`, copies once, and leaves later changes alone. `git grep -i -e scribee -e sbee` finds the old names only in this CHANGELOG's history and in the migration code above.
 
 ## 2026-10-17: Loop by bar, phrase by phrase; snapping to beats
 

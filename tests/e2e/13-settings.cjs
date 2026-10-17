@@ -77,8 +77,8 @@ module.exports = async function (h) {
   await sleep(200);
   check(
     "Reset puts the default back",
-    (await js(`document.documentElement.dataset.theme`)) === "scribee" &&
-      (await js(`${radio("theme", "choice", "scribee")}.checked`)) &&
+    (await js(`document.documentElement.dataset.theme`)) === "earbee" &&
+      (await js(`${radio("theme", "choice", "earbee")}.checked`)) &&
       !(await resetShown("theme", "choice")),
   );
 
@@ -198,11 +198,11 @@ module.exports = async function (h) {
   // The main process checks everything the page sends.
   const before = fs.readFileSync(prefsFile, "utf8");
   const answers = await js(`Promise.all([
-    scribee.prefs.set("downloads", "folder", "/etc"),
-    scribee.prefs.set("downloads", "kind", "podcast"),
-    scribee.prefs.set("downloads", "nope", 1),
-    scribee.prefs.set("nope", "kind", "audio"),
-    scribee.prefs.chooseFolder("downloads", "kind"),
+    earbee.prefs.set("downloads", "folder", "/etc"),
+    earbee.prefs.set("downloads", "kind", "podcast"),
+    earbee.prefs.set("downloads", "nope", 1),
+    earbee.prefs.set("nope", "kind", "audio"),
+    earbee.prefs.chooseFolder("downloads", "kind"),
   ])`);
   check(
     "the page can't set a folder, an invalid value or an unknown setting",
@@ -224,5 +224,5 @@ module.exports = async function (h) {
   prefsStore.reset("theme");
   prefsStore.reset("downloads");
   await sleep(300);
-  check("back to the default theme", (await js(`document.documentElement.dataset.theme`)) === "scribee");
+  check("back to the default theme", (await js(`document.documentElement.dataset.theme`)) === "earbee");
 };

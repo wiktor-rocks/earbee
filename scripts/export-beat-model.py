@@ -1,4 +1,4 @@
-"""Exports the Beat This! small beat tracker to ONNX for ScriBee, and the
+"""Exports the Beat This! small beat tracker to ONNX for EarBee, and the
 reference data the JS port is tested against. A one-time, dev-only step;
 nothing Python ships with the app.
 

@@ -168,7 +168,7 @@ const downloadsSection = defineSection({
       type: "folder",
       label: "Save downloads in",
       help: "Downloaded songs and videos are saved here, then opened.",
-      default: null, // ~/Downloads/ScriBee (the main process knows where that is)
+      default: null, // ~/Downloads/EarBee (the main process knows where that is)
     },
     {
       key: "kind",

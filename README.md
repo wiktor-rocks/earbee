@@ -1,18 +1,18 @@
 <p align="center"><img src="assets/logo.webp" width="140" alt="" /></p>
 
-# ScriBee
+# EarBee
 
 A desktop player for transcribing music by ear. Open a song or a video, slow it down without changing the pitch (or shift the pitch without changing the speed), loop a passage, and step through it with the keyboard. For Windows, macOS and Linux; free and open source (MIT).
 
-![ScriBee playing a live video at 0.6×, looping a marked part](site/img/screenshot.webp)
+![EarBee playing a live video at 0.6×, looping a marked part](site/img/screenshot.webp)
 
 ## Download
 
-Get the latest version from the [releases page](https://github.com/wiktor-rocks/scribee/releases/latest), or from [the website](https://wiktor-rocks.github.io/scribee/).
+Get the latest version from the [releases page](https://github.com/wiktor-rocks/earbee/releases/latest), or from [the website](https://wiktor-rocks.github.io/earbee/).
 
-- **Windows:** `ScriBee-…-win-x64.exe`, a portable app: nothing to install. Windows may warn about an unrecognised app the first time; choose **More info**, then **Run anyway**.
-- **macOS:** `ScriBee-…-mac-arm64.dmg` (Apple Silicon) or `…-mac-x64.dmg` (Intel). Drag it to Applications. It isn't signed by Apple, so the first time, right-click it and choose **Open**. On recent macOS: try to open it, then go to System Settings › Privacy & Security and choose **Open Anyway**. _The macOS builds haven't been tried on a Mac yet; please [report](https://github.com/wiktor-rocks/scribee/issues) how they do._
-- **Linux:** `ScriBee-…-linux-x86_64.AppImage`. Make it executable (`chmod +x ScriBee-*.AppImage`) and run it.
+- **Windows:** `EarBee-…-win-x64.exe`, a portable app: nothing to install. Windows may warn about an unrecognised app the first time; choose **More info**, then **Run anyway**.
+- **macOS:** `EarBee-…-mac-arm64.dmg` (Apple Silicon) or `…-mac-x64.dmg` (Intel). Drag it to Applications. It isn't signed by Apple, so the first time, right-click it and choose **Open**. On recent macOS: try to open it, then go to System Settings › Privacy & Security and choose **Open Anyway**. _The macOS builds haven't been tried on a Mac yet; please [report](https://github.com/wiktor-rocks/earbee/issues) how they do._
+- **Linux:** `EarBee-…-linux-x86_64.AppImage`. Make it executable (`chmod +x EarBee-*.AppImage`) and run it.
 
 ## What it does
 
@@ -22,7 +22,7 @@ Get the latest version from the [releases page](https://github.com/wiktor-rocks/
 - **Step through it from the keyboard:** short steps back and forward, Space replays from where you started listening, and Enter from where it last stopped. Press **?** in the app for every key.
 - **Find the beats** (B): a beat-tracking model marks every beat and the first of each bar on the waveform, shows the tempo, and lets ← / → step by beat or by bar. A click on each beat (Shift+B) checks them by ear.
 - **Videos too,** in sync at any speed; in their own window if you like.
-- **Save your session** (marks, loop, speed and EQ) in a `.sbee` project file.
+- **Save your session** (marks, loop, speed and EQ) in a `.ebee` project file.
 - **Open from YouTube:** paste a link or search, and it opens once downloaded (only download what you have the rights to).
 - **EQ, volume up to 200 %, 17 colour themes,** and long files (an hour or two) open in seconds.
 - **Works offline;** only downloading needs the internet.
@@ -39,7 +39,7 @@ npm run build:linux  # or build:win, build:mac: the app for your system, in dist
 
 ## Licence
 
-MIT: see [LICENSE](LICENSE). ScriBee is built on Signalsmith Stretch, Mediabunny, wavesurfer.js, the Beat This! beat tracker, ONNX Runtime, Electron and the Righteous and Nunito fonts, each under its own licence: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+MIT: see [LICENSE](LICENSE). EarBee is built on Signalsmith Stretch, Mediabunny, wavesurfer.js, the Beat This! beat tracker, ONNX Runtime, Electron and the Righteous and Nunito fonts, each under its own licence: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 # Development
 
@@ -73,7 +73,7 @@ To test a packaged build:
 ```sh
 npm run build:dir
 TB_APP_PATH=$PWD/dist/linux-unpacked/resources/app.asar \
-TB_APP_BINARY=$PWD/dist/linux-unpacked/scribee npm test
+TB_APP_BINARY=$PWD/dist/linux-unpacked/earbee npm test
 ```
 
 ## Files
@@ -89,11 +89,11 @@ electron/          The main process (CommonJS, Node)
                      picker; the colour theme, applied before the page shows
   downloader.js      downloading links, and searching by keywords, with yt-dlp
   media-files.js     serves downloaded files (or a slice of one) to the page by private URL
-  project-files.js   reads and writes project files (.sbee); the close guard
+  project-files.js   reads and writes project files (.ebee); the close guard
   system.js          available memory; recovering from a crashed page
   beat-model.js      runs the beat model for the page, in a utility process
                      (beat-model-process.js) on the native ONNX Runtime
-  preload.js         the page's bridge to the main process (window.scribee)
+  preload.js         the page's bridge to the main process (window.earbee)
 src/               The page (ES modules, no build step), in layers:
   core/              pure helpers, no DOM (unit-tested); media.js: media files,
                      the memory check, waveform levels, decoding in parts;
@@ -132,7 +132,7 @@ src/               The page (ES modules, no build step), in layers:
                      the shared modules (search/, prefs/, project/)
 index.html         The page: welcome screen, loading screen, player
 style.css          All styles; colour and font tokens at the top
-assets/            Logo and icons (generated from scribee-source.png
+assets/            Logo and icons (generated from earbee-source.png
                    by scripts/make-images.py)
 models/            beat-this-small.onnx: the beat model (Beat This!, MIT)
 scripts/           make-images.py; export-beat-model.py (the beat model and
@@ -164,7 +164,7 @@ CHANGELOG.md       What changed, why, how and where, newest first
 
 **Marks.** A mark is `{ id, start, end, label, color }` (`end: null` for a point), described in `src/marks/index.js` along with its saved form, `{ version: 1, marks: [...] }`. The store (`createMarks`, same file) lives in `context.js` and is changed through the actions in `src/features/marks.js`.
 
-**Project files (.sbee).** A project is a JSON header, optionally followed by a NUL byte and the media's bytes (when the media is inside). The header is `{ format, version, savedWith, media, sections }`, described in `src/project/format.js`. **To save something new, add a section** to `SECTIONS` in `src/features/project/sections.js`. A section has an `id`, its own `version`, `capture()` (its saved form), `restore(data, { duration })` (check and clamp: the data comes from a file), and `dirties` (whether changing it counts as an unsaved change). Nothing else needs to change: saving, opening and spotting unsaved changes all go through the list. When a section's form changes, bump its `version` and teach `restore()` to read the old one. Older apps skip a section they don't know, and a section saved by a newer app is skipped with a notice. The main process (`electron/project-files.js`) writes the file to a temporary file and renames it into place, and serves media that's inside a project as a slice of it (`media-files.js`). The page names its media only by the private URL it was given, never by a path.
+**Project files (.ebee).** A project is a JSON header, optionally followed by a NUL byte and the media's bytes (when the media is inside). The header is `{ format, version, savedWith, media, sections }`, described in `src/project/format.js`. **To save something new, add a section** to `SECTIONS` in `src/features/project/sections.js`. A section has an `id`, its own `version`, `capture()` (its saved form), `restore(data, { duration })` (check and clamp: the data comes from a file), and `dirties` (whether changing it counts as an unsaved change). Nothing else needs to change: saving, opening and spotting unsaved changes all go through the list. When a section's form changes, bump its `version` and teach `restore()` to read the old one. Older apps skip a section they don't know, and a section saved by a newer app is skipped with a notice. The main process (`electron/project-files.js`) writes the file to a temporary file and renames it into place, and serves media that's inside a project as a slice of it (`media-files.js`). The page names its media only by the private URL it was given, never by a path.
 
 **Adding a colour theme.** In `src/themes/palettes.js`, copy a theme (for example `nord`), give it a new `id`, `name`, `scheme` (`"dark"` or `"light"`) and colours for each role, then add it to `THEMES` at the bottom of that file. The roles are listed, with what each colours, in `ROLES` in `src/themes/index.js`. `npm run test:unit` checks that the theme defines every role and that its text, accent, loop and error colours have enough contrast. It names any pair that fails.
 

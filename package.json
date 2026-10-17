@@ -1,20 +1,20 @@
 {
-  "name": "scribee",
-  "productName": "ScriBee",
+  "name": "earbee",
+  "productName": "EarBee",
   "version": "0.1.1",
   "description": "A music-transcription player: slow down, pitch-shift, EQ and loop songs and videos, and step through them with the keyboard.",
   "author": "Wiktor Wieczorkiewicz",
   "license": "MIT",
-  "homepage": "https://wiktor-rocks.github.io/scribee/",
+  "homepage": "https://wiktor-rocks.github.io/earbee/",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/wiktor-rocks/scribee.git"
+    "url": "git+https://github.com/wiktor-rocks/earbee.git"
   },
   "bugs": {
-    "url": "https://github.com/wiktor-rocks/scribee/issues"
+    "url": "https://github.com/wiktor-rocks/earbee/issues"
   },
   "main": "electron/main.js",
-  "desktopName": "scribee.desktop",
+  "desktopName": "earbee.desktop",
   "scripts": {
     "start": "electron .",
     "start:gpu-info": "electron . --gpu-info",
@@ -60,8 +60,8 @@
     "wavesurfer.js": "^8.0.1"
   },
   "build": {
-    "appId": "com.scribee.app",
-    "productName": "ScriBee",
+    "appId": "com.earbee.app",
+    "productName": "EarBee",
     "icon": "assets/icon-512.png",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "publish": null,
@@ -84,7 +84,7 @@
     ],
     "linux": {
       "target": "AppImage",
-      "executableName": "scribee",
+      "executableName": "earbee",
       "category": "Audio",
       "syncDesktopName": true
     },

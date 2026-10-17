@@ -1,10 +1,10 @@
-// The page's only ways out of its sandbox, exposed as window.scribee:
+// The page's only ways out of its sandbox, exposed as window.earbee:
 //   - downloading a link, or searching by keywords (see downloader.js); the page hides its download
 //     buttons when this is missing (e.g. opened in a plain browser);
 //   - the memory available for a track (see system.js);
 //   - running the beat model on one window of a spectrogram (see beat-model.js);
 //   - saying the page is ready, so its window shows (see windows.js, "The splash");
-//   - project files (.sbee; see project-files.js): opening, saving, and
+//   - project files (.ebee; see project-files.js): opening, saving, and
 //     whether there are unsaved changes; a File's path is found here, so
 //     the page never names a path itself;
 //   - the settings (see prefs-store.js): read at startup, changed one at a
@@ -51,7 +51,7 @@ if (initialTheme?.variables) {
   }
 }
 
-contextBridge.exposeInMainWorld("scribee", {
+contextBridge.exposeInMainWorld("earbee", {
   // Resolves to { ok: true, name, path, url } or { ok: false, canceled, error };
   // `url` serves the saved file in pieces (media-files.js).
   download: (url, kind) => ipcRenderer.invoke("download:start", String(url), String(kind)),

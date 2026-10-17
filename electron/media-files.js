@@ -10,7 +10,7 @@
 //                                      update(url, slice), handle(protocol) }
 //
 // Only files the app itself shares are served, each under a random token
-// (scribee-media://<token>/<name>), never a path the page names. A
+// (earbee-media://<token>/<name>), never a path the page names. A
 // share can be a slice of a file: the media inside a project file
 // (project-files.js) is served straight from it, as if it were its own file.
 const crypto = require("crypto");
@@ -18,7 +18,7 @@ const fs = require("fs");
 const path = require("path");
 const { Readable } = require("stream");
 
-const SCHEME = "scribee-media";
+const SCHEME = "earbee-media";
 
 function registerMediaScheme(protocol) {
   protocol.registerSchemesAsPrivileged([

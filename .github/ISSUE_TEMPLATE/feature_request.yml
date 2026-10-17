@@ -1,5 +1,5 @@
 name: Feature request
-description: Something ScriBee could do to help you transcribe.
+description: Something EarBee could do to help you transcribe.
 title: "Feature: "
 labels: ["enhancement"]
 body:
@@ -10,7 +10,7 @@ body:
   - type: textarea
     id: what
     attributes:
-      label: What would you like ScriBee to do?
+      label: What would you like EarBee to do?
       placeholder: 'e.g. "Loop the last 2 seconds with one key."'
     validations:
       required: true

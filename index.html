@@ -14,10 +14,10 @@
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' blob: 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob: scribee-media:; object-src 'none'; base-uri 'none'; form-action 'none'"
+      content="default-src 'self'; script-src 'self' blob: 'wasm-unsafe-eval'; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob: earbee-media:; object-src 'none'; base-uri 'none'; form-action 'none'"
     />
 
-    <title>ScriBee</title>
+    <title>EarBee</title>
 
     <!-- Fonts are bundled from npm (Fontsource), so the app works offline. -->
     <link rel="stylesheet" href="node_modules/@fontsource-variable/nunito/index.css" />
@@ -58,7 +58,7 @@
         <div class="logo-aura">
           <img class="welcome-logo" src="assets/logo.webp" alt="" />
         </div>
-        <h1 class="welcome-title">Scri<b>Bee</b></h1>
+        <h1 class="welcome-title">Ear<b>Bee</b></h1>
 
         <div class="welcome-drop">
           <!-- The marching border while a file is dragged over the window. -->
@@ -89,7 +89,7 @@
             </li>
             <li id="welcomeProjectFormat" hidden>
               <svg class="icon" aria-hidden="true"><use href="#i-project" /></svg>
-              <b>Project</b> .sbee
+              <b>Project</b> .ebee
             </li>
           </ul>
         </div>
@@ -344,12 +344,12 @@
         </div>
       </div>
       <header class="topbar">
-        <span class="brand">Scri<b>Bee</b></span>
+        <span class="brand">Ear<b>Bee</b></span>
 
         <div class="topbar-actions">
           <!-- Open, Save and From YouTube are in the File menu below
                (features/file-menu.js); Ctrl+O opens this input too. -->
-          <input id="file" type="file" accept="audio/*,video/*,.mkv,.sbee" hidden />
+          <input id="file" type="file" accept="audio/*,video/*,.mkv,.ebee" hidden />
           <button
             id="fileMenuButton"
             class="menu-button"

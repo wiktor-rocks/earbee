@@ -2,7 +2,7 @@
 // counts, kept in prefs.json in the user-data folder. The sections and the
 // checks are the page's (src/prefs, ES modules), loaded here with require().
 //
-// The page reaches it through the preload (window.scribee.prefs): it
+// The page reaches it through the preload (window.earbee.prefs): it
 // reads every value at startup, asks to change one, and hears about every
 // change, whoever made it. Everything the page sends is checked here, and a
 // folder path is only ever set by the folder picker below, never sent by
@@ -14,19 +14,29 @@ const path = require("path");
 const prefs = require("../src/prefs/index.js");
 const themes = require("../src/themes/index.js");
 
-const VERSION = 1;
+const VERSION = 2;
+
+// The app's own themes under the app's old name (ScriBee, until 0.1.1).
+const RENAMED_THEMES = { scribee: "earbee", "scribee-light": "earbee-light" };
 
 // Brings what was stored up to VERSION. Version 0 is "no prefs.json yet":
-// the theme was kept on its own, in theme.json (left in place).
+// the theme was kept on its own, in theme.json (left in place). Version 1
+// named the app's own themes by its old name.
 function upgrade(stored, legacyThemeFile) {
-  if (stored) return stored; // version 1; later versions add steps here
-  const imported = {};
-  try {
-    if (legacyThemeFile) imported.theme = JSON.parse(fs.readFileSync(legacyThemeFile, "utf8"));
-  } catch {
-    // no theme.json (first run), or unreadable: the defaults
+  if (!stored) {
+    stored = {};
+    try {
+      if (legacyThemeFile) stored.theme = JSON.parse(fs.readFileSync(legacyThemeFile, "utf8"));
+    } catch {
+      // no theme.json (first run), or unreadable: the defaults
+    }
   }
-  return imported;
+  if (!(stored.version >= 2) && stored.theme && typeof stored.theme === "object") {
+    const theme = { ...stored.theme };
+    for (const key of ["choice", "dark", "light"]) theme[key] = RENAMED_THEMES[theme[key]] ?? theme[key];
+    stored = { ...stored, theme };
+  }
+  return stored;
 }
 
 /**

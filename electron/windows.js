@@ -110,7 +110,7 @@ function showAfterSplash(win, { around, colors, icon, maximized = false }) {
     maximizable: false,
     fullscreenable: false,
     show: false,
-    title: "ScriBee",
+    title: "EarBee",
     icon,
     backgroundColor: colors.bg, // the theme's, so opening doesn't flash
     webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
@@ -187,7 +187,7 @@ function showAfterSplash(win, { around, colors, icon, maximized = false }) {
 // tests: run.cjs, smoke.cjs, e2e/harness.cjs, 01-static-ui.cjs, and
 // 18-video-window.cjs whole), and putting back main.js's
 // `setWindowOpenHandler(() => ({ action: "deny" }))`.
-const FRAME_NAME = "scribee-video"; // the page's window.open name
+const FRAME_NAME = "earbee-video"; // the page's window.open name
 const STATE_NAME = "video-window-state";
 const MIN_SIZE = { width: 240, height: 135 };
 const DEFAULT_BOUNDS = { width: 640, height: 360 };

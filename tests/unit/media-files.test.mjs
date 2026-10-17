@@ -34,7 +34,7 @@ describe("parseRange", () => {
 });
 
 describe("createMediaFiles", () => {
-  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "scribee-media-test-"));
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "earbee-media-test-"));
   const file = path.join(folder, "Song [id].m4a");
   fs.writeFileSync(file, Buffer.from(Array.from({ length: 100 }, (_, i) => i)));
   const media = createMediaFiles();
@@ -43,7 +43,7 @@ describe("createMediaFiles", () => {
   after(() => fs.rmSync(folder, { recursive: true, force: true }));
 
   test("a shared file has a private URL ending in its name", () => {
-    assert.match(url, /^scribee-media:\/\/[0-9a-f-]{36}\/Song%20%5Bid%5D\.m4a$/);
+    assert.match(url, /^earbee-media:\/\/[0-9a-f-]{36}\/Song%20%5Bid%5D\.m4a$/);
     assert.notEqual(media.share(file), url, "a new token each time");
   });
 
@@ -80,9 +80,9 @@ describe("createMediaFiles", () => {
   });
 
   test("only shared files: an unknown token or a path is 404", async () => {
-    assert.equal((await get("scribee-media://00000000-0000-0000-0000-000000000000/x")).status, 404);
-    assert.equal((await get(`scribee-media://etc/passwd`)).status, 404);
-    assert.equal((await get(`scribee-media://localhost${file}`)).status, 404);
+    assert.equal((await get("earbee-media://00000000-0000-0000-0000-000000000000/x")).status, 404);
+    assert.equal((await get(`earbee-media://etc/passwd`)).status, 404);
+    assert.equal((await get(`earbee-media://localhost${file}`)).status, 404);
   });
 
   test("a shared file that is gone since: 404", async () => {

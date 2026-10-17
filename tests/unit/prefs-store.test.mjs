@@ -11,14 +11,14 @@ const require = createRequire(import.meta.url);
 const { createPrefsStore } = require("../../electron/prefs-store.js");
 const { videoFormat } = require("../../electron/downloader.js");
 
-const folder = () => fs.mkdtempSync(path.join(os.tmpdir(), "scribee-prefs-"));
+const folder = () => fs.mkdtempSync(path.join(os.tmpdir(), "earbee-prefs-"));
 const read = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
 
 describe("prefs store", () => {
   test("first run: the defaults, and no file until something changes", () => {
     const file = path.join(folder(), "prefs.json");
     const store = createPrefsStore(file);
-    assert.equal(store.get("theme").choice, "scribee");
+    assert.equal(store.get("theme").choice, "earbee");
     assert.equal(store.get("downloads").folder, null);
     assert.equal(fs.existsSync(file), false);
   });
@@ -27,9 +27,9 @@ describe("prefs store", () => {
     const file = path.join(folder(), "prefs.json");
     createPrefsStore(file).set("downloads", "maxHeight", 720);
     const saved = read(file);
-    assert.equal(saved.version, 1);
+    assert.equal(saved.version, 2);
     assert.equal(saved.downloads.maxHeight, 720);
-    assert.equal(saved.theme.choice, "scribee");
+    assert.equal(saved.theme.choice, "earbee");
     assert.equal(createPrefsStore(file).get("downloads").maxHeight, 720);
     assert.deepEqual(fs.readdirSync(path.dirname(file)), ["prefs.json"]); // no temporary file left
   });
@@ -39,14 +39,14 @@ describe("prefs store", () => {
     fs.writeFileSync(path.join(dir, "prefs.json"), "{ not json");
     fs.writeFileSync(path.join(dir, "theme.json"), JSON.stringify({ choice: "nord" }));
     const store = createPrefsStore(path.join(dir, "prefs.json"), { legacyThemeFile: path.join(dir, "theme.json") });
-    assert.equal(store.get("theme").choice, "scribee");
+    assert.equal(store.get("theme").choice, "earbee");
   });
 
   test("invalid stored values become defaults; valid ones are kept", () => {
     const file = path.join(folder(), "prefs.json");
     fs.writeFileSync(file, JSON.stringify({ version: 1, theme: { choice: "gone" }, downloads: { kind: "video" } }));
     const store = createPrefsStore(file);
-    assert.equal(store.get("theme").choice, "scribee");
+    assert.equal(store.get("theme").choice, "earbee");
     assert.equal(store.get("downloads").kind, "video");
   });
 
@@ -58,6 +58,17 @@ describe("prefs store", () => {
     );
     const store = createPrefsStore(path.join(dir, "prefs.json"), { legacyThemeFile: path.join(dir, "theme.json") });
     assert.deepEqual(store.get("theme"), { choice: "auto", dark: "nord", light: "github-light" });
+  });
+
+  test("ScriBee's settings (version 1) keep the app's own themes, under their new ids", () => {
+    const file = path.join(folder(), "prefs.json");
+    const theme = { choice: "auto", dark: "scribee", light: "scribee-light" };
+    fs.writeFileSync(file, JSON.stringify({ version: 1, theme, downloads: { kind: "video" } }));
+    const store = createPrefsStore(file);
+    assert.deepEqual(store.get("theme"), { choice: "auto", dark: "earbee", light: "earbee-light" });
+    assert.equal(store.get("downloads").kind, "video");
+    fs.writeFileSync(file, JSON.stringify({ version: 1, theme: { choice: "nord" } }));
+    assert.equal(createPrefsStore(file).get("theme").choice, "nord"); // other themes as they were
   });
 
   test("refuses unknown sections and keys, invalid values, and folders from the page", () => {

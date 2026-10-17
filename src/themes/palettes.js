@@ -5,13 +5,13 @@
 
 /** @typedef {import("./index.js").Theme} Theme */
 
-// ScriBee: the app's own dark theme, amber on graphite.
+// EarBee: the app's own dark theme, amber on graphite.
 // style.css :root holds the same values as the fallback (a unit test keeps
 // them equal).
 /** @type {Theme} */
-const scribee = {
-  id: "scribee",
-  name: "ScriBee",
+const earbee = {
+  id: "earbee",
+  name: "EarBee",
   scheme: "dark",
   colors: {
     bg: "#0e1014",
@@ -233,14 +233,14 @@ const tokyoNight = {
   },
 };
 
-// ScriBee Light: the app's own theme for light mode, amber on honey
-// paper, the light counterpart of ScriBee. The amber is the dark
+// EarBee Light: the app's own theme for light mode, amber on honey
+// paper, the light counterpart of EarBee. The amber is the dark
 // theme's own yellow, so the brand colour is the same in both (it's soft on
 // the pale panels; tests/unit/themes.test.mjs exempts it from the 3:1 check).
 /** @type {Theme} */
-const scribeeLight = {
-  id: "scribee-light",
-  name: "ScriBee Light",
+const earbeeLight = {
+  id: "earbee-light",
+  name: "EarBee Light",
   scheme: "light",
   colors: {
     bg: "#f5f1e8",
@@ -433,7 +433,7 @@ const everforestLight = {
 // Dark themes first, then light ones; the menu lists them in this order.
 /** @type {Theme[]} */
 export const THEMES = [
-  scribee,
+  earbee,
   monokai,
   dracula,
   nord,
@@ -442,7 +442,7 @@ export const THEMES = [
   solarizedDark,
   catppuccinMocha,
   tokyoNight,
-  scribeeLight,
+  earbeeLight,
   solarizedLight,
   catppuccinLatte,
   githubLight,
