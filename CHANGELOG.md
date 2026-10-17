@@ -43,6 +43,25 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-17: Version 0.2.0
+
+- **What:** EarBee 0.2.0, the first release under the new name. Details are in the entries below, back to "A splash window while the app starts".
+  - **New:**
+    - **Finding the beats** (B), by the Beat This! model: a line on each beat and a stronger one on the first of each bar, the tempo, and ← / → by beat or by bar. **A click on each beat** (Shift+B) checks them by ear.
+    - **Looping by the music:** `\` loops the bar you're in, `=` / `-` double or halve the loop, and Shift+`]` / Shift+`[` move it on or back by a phrase. Loop edges and marks snap to the beats; hold Alt to place them freely.
+    - Dragging a loop edge while playing takes effect at once.
+    - A **splash window** while the app starts.
+  - **Better:** 12 speed presets, finer at the slow end (0.25× to 0.5× in 0.05 steps), beside the Speed title. More room in the From YouTube dialog.
+  - **Renamed: ScriBee is now EarBee.**
+    - On its first start, EarBee takes over ScriBee's settings: the theme, the window, the download folder and the rest.
+    - Project files are now `.ebee`. Rename a `.sbee` file to `.ebee` to open it; the content is the same.
+    - New downloads go to `Downloads/EarBee`, unless you chose another folder.
+  - **Good to know:** the beat model adds about 45 MB to the download. Intel Macs can't run it, so they find beats with the simple finder, without bars.
+- **Why:** the user asked for a new release of what was on `testing`, and chose 0.2.0 (new features, while 1.0.0 waits until the Mac builds have been tried).
+- **How:** `npm version 0.2.0 --no-git-tag-version`, then `main` moved up to `testing` and tagged `v0.2.0`, which builds the release (docs/maintaining.md, "Putting out a new version").
+- **Where:** `package.json`, `package-lock.json`.
+- **Verified by:** the full `npm test` before `main` moved; main's CI; and the draft release's files: the smoke test against the Linux AppImage, and the Windows and Apple Silicon builds checked for the beat model and ONNX Runtime's native files.
+
 ## 2026-10-17: More room in the From YouTube dialog
 
 - **What:** the From YouTube dialog is less cramped. Opened from the welcome screen (no results yet), the option cards no longer sit right on the footer's line. Search results start further below the cards and stop short of the footer, with more space around and between them. The search bar and its button are a little taller, the option cards have more padding, and every part of the dialog keeps the same 22 px side margin as its header.
