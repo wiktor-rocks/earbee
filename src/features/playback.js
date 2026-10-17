@@ -93,6 +93,15 @@ export function replayOrPause(event) {
   play();
 }
 
+// Enter: pause, or play again from where playback last stopped (the red
+// stop point), where Space plays from where it last started. Before the
+// first stop, from the cursor.
+export function replayFromStopOrPause(event) {
+  if (player.transport.playing) return pause(event);
+  if (stopPoint !== null && stopPoint !== player.transport.position) player.transport.seek(stopPoint);
+  play();
+}
+
 // Play-while-held: keys currently held, and whether playback was already
 // running when the first one went down (then releasing keeps it running).
 const heldKeys = new Set();

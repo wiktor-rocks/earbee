@@ -43,6 +43,20 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-17: Enter plays from the stop point; no menu bar
+
+- **Enter plays from where playback last stopped.**
+  - **What:** Enter (or the keypad's Enter) pauses while playing, as Space does. Otherwise it plays from the red stop point, wherever the cursor is. Space plays from where you last started. Before the first stop, Enter plays from the cursor. It is listed in the shortcuts dialog, and the ■ readout's tooltip mentions it. In text fields Enter stays Enter.
+  - **Why:** the user asked for a key to replay from the end point, as Space does from the start point.
+  - **How:** `replayFromStopOrPause` seeks to `stopPoint` (already kept for the ■ marker and readout), then plays. The transport still has the last word, so with a loop on, playback starts inside it.
+  - **Where:** `src/features/playback.js` (`replayFromStopOrPause`); the `SHORTCUTS` table in `src/app.js`; `#stopPoint`'s title in `index.html`; README.
+- **No menu bar.**
+  - **What:** the main window and the video window no longer show Electron's File/Edit/View/Window/Help bar, which the app never used. (The video window used to show it on Alt.) A Mac's menu, at the top of the screen, is unchanged.
+  - **Why:** the user asked; everything is in the page.
+  - **How:** `win.removeMenu()` (Linux and Windows). This also drops that menu's keys: Ctrl+Shift+I (DevTools), Ctrl+R (reload), Ctrl+W, and Ctrl +/−/0 (zoom). Copy and paste in text fields still work, since Chromium handles them itself.
+  - **Where:** `electron/main.js` (`createWindow`); `electron/windows.js` (`allowVideoWindow`, `did-create-window`).
+- **Verified by:** e2e `04-space-replay`: Enter plays from the stop point with the cursor elsewhere, and Enter again pauses. Topics 01–04 and 18 (120 pass) and the smoke test (21 pass, the real `main.js`) pass, as do `npm run check` and `npm run test:unit` (211 pass). The missing menu bar was not checked by a test; the smoke test only drives the page.
+
 ## 2026-10-17: A smoother continuous waveform
 
 - **What:** the Continuous and Peak + loudness shapes, and the minimap, have smooth sloping outlines instead of a blocky, pixelated edge. Zoomed in past the drawn detail, they slope between levels instead of stepping. Bars are unchanged.

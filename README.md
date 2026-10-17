@@ -19,7 +19,7 @@ Get the latest version from the [releases page](https://github.com/wiktor-rocks/
 - **Slow it down, or shift the pitch,** without the other changing: speed from 0.25× to 3×, pitch in semitones and cents.
 - **Loop the hard part:** Shift+drag across the waveform.
 - **Mark it:** points and named regions on the track, with a list beside it.
-- **Step through it from the keyboard:** short steps back and forward, and Space replays from where you started listening. Press **?** in the app for every key.
+- **Step through it from the keyboard:** short steps back and forward, Space replays from where you started listening, and Enter from where it last stopped. Press **?** in the app for every key.
 - **Videos too,** in sync at any speed; in their own window if you like.
 - **Save your session** (marks, loop, speed and EQ) in a `.sbee` project file.
 - **Open from YouTube:** paste a link or search, and it opens once downloaded (only download what you have the rights to).

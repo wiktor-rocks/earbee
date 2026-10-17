@@ -159,6 +159,9 @@ function createWindow() {
     },
   });
   if (maximized) win.maximize();
+  // No menu bar: everything is in the page. (Linux and Windows; a Mac's
+  // menu is the system's, at the top of the screen, and stays.)
+  win.removeMenu();
   mainWindows.add(win);
   win.on("closed", () => mainWindows.delete(win));
 

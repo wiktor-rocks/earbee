@@ -243,6 +243,19 @@ module.exports = async function (h) {
     near(readout, stoppedAt, 0.002) && near(await pos(), stoppedAt, 0.002),
     `${readout} vs ${stoppedAt}, cursor ${await pos()}`,
   );
+  // Enter plays from the stop point (Space, from where playback started),
+  // wherever the cursor is; Enter again pauses.
+  await click(2);
+  key("Enter");
+  s = await sample(300);
+  check(
+    "Enter plays from the stop point",
+    near(firstMoved(s, 2), stoppedAt, 0.06) && s.every((q) => q.pos >= stoppedAt - 0.002),
+    `${stoppedAt} vs first ${firstMoved(s, 2)}`,
+  );
+  key("Enter");
+  await sleep(150);
+  check("Enter again pauses", !(await playing()));
   await shot("stop-point.png");
   await click(19);
   key("Space");

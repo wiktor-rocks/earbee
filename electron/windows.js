@@ -119,7 +119,6 @@ function allowVideoWindow(win, { icon, extraOptions = {} } = {}) {
         title: "Video",
         icon,
         backgroundColor: "#000",
-        autoHideMenuBar: true,
         ...extraOptions,
       },
     };
@@ -127,6 +126,7 @@ function allowVideoWindow(win, { icon, extraOptions = {} } = {}) {
 
   contents.on("did-create-window", (child) => {
     videoWindows.set(id, child);
+    child.removeMenu(); // no menu bar, not even on Alt (as the main window)
     child.webContents.on("will-navigate", (event) => event.preventDefault());
     child.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
     rememberWindowState(child, STATE_NAME);
