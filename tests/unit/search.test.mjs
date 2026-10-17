@@ -245,3 +245,30 @@ describe("the downloader's yt-dlp setup", { skip: process.platform === "win32" }
     assert.ok(progress.includes("setup"), "the second search hears the setup's progress");
   });
 });
+
+// ETXTBSY ("text file busy"): on Linux, a program can't start while any
+// process has its file open for writing, which can happen for a moment
+// right after the setup wrote yt-dlp (see run in electron/downloader.js).
+// Holding the stand-in open for writing makes it happen every time.
+describe("starting yt-dlp while its file is busy", { skip: process.platform === "win32" }, () => {
+  const folder = fs.mkdtempSync(path.join(os.tmpdir(), "earbee-busy-test-"));
+  after(() => fs.rmSync(folder, { recursive: true, force: true }));
+  const binary = path.join(folder, "yt-dlp");
+  fs.writeFileSync(binary, "#!/bin/sh\nexit 0\n", { mode: 0o755 });
+  const downloader = createDownloader({ binDir: folder, saveDir: folder, ytDlp: binary });
+
+  test("tries again, and runs once the file is free", async () => {
+    let fd = fs.openSync(binary, "r+"); // open for writing, as if still being written
+    const free = () => {
+      if (fd !== null) fs.closeSync(fd);
+      fd = null;
+    };
+    const timer = setTimeout(free, 80);
+    try {
+      assert.deepEqual(await downloader.search("busy", "youtube", 1, () => {}), { results: [], more: false });
+    } finally {
+      clearTimeout(timer);
+      free();
+    }
+  });
+});

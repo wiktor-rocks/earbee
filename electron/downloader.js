@@ -42,6 +42,7 @@ const RELEASES = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/";
 const UPDATE_EVERY_MS = 24 * 60 * 60 * 1000;
 const STALE_WORK_MS = 24 * 60 * 60 * 1000; // a work folder this old was left behind
 const STALL_MS = 30_000; // give up on GitHub after this long without data
+const START_ATTEMPTS = 5; // tries at starting yt-dlp while its file is busy (see run)
 
 // yt-dlp format selectors: "a/b" means a, else b; "x,y" downloads both.
 const AUDIO_FORMAT = "ba[ext=m4a]/ba";
@@ -282,7 +283,25 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
 
   // Runs yt-dlp for `job` (whose cancel kills it), calling onLine for each
   // line it prints to stdout.
-  function run(job, args, onLine, timeoutMs = 0) {
+  //
+  // Starting it can fail with ETXTBSY ("text file busy") just after the
+  // setup wrote it: on Linux, a process started elsewhere at that moment
+  // briefly holds the new file open for writing. That passes within
+  // milliseconds, so the start is tried again, a little later each time.
+  // (spawn() throws this one, rather than reporting it as the child's
+  // "error" event the way it does a missing file.)
+  async function run(job, args, onLine, timeoutMs = 0) {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await runOnce(job, args, onLine, timeoutMs);
+      } catch (error) {
+        if (error?.code !== "ETXTBSY" || attempt === START_ATTEMPTS || job.canceled) throw error;
+      }
+      await new Promise((resolve) => setTimeout(resolve, attempt * 50));
+    }
+  }
+
+  function runOnce(job, args, onLine, timeoutMs) {
     const child = spawn(binary, args, {
       env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
       windowsHide: true,

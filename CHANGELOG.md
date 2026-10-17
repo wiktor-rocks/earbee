@@ -43,6 +43,18 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-18: yt-dlp starts even when its file is briefly busy (ETXTBSY)
+
+- **What:** starting yt-dlp no longer fails with "spawn ETXTBSY" just after it was set up. That was rare in the app, but frequent in CI: one unit test ("a new search doesn't cancel the setup…") failed on four pushes in a day, sometimes several times running, and each time the job had to be re-run.
+- **Why:** the user asked for the flaky test to be fixed. The cause was in the downloader, not the test: the test runs the real setup, which downloads yt-dlp, writes it, and starts it.
+- **How:**
+  - On Linux, a program can't start while any process has its file open for writing. Right after the setup writes yt-dlp, a process started elsewhere at that moment (in the tests, other tests start processes in parallel) briefly inherits the open file, and the start fails with ETXTBSY. It passes within milliseconds.
+  - `run` now tries the start again on ETXTBSY: up to 5 times, waiting 50, 100, 150 and 200 ms, and not after a cancel. Any other error is thrown as before. `spawn()` throws this error rather than reporting it on the child's "error" event (as it does for a missing file), so the retry catches the throw; the first try at the fix handled the event, and the new test showed it didn't work.
+  - A new unit test makes the case happen every time: it holds the stand-in yt-dlp open for writing, starts a search, and frees the file 80 ms later. It fails without the fix with exactly CI's error (`spawn ETXTBSY`), and passes with it.
+  - AGENTS.md no longer lists the flaky test as a pitfall, and now says e2e topic 09 needs a file open (`TB_TOPICS=03,09`); run alone, one of its checks fails whether or not this change is in.
+- **Where:** `electron/downloader.js` (`run`, `runOnce`, `START_ATTEMPTS`), `tests/unit/search.test.mjs` ("starting yt-dlp while its file is busy"), `AGENTS.md`.
+- **Verified by:** the new test, 5 runs in a row, and failing without the fix. `npm run check`; `TB_TOPICS=03,09 npm test` (270 unit, 88 e2e, 28 smoke). Then CI on `testing`.
+
 ## 2026-10-17: A codebase comfortable for AI assistants: AGENTS.md, a glossary, the main process type-checked
 
 - **What:**

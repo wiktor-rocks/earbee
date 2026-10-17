@@ -34,7 +34,7 @@ A desktop player for transcribing music (Electron). There's no build step: the p
 | Make the test media              | `npm run test:fixtures` (needs ffmpeg; `npm test` does it when missing)                                                                    |
 | A packaged build, and testing it | `npm run build:dir`, then `TB_APP_PATH=$PWD/dist/linux-unpacked/resources/app.asar TB_APP_BINARY=$PWD/dist/linux-unpacked/earbee npm test` |
 
-The end-to-end topics are the files in `tests/e2e/`: 01 static UI, 02 welcome screen, 03 audio and the loop, 04 Space replay, 05 stepping, 06 zoom, 07 errors, 08 video, 09 downloads and search, 10 themes, 11 parallel decoding, 12 resources, 13 settings, 14 marks, 15 security, 16 projects, 17 waveform, 18 video window, 19 big video, 20 beats. A topic may rely on what an earlier one left open; if one fails only when run alone, run it with the topics before it.
+The end-to-end topics are the files in `tests/e2e/`: 01 static UI, 02 welcome screen, 03 audio and the loop, 04 Space replay, 05 stepping, 06 zoom, 07 errors, 08 video, 09 downloads and search, 10 themes, 11 parallel decoding, 12 resources, 13 settings, 14 marks, 15 security, 16 projects, 17 waveform, 18 video window, 19 big video, 20 beats. A topic may rely on what an earlier one left open; if one fails only when run alone, run it with the topics before it. Known: 09 needs a file open (`TB_TOPICS=03,09`).
 
 ## Which checks for which change
 
@@ -63,7 +63,6 @@ A small change (a comment, a CSS value, a typo) needs `npm run check` only.
 - **`ELECTRON_RUN_AS_NODE`.** VS Code's terminal sets it, which makes Electron start as plain Node. `npm test` clears it; to run Electron yourself, use `env -u ELECTRON_RUN_AS_NODE npx electron …`.
 - **The e2e and smoke tests need a display** (X11 or Wayland), although their windows are invisible. On a machine without one: `xvfb-run -a npm test`.
 - **The e2e harness empties `tests/output/downloads`** when it starts, and writes screenshots to `tests/output/`. Settings and downloads in progress go to temporary folders, never to your real ones.
-- **A flaky unit test in CI:** "a new search doesn't cancel the setup…" (`tests/unit/search.test.mjs`) sometimes fails on GitHub with `spawn ETXTBSY`. If that's the only failure, re-run the failed job (`gh run rerun <id> --failed`). It hasn't failed locally.
 - **ONNX Runtime:** `.npmrc` stops its install from downloading CUDA libraries (about 270 MB). Keep it.
 - **`site/` is published as it is** from `main`. Don't put working files there (a source video, for instance); everything in it goes online.
 
