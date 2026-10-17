@@ -4,9 +4,9 @@
  * only reads state; it never changes it.
  * ===================================================================== */
 
-import { player, settings, totalSemitones } from "../context.js";
+import { beats, hasAudio, player, settings, totalSemitones } from "../context.js";
 import { AppError } from "../core/errors.js";
-import { formatPitchTotal, formatStepSize, formatTrackTime } from "../core/format.js";
+import { formatPitchTotal, formatSpeed, formatStepSize, formatTrackTime } from "../core/format.js";
 
 /** @param {string} id */
 export const $ = (id) => document.getElementById(id);
@@ -68,6 +68,7 @@ export const dom = {
   stepBackButton: /** @type {HTMLButtonElement} */ ($("stepBack")),
   stepForwardButton: /** @type {HTMLButtonElement} */ ($("stepForward")),
   stepSize: $("stepSize"),
+  beatInfo: $("beatInfo"),
   startPointButton: $("startPoint"),
   stopPointButton: $("stopPoint"),
   speedChips: $("speedChips"),
@@ -147,7 +148,33 @@ export function renderTrackTime(position) {
 
 // The step readout in the transport bar (the step buttons show arrows).
 export function renderStepSize() {
-  dom.stepSize.textContent = `Step ${formatStepSize(settings.stepSize)} s`;
+  dom.stepSize.textContent =
+    settings.stepSize === "beat" ? "Step 1 beat" : `Step ${formatStepSize(settings.stepSize)} s`;
+}
+
+// The beats chip in the transport bar: a button that finds them, their
+// progress, then the tempo (and the tempo heard, at another speed); dimmed
+// while their lines are hidden.
+export function renderBeatInfo() {
+  const chip = dom.beatInfo;
+  chip.hidden = !hasAudio();
+  chip.classList.toggle("disabled", beats.status === "found" && !beats.shown);
+  if (beats.status === "finding") {
+    chip.textContent = `♩ Finding the beats ${Math.floor(beats.progress * 100)} %`;
+    chip.title = "Finding the beats (click or B to stop)";
+  } else if (beats.status === "found") {
+    const bpm = Math.round(beats.bpm);
+    const heard =
+      settings.speed === 1 ? "" : `${Math.round(beats.bpm * settings.speed)} at ${formatSpeed(settings.speed)}`;
+    chip.textContent = `♩ ${bpm} BPM${heard && ` · ${heard}`}`;
+    chip.title = `About ${bpm} beats per minute${heard && ` (${heard})`}; click or B to ${beats.shown ? "hide" : "show"} the beat lines`;
+  } else if (beats.status === "none") {
+    chip.textContent = "♩ No steady beat";
+    chip.title = "No steady beat was found in this track";
+  } else {
+    chip.textContent = "♩ Find the beats";
+    chip.title = "Find the beats: lines on the waveform, the tempo, and ← / → stepping by beats (B)";
+  }
 }
 
 // The loop readout next to the track time; dimmed while the loop is off.

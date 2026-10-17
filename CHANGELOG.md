@@ -43,6 +43,37 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-17: Finding the beats
+
+- **What:**
+  - A new **♩ Find the beats** chip in the transport bar, or **B**, finds the open track's beats. While it works the chip shows the progress; a click or B stops it.
+  - Once found, faint lines mark each beat over the waveform, and the chip shows the tempo: "♩ 120 BPM", plus the tempo heard at another speed ("· 60 at 0.50×").
+  - The step size becomes **"1 beat"**, so ← / → jump to the next or previous beat. ↑ / ↓ still pick seconds sizes; "beat" sits among them by its length.
+  - The chip or B then hides or shows the lines (the chip dims while they're hidden). A track with no steady beat says "♩ No steady beat".
+  - A new file forgets the beats, and a "1 beat" step goes back to 1 s. Beats aren't saved in projects yet.
+- **Why:** knowing where the beats fall makes it easier to find your place while transcribing, and to step through a passage beat by beat.
+- **How:**
+  - Our own algorithm, with no library: essentia.js and aubio are AGPL/GPL, and `web-audio-beat-detector` only gives one constant tempo.
+  - **Onset envelope:** spectral flux of the log magnitude up to 8 kHz, every ~11.6 ms with a 23 ms Hann window, minus its 0.5 s moving mean. The spectrum of the real samples comes from a half-length complex FFT with precomputed tables, which takes about 0.4 s per 4 minutes of audio.
+  - **Tempo:** autocorrelation over 40–240 BPM, weighted by a log-Gaussian around 120 BPM (σ = 1 octave) to avoid double or half tempo. A pulse below 0.1 "clarity" (the weighted peak as a share of the envelope's energy) counts as no steady beat: click tracks score ~0.9, white noise ~0.05, a steady tone ~0.
+  - **Beats:** Ellis 2007's dynamic programming (as in librosa's `beat_track`, tightness 100), which follows tempo drift. Weak beats at either end are trimmed.
+  - The player's samples are handed to the audio thread when a file opens, so the page can't read them anymore. The beat worker decodes the file again and streams it in mono through the detector, so only the small envelope is kept.
+  - The beat lines are drawn only for the visible range plus a screen either side, like the ruler's ticks, and are hidden when beats would be under 5 px apart.
+  - Stepping by beats lands on the next beat beyond 30 ms, so a step taken just after a beat doesn't land on it again. Before the first beat or after the last, a step is one average beat.
+- **Where:**
+  - New `src/core/beats.js` (`createOnsetDetector`, `createSpectrum`, `createFft`, `estimateTempo`, `trackBeats`, `detectBeats`, `visibleBeats`, `beatStep`, `stepSizes`).
+  - New `src/audio/beat-worker.js`, and `src/audio/open-track.js` (`openTrack`, `DecodeError`), which was moved out of `decode-worker.js` so both workers share it.
+  - New `src/features/beats.js` (`beatsAction`, `resetBeats`, `bindBeats`).
+  - `context.js` (`beats`, `beatLength`; `settings.stepSize` can be "beat").
+  - `ui/controls.js` (step sizes through `stepSizes`, the tempo redrawn when the speed changes), `ui/dom.js` (`renderBeatInfo`, `renderStepSize`).
+  - `features/playback.js` (`step`), `features/open-file.js` (`resetBeats` on load), `timeline.js` (`setBeats`, `renderBeats`).
+  - `app.js` (the B shortcut, the file map), `config.js` (`beats.minSpacingPx`), `index.html` (`#beatInfo`), `style.css` (`.guide-beat`), `eslint.config.js` (worker globals for the new files).
+- **Verified by:**
+  - New `tests/unit/beats.test.mjs`: synthetic click tracks at a steady 120 BPM, at 90 BPM (not read as double or half), and speeding up from 100 to 110 BPM; noise, a steady tone and silence (no beats); chunking; the real spectrum against the full FFT; stepping and step sizes.
+  - New `tests/e2e/20-beats.cjs` with a `clicks.wav` fixture: B finds 120 BPM, about 40 lines are drawn, → / ← land within 3 ms of the clicks, the tempo heard at 0.5× is shown, the lines hide and show, and a new file resets everything; a steady tone has no steady beat.
+  - `tests/e2e/06-zoom.cjs` now skips the beats' layer in its lanes-in-sync check.
+  - `npm run check` and `npm test`.
+
 ## 2026-10-17: A splash window while the app starts
 
 - **What:** starting ScriBee first shows a small frameless window with the bee and its pulsing aura, "ScriBee" and the 4-bar loader, in the current theme's colours. The main window appears, already built, once the page is ready, and the splash closes. On a fast start the splash stays up for at least 600 ms, so it doesn't blink.

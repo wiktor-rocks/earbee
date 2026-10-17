@@ -2159,6 +2159,16 @@ body.dragging .drop-card {
   border-left: 1px solid color-mix(in srgb, var(--stop) 70%, transparent);
 }
 
+/* The beats (B; features/beats.js): fainter, and under the start and stop
+   points' lines (their layer comes first). */
+.guide-beat {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  margin-left: -0.5px;
+  border-left: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
+}
+
 /* The hover line: where a click would seek to (waveform.js), with its
    time at the bottom. Fainter than the playback cursor, above the marks. */
 .waveform ::part(hover-line) {

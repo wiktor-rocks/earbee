@@ -12,7 +12,9 @@ export const settings = {
   semitones: CONFIG.semitones.initial,
   cents: CONFIG.cents.initial,
   eqEnabled: CONFIG.eq.enabledInitially,
-  stepSize: CONFIG.step.initial, // seconds, one of CONFIG.step.sizes
+  // Seconds, one of CONFIG.step.sizes, or "beat" (to the next beat) while
+  // the track's beats are known.
+  stepSize: /** @type {number | "beat"} */ (CONFIG.step.initial),
   // One gain (dB) per EQ band, keyed by band id: eqLow, eqLowMid, …
   ...Object.fromEntries(CONFIG.eq.bands.map((band) => [band.id, CONFIG.eq.gain.initial])),
 };
@@ -21,6 +23,20 @@ export const settings = {
 // through the actions in features/marks.js, which keep the waveform and
 // the marks list in step. Project files save and restore them.
 export const marks = createMarks({ minSeconds: CONFIG.marks.minSeconds });
+
+// The open track's beats (features/beats.js). `status`: "idle" (not looked
+// for yet), "finding" (`progress` 0…1), "found" (`times` in seconds, in
+// order, and `bpm`), or "none" (no steady beat). `shown`: whether their
+// lines are drawn. A new file starts idle.
+export const beats = {
+  status: /** @type {"idle" | "finding" | "found" | "none"} */ ("idle"),
+  progress: 0,
+  times: /** @type {Float64Array | null} */ (null),
+  bpm: /** @type {number | null} */ (null),
+  shown: true,
+};
+// The average beat in seconds, or null without beats.
+export const beatLength = () => (beats.status === "found" ? 60 / beats.bpm : null);
 
 export const totalSemitones = () => settings.semitones + settings.cents / 100;
 export const eqGains = () => Object.fromEntries(CONFIG.eq.bands.map((band) => [band.id, settings[band.id]]));

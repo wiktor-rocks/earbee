@@ -6,11 +6,13 @@
  * ===================================================================== */
 
 import { CONFIG } from "../config.js";
-import { eqGains, player, settings } from "../context.js";
+import { beatLength, eqGains, player, settings } from "../context.js";
+import { stepSizes } from "../core/beats.js";
 import { clamp, formatFrequency, formatGain, formatPercent, formatSigned, formatSpeed } from "../core/format.js";
 import {
   $,
   dom,
+  renderBeatInfo,
   element,
   guarded,
   onClick,
@@ -84,6 +86,7 @@ const SLIDERS = {
     format: formatSpeed,
     onChange: () => {
       renderSpeedChips();
+      renderBeatInfo(); // the tempo heard
       player.transport.retune();
     },
   },
@@ -156,9 +159,13 @@ function resetEq() {
   for (const band of CONFIG.eq.bands) setSetting(band.id, CONFIG.eq.gain.initial);
 }
 
+// The step sizes in order: CONFIG.step.sizes, and "beat" among them by
+// its length while the track's beats are known.
+const currentStepSizes = () => stepSizes(CONFIG.step.sizes, beatLength());
+
 // ↑ / ↓: the next larger (+1) or smaller (−1) step size; stops at either end.
 export function changeStepSize(direction) {
-  const { sizes } = CONFIG.step;
+  const sizes = currentStepSizes();
   const index = sizes.indexOf(settings.stepSize);
   setStepSize(sizes[clamp(index + direction, 0, sizes.length - 1)]);
 }
@@ -166,14 +173,18 @@ export function changeStepSize(direction) {
 // A click on the step size: the next larger (+1) or smaller (−1) one,
 // going round from either end.
 export function cycleStepSize(direction) {
-  const { sizes } = CONFIG.step;
+  const sizes = currentStepSizes();
   const index = sizes.indexOf(settings.stepSize);
   setStepSize(sizes[(index + direction + sizes.length) % sizes.length]);
 }
 
-/** One of CONFIG.step.sizes (anything else is ignored). @param {number} size */
+/**
+ * One of CONFIG.step.sizes, or "beat" while there are beats (anything
+ * else is ignored).
+ * @param {number | "beat"} size
+ */
 export function setStepSize(size) {
-  if (!CONFIG.step.sizes.includes(size)) return;
+  if (size === "beat" ? beatLength() === null : !CONFIG.step.sizes.includes(size)) return;
   settings.stepSize = size;
   renderStepSize();
 }

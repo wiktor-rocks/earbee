@@ -123,6 +123,10 @@ export const CONFIG = {
     maxPeaksPerSecond: 8000,
   },
 
+  // The beat lines over the waveform (B; features/beats.js) are hidden when
+  // zoomed out so far that beats are closer than this.
+  beats: { minSpacingPx: 5 },
+
   // The notifications (ui/toast.js): how long one shows, and how many at
   // once (a new one pushes out the oldest).
   notifications: { showMs: 4000, max: 3 },

@@ -26,23 +26,11 @@
 // to warm up; Mediabunny starts exactly where asked) and drops what comes
 // before `from`. Where `from` is comes from the timestamps, which can be a
 // few frames off; decoder.js corrects that when it joins the parts.
-import {
-  ALL_FORMATS,
-  AudioSampleSink,
-  BlobSource,
-  Input,
-  UrlSource,
-} from "../../node_modules/mediabunny/dist/bundles/mediabunny.mjs";
-import { downsampleLevels, mediaSource } from "../core/media.js";
+import { AudioSampleSink } from "../../node_modules/mediabunny/dist/bundles/mediabunny.mjs";
+import { downsampleLevels } from "../core/media.js";
+import { DecodeError, openTrack } from "./open-track.js";
 
 const scope = /** @type {any} */ (self);
-
-class DecodeError extends Error {
-  constructor(kind, message) {
-    super(message);
-    this.kind = kind;
-  }
-}
 
 // One Float32Array per channel; grows (by copying) if the track turns out
 // longer than its reported duration.
@@ -77,28 +65,6 @@ function createChannelStore(channels, capacity) {
     },
     // The samples, without the unused end (the views keep their buffers).
     finish: () => arrays.map((array) => array.subarray(0, written)),
-  };
-}
-
-async function open(media) {
-  const input = new Input({ formats: ALL_FORMATS, source: mediaSource(media, { BlobSource, UrlSource }) });
-  let track;
-  try {
-    track = await input.getPrimaryAudioTrack();
-  } catch (error) {
-    throw new DecodeError("cannot-decode", String(error?.message ?? error));
-  }
-  if (!track) throw new DecodeError("no-audio", "no audio track");
-  if (!(await track.canDecode())) throw new DecodeError("cannot-decode", `can't decode ${track.codec ?? "its codec"}`);
-
-  const [end, first] = await Promise.all([track.computeDuration(), track.getFirstTimestamp()]);
-  return {
-    input,
-    track,
-    first,
-    duration: end - first,
-    sampleRate: track.sampleRate,
-    channels: track.numberOfChannels,
   };
 }
 
@@ -158,7 +124,7 @@ let opened = null;
 scope.onmessage = async ({ data }) => {
   try {
     if (data.type === "open") {
-      opened = await open(data.media);
+      opened = await openTrack(data.media);
       const { duration, sampleRate, channels } = opened;
       scope.postMessage({ type: "info", duration, sampleRate, channels });
     } else if (data.type === "decode") {

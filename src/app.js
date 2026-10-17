@@ -73,7 +73,8 @@
  * FILES (src/), in layers: a file imports only from layers above it in
  * this list, never below (enforced by `npm run lint`)
  *   core/          Pure helpers, no DOM: format, waveshape (scaling the
- *                  waveform), ruler, timeline (and the
+ *                  waveform), ruler, beats (finding them, stepping by
+ *                  them), timeline (and the
  *                  Segment / Loop / LoopRegion types), emitter, errors,
  *                  media (the Media type, the memory check, waveform
  *                  levels, splitting and joining a parallel decode)
@@ -91,13 +92,16 @@
  *   project/       What a project file is (format.js): its header, version
  *                  and media; pure, shared with the main process
  *   config.js      CONFIG: every tunable number
- *   audio/         engine.js, transport.js, decoder.js (+ decode-worker.js)
+ *   audio/         engine.js, transport.js, decoder.js (+ decode-worker.js),
+ *                  beat-worker.js (finding the beats), open-track.js
+ *                  (opening a file's audio track, for both workers)
  *   video/         view.js (the picture), proxy.js (low-res copy for seeking),
  *                  proxy-plan.js (where that copy is built next)
  *   waveform.js    The waveform, zoom, minimap, loop; its view for the lanes.
  *                  waveform-draw.js draws it (bars, continuous, two-tone)
  *   timeline.js    The lanes: ruler, start/stop points, marks; guide lines
- *   context.js     `settings`, `marks` (the open track's), and `player`: the
+ *                  (and the beats' lines)
+ *   context.js     `settings`, `marks` and `beats` (the open track's), and `player`: the
  *                  components above, once created
  *   ui/            dom.js (elements, messages, rendering, loading screens),
  *                  controls.js (sliders, chips, EQ), shortcuts.js (key
@@ -107,7 +111,8 @@
  *                  field type), menu.js (popover menus), storage.js
  *                  (browser storage that never throws), toast.js
  *                  (notifications: small confirmations, notify())
- *   features/      playback.js (and the A–B loop), marks.js (actions,
+ *   features/      playback.js (and the A–B loop), beats.js (finding the
+ *                  beats on demand, the ♩ chip), marks.js (actions,
  *                  selection, the marks list), open-file.js, download.js
  *                  (and searching in the download dialog), settings.js
  *                  (the Settings dialog and the theme menu), file-menu.js
@@ -237,6 +242,7 @@ import {
 } from "./features/marks.js";
 import { bigVideoPictureChanged, bindBigVideo, toggleBigVideo } from "./features/big-video.js"; // Big video (src/features/big-video.js)
 import { bindLayout, openShortcuts } from "./features/layout.js";
+import { beatsAction, bindBeats } from "./features/beats.js";
 import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
 import { bindProject, isSaveDialogOpen, openFile, saveProject, saveProjectAs } from "./features/project/index.js";
@@ -444,6 +450,13 @@ const SHORTCUTS = [
     description: "Smaller step",
     down: () => changeStepSize(-1),
   },
+  {
+    group: "Moving around",
+    codes: ["KeyB"],
+    keys: ["B"],
+    description: "Find the beats (← / → then step by beats); again: show / hide them",
+    down: beatsAction,
+  },
   { group: "A–B loop", codes: ["BracketLeft"], keys: ["["], description: "Loop start", down: setLoopStart },
   { group: "A–B loop", codes: ["BracketRight"], keys: ["]"], description: "Loop end", down: setLoopEnd },
   { group: "A–B loop", codes: ["KeyL"], keys: ["L"], description: "Loop on / off", down: toggleLoop },
@@ -543,6 +556,7 @@ function start() {
   bindFileMenu();
   bindSettings();
   bindMarks();
+  bindBeats();
   bindLayout();
   bindBigVideo(); // Big video (src/features/big-video.js)
   bindFocus();

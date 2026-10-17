@@ -37,6 +37,7 @@ import {
   setLoadingStatus,
   showPlayer,
 } from "../ui/dom.js";
+import { resetBeats } from "./beats.js";
 import { setLoopRegion } from "./playback.js";
 import { resetMarks } from "./marks.js";
 
@@ -190,10 +191,11 @@ export async function loadMediaFile(media, signal) {
     timer.time("waveform", () => player.waveform.load(decoded.levels, decoded.duration)),
   ]);
   player.transport.load(decoded.duration);
-  // A new file starts fresh: no loop or marks, and default speed, pitch,
-  // volume and EQ.
+  // A new file starts fresh: no loop, marks or beats, and default speed,
+  // pitch, volume and EQ.
   setLoopRegion(null);
   resetMarks(decoded.duration);
+  resetBeats(media);
   resetSoundSettings();
   dom.fileName.textContent = media.name;
   dom.fileName.title = media.name;

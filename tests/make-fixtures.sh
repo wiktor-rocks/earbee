@@ -20,6 +20,8 @@
 #   verse-chorus.wav 12 s tone, 2 s at 0.4 then 2 s at 0.65, in turn: the
 #                    minimap's exaggerated contrast
 #                 (the last four: the waveform's scaling, e2e/17-waveform.cjs)
+#   clicks.wav    20 s click track at 120 BPM, a click every 0.5 s from
+#                 0.25 s, over a quiet hum: finding the beats (e2e/20-beats.cjs)
 # Needs ffmpeg (with libvpx and libopus).
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -56,5 +58,9 @@ ffmpeg -v error -y -f lavfi \
 ffmpeg -v error -y -f lavfi -i "aevalsrc=0.5*sin(2*PI*440*t)|0:s=44100:d=6" -c:a pcm_s16le stereo-left.wav
 ffmpeg -v error -y -f lavfi -i "aevalsrc=if(lt(mod(t\,4)\,2)\,0.4\,0.65)*sin(2*PI*330*t):s=44100:d=12" \
   -c:a pcm_s16le verse-chorus.wav
+
+ffmpeg -v error -y -f lavfi \
+  -i "aevalsrc=if(lt(mod(t+0.25\,0.5)\,0.01)\,0.8*sin(2*PI*1000*t)*exp(-300*mod(t+0.25\,0.5))\,0)+0.01*sin(2*PI*90*t):s=44100:d=20" \
+  -c:a pcm_s16le clicks.wav
 
 echo "Test fixtures written to $(pwd)"

@@ -182,7 +182,7 @@ module.exports = async function (h) {
       const lane = document.getElementById("ruler").getBoundingClientRect();
       let worst = 0, count = 0;
       for (const el of document.querySelectorAll("#ruler .ruler-tick.major, #ruler .ruler-start, #timelineGuides > * > *, #marksLane .lane-mark")) {
-        if (el.hidden || el.classList.contains("guide-stop")) continue;
+        if (el.hidden || el.classList.contains("guide-stop") || el.classList.contains("guide-beats")) continue;
         const guide = el.parentElement.parentElement.id === "timelineGuides";
         const x = el.getBoundingClientRect().left + (guide ? 0.5 : 0);
         if (x < lane.left || x > lane.right) continue;

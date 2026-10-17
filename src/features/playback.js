@@ -5,7 +5,8 @@
  * ===================================================================== */
 
 import { CONFIG } from "../config.js";
-import { hasAudio, player, settings } from "../context.js";
+import { beatLength, beats, hasAudio, player, settings } from "../context.js";
+import { beatStep } from "../core/beats.js";
 import { formatTrackTime } from "../core/format.js";
 import { cycleStepSize } from "../ui/controls.js";
 import { dom, guarded, onClick, renderLoopInfo, reportError } from "../ui/dom.js";
@@ -29,8 +30,13 @@ export function stop(event) {
 }
 // Pause, or resume from where playback is now (comma).
 export const togglePlay = (event) => (player.transport.playing ? pause(event) : play());
-// Moves the cursor one step (settings.stepSize) back or forward.
-const step = (direction) => player.transport.seek(player.transport.position + direction * settings.stepSize);
+// Moves the cursor one step (settings.stepSize) back or forward: by
+// seconds, or to the previous or next beat.
+function step(direction) {
+  const { position } = player.transport;
+  if (settings.stepSize === "beat") player.transport.seek(beatStep(beats.times, position, direction, beatLength()));
+  else player.transport.seek(position + direction * settings.stepSize);
+}
 export const stepBack = () => step(-1);
 export const stepForward = () => step(1);
 

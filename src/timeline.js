@@ -1,5 +1,6 @@
 import { CONFIG } from "./config.js";
 import { clamp } from "./core/format.js";
+import { visibleBeats } from "./core/beats.js";
 import { formatRulerTime, rulerTicks } from "./core/ruler.js";
 
 /** @typedef {import("./marks/index.js").Mark} Mark */
@@ -21,7 +22,8 @@ import { formatRulerTime, rulerTicks } from "./core/ruler.js";
  *     double-click asks for a rename; an empty spot seeks.
  * The start and stop points continue as faint guide lines over the
  * waveform (a layer of ours over it, not inside WaveSurfer); marks stay in
- * their lane, so the sound isn't crossed by lines. The minimap gets a
+ * their lane, so the sound isn't crossed by lines. The beats, once found
+ * (features/beats.js), are fainter lines in that layer too. The minimap gets a
  * tick for each marker.
  *
  * Staying in sync: every lane (and the guides) holds one track element
@@ -37,7 +39,7 @@ import { formatRulerTime, rulerTicks } from "./core/ruler.js";
  * The timeline only draws and reports what the pointer did; the marks and
  * the points belong to the features (features/marks.js, playback.js).
  *
- * Exposes: setMarks, setStartPoint, setStopPoint
+ * Exposes: setMarks, setStartPoint, setStopPoint, setBeats
  * ===================================================================== */
 
 /**
@@ -91,6 +93,8 @@ export function createTimeline({
   const rulerTicksLayer = element("ruler-ticks", rulerTrack);
   const marksTrack = element("timeline-track", marksLane);
   const guidesTrack = element("timeline-track", guides);
+  // First in the guides, so the start and stop points' lines are above it.
+  const beatsLayer = element("guide-beats", guidesTrack);
   const tracks = [rulerTrack, marksTrack, guidesTrack];
 
   const minimapLayer = element("minimap-marks", minimapContainer);
@@ -111,6 +115,7 @@ export function createTimeline({
       track.style.transform = `translateX(${view.offset}px)`;
     }
     renderRuler();
+    renderBeats();
   }
 
   function renderRuler() {
@@ -134,6 +139,34 @@ export function createTimeline({
       if (tick.major) line.textContent = formatRulerTime(tick.time, step);
     }
     rulerTicksLayer.replaceChildren(fragment);
+  }
+
+  /* ---------- The beats ---------- */
+
+  // Drawn like the ruler's ticks: for the visible range and a screen
+  // either side. Hidden when zoomed out so far that they'd be a grey wash.
+  let beats = null; // as last set by setBeats()
+  let beatsRendered = null; // { start, end, width }
+
+  function renderBeats() {
+    const pxPerSecond = view.duration && view.width ? view.width / view.duration : 0;
+    const spacing = beats?.length > 1 ? ((beats.at(-1) - beats[0]) / (beats.length - 1)) * pxPerSecond : 0;
+    if (spacing < CONFIG.beats.minSpacingPx) {
+      beatsRendered = null;
+      beatsLayer.replaceChildren();
+      return;
+    }
+    const start = -view.offset / pxPerSecond;
+    const end = start + guides.clientWidth / pxPerSecond;
+    const cached = beatsRendered;
+    if (cached && cached.width === view.width && start >= cached.start && end <= cached.end) return;
+
+    const span = end - start;
+    beatsRendered = { start: Math.max(0, start - span), end: Math.min(view.duration, end + span), width: view.width };
+    const { from, to } = visibleBeats(beats, beatsRendered.start, beatsRendered.end);
+    const fragment = document.createDocumentFragment();
+    for (let i = from; i < to; i++) element("guide-beat", fragment).style.left = percent(beats[i]);
+    beatsLayer.replaceChildren(fragment);
   }
 
   /* ---------- The start and stop points ---------- */
@@ -431,6 +464,12 @@ export function createTimeline({
     setStopPoint(time) {
       stopPoint = time;
       renderStopPoint();
+    },
+    /** The beats (seconds, in order), or null to hide them. @param {Float64Array | null} times */
+    setBeats(times) {
+      beats = times;
+      beatsRendered = null;
+      renderBeats();
     },
   };
 }

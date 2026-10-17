@@ -59,6 +59,7 @@ const TOPICS = [
   "17-waveform.cjs",
   "18-video-window.cjs", // Video window (src/features/video-window/)
   "19-big-video.cjs", // Big video (src/features/big-video.js)
+  "20-beats.cjs",
 ];
 
 prepare();

@@ -138,8 +138,8 @@ module.exports = [
     },
   },
   {
-    // The decoder's Worker: a worker's globals, not a page's.
-    files: ["src/audio/decode-worker.js"],
+    // The decoder's and the beat finder's Workers: a worker's globals, not a page's.
+    files: ["src/audio/decode-worker.js", "src/audio/beat-worker.js", "src/audio/open-track.js"],
     languageOptions: { globals: globals.worker },
   },
   {
