@@ -226,6 +226,12 @@
  *                             alone: `npm run test:unit`), and record it in
  *                             CHANGELOG.md (what, why, how, where), so the
  *                             next person or LLM can follow.
+ *
+ * READ ALSO
+ *   docs/glossary.md   The app's words (start point, region, Peak +
+ *                      loudness, the dock…) and their names in the code.
+ *   AGENTS.md          Commands, which checks for which change, the
+ *                      conventions and the known pitfalls.
  * ===================================================================== */
 
 import { createAudioEngine } from "./audio/engine.js";

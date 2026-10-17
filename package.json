@@ -27,7 +27,7 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "lint": "eslint .",
-    "typecheck": "tsc -p jsconfig.json",
+    "typecheck": "tsc -p jsconfig.json && tsc -p electron/jsconfig.json",
     "build:dir": "electron-builder --linux --dir",
     "build:linux": "electron-builder --linux",
     "build:win": "electron-builder --win",
@@ -43,6 +43,7 @@
   "private": true,
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@types/node": "^22.20.5",
     "electron": "^44.4.5",
     "electron-builder": "^26.15.3",
     "electron-reload": "^2.0.0-alpha.1",

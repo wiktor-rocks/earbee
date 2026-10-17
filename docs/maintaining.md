@@ -73,64 +73,100 @@ git merge main
 
 ## Trying an idea: an experiment branch
 
-When you want to try something that might not work out, give it its own branch. `testing` stays as it was while you try, and if the idea fails, you delete the branch and nothing of it is left. One branch per idea: two ideas, two branches.
+When you want to try something that might not work out, give it its own branch. `testing` stays as it was while you try. If the idea works, the whole branch is merged into `testing`; if it doesn't, the branch is deleted and nothing of it is left. One branch per idea: two ideas, two branches.
 
-### Start one
+The procedures below are exact, so that anyone, a person or an AI assistant, does the same thing every time. Follow them step by step: run each command as written, then do its check.
 
-```sh
-git checkout testing
-git pull                       # start from the latest testing
-git checkout -b exp/tuner      # a new branch, "exp/" and a short name, starting where testing is
-git push -u origin exp/tuner   # put it on GitHub too; -u makes later git push / git pull use it
-```
+### The rules
 
-### Work on it
+1. **The name.** An experiment branch is `exp/` followed by the idea's name, which uses only lowercase letters, digits and single hyphens, starts and ends with a letter or digit, and is at most 30 characters (`exp/tuner`, `exp/midi-input`). Below, `exp/IDEA` stands for that name; replace `IDEA` everywhere with it.
+2. **When something goes wrong, stop.** If a command fails (an error, or a non-zero exit code) or a check doesn't give the expected result: don't try other commands to get around it. Stop, and report the command, its output and the step you were on. The exceptions are written into the steps (a merge conflict in A3, failed tests in D5).
+3. **Never** on an experiment: `git rebase`, `git push --force`, `git reset --hard` (except where D5 says so), merging an `exp/` branch into `main`, or committing to `main`.
+4. **CHANGELOG.md is only written on `testing`**, when an experiment is merged into it (D7). Not on an `exp/` branch.
+5. **Only the owner decides** whether an experiment worked. An AI assistant asks before running D (merge into `testing`) or E (throw away), and names the branch in the question.
+6. **Start every procedure with a clean working tree.** `git status --porcelain` prints nothing. If it prints anything, stop: there are uncommitted changes to commit or put aside first.
 
-The same as on `testing`: change things, `npm start` to try them, commit, `git push`. CI checks each push (the 1-minute checks). Don't write a CHANGELOG entry yet; that comes when the idea goes into `testing`.
+### A. Start an experiment
 
-### Keep it up to date (if it takes a while)
+| #   | Run                                                  | Check                                                                                |
+| --- | ---------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| A1  | `git status --porcelain`                             | Prints nothing (rule 6).                                                             |
+| A2  | `git fetch origin`                                   | No error.                                                                            |
+| A3  | `git rev-parse --verify --quiet refs/heads/exp/IDEA` | Prints nothing: no such branch here. If it prints a commit, the name is taken: stop. |
+| A4  | `git ls-remote --exit-code --heads origin exp/IDEA`  | Prints nothing and exits with 2: no such branch on GitHub. Otherwise stop.           |
+| A5  | `git checkout testing`                               | No error.                                                                            |
+| A6  | `git pull --ff-only`                                 | No error: `testing` is now up to date with GitHub.                                   |
+| A7  | `git checkout -b exp/IDEA`                           | Prints `Switched to a new branch 'exp/IDEA'`.                                        |
+| A8  | `git push -u origin exp/IDEA`                        | Prints `branch 'exp/IDEA' set up to track 'origin/exp/IDEA'`.                        |
+| A9  | `git status -sb`                                     | The first line is `## exp/IDEA...origin/exp/IDEA`, with nothing after it.            |
 
-```sh
-git checkout exp/tuner
-git merge testing              # bring in what's new on testing since you started
-git push
-```
+### B. Work on the experiment
 
-### It worked: bring it into `testing`
+For each change:
 
-```sh
-git checkout testing
-git pull
-git merge exp/tuner            # all of the experiment's commits come along
-npm test                       # everything still passes?
-```
+| #   | Run                                                                | Check                                                                             |
+| --- | ------------------------------------------------------------------ | --------------------------------------------------------------------------------- |
+| B1  | `git branch --show-current`                                        | Prints `exp/IDEA`. If not, `git checkout exp/IDEA` first.                         |
+| B2  | (make the change; try it with `npm start`)                         |                                                                                   |
+| B3  | `npm run check`                                                    | Passes. If it fails, fix the change (B2) and run it again.                        |
+| B4  | `git add` the changed files, then `git commit -m "<what changed>"` | A short line saying what changed. `CHANGELOG.md` is not among the files (rule 4). |
+| B5  | `git push`                                                         | No error. CI checks the push (about a minute).                                    |
 
-Add the CHANGELOG entry for the new feature, commit it, and `git push`. Then delete the experiment, which is now part of `testing`:
+### C. Bring in what's new on `testing` (for an experiment that takes a while)
 
-```sh
-git branch -d exp/tuner              # -d only deletes a branch that's been merged
-git push origin --delete exp/tuner   # and on GitHub
-```
+| #   | Run                                         | Check                                                                                                                                                                                       |
+| --- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1  | `git status --porcelain`                    | Prints nothing.                                                                                                                                                                             |
+| C2  | `git checkout testing`                      | No error.                                                                                                                                                                                   |
+| C3  | `git pull --ff-only`                        | No error.                                                                                                                                                                                   |
+| C4  | `git checkout exp/IDEA`                     | No error.                                                                                                                                                                                   |
+| C5  | `git merge --no-edit testing`               | Ends without `CONFLICT`. If it says `CONFLICT`: run `git merge --abort`, check that `git status --porcelain` prints nothing, and stop (rule 2): a person resolves the conflict (see below). |
+| C6  | `npm run check`                             | Passes. If it fails, stop.                                                                                                                                                                  |
+| C7  | `git push`                                  | No error.                                                                                                                                                                                   |
+| C8  | `git merge-base --is-ancestor testing HEAD` | Exits with 0: the experiment now contains all of `testing`.                                                                                                                                 |
 
-From here it goes to `main` the usual way, with `testing`. Never merge an experiment into `main` directly.
+### D. It worked: merge it into `testing` (ask first, rule 5)
 
-### It didn't work: throw it away
+| #   | Run                                                                                                                                                                   | Check                                                                                                                                |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| D1  | Procedure C, all of it                                                                                                                                                | Every check passes.                                                                                                                  |
+| D2  | `git checkout testing`                                                                                                                                                | No error.                                                                                                                            |
+| D3  | `git pull --ff-only`                                                                                                                                                  | No error.                                                                                                                            |
+| D4  | `git merge --no-ff exp/IDEA -m "Merge experiment exp/IDEA"`                                                                                                           | Ends without `CONFLICT` (C made sure it can't conflict).                                                                             |
+| D5  | `npm test`                                                                                                                                                            | Passes (about 10 minutes). If it fails: run `git reset --hard ORIG_HEAD`, which undoes the merge (nothing was pushed yet), and stop. |
+| D6  | `git log --oneline -1`                                                                                                                                                | Shows `Merge experiment exp/IDEA`.                                                                                                   |
+| D7  | Add a CHANGELOG.md entry for the feature (at the top, in the format described there), then `git add CHANGELOG.md` and `git commit -m "<the feature, in a few words>"` | No error.                                                                                                                            |
+| D8  | `git push`                                                                                                                                                            | No error.                                                                                                                            |
+| D9  | `git branch -d exp/IDEA`                                                                                                                                              | Prints a line starting `Deleted branch exp/IDEA` (then the commit it was on). (`-d` refuses if the branch isn't merged: then stop.)  |
+| D10 | `git push origin --delete exp/IDEA`                                                                                                                                   | Prints a line with `[deleted]` and `exp/IDEA`.                                                                                       |
+| D11 | `git status -sb`                                                                                                                                                      | The first line is `## testing...origin/testing`, with nothing after it.                                                              |
 
-```sh
-git checkout testing
-git branch -D exp/tuner              # -D deletes it even though it was never merged
-git push origin --delete exp/tuner   # and on GitHub
-```
+From here it reaches `main` the usual way, with `testing` (step 4 of "Each time you work on it").
 
-Or keep it for later reference: an unused branch costs nothing.
+### E. It didn't work: throw it away (ask first, rule 5)
 
-### Finding your way
+| #   | Run                                                 | Check                                                                                                                         |
+| --- | --------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| E1  | `git status --porcelain`                            | Prints nothing.                                                                                                               |
+| E2  | `git checkout testing`                              | No error.                                                                                                                     |
+| E3  | `git branch -D exp/IDEA`                            | Prints a line starting `Deleted branch exp/IDEA` (then the commit it was on). (`-D` deletes it although it was never merged.) |
+| E4  | `git push origin --delete exp/IDEA`                 | Prints a line with `[deleted]` and `exp/IDEA`.                                                                                |
+| E5  | `git ls-remote --exit-code --heads origin exp/IDEA` | Prints nothing and exits with 2: gone from GitHub too.                                                                        |
 
-- `git branch --show-current`: which branch you're on.
-- `git branch`: all your branches. `git branch -r` lists the ones on GitHub.
-- `git log --oneline testing..exp/tuner`: the commits on the experiment that aren't on `testing` yet.
+To keep a failed idea for reference instead, skip E: an unused branch costs nothing.
 
-**A merge conflict** means both branches changed the same lines, and git asks you which to keep. `git status` lists the files; in each, keep the right lines between the `<<<<<<<` and `>>>>>>>` markers and delete the markers, then `git add` the files and `git commit`. To give up instead, `git merge --abort` puts everything back as it was.
+### F. See what's there
+
+| Run                                    | Shows                                                  |
+| -------------------------------------- | ------------------------------------------------------ |
+| `git branch --show-current`            | The branch you're on.                                  |
+| `git branch --list 'exp/*'`            | The experiments on this computer.                      |
+| `git ls-remote --heads origin 'exp/*'` | The experiments on GitHub.                             |
+| `git log --oneline testing..exp/IDEA`  | The experiment's commits that aren't on `testing` yet. |
+
+### A merge conflict (for a person)
+
+A conflict means both branches changed the same lines, and git asks which to keep. After C5 stopped, do the merge by hand: `git checkout exp/IDEA`, `git merge testing`. `git status` lists the files in conflict. In each, keep the right lines between the `<<<<<<<` and `>>>>>>>` markers and delete the markers. Then `git add` those files, `git commit --no-edit`, and carry on from C6. To give up instead, `git merge --abort` puts everything back as it was.
 
 ## Putting out a new version
 

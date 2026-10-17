@@ -81,7 +81,8 @@ app.on("child-process-gone", (_event, details) => {
 });
 
 async function logGpuInfo() {
-  const info = await app.getGPUInfo("basic");
+  // Electron types this as unknown; "basic" has the devices, each with `active`.
+  const info = /** @type {{ gpuDevice?: { active: boolean }[] }} */ (await app.getGPUInfo("basic"));
   const activeGpu = info.gpuDevice?.find((device) => device.active);
   console.log("GPU features:", app.getGPUFeatureStatus());
   console.log("Active GPU:", activeGpu ?? info.gpuDevice);
@@ -91,7 +92,8 @@ async function logGpuInfo() {
 // what tests, builds and the landing page write or hold (this replaces
 // electron-reload's own list, so node_modules and dotfiles are repeated).
 if (!app.isPackaged) {
-  require("electron-reload")(ROOT, {
+  // Its types declare a default export, but the module is the function itself.
+  /** @type {(glob: string, options: object) => void} */ (/** @type {unknown} */ (require("electron-reload")))(ROOT, {
     electron: require(path.join(ROOT, "node_modules", "electron")),
     ignored: [/node_modules|[/\\]\./, /[/\\](dist|site|tests[/\\](output|fixtures))([/\\]|$)/],
   });
@@ -218,7 +220,7 @@ app.whenReady().then(() => {
   handleDownloads(ipcMain, {
     binDir: path.join(userData, "bin"),
     saveDir: downloadsFolder,
-    prefs: () => prefsStore.get("downloads"),
+    prefs: () => /** @type {{ folder: string | null, maxHeight: number }} */ (prefsStore.get("downloads")),
     fetch: net.fetch, // follows the system's proxy settings
     share: mediaFiles.share,
     // A search result, in the browser (no browser: just a warning).

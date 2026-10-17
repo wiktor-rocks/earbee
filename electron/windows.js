@@ -208,6 +208,10 @@ function handleVideoWindows(ipcMain) {
 
 // Lets `win`'s page open its video window. `extraOptions` are added to the
 // window's options (the tests make it offscreen).
+/**
+ * @param {Electron.BrowserWindow} win
+ * @param {{ icon?: string | Electron.NativeImage, extraOptions?: Electron.BrowserWindowConstructorOptions }} [options]
+ */
 function allowVideoWindow(win, { icon, extraOptions = {} } = {}) {
   const contents = win.webContents;
   const id = contents.id;

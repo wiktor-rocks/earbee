@@ -163,7 +163,7 @@ function removeStaleWorkFolders() {
  *   The Downloads settings (prefs-store.js), read at the start of each download.
  * @param {string} [options.ytDlp]     A yt-dlp to use as is (no setup or updates); the tests pass a fake.
  * @param {string} [options.jsRuntime] The Node-compatible runtime yt-dlp uses (default: this Electron).
- * @param {typeof fetch} [options.fetch]
+ * @param {typeof globalThis.fetch} [options.fetch]
  */
 function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.execPath, fetch = globalThis.fetch }) {
   const managed = !ytDlp;
@@ -200,11 +200,11 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
         stallTimer = setTimeout(() => stalled.abort(), STALL_MS);
         hash.update(chunk);
         received += chunk.length;
-        if (!out.write(chunk)) await new Promise((resolve) => out.once("drain", resolve));
+        if (!out.write(chunk)) await new Promise((resolve) => out.once("drain", () => resolve(undefined)));
         onProgress({ stage: "setup", fraction: total ? received / total : null });
       }
       await new Promise((resolve, reject) =>
-        out.end((/** @type {any} */ error) => (error ? reject(error) : resolve())),
+        out.end((/** @type {any} */ error) => (error ? reject(error) : resolve(undefined))),
       );
       if (hash.digest("hex") !== expected) throw new DownloadError("The downloaded yt-dlp was damaged. Try again.");
       fs.chmodSync(partial, 0o755);

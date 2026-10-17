@@ -1,0 +1,19 @@
+{
+  // Type-checks the main process (electron/, CommonJS on Node) from its
+  // JSDoc comments, as ../jsconfig.json does the page; nothing is compiled.
+  // Its own file, because the page is browser code (DOM, ES modules) and
+  // this is Node's (require, Electron's API).
+  "compilerOptions": {
+    "checkJs": true,
+    "noEmit": true,
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "lib": ["ES2023", "DOM"], // DOM: preload.js and splash.js run in a page
+    "types": ["node"],
+    "strict": false,
+    "skipLibCheck": true,
+    "maxNodeModuleJsDepth": 0
+  },
+  "include": ["**/*.js"]
+}

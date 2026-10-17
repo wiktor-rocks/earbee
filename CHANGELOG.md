@@ -43,6 +43,34 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-17: A codebase comfortable for AI assistants: AGENTS.md, a glossary, the main process type-checked
+
+- **What:**
+  - **`AGENTS.md`**, the one place an AI assistant starts: what EarBee is (the page and the main process), what to read first, how to find your way in the big files (style.css's outline, CHANGELOG's top), the commands, which checks to run for which change, the conventions, the known pitfalls, and the branches. `CLAUDE.md` includes it, for Claude Code.
+  - **`docs/glossary.md`**: the app's words (start and stop point, region, phrase, snapping, beat model, Peak + loudness, the dock, the proxy, project sections…) mapped to the identifiers and files in the code.
+  - **The main process is type-checked too.** `npm run check` now runs `tsc` on `electron/` (new `electron/jsconfig.json`) as well as on the page.
+  - The header of `src/app.js` ends with "READ ALSO": the glossary and AGENTS.md.
+- **Why:** the user wants any LLM to be able to work in the repo without being told the basics each time: where things are, what the app's words mean in code, what to run, and what's known to go wrong. Type-checking the main process catches an assistant's mistakes there the way they're already caught in the page.
+- **How:**
+  - The pitfalls were scattered through code comments and notes: `ELECTRON_RUN_AS_NODE` from VS Code's terminal, e2e needing a display (`xvfb-run -a`), the harness emptying `tests/output/downloads`, the flaky `spawn ETXTBSY` unit test in CI, `.npmrc` and ONNX Runtime's CUDA, and `site/` being published as is.
+  - **Types:** `electron/jsconfig.json` uses the page's lenient settings, with Node's module system (`NodeNext`), Node's types, and the DOM's for `preload.js` and `splash.js`, which run in a page. It found 9 errors, all JSDoc out of step with the code; the fixes change no behaviour. The `fetch` option's type now names `globalThis.fetch` (it referred to itself). Two `resolve` callbacks became `() => resolve(undefined)`. The GPU info gets its shape (Electron types it `unknown`). electron-reload is cast to what it is (its types declare a default export the module doesn't have). The Downloads settings get their type at the call. `allowVideoWindow` gets JSDoc, including `icon`.
+  - `@types/node@^22` is now a devDependency, matching the Node the app needs. It came only through electron-builder before (at 24), and could have vanished.
+  - Every identifier in the glossary was checked with `grep` against the files it names, and every command in AGENTS.md was run.
+- **Where:** new `AGENTS.md`, `CLAUDE.md`, `docs/glossary.md`, `electron/jsconfig.json`; `package.json` (`typecheck`, `@types/node`), `package-lock.json`; `electron/main.js`, `downloader.js`, `windows.js` (JSDoc); `src/app.js` (header).
+- **Verified by:** `npm run check` with the new type-check. A type error planted in `electron/beat-model.js` was caught, then removed. The unit tests (269), one unit file on its own, `TB_TOPICS=20 npm test` (41 e2e, 28 smoke) and the style.css outline grep. `npm audit`'s 12 findings are all in electron-builder's and electron-reload's dependencies, as before; `@types/node` added none.
+
+## 2026-10-17: The experiment procedure, step by step; notes for AI assistants
+
+- **What:** the "Trying an idea: an experiment branch" section of `docs/maintaining.md` is now an exact procedure that a person or an AI assistant can follow the same way every time. It starts with six rules: the branch name, stop when something goes wrong, what never to do, where the CHANGELOG is written, who decides, and a clean working tree. Then come procedures A (start), B (work), C (bring in `testing`), D (merge into `testing`), E (throw away) and F (see what's there), each a table of numbered steps with the command and the check of its result. New `AGENTS.md` sums up the branches and the per-change routine for AI assistants and points to the procedure. New `CLAUDE.md` includes it, for Claude Code.
+- **Why:** the user wants an LLM to be able to repeat the procedure exactly, every time.
+- **How:**
+  - Each step's check is something a reader can test: an exact line of output, an exit code (`git ls-remote --exit-code` exits with 2 when a branch isn't there; `git merge-base --is-ancestor` with 0), or "no error". On anything else, rule 2 says stop and report.
+  - The two places where failing is expected say what to do. A conflict in C5: `git merge --abort`, then a person resolves it. Failed tests in D5: `git reset --hard ORIG_HEAD` undoes the unpushed merge.
+  - D merges with `--no-ff` and a fixed message ("Merge experiment exp/IDEA"), so a finished experiment is visible in the history. C runs first, so D can't conflict.
+  - Before D and E an assistant asks the owner (rule 5).
+- **Where:** `docs/maintaining.md`, new `AGENTS.md` and `CLAUDE.md`, `README.md` (pointer).
+- **Verified by:** `npm run format:check`. Procedures A to E were run in a scratch clone with a local stand-in for GitHub, and every expected output was checked against the real one. A merge conflict in C5 was provoked, and so was `-d` refusing an unmerged branch. Two checks were reworded to match git's real wording: "Deleted branch … (was …)", and "- [deleted]" followed by several spaces.
+
 ## 2026-10-17: Experiments on their own branches
 
 - **What:** a third kind of branch, for trying ideas that might not work out: `exp/<idea>` (say, `exp/tuner`), one per idea, made from `testing`. If the idea works, the whole branch is merged into `testing` and deleted; if not, it's just deleted. `docs/maintaining.md` has a new section, "Trying an idea: an experiment branch", with the commands for starting one, keeping it up to date, bringing it into `testing`, throwing it away, finding your way and handling a merge conflict. CI checks every `exp/` branch too.
