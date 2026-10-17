@@ -211,8 +211,9 @@ function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
       }
       // The page goes on reading its media by the same URL; once it's
       // inside the new file, from there (the old one may have been replaced).
+      // Then it is only inside a project, and a later save can't link to it.
       if (embed) mediaFiles.update(mediaUrl, { path: target, offset: headerBytes.length + 1, size, name: source.name });
-      return { ok: true, path: target, name: path.basename(target), embedded: embed, linkable };
+      return { ok: true, path: target, name: path.basename(target), embedded: embed, linkable: linkable && !embed };
     },
   };
 }

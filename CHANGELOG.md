@@ -43,6 +43,28 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-17: Bug hunt: four fixes
+
+A read-through of the risky code (transport, marks, timeline, projects, opening files, decoder, main process, downloader) for real bugs.
+
+- **The start point no longer carries over to the next file.**
+  - **What:** if you clicked or stepped somewhere in a song without playing it and then opened another, Space played the new one from the old spot, and the ▶ readout showed it. Now a new file always starts at 0.
+  - **How:** `returnPoint` (and the stop point) is reset by the transport's `"state"` event, but `setState` stays quiet when the state doesn't change. A song that was never played stays `"ready"` (a seek doesn't change that), so loading the next one sent no event. `transport.load()` now always sends `"state"`. Every listener is safe to run twice.
+  - **Where:** `src/audio/transport.js` (`load`); the listener in `features/playback.js` (`bindPlayback`).
+- **After Save As with the media inside, linking is no longer offered when it can't work.**
+  - **What:** after Save As → "put it inside", the next Save As still offered "link to the media", and choosing it failed with "This song or video is inside its project…". Now that choice is disabled, with its usual note, as it is when you reopen that project.
+  - **How:** `save()` worked out `linkable` before pointing the page's media URL at the copy inside the new project, so it answered `true` for a URL that now names an embedded slice. It now answers `linkable && !embed`.
+  - **Where:** `electron/project-files.js` (`save`).
+- **Ctrl+S while renaming a mark saves the new name.**
+  - **What:** typing a mark's name and pressing Ctrl+S without leaving the field saved the old name, and the • came back once you clicked away.
+  - **How:** the name field commits on `"change"`, which only fires on blur or Enter, while Ctrl shortcuts work inside text fields. `writeProject` now dispatches `"change"` on a focused text field before it captures, so the field keeps its focus.
+  - **Where:** `src/features/project/index.js` (`writeProject`).
+- **A download's time left never reads "0:60".**
+  - **What / How:** `formatEta` rounded the seconds after splitting off the minutes, so 59.6 s showed as "0:60". It now rounds first.
+  - **Where:** `src/core/format.js` (`formatEta`).
+- **Why:** the user asked for a bug hunt.
+- **Verified by:** new unit tests: a reload while `"ready"` still announces the state (`transport.test.mjs`); the embedded save answers `linkable: false`, and a link save from that URL is refused (`project.test.mjs`); `formatEta(59.6)` (`core.test.mjs`). `npm run test:unit` (203 pass) and `npm run check` pass. The e2e topics 02, 03, 04, 14 and 16 (156 pass) and the smoke test (21 pass) also pass.
+
 ## 2026-10-13: Issue forms: feature request and bug report
 
 - **What:** **New issue** on GitHub now offers two forms. The website is offered as a link next to them, and blank issues are still allowed.

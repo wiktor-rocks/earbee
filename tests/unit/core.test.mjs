@@ -41,6 +41,8 @@ describe("format", () => {
     assert.equal(formatStepSize(0.25), "0.25");
     assert.equal(formatEta(75), "1:15");
     assert.equal(formatEta(5), "0:05");
+    assert.equal(formatEta(59.6), "1:00");
+    assert.equal(formatEta(119.7), "2:00");
   });
 
   test("clamp", () => {

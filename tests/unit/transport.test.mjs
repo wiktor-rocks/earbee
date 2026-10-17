@@ -64,6 +64,17 @@ describe("loading", () => {
     transport.load(0);
     assert.equal(transport.state, "empty");
   });
+
+  test("a new track is announced even when the old one was still ready", () => {
+    const { transport, events } = setup();
+    transport.seek(4); // no state change: still "ready"
+    events.length = 0;
+    transport.load(20);
+    assert.deepEqual(
+      events.filter(([name]) => name === "state"),
+      [["state", "ready"]],
+    );
+  });
 });
 
 describe("playing", () => {

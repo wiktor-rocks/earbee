@@ -47,5 +47,8 @@ const compact = new Intl.NumberFormat("en", { notation: "compact", maximumFracti
 export const formatCount = (count) => compact.format(count);
 
 // 75 → "1:15" (time left in a download).
-export const formatEta = (seconds) =>
-  `${Math.floor(seconds / 60)}:${String(Math.round(seconds % 60)).padStart(2, "0")}`;
+// Rounded first, so 59.6 is "1:00", not "0:60".
+export function formatEta(seconds) {
+  const total = Math.round(seconds);
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
+}

@@ -121,11 +121,16 @@ describe("main process", () => {
     const target = path.join(folder, "inside.sbee");
     const saved = await projects.save(null, { file: target, mediaUrl, embed: true, duration: 2, sections });
     assert.equal(saved.embedded, true);
-    assert.equal(saved.linkable, true, "the media was still its own file");
+    assert.equal(saved.linkable, false, "the page's URL now names the media inside, which can't be linked");
     const header = await readHeader(target);
     assert.equal(header.fileSize - header.mediaOffset, 300);
     assert.equal(parseProject(header.text).media.path, null, "no path when it's inside");
     assert.deepEqual(await body(mediaUrl), bytes, "the page's URL now reads from the project");
+    await assert.rejects(
+      projects.save(null, { file: path.join(folder, "link.sbee"), mediaUrl, embed: false, duration: 2, sections }),
+      /inside its project/,
+      "as linkable: false said",
+    );
 
     const opened = await projects.open(null, target);
     assert.equal(opened.embedded, true);

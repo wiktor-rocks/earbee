@@ -16,6 +16,7 @@ import { hasAudio, marks, player } from "../../context.js";
 import { AppError } from "../../core/errors.js";
 import { isProjectName } from "../../project/format.js";
 import { dom, guarded, onClick, reportError, showNotice } from "../../ui/dom.js";
+import { isTextField } from "../../ui/shortcuts.js";
 import { notify } from "../../ui/toast.js";
 import { importChapters } from "../marks.js";
 import { loadMediaFile, withLoading } from "../open-file.js";
@@ -226,6 +227,10 @@ async function writeProject(file, embed) {
   if (!bridge || !hasAudio()) return false;
   if (!session.mediaUrl)
     throw new AppError(`“${session.mediaName}” isn't a file on this computer, so a project can't name it.`);
+  // A name still being typed (Ctrl+S works in text fields) counts: its
+  // field only commits on "change", which hasn't fired yet.
+  const focused = document.activeElement;
+  if (focused instanceof HTMLElement && isTextField(focused)) focused.dispatchEvent(new Event("change"));
   const result = await bridge.save({
     file,
     mediaUrl: session.mediaUrl,

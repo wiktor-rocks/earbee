@@ -259,7 +259,10 @@ export function createTransport({ engine, getRate, getSemitones }) {
     loop = null;
 
     if (duration) apply({ input: 0, active: false });
-    setState(duration ? "ready" : "empty");
+    // Always announced, even if the state is the same ("ready" before and
+    // after): views reset what belonged to the old track on it.
+    state = duration ? "ready" : "empty";
+    events.emit("state", state);
     onPosition(0);
   }
 
