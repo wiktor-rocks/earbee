@@ -246,7 +246,7 @@ import {
 } from "./features/marks.js";
 import { bigVideoPictureChanged, bindBigVideo, toggleBigVideo } from "./features/big-video.js"; // Big video (src/features/big-video.js)
 import { bindLayout, openShortcuts } from "./features/layout.js";
-import { beatsAction, bindBeats, toggleBeatClick } from "./features/beats.js";
+import { beatsAction, bindBeats, snapForDrag, toggleBeatClick } from "./features/beats.js";
 import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
 import { bindProject, isSaveDialogOpen, openFile, saveProject, saveProjectAs } from "./features/project/index.js";
@@ -257,7 +257,10 @@ import {
   bindTransportButtons,
   clearLoop,
   holdToPlay,
+  loopThisBar,
+  moveLoopBy,
   releaseHold,
+  resizeLoopBy,
   replayFromStopOrPause,
   replayOrPause,
   setLoopEnd,
@@ -313,6 +316,7 @@ const waveform = createWaveform({
   minimapContainer: $("waveform-minimap"),
   onSeek: (time) => transport.seek(time),
   onLoopChange: (loop) => setLoopRegion({ ...loop, enabled: true }),
+  snap: snapForDrag,
 });
 
 // The markers' lanes above the waveform, following its zoom and scroll.
@@ -327,6 +331,7 @@ const timeline = createTimeline({
   onMarkChange: moveMark,
   onMarkRename: renameMark,
   onStartPointChange: setStartPoint,
+  snap: snapForDrag,
 });
 
 const videoView = createVideoView({
@@ -471,6 +476,43 @@ const SHORTCUTS = [
   },
   { group: "A–B loop", codes: ["BracketLeft"], keys: ["["], description: "Loop start", down: setLoopStart },
   { group: "A–B loop", codes: ["BracketRight"], keys: ["]"], description: "Loop end", down: setLoopEnd },
+  {
+    group: "A–B loop",
+    codes: ["Backslash", "IntlBackslash"],
+    keys: ["\\", "\\"],
+    description: "Loop the bar you're in (with the beats found: B)",
+    down: loopThisBar,
+  },
+  {
+    group: "A–B loop",
+    codes: ["BracketRight"],
+    shift: true,
+    keys: ["]"],
+    description: "Next phrase: the loop moved on by its length",
+    down: () => moveLoopBy(1),
+  },
+  {
+    group: "A–B loop",
+    codes: ["BracketLeft"],
+    shift: true,
+    keys: ["["],
+    description: "Previous phrase",
+    down: () => moveLoopBy(-1),
+  },
+  {
+    group: "A–B loop",
+    codes: ["Equal", "NumpadAdd"],
+    keys: ["=", "+"],
+    description: "Double the loop",
+    down: () => resizeLoopBy(2),
+  },
+  {
+    group: "A–B loop",
+    codes: ["Minus", "NumpadSubtract"],
+    keys: ["-", "−"],
+    description: "Halve the loop",
+    down: () => resizeLoopBy(0.5),
+  },
   { group: "A–B loop", codes: ["KeyL"], keys: ["L"], description: "Loop on / off", down: toggleLoop },
   { group: "A–B loop", codes: ["KeyL"], shift: true, keys: ["L"], description: "Clear loop", down: clearLoop },
   { group: "Marks", codes: ["KeyM"], keys: ["M"], description: "Mark a point", down: markPoint },

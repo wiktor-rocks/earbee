@@ -113,6 +113,41 @@ module.exports = async function (h) {
     JSON.stringify(loop),
   );
 
+  // A drag takes effect as it goes: while playing, pull B in from 4 to 2
+  // with the mouse still held, and playback already wraps at 2.
+  key("Space");
+  await sleep(300);
+  {
+    const y = Math.round((await rect()).y);
+    const [from, to] = [await xAt(4), await xAt(2)];
+    wc.sendInputEvent({ type: "mouseDown", x: from, y, button: "left", clickCount: 1 });
+    for (let i = 1; i <= 6; i++) {
+      wc.sendInputEvent({ type: "mouseMove", x: Math.round(from + ((to - from) * i) / 6), y, button: "left" });
+      await sleep(20);
+    }
+    await sleep(150);
+    const held = await loopRange();
+    check(
+      "while dragging, the loop is already the dragged one",
+      held && Math.abs(held.end - 2) < 0.06,
+      JSON.stringify(held),
+    );
+    const during = (await sample(1500)).slice(10);
+    let wraps = 0;
+    for (let i = 1; i < during.length; i++) if (during[i].pos < during[i - 1].pos - 0.01) wraps++;
+    check(
+      "…and playback wraps at the pointer before the mouse is released",
+      wraps >= 1 && during.every((p) => p.pos <= held.end + 0.01),
+      `wraps=${wraps}, max ${Math.max(...during.map((p) => p.pos)).toFixed(3)}`,
+    );
+    wc.sendInputEvent({ type: "mouseUp", x: to, y, button: "left", clickCount: 1 });
+    await sleep(150);
+    check("releasing keeps it", Math.abs((await loopRange()).end - 2) < 0.06, JSON.stringify(await loopRange()));
+  }
+  await ensurePaused();
+  await drag(null, 4, [], await xAt(2), undefined); // back to 0.5–4 for what follows
+  loop = await loopRange();
+
   // Short shift+drag acts as a click
   const xs = await xAt(10);
   await drag(null, null, ["shift"], xs, xs + 1);

@@ -32,8 +32,10 @@ import { drawWaveform } from "./waveform-draw.js";
  * The A–B loop is drawn as a <div part="loop-region"> inside WaveSurfer's
  * wrapper (styled from style.css with ::part), positioned in percent so it
  * follows zoom and scrolling. Shift+drag draws a loop and dragging near
- * an edge moves that edge; the result goes to onLoopChange, and the
- * region only changes for good when setLoop() is called with it.
+ * an edge moves that edge (both snap to beats close by, through the `snap`
+ * option, unless Alt is held). The loop goes to onLoopChange as the drag
+ * goes (once per frame), so playback follows the pointer live; the region
+ * only changes for good when setLoop() is called with it.
  *
  * Markers (marks, the start and stop points) are not drawn here: they
  * live on their own lanes above the waveform (timeline.js), which follow
@@ -68,9 +70,12 @@ import { drawWaveform } from "./waveform-draw.js";
  * @param {HTMLElement} options.container
  * @param {HTMLElement} options.minimapContainer
  * @param {(time: number) => void} options.onSeek A click or drag asks to move the cursor.
- * @param {(loop: Loop) => void} options.onLoopChange A drag drew or adjusted the loop.
+ * @param {(loop: Loop) => void} options.onLoopChange A drag is drawing or
+ *   adjusting the loop: called as it goes (once per frame, when it changes).
+ * @param {(time: number, pxPerSecond: number) => number} [options.snap] Where a
+ *   dragged loop edge at `time` lands (snapping to beats); not while Alt is held.
  */
-export function createWaveform({ container, minimapContainer, onSeek, onLoopChange }) {
+export function createWaveform({ container, minimapContainer, onSeek, onLoopChange, snap = (time) => time }) {
   const { maxZoomMultiplier, initialViewSeconds } = CONFIG.waveform;
 
   let waveSurfer = null;
@@ -293,13 +298,18 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
 
   // One drag at a time: { mode: "seek" } | { mode: "draw", anchor }
   // | { mode: "edge", fixed } (`fixed` is the loop end that stays put),
-  // plus `draft`, the loop described so far, while drawing or adjusting.
+  // plus `draft`, the loop described so far, while drawing or adjusting,
+  // and `sent`, the last of those passed to onLoopChange.
   function bindPointerSeek() {
     const { minSeconds } = CONFIG.loop;
     let pointerId = null;
     let drag = null;
     let pendingX = null;
+    let free = false; // Alt held: loop edges don't snap
     let frame = 0;
+
+    const snapped = (time) =>
+      free ? time : snap(time, waveSurfer.getWrapper().getBoundingClientRect().width / duration);
 
     // The loop described by the current drag, or null if it is too short.
     function draftLoop(time) {
@@ -320,7 +330,14 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       const time = timeAtClientX(x);
       if (drag.mode === "seek") onSeek(time);
       else {
-        drag.draft = draftLoop(time);
+        drag.draft = draftLoop(snapped(time));
+        // Playback follows at once: the loop is where the pointer is now,
+        // not only once the mouse is released.
+        const { draft, sent } = drag;
+        if (draft && (draft.start !== sent?.start || draft.end !== sent?.end)) {
+          drag.sent = draft;
+          onLoopChange({ start: draft.start, end: draft.end });
+        }
         renderLoop(drag.draft ?? (drag.mode === "edge" ? loop : null));
       }
     }
@@ -332,8 +349,9 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       // Shift draws a loop anywhere; otherwise a loop edge is moved, and
       // anywhere else seeks.
       const edge = event.shiftKey ? null : loopEdgeAt(event.clientX);
+      free = event.altKey;
       if (edge) drag = { mode: "edge", fixed: edge === "start" ? loop.end : loop.start };
-      else if (event.shiftKey) drag = { mode: "draw", anchor: timeAtClientX(event.clientX) };
+      else if (event.shiftKey) drag = { mode: "draw", anchor: snapped(timeAtClientX(event.clientX)) };
       else drag = { mode: "seek" };
 
       pointerId = event.pointerId;
@@ -359,6 +377,7 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     container.addEventListener("pointermove", (event) => {
       if (event.pointerId !== pointerId) return;
       pendingX = event.clientX;
+      free = event.altKey;
       frame ||= requestAnimationFrame(applyPointer);
     });
 
@@ -378,10 +397,10 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       }
 
       if (finished.mode === "seek") return;
-      if (finished.draft) onLoopChange({ start: finished.draft.start, end: finished.draft.end });
-      // A Shift+click (too short to be a loop) is a plain click.
-      else if (finished.mode === "draw") onSeek(finished.anchor);
-      renderLoop(); // back to the loop as last set
+      // The loop was sent as the drag went (applyPointer). A Shift+click
+      // that never made a loop is a plain click.
+      if (!finished.sent && finished.mode === "draw") onSeek(finished.anchor);
+      renderLoop(); // the loop as last set
     };
     container.addEventListener("pointerup", endDrag);
     container.addEventListener("pointercancel", endDrag);

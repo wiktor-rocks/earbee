@@ -54,6 +54,8 @@ import { formatRulerTime, rulerTicks } from "./core/ruler.js";
  * @param {(id: string, times: MarkTimes) => void} options.onMarkChange A drag moved a mark.
  * @param {(id: string) => void} options.onMarkRename A mark was double-clicked.
  * @param {(time: number) => void} options.onStartPointChange The start point's ▶ was dragged.
+ * @param {(time: number, pxPerSecond: number) => number} [options.snap] Where a
+ *   dragged mark's time lands (snapping to beats); not while Alt is held.
  */
 export function createTimeline({
   ruler,
@@ -66,6 +68,7 @@ export function createTimeline({
   onMarkChange,
   onMarkRename,
   onStartPointChange,
+  snap = (time) => time,
 }) {
   const clickSlopPx = 3; // a press that moves less is a click
 
@@ -297,6 +300,7 @@ export function createTimeline({
     let drag = null;
     let pointerId = null;
     let pendingX = null;
+    let free = false; // Alt held: no snapping
     let frame = 0;
 
     function apply() {
@@ -305,13 +309,14 @@ export function createTimeline({
       const x = pendingX;
       pendingX = null;
       waveform.scrollNearEdge(x);
-      drag.move(x, waveform.timeAtClientX(x));
+      drag.move(x, waveform.timeAtClientX(x), free);
     }
 
     lane.addEventListener("pointerdown", (event) => {
       if (event.button !== 0 || !view.duration) return;
       event.preventDefault();
       drag = press(event);
+      free = event.altKey;
       pointerId = event.pointerId;
       lane.setPointerCapture(pointerId);
       waveform.holdFollow(true);
@@ -321,6 +326,7 @@ export function createTimeline({
     lane.addEventListener("pointermove", (event) => {
       if (event.pointerId !== pointerId) return;
       pendingX = event.clientX;
+      free = event.altKey;
       frame ||= requestAnimationFrame(apply);
     });
     const end = (event) => {
@@ -349,9 +355,9 @@ export function createTimeline({
   function clickOrDrag(startX, { move, click, drop }) {
     let moved = false;
     return {
-      move(x, time) {
+      move(x, time, free) {
         moved ||= Math.abs(x - startX) >= clickSlopPx;
-        if (moved) move(time);
+        if (moved) move(time, free);
       },
       end: (event) => (moved ? drop() : click(event)),
     };
@@ -394,24 +400,27 @@ export function createTimeline({
     let draft = null;
     onMarkSelect(id);
 
-    // Where the mark would be with the pointer at `time`. A region can't
-    // get shorter than CONFIG.marks.minSeconds; it stays as it was.
-    function draftAt(time) {
-      if (part === "point") return { start: time, end: null };
+    // Where the mark would be with the pointer at `time`: the dragged time
+    // (a whole mark's start) snapped to a beat close by, unless `free`. A
+    // region can't get shorter than CONFIG.marks.minSeconds; it stays as it was.
+    const snapped = (time, free) => (free ? time : snap(time, view.width / view.duration));
+    function draftAt(time, free) {
+      if (part === "point") return { start: snapped(time, free), end: null };
       if (part === "whole") {
         const length = (origin.end ?? origin.start) - origin.start;
-        const start = clamp(origin.start + time - grabTime, 0, view.duration - length);
+        const start = clamp(snapped(origin.start + time - grabTime, free), 0, view.duration - length);
         return { start, end: origin.end === null ? null : start + length };
       }
       const other = part === "start" ? origin.end : origin.start;
+      time = snapped(time, free);
       const [start, end] = [Math.min(time, other), Math.max(time, other)];
       if (end - start >= CONFIG.marks.minSeconds) return { start, end };
       return draft ?? { start: origin.start, end: origin.end };
     }
 
     return clickOrDrag(event.clientX, {
-      move(time) {
-        draft = draftAt(time);
+      move(time, free) {
+        draft = draftAt(time, free);
         markDraft = { id, ...draft };
         renderMarks();
       },

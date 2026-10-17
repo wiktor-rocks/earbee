@@ -43,6 +43,43 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-17: Loop by bar, phrase by phrase; snapping to beats
+
+- **What:**
+  - **`\`** loops the bar the cursor is in, or what's being heard while playing. Without bars (the simple beat finder) it loops the beat. Without beats it asks for them (B).
+  - **`=` / `-`** double or halve the loop from its start.
+  - **Shift+`]` / Shift+`[`** move the loop on or back by its own length: the next or previous phrase. Playing, playback jumps straight into it; paused, the cursor goes to its start.
+  - **Snapping:** while the beat lines show, loop edges and marks snap to a beat close by:
+    - a Shift+drag drawing the loop, dragging a loop edge, and dragging a mark (a point, a region's edge, or a whole mark by its start), within 8 px;
+    - `[` `]` M and R, within a quarter of a beat.
+    - Off-beat spots stay where you put them. Hold Alt while dragging to place freely, and hide the lines (B) to stop snapping altogether.
+  - **Loop drags take effect live:** while you drag a loop edge or draw a loop, playback already uses the loop where the pointer is. Pull the end in while it plays and it wraps there at once, not only once the mouse is released.
+- **Why:** to make the section-by-section routine of transcribing quick: loop a bar, grow it to a phrase, then step phrase by phrase without placing loop edges by hand. The user chose the keys (next to `[` `]`), magnetic snapping, and snapping tied to the beat lines.
+- **How:**
+  - **On the grid:** a loop whose ends lie on bar lines (within 30 ms), or else on beats, is counted in bars or beats. Doubling, halving and moving use the music's real beat and bar times, so a drifting tempo is followed.
+    - Halving a one-bar loop goes on to its beats.
+    - A one-beat loop, and a loop off the grid, change by time.
+    - Past the last beat, or before the first, the grid goes on by its average spacing.
+    - The track's ends cut a loop.
+  - **Drags:** `waveform.js` and `timeline.js` can't read the beats (layering), so they take a `snap(time, pxPerSecond)` option, wired in `app.js` to `features/beats.js`. Each tracks the pointer's `altKey`.
+  - **Live loop drags:** `onLoopChange` fires from the per-frame pointer update whenever the drafted loop changes, not only at the drag's end. The transport sends a seamless segment and jumps into the loop if the playhead is now outside it, as dragging the speed slider already does on every input. A Shift+click that never made a loop still only seeks.
+- **Where:**
+  - `core/beats.js` (`snapTo`, `gridTime`, `spanAt`, `onGrid`, `resizeLoop`, `moveLoop`).
+  - `features/beats.js` (`snapToBeat`, `snapForDrag`, `beatGrids`).
+  - `features/playback.js` (`loopThisBar`, `resizeLoopBy`, `moveLoopBy`; `setLoopStart` / `setLoopEnd` snap), `features/marks.js` (`markPoint`, `markRegion`).
+  - `waveform.js` (`bindPointerSeek`), `timeline.js` (`bindDrags`, the marks lane's `draftAt`).
+  - `app.js` (the shortcuts, the `snap` options), `config.js` (`beats.snapPx`, `beats.snapKeyFraction`), `README.md`.
+- **Verified by:**
+  - Unit tests in `tests/unit/beats.test.mjs`: snapping; the grid past its ends; the bar a time is in (including the pickup and past the last); whether a loop lies on the grid; doubling and halving by bars, beats and time, with a drifting grid and the track's end; moving, including past the last bar and at both ends.
+  - `tests/e2e/20-beats.cjs`:
+    - `\` → 4.26–6.26; `=` → 4.26–8.26; `-` → 4.26–6.26; `-` → 4.26–5.26.
+    - Shift+`]` → 5.26–6.26 with the cursor there; Shift+`[` back.
+    - A Shift+drag snaps, but not with Alt.
+    - `[` near a beat snaps, `[` off the beat doesn't; M snaps.
+    - Nothing snaps with the lines hidden; `\` without beats asks for them.
+  - `tests/e2e/03-audio-and-loop.cjs`: while playing, the loop end is pulled from 4 s to 2 s with the mouse still held. The loop is already 0.49–2.00 and playback wraps at 2 s before the release, which keeps it.
+  - `npm run check` and `npm test`.
+
 ## 2026-10-17: Beats by a beat-tracking model, with bars
 
 - **What:**

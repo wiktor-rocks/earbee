@@ -384,3 +384,168 @@ export function stepSizes(sizes, { beat = null, bar = null } = {}) {
   // A stable sort keeps a seconds size before "beat" or "bar" of the same length.
   return all.sort((a, b) => a[1] - b[1]).map(([size]) => size);
 }
+
+/* ---------- Snapping, and loops on the beat grid ---------- */
+
+// A grid is a list of times in order (the beats, or the first beats of the
+// bars) and its average spacing (`length`), by which it goes on before its
+// first time and after its last.
+
+/**
+ * The nearest of `times` to `time`, if it's within `within` seconds;
+ * otherwise `time` itself (magnetic snapping).
+ * @param {ArrayLike<number> | null} times In order.
+ * @param {number} time
+ * @param {number} within
+ */
+export function snapTo(times, time, within) {
+  if (!times?.length || !(within > 0)) return time;
+  const after = firstAfter(times, time);
+  let best = time;
+  let distance = within;
+  for (const index of [after - 1, after]) {
+    if (index < 0 || index >= times.length) continue;
+    const away = Math.abs(times[index] - time);
+    if (away < distance || (away === distance && best === time)) [best, distance] = [times[index], away];
+  }
+  return best;
+}
+
+/**
+ * Grid point `index` of `times`, carried on by `length` before the first and
+ * after the last.
+ * @param {ArrayLike<number>} times
+ * @param {number} index
+ * @param {number} length
+ */
+export function gridTime(times, index, length) {
+  if (index < 0) return times[0] + index * length;
+  if (index >= times.length) return times[times.length - 1] + (index - times.length + 1) * length;
+  return times[index];
+}
+
+// The index of the grid cell containing `time` (from that point to the next).
+function cellIndex(times, time, length) {
+  const last = times.length - 1;
+  if (time < times[0]) return Math.floor((time - times[0]) / length);
+  if (time >= times[last]) return last + Math.floor((time - times[last]) / length);
+  return firstAfter(times, time) - 1;
+}
+
+/**
+ * The grid cell containing `time` (a bar, or a beat), inside the track:
+ * before the first grid point that's the pickup, after the last one more
+ * of `length`.
+ * @param {ArrayLike<number>} times In order, at least one.
+ * @param {number} time
+ * @param {number} length
+ * @param {number} duration
+ */
+export function spanAt(times, time, length, duration) {
+  const index = cellIndex(times, time, length);
+  return {
+    start: Math.max(0, gridTime(times, index, length)),
+    end: Math.min(duration, gridTime(times, index + 1, length)),
+  };
+}
+
+/**
+ * Whether `start` and `end` both lie on the grid (within `tolerance`):
+ * their grid indices, or null.
+ * @param {ArrayLike<number>} times In order, at least one.
+ * @param {number} start
+ * @param {number} end
+ * @param {number} length
+ * @param {number} tolerance
+ * @returns {{ from: number, to: number } | null}
+ */
+export function onGrid(times, start, end, length, tolerance) {
+  const nearest = (time) => {
+    const index = cellIndex(times, time, length);
+    for (const candidate of [index, index + 1]) {
+      if (Math.abs(gridTime(times, candidate, length) - time) <= tolerance) return candidate;
+    }
+    return null;
+  };
+  const from = nearest(start);
+  const to = nearest(end);
+  return from !== null && to !== null && to > from ? { from, to } : null;
+}
+
+/**
+ * @typedef {object} Grids The track's beats and bars (either may be missing).
+ * @property {ArrayLike<number> | null} beats
+ * @property {number | null} beatLength
+ * @property {ArrayLike<number> | null} bars
+ * @property {number | null} barLength
+ * @typedef {{ start: number, end: number }} Span
+ * @typedef {{ duration: number, minSeconds: number }} Limits
+ */
+
+// The loop on the bars if it lies on them, else on the beats, else null:
+// { times, length, from, to }. `minUnits` leaves out a grid the loop has
+// fewer units of (halving a one-bar loop goes on to the beats).
+function loopGrid(grids, { start, end }, minUnits = 1) {
+  const choices = [
+    [grids.bars, grids.barLength],
+    [grids.beats, grids.beatLength],
+  ];
+  for (const [times, length] of choices) {
+    if (!times?.length || !length) continue;
+    const span = onGrid(times, start, end, length, BEAT_STEP_EPSILON);
+    if (span && span.to - span.from >= minUnits) return { times, length, ...span };
+  }
+  return null;
+}
+
+/**
+ * The loop made twice as long (`factor` 2) or half as long (0.5), from the
+ * same start. On the grid, by whole bars or beats as the music has them
+ * (so a drifting tempo is followed): halving a one-bar loop gives half its
+ * beats; a one-beat loop, and a loop off the grid, change by time. Null if
+ * the result would be too short or start past the track's end.
+ * @param {Grids} grids
+ * @param {Span} loop
+ * @param {2 | 0.5} factor
+ * @param {Limits} limits
+ * @returns {Span | null}
+ */
+export function resizeLoop(grids, loop, factor, { duration, minSeconds }) {
+  const grid = loopGrid(grids, loop, factor < 1 ? 2 : 1);
+  let end;
+  if (grid) {
+    const units = grid.to - grid.from;
+    end = gridTime(grid.times, grid.from + (factor > 1 ? units * 2 : Math.floor(units / 2)), grid.length);
+  } else end = loop.start + (loop.end - loop.start) * factor;
+  end = Math.min(end, duration);
+  return end - loop.start >= minSeconds ? { start: loop.start, end } : null;
+}
+
+/**
+ * The loop moved forward (`direction` 1) or back (−1) by its own length:
+ * on the grid by its number of bars or beats, otherwise by time. It's
+ * cut at the track's ends; null if nothing of it would be left.
+ * @param {Grids} grids
+ * @param {Span} loop
+ * @param {1 | -1} direction
+ * @param {Limits} limits
+ * @returns {Span | null}
+ */
+export function moveLoop(grids, loop, direction, { duration, minSeconds }) {
+  const grid = loopGrid(grids, loop);
+  let start;
+  let end;
+  if (grid) {
+    const units = grid.to - grid.from;
+    const from = grid.from + direction * units;
+    start = gridTime(grid.times, from, grid.length);
+    end = gridTime(grid.times, from + units, grid.length);
+  } else {
+    const length = loop.end - loop.start;
+    start = loop.start + direction * length;
+    end = loop.end + direction * length;
+  }
+  start = Math.max(0, start);
+  end = Math.min(duration, end);
+  return end - start >= minSeconds ? { start, end } : null;
+}

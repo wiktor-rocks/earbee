@@ -10,6 +10,8 @@ const { ipcMain, utilityProcess } = require("electron");
 module.exports = async function (h) {
   const {
     js,
+    drag,
+    loopRange,
     key,
     click,
     pos,
@@ -103,6 +105,75 @@ module.exports = async function (h) {
   for (let i = 0; i < 3; i++) key("Down");
   await sleep(50);
 
+  // Looping by bars (\\, = -, Shift+] Shift+[) and snapping to beats.
+  const loopIs = async (start, end) => {
+    const loop = await loopRange();
+    return loop !== null && loop.enabled && near(loop.start, start, 0.002) && near(loop.end, end, 0.002);
+  };
+  await click(5.1);
+  await sleep(100);
+  key("\\");
+  await sleep(100);
+  check("\\ loops the bar the cursor is in", await loopIs(4.26, 6.26), JSON.stringify(await loopRange()));
+  key("=");
+  await sleep(100);
+  check("= doubles it to two bars", await loopIs(4.26, 8.26), JSON.stringify(await loopRange()));
+  key("-");
+  await sleep(100);
+  check("- halves it back to one", await loopIs(4.26, 6.26), JSON.stringify(await loopRange()));
+  key("-");
+  await sleep(100);
+  check("- again: half a bar, by its beats", await loopIs(4.26, 5.26), JSON.stringify(await loopRange()));
+  key("]", ["shift"]);
+  await sleep(150);
+  check("Shift+] moves on to the next phrase", await loopIs(5.26, 6.26), JSON.stringify(await loopRange()));
+  check("…and the cursor to its start", near(await pos(), 5.26, 0.002), await pos());
+  key("[", ["shift"]);
+  await sleep(150);
+  check("Shift+[ moves back", await loopIs(4.26, 5.26), JSON.stringify(await loopRange()));
+
+  await drag(4.32, 6.18, ["shift"]);
+  check("a Shift+drag near the beats snaps onto them", await loopIs(4.26, 6.26), JSON.stringify(await loopRange()));
+  await drag(4.36, 6.14, ["shift", "alt"]);
+  let loop = await loopRange();
+  check(
+    "…with Alt it doesn't",
+    near(loop.start, 4.36, 0.03) && !near(loop.start, 4.26, 0.01) && !near(loop.end, 6.26, 0.01),
+    JSON.stringify(loop),
+  );
+  await click(5.32);
+  key("[");
+  await sleep(100);
+  check(
+    "[ just after a beat starts the loop on it",
+    near((await loopRange()).start, 5.26, 0.002),
+    JSON.stringify(await loopRange()),
+  );
+  await click(5.5);
+  key("[");
+  await sleep(100);
+  check(
+    "[ off the beat stays where it is",
+    near((await loopRange()).start, 5.5, 0.03),
+    JSON.stringify(await loopRange()),
+  );
+  await click(7.31);
+  key("M");
+  await sleep(100);
+  const markTimes = () => js(`document.getElementById("marksList").textContent`);
+  check("M near a beat puts the mark on it", (await markTimes()).includes("0:07.260"), await markTimes());
+  key("Delete");
+  key("B"); // hide the lines: no snapping
+  await sleep(50);
+  await click(5.32);
+  key("[");
+  await sleep(100);
+  loop = await loopRange();
+  check("with the lines hidden, nothing snaps", !near(loop.start, 5.26, 0.01), JSON.stringify(loop));
+  key("B");
+  key("L", ["shift"]);
+  await sleep(50);
+
   await slide("speed", 0.5);
   await sleep(50);
   c = await chip();
@@ -160,4 +231,13 @@ module.exports = async function (h) {
   check("a steady tone has no steady beat", c.text === "♩ No steady beat", JSON.stringify(c));
   check("…and the step stays in seconds", (await stepText()) === "Step 1 s", await stepText());
   await js(`document.getElementById("message").textContent = ""`);
+  await clearToasts();
+  key("\\");
+  await sleep(150);
+  check(
+    "\\ without beats asks for them",
+    (await toasts()).some((t) => t.text === "Find the beats first (B).") && (await loopRange()) === null,
+    JSON.stringify(await toasts()),
+  );
+  await clearToasts();
 };

@@ -26,12 +26,17 @@
  * says each beat will play, and go out through the same volume as the
  * track; a seek, a loop change, a new speed or new beats cancel the ones
  * not yet played and work them out again.
+ *
+ * Snapping: while the beat lines show, loop edges and marks snap to a beat
+ * close by (snapToBeat for keys, snapForDrag for drags; Alt frees a drag),
+ * and beatGrids gives the beats and bars for looping by bar
+ * (features/playback.js).
  * ===================================================================== */
 
 import { CONFIG } from "../config.js";
-import { beats, player, settings } from "../context.js";
+import { beatLength, beats, player, settings } from "../context.js";
 import { beatsFromLogits, CHUNK, FPS, joinWindows, windowInput, windowStarts } from "../core/beat-this.js";
-import { beatClockTimes, medianGap } from "../core/beats.js";
+import { beatClockTimes, medianGap, snapTo } from "../core/beats.js";
 import { setStepSize } from "../ui/controls.js";
 import { dom, onClick, renderBeatInfo, showNotice } from "../ui/dom.js";
 import { getPrefs, onPrefsChange, setPref } from "../ui/prefs.js";
@@ -218,6 +223,32 @@ export function resetBeats(next) {
   show();
   updateClicks();
 }
+
+/* ---------- Snapping, and the grid for loops ---------- */
+
+const snapping = () => beats.status === "found" && beats.shown;
+
+/** A time set by a key ([ ] M R): onto a beat within a share of a beat. @param {number} time */
+export const snapToBeat = (time) =>
+  snapping() ? snapTo(beats.times, time, beatLength() * CONFIG.beats.snapKeyFraction) : time;
+
+/**
+ * A dragged time: onto a beat within CONFIG.beats.snapPx at this zoom.
+ * @param {number} time
+ * @param {number} pxPerSecond
+ */
+export const snapForDrag = (time, pxPerSecond) =>
+  snapping() && pxPerSecond > 0 ? snapTo(beats.times, time, CONFIG.beats.snapPx / pxPerSecond) : time;
+
+/**
+ * The beats and bars, for looping by them (core/beats.js resizeLoop,
+ * moveLoop), or null before they're found.
+ * @returns {import("../core/beats.js").Grids | null}
+ */
+export const beatGrids = () =>
+  beats.status === "found"
+    ? { beats: beats.times, beatLength: beatLength(), bars: beats.bars, barLength: beats.barLength }
+    : null;
 
 /* ---------- The beat click ---------- */
 

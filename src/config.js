@@ -133,6 +133,11 @@ export const CONFIG = {
     // Clicks are put on the audio clock this far ahead, topped up this often.
     clickLookaheadSeconds: 0.12,
     clickTickMs: 25,
+    // While the beat lines show, loop edges and marks snap to a beat this
+    // close: dragged, within this many pixels; set by a key ([ ] M R),
+    // within this share of a beat.
+    snapPx: 8,
+    snapKeyFraction: 0.25,
   },
 
   // The notifications (ui/toast.js): how long one shows, and how many at

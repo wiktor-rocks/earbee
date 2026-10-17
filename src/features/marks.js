@@ -10,6 +10,7 @@ import { formatTrackTime } from "../core/format.js";
 import { MAX_LABEL_LENGTH } from "../marks/index.js";
 import { MARK_COLORS } from "../themes/index.js";
 import { dom, element, onClick } from "../ui/dom.js";
+import { snapToBeat } from "./beats.js";
 
 /** @typedef {import("../marks/index.js").Mark} Mark */
 
@@ -77,13 +78,13 @@ export function importChapters(chapters) {
 // while it plays lands on the beat).
 /** @param {KeyboardEvent} event */
 export function markPoint(event) {
-  selectMark(marks.addPoint(player.transport.positionAt(event.timeStamp)).id);
+  selectMark(marks.addPoint(snapToBeat(player.transport.positionAt(event.timeStamp))).id);
 }
 
 // R: starts a region; R again ends it there (too short: nothing).
 /** @param {KeyboardEvent} event */
 export function markRegion(event) {
-  const time = player.transport.positionAt(event.timeStamp);
+  const time = snapToBeat(player.transport.positionAt(event.timeStamp));
   if (pendingStart === null) {
     pendingStart = time;
     drawMarks();

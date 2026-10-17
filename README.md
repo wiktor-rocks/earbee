@@ -17,7 +17,7 @@ Get the latest version from the [releases page](https://github.com/wiktor-rocks/
 ## What it does
 
 - **Slow it down, or shift the pitch,** without the other changing: speed from 0.25× to 3×, pitch in semitones and cents.
-- **Loop the hard part:** Shift+drag across the waveform.
+- **Loop the hard part:** Shift+drag across the waveform, or, once the beats are found, loop the bar you're in (`\`), double or halve it (`=` / `-`), and move it on phrase by phrase (Shift+`]` / Shift+`[`). Loop edges and marks snap to the beats.
 - **Mark it:** points and named regions on the track, with a list beside it.
 - **Step through it from the keyboard:** short steps back and forward, Space replays from where you started listening, and Enter from where it last stopped. Press **?** in the app for every key.
 - **Find the beats** (B): a beat-tracking model marks every beat and the first of each bar on the waveform, shows the tempo, and lets ← / → step by beat or by bar. A click on each beat (Shift+B) checks them by ear.

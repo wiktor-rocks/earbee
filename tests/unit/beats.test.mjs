@@ -5,6 +5,12 @@ import { describe, test } from "node:test";
 import {
   beatClockTimes,
   beatStep,
+  gridTime,
+  moveLoop,
+  onGrid,
+  resizeLoop,
+  snapTo,
+  spanAt,
   createOnsetDetector,
   detectBeats,
   stepSizes,
@@ -237,5 +243,84 @@ describe("using the beats", () => {
     const sizes = [0.1, 0.25, 0.5, 1, 2, 5];
     assert.deepEqual(stepSizes(sizes, { beat: 0.5, bar: 2 }), [0.1, 0.25, 0.5, "beat", 1, 2, "bar", 5]);
     assert.deepEqual(stepSizes(sizes, { beat: 0.4, bar: null }), [0.1, 0.25, "beat", 0.5, 1, 2, 5]);
+  });
+});
+
+describe("snapping, and loops on the beat grid", () => {
+  // 120 BPM from 1 s, 4 beats to the bar.
+  const beats = Float64Array.from({ length: 16 }, (_, i) => 1 + i * 0.5);
+  const bars = Float64Array.from({ length: 4 }, (_, i) => 1 + i * 2);
+  const grids = { beats, beatLength: 0.5, bars, barLength: 2 };
+  const limits = { duration: 20, minSeconds: 0.05 };
+  const close = (span, start, end) =>
+    span !== null && Math.abs(span.start - start) < 1e-9 && Math.abs(span.end - end) < 1e-9;
+
+  test("snapping: only when close", () => {
+    assert.equal(snapTo(beats, 2.08, 0.1), 2);
+    assert.equal(snapTo(beats, 2.3, 0.1), 2.3);
+    assert.equal(snapTo(beats, 2.45, 0.1), 2.5);
+    assert.equal(snapTo(beats, 0.95, 0.1), 1);
+    assert.equal(snapTo(null, 2.08, 0.1), 2.08);
+    assert.equal(snapTo(beats, 2.08, 0), 2.08);
+  });
+
+  test("the grid goes on past its ends", () => {
+    assert.equal(gridTime(bars, 0, 2), 1);
+    assert.equal(gridTime(bars, 3, 2), 7);
+    assert.equal(gridTime(bars, 5, 2), 11);
+    assert.equal(gridTime(bars, -1, 2), -1);
+  });
+
+  test("the bar a time is in: inside, the pickup, past the last", () => {
+    assert.deepEqual(spanAt(bars, 4.1, 2, 20), { start: 3, end: 5 });
+    assert.deepEqual(spanAt(bars, 3, 2, 20), { start: 3, end: 5 });
+    assert.deepEqual(spanAt(bars, 0.4, 2, 20), { start: 0, end: 1 });
+    assert.deepEqual(spanAt(bars, 8, 2, 20), { start: 7, end: 9 });
+    assert.deepEqual(spanAt(bars, 19.5, 2, 20), { start: 19, end: 20 });
+  });
+
+  test("whether a loop lies on the grid", () => {
+    assert.deepEqual(onGrid(bars, 3.01, 6.98, 2, 0.03), { from: 1, to: 3 });
+    assert.equal(onGrid(bars, 3.2, 7, 2, 0.03), null);
+    assert.deepEqual(onGrid(bars, 7, 11, 2, 0.03), { from: 3, to: 5 });
+  });
+
+  test("doubling and halving by bars, then beats, then time", () => {
+    const bar = { start: 3, end: 5 };
+    assert.ok(close(resizeLoop(grids, bar, 2, limits), 3, 7));
+    assert.ok(close(resizeLoop(grids, { start: 3, end: 7 }, 0.5, limits), 3, 5));
+    // One bar halves to two of its four beats; one beat halves by time.
+    assert.ok(close(resizeLoop(grids, bar, 0.5, limits), 3, 4));
+    assert.ok(close(resizeLoop(grids, { start: 3, end: 3.5 }, 0.5, limits), 3, 3.25));
+    // Three bars halve to one.
+    assert.ok(close(resizeLoop(grids, { start: 1, end: 7 }, 0.5, limits), 1, 3));
+    // Off the grid: by time.
+    assert.ok(close(resizeLoop(grids, { start: 3.2, end: 4.2 }, 2, limits), 3.2, 5.2));
+  });
+
+  test("doubling follows the grid as it drifts", () => {
+    // Bars getting longer: 2 s, 2.2 s, 2.4 s.
+    const drifting = { beats: null, beatLength: null, bars: Float64Array.from([1, 3, 5.2, 7.6]), barLength: 2.2 };
+    assert.ok(close(resizeLoop(drifting, { start: 1, end: 3 }, 2, limits), 1, 5.2));
+  });
+
+  test("doubling stops at the track's end; too short is nothing", () => {
+    assert.ok(close(resizeLoop(grids, { start: 15, end: 19 }, 2, limits), 15, 20));
+    assert.equal(resizeLoop(grids, { start: 3.2, end: 3.26 }, 0.5, limits), null);
+  });
+
+  test("moving by the loop's own length", () => {
+    assert.ok(close(moveLoop(grids, { start: 3, end: 5 }, 1, limits), 5, 7));
+    assert.ok(close(moveLoop(grids, { start: 3, end: 7 }, 1, limits), 7, 11)); // past the last bar
+    assert.ok(close(moveLoop(grids, { start: 3, end: 5 }, -1, limits), 1, 3));
+    assert.ok(close(moveLoop(grids, { start: 3, end: 3.5 }, 1, limits), 3.5, 4)); // a beat
+    assert.ok(close(moveLoop(grids, { start: 3.2, end: 4.2 }, 1, limits), 4.2, 5.2)); // off the grid
+  });
+
+  test("moving stops at the track's ends", () => {
+    assert.ok(close(moveLoop(grids, { start: 1, end: 3 }, -1, limits), 0, 1));
+    assert.equal(moveLoop(grids, { start: 0, end: 1 }, -1, limits), null);
+    assert.ok(close(moveLoop(grids, { start: 17, end: 19 }, 1, limits), 19, 20));
+    assert.equal(moveLoop(grids, { start: 19, end: 20 }, 1, limits), null);
   });
 });

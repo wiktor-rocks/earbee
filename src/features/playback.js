@@ -6,10 +6,12 @@
 
 import { CONFIG } from "../config.js";
 import { barLength, beatLength, beats, hasAudio, player, settings } from "../context.js";
-import { beatStep } from "../core/beats.js";
+import { beatStep, moveLoop, resizeLoop, spanAt } from "../core/beats.js";
 import { formatTrackTime } from "../core/format.js";
 import { cycleStepSize } from "../ui/controls.js";
 import { dom, guarded, onClick, renderLoopInfo, reportError } from "../ui/dom.js";
+import { notify } from "../ui/toast.js";
+import { beatGrids, snapToBeat } from "./beats.js";
 
 function play() {
   // Only needed if the system suspended the audio; scheduled playback
@@ -182,16 +184,16 @@ export function setLoopRegion(region) {
   renderLoopInfo(loopRegion);
 }
 
-// [ and ]: move one end of the loop to the cursor, keeping the other end
-// if it still makes a loop, and turn the loop on.
+// [ and ]: move one end of the loop to the cursor (onto a beat close by),
+// keeping the other end if it still makes a loop, and turn the loop on.
 export function setLoopStart() {
-  const start = player.transport.position;
+  const start = snapToBeat(player.transport.position);
   const end = loopRegion && loopRegion.end > start ? loopRegion.end : player.transport.duration;
   setLoopRegion({ start, end, enabled: true });
 }
 
 export function setLoopEnd() {
-  const end = player.transport.position;
+  const end = snapToBeat(player.transport.position);
   const start = loopRegion && loopRegion.start < end ? loopRegion.start : 0;
   setLoopRegion({ start, end, enabled: true });
 }
@@ -201,3 +203,39 @@ export const getLoopRegion = () => loopRegion && { ...loopRegion };
 
 export const toggleLoop = () => loopRegion && setLoopRegion({ ...loopRegion, enabled: !loopRegion.enabled });
 export const clearLoop = () => setLoopRegion(null);
+
+// Looping by the music's bars and beats (core/beats.js; the beats come
+// from features/beats.js). Without them, = - and the phrase keys work by time.
+const NO_GRIDS = { beats: null, beatLength: null, bars: null, barLength: null };
+const loopLimits = () => ({ duration: player.transport.duration, minSeconds: CONFIG.loop.minSeconds });
+
+// \: loop the bar the cursor is in (what's heard, while playing), or
+// the beat when there are no bars (the simple beat finder).
+/** @param {KeyboardEvent} event */
+export function loopThisBar(event) {
+  const grids = beatGrids();
+  if (!grids) return notify("Find the beats first (B).");
+  const [times, length] = grids.bars ? [grids.bars, grids.barLength] : [grids.beats, grids.beatLength];
+  const time = player.transport.positionAt(event.timeStamp);
+  setLoopRegion({ ...spanAt(times, time, length, player.transport.duration), enabled: true });
+}
+
+// = and -: the loop twice or half as long, from the same start.
+/** @param {2 | 0.5} factor */
+export function resizeLoopBy(factor) {
+  if (!loopRegion) return;
+  const next = resizeLoop(beatGrids() ?? NO_GRIDS, loopRegion, factor, loopLimits());
+  if (next) setLoopRegion({ ...next, enabled: true });
+}
+
+// Shift+] and Shift+[: the next or previous phrase, the loop moved by its
+// own length. Playing, the transport jumps into it by itself; paused, the
+// cursor goes to its start.
+/** @param {1 | -1} direction */
+export function moveLoopBy(direction) {
+  if (!loopRegion) return;
+  const next = moveLoop(beatGrids() ?? NO_GRIDS, loopRegion, direction, loopLimits());
+  if (!next) return;
+  setLoopRegion({ ...next, enabled: true });
+  if (!player.transport.playing) player.transport.seek(next.start);
+}
