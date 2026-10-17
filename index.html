@@ -544,17 +544,17 @@
 
       <section class="dock" aria-label="Sound">
         <div class="dock-group speed-group">
-          <div class="dock-head">
-            <h2 id="speedTitle">Speed</h2>
-            <output id="speedValue" class="readout">1.00×</output>
-          </div>
-          <div class="speed-controls">
+          <div class="speed-main">
+            <div class="dock-head">
+              <h2 id="speedTitle">Speed</h2>
+              <output id="speedValue" class="readout">1.00×</output>
+            </div>
             <div class="dock-slider">
               <input id="speed" type="range" aria-labelledby="speedTitle" />
               <div id="speedScale" class="scale"></div>
             </div>
-            <div id="speedChips" class="chips" aria-label="Speed presets"></div>
           </div>
+          <div id="speedChips" class="chips" aria-label="Speed presets"></div>
         </div>
 
         <div class="dock-group pitch-group">

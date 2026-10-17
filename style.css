@@ -2653,16 +2653,21 @@ button.mark-remove {
   font-weight: 800;
 }
 
-/* The slider lines up with the presets' first row (and the other groups'
-   first rows), not the middle of both rows. */
-.speed-controls {
-  display: flex;
+/* Speed in two columns: the title and slider on the left, the presets on
+   the right, their first row level with the title. (`.dock` so the short
+   window's `.dock-group` gap doesn't close up the columns.) */
+.dock .speed-group {
+  flex-direction: row;
   align-items: flex-start;
   gap: 14px;
 }
 
-.speed-controls .dock-slider {
-  margin-top: 4px;
+.speed-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 90px;
 }
 
 .dock-slider {
@@ -2681,10 +2686,11 @@ button.mark-remove {
   font-variant-numeric: tabular-nums;
 }
 
-/* The speed presets: one row, or two on a narrower window. */
+/* The speed presets: two rows of six, or three of four on a narrow
+   window. */
 .chips {
   display: grid;
-  grid-template-columns: repeat(8, auto);
+  grid-template-columns: repeat(6, auto);
   gap: 4px;
 }
 
@@ -3056,20 +3062,18 @@ button.mark-remove {
 
 /* ---------- Smaller windows ----------
    The marks sidebar always stays in view, so half a screen (about 960 px
-   wide) still shows everything: under 1100 px it gets narrower and its
-   buttons show only their icons; under 1280 px the speed presets take two
-   rows; the transport stays one row, its chips cut off when they don't fit.
+   wide) still shows everything: under 1100 px it gets narrower, its
+   buttons show only their icons, and the speed presets take three rows;
+   the transport stays one row, its chips cut off when they don't fit.
    Short windows: the dock and the minimap get more compact. */
-
-@media (max-width: 1279px) {
-  .chips {
-    grid-template-columns: repeat(4, auto);
-  }
-}
 
 @media (max-width: 1099px) {
   :root {
     --sidebar-width: 240px;
+  }
+
+  .chips {
+    grid-template-columns: repeat(4, auto);
   }
 
   .sidebar-actions .label {
@@ -3095,7 +3099,8 @@ button.mark-remove {
     display: none;
   }
 
-  .dock-group {
+  .dock-group,
+  .speed-main {
     gap: 3px;
   }
 }

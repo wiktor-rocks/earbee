@@ -43,6 +43,18 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-17: Twelve speed presets, finer at the slow end
+
+- **What:** the Speed group has 12 preset buttons instead of 8: 0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.75, 0.8, 0.9 and 1×. The group is now two columns: the title and the slider on the left, the presets on the right, their first row level with the "Speed" title. The presets sit in two rows of six; under 1100 px wide, three rows of four.
+- **Why:** the user wanted finer control from the buttons, with the new ones at the low speeds (the old set jumped straight from 0.25× to 0.5×), and the buttons to start at the height of the title.
+- **How:**
+  - The four new presets fill the 0.25–0.5 gap in 0.05 steps; every old preset stays.
+  - The grid was 8 columns (4 under 1280 px). It is now 6, and 4 only under 1100 px: six still fit beside the slider down to 1100 px.
+  - The title row and the slider are wrapped in `.speed-main`, a column; `.speed-group` lays it out in a row with the presets. `align-items: flex-start` keeps the presets from stretching to the column's height (they grew to 32 px tall). The rule is `.dock .speed-group` so the short window's `.dock-group { gap: 3px }` doesn't close up the 14 px between the columns; `.speed-main` gets the short window's 3 px gap itself.
+  - With the presets beside the title, the dock is 18 px shorter on a wide window (102 px instead of 120) and about the same under 1100 px (118 instead of 120).
+- **Where:** `src/config.js` (`CONFIG.speed.presets`); `index.html` (the Speed group: `.speed-main` replaces `.speed-controls`); `style.css` (`.dock .speed-group`, `.speed-main`, `.chips`, the `max-width: 1099px` query, which took over the old 1279 px rule, and the `max-height: 719px` query).
+- **Verified by:** `npm run check`. In an offscreen Electron window at 1600, 1440, 1279, 1100 and 960 px wide, and at 1440 and 960 px with a short window (680 px): 12 buttons; a click on 0.35× sets the readout and highlights the button; the first row's top and centre match the title row's; the speed slider is level with the volume slider; the buttons stay inside the Speed group. Screenshots of the dock were checked by eye.
+
 ## 2026-10-17: ScriBee is now EarBee
 
 - **What:** the app is called **EarBee** everywhere: window titles, the wordmark (Ear**Bee**, "Bee" in the accent colour), the splash, the theme names (EarBee, EarBee Light), messages, the landing page, the GitHub templates and the docs. Project files are now `.ebee`; existing `.sbee` files don't open any more (rename them: the content is the same). Downloads go to `~/Downloads/EarBee` unless another folder was chosen. On its first start under the new name, the app copies ScriBee's settings folder, and this time nothing resets: the colour theme, the sidebar and the video-window choice all carry over.
