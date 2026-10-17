@@ -146,6 +146,7 @@ export function createTimeline({
   // Drawn like the ruler's ticks: for the visible range and a screen
   // either side. Hidden when zoomed out so far that they'd be a grey wash.
   let beats = null; // as last set by setBeats()
+  let downbeat = null; // one flag per beat, or null
   let beatsRendered = null; // { start, end, width }
 
   function renderBeats() {
@@ -165,7 +166,9 @@ export function createTimeline({
     beatsRendered = { start: Math.max(0, start - span), end: Math.min(view.duration, end + span), width: view.width };
     const { from, to } = visibleBeats(beats, beatsRendered.start, beatsRendered.end);
     const fragment = document.createDocumentFragment();
-    for (let i = from; i < to; i++) element("guide-beat", fragment).style.left = percent(beats[i]);
+    for (let i = from; i < to; i++) {
+      element(downbeat?.[i] ? "guide-beat downbeat" : "guide-beat", fragment).style.left = percent(beats[i]);
+    }
     beatsLayer.replaceChildren(fragment);
   }
 
@@ -465,9 +468,15 @@ export function createTimeline({
       stopPoint = time;
       renderStopPoint();
     },
-    /** The beats (seconds, in order), or null to hide them. @param {Float64Array | null} times */
-    setBeats(times) {
+    /**
+     * The beats (seconds, in order), or null to hide them; `downbeats`
+     * flags the first beat of each bar, drawn stronger.
+     * @param {Float64Array | null} times
+     * @param {Uint8Array | null} [downbeats]
+     */
+    setBeats(times, downbeats = null) {
       beats = times;
+      downbeat = downbeats;
       beatsRendered = null;
       renderBeats();
     },

@@ -2169,6 +2169,11 @@ body.dragging .drop-card {
   border-left: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
 }
 
+/* The first beat of each bar (the beat model's downbeats): stronger. */
+.guide-beat.downbeat {
+  border-left-color: color-mix(in srgb, var(--text) 50%, transparent);
+}
+
 /* The hover line: where a click would seek to (waveform.js), with its
    time at the bottom. Fainter than the playback cursor, above the marks. */
 .waveform ::part(hover-line) {

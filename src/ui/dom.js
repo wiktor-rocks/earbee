@@ -148,13 +148,14 @@ export function renderTrackTime(position) {
 
 // The step readout in the transport bar (the step buttons show arrows).
 export function renderStepSize() {
-  dom.stepSize.textContent =
-    settings.stepSize === "beat" ? "Step 1 beat" : `Step ${formatStepSize(settings.stepSize)} s`;
+  const { stepSize } = settings;
+  dom.stepSize.textContent = typeof stepSize === "string" ? `Step 1 ${stepSize}` : `Step ${formatStepSize(stepSize)} s`;
 }
 
 // The beats chip in the transport bar: a button that finds them, their
-// progress, then the tempo (and the tempo heard, at another speed); dimmed
-// while their lines are hidden.
+// progress, then the tempo (and the tempo heard, at another speed, and
+// the progress while the model fills in the rest); dimmed while their
+// lines are hidden. Its tooltip says which finder found them.
 export function renderBeatInfo() {
   const chip = dom.beatInfo;
   chip.hidden = !hasAudio();
@@ -166,8 +167,15 @@ export function renderBeatInfo() {
     const bpm = Math.round(beats.bpm);
     const heard =
       settings.speed === 1 ? "" : `${Math.round(beats.bpm * settings.speed)} at ${formatSpeed(settings.speed)}`;
-    chip.textContent = `♩ ${bpm} BPM${heard && ` · ${heard}`}`;
-    chip.title = `About ${bpm} beats per minute${heard && ` (${heard})`}; click or B to ${beats.shown ? "hide" : "show"} the beat lines`;
+    const filling = beats.complete ? "" : ` · ${Math.floor(beats.progress * 100)} %`;
+    chip.textContent = `♩ ${bpm} BPM${heard && ` · ${heard}`}${filling}`;
+    const by =
+      beats.method === "model"
+        ? beats.complete
+          ? "Found by the beat model"
+          : "Found so far by the beat model, which is still going through the rest of the track"
+        : "Found by the simple beat finder (no bars)";
+    chip.title = `About ${bpm} beats per minute${heard && ` (${heard})`}. ${by}. Click or B to ${beats.shown ? "hide" : "show"} the beat lines.`;
   } else if (beats.status === "none") {
     chip.textContent = "♩ No steady beat";
     chip.title = "No steady beat was found in this track";

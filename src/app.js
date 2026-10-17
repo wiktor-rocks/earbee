@@ -73,8 +73,10 @@
  * FILES (src/), in layers: a file imports only from layers above it in
  * this list, never below (enforced by `npm run lint`)
  *   core/          Pure helpers, no DOM: format, waveshape (scaling the
- *                  waveform), ruler, beats (finding them, stepping by
- *                  them), timeline (and the
+ *                  waveform), ruler, beats (the simple beat finder,
+ *                  stepping by beats), beat-this (around the beat model:
+ *                  its windows, picking beats from its answers), melspec
+ *                  and resample (the model's input), fft, timeline (and the
  *                  Segment / Loop / LoopRegion types), emitter, errors,
  *                  media (the Media type, the memory check, waveform
  *                  levels, splitting and joining a parallel decode)
@@ -93,8 +95,9 @@
  *                  and media; pure, shared with the main process
  *   config.js      CONFIG: every tunable number
  *   audio/         engine.js, transport.js, decoder.js (+ decode-worker.js),
- *                  beat-worker.js (finding the beats), open-track.js
- *                  (opening a file's audio track, for both workers)
+ *                  beat-worker.js (the beat model's input, and the simple
+ *                  beat finder's answer), open-track.js (opening a file's
+ *                  audio track, for both workers)
  *   video/         view.js (the picture), proxy.js (low-res copy for seeking),
  *                  proxy-plan.js (where that copy is built next)
  *   waveform.js    The waveform, zoom, minimap, loop; its view for the lanes.
@@ -112,7 +115,8 @@
  *                  (browser storage that never throws), toast.js
  *                  (notifications: small confirmations, notify())
  *   features/      playback.js (and the A–B loop), beats.js (finding the
- *                  beats on demand, the ♩ chip), marks.js (actions,
+ *                  beats on demand: the worker, then the beat model window
+ *                  by window; the ♩ chip; the beat click), marks.js (actions,
  *                  selection, the marks list), open-file.js, download.js
  *                  (and searching in the download dialog), settings.js
  *                  (the Settings dialog and the theme menu), file-menu.js
@@ -242,7 +246,7 @@ import {
 } from "./features/marks.js";
 import { bigVideoPictureChanged, bindBigVideo, toggleBigVideo } from "./features/big-video.js"; // Big video (src/features/big-video.js)
 import { bindLayout, openShortcuts } from "./features/layout.js";
-import { beatsAction, bindBeats } from "./features/beats.js";
+import { beatsAction, bindBeats, toggleBeatClick } from "./features/beats.js";
 import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
 import { bindProject, isSaveDialogOpen, openFile, saveProject, saveProjectAs } from "./features/project/index.js";
@@ -456,6 +460,14 @@ const SHORTCUTS = [
     keys: ["B"],
     description: "Find the beats (← / → then step by beats); again: show / hide them",
     down: beatsAction,
+  },
+  {
+    group: "Moving around",
+    codes: ["KeyB"],
+    shift: true,
+    keys: ["B"],
+    description: "A click on each beat, on / off",
+    down: toggleBeatClick,
   },
   { group: "A–B loop", codes: ["BracketLeft"], keys: ["["], description: "Loop start", down: setLoopStart },
   { group: "A–B loop", codes: ["BracketRight"], keys: ["]"], description: "Loop end", down: setLoopEnd },

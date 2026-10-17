@@ -21,7 +21,13 @@
 #                    minimap's exaggerated contrast
 #                 (the last four: the waveform's scaling, e2e/17-waveform.cjs)
 #   clicks.wav    20 s click track at 120 BPM, a click every 0.5 s from
-#                 0.25 s, over a quiet hum: finding the beats (e2e/20-beats.cjs)
+#                 0.25 s, over a quiet hum: the simple beat finder
+#                 (e2e/20-beats.cjs)
+#   bars.wav      20 s, music-like for the beat model: 120 BPM from 0.25 s,
+#                 a higher, louder click with a kick on every 4th beat (the
+#                 1 of each bar, every 2 s), over a chord that changes every
+#                 bar (e2e/20-beats.cjs; the same recipe as the model's test
+#                 clip, scripts/export-beat-model.py)
 # Needs ffmpeg (with libvpx and libopus).
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -62,5 +68,13 @@ ffmpeg -v error -y -f lavfi -i "aevalsrc=if(lt(mod(t\,4)\,2)\,0.4\,0.65)*sin(2*P
 ffmpeg -v error -y -f lavfi \
   -i "aevalsrc=if(lt(mod(t+0.25\,0.5)\,0.01)\,0.8*sin(2*PI*1000*t)*exp(-300*mod(t+0.25\,0.5))\,0)+0.01*sin(2*PI*90*t):s=44100:d=20" \
   -c:a pcm_s16le clicks.wav
+
+p="mod(t+0.25\,0.5)"
+accent="eq(mod(floor((t+0.25)/0.5)\,4)\,1)"
+bar="mod(floor((t+0.25)/2)\,4)"
+note() { echo "0.04*sin(2*PI*if(eq($bar\,0)\,$1\,if(eq($bar\,1)\,$2\,if(eq($bar\,2)\,$3\,$4)))*t)"; }
+ffmpeg -v error -y -f lavfi \
+  -i "aevalsrc=if($accent\,0.6*sin(2*PI*2000*$p)\,0.35*sin(2*PI*1000*$p))*exp(-60*$p)+$accent*0.5*sin(2*PI*60*$p)*exp(-12*$p)+$(note 220 174.61 261.63 196)+$(note 261.63 220 329.63 246.94)+$(note 329.63 261.63 392 293.66):s=44100:d=20" \
+  -c:a pcm_s16le bars.wav
 
 echo "Test fixtures written to $(pwd)"

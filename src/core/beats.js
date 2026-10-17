@@ -15,6 +15,8 @@
 //    the tempo's beat length. Following the best path back gives beats
 //    that fit the onsets and drift with the tempo (live music).
 
+import { createSpectrum } from "./fft.js";
+
 /* ---------- 1. The onset envelope ---------- */
 
 const HOP_SECONDS = 0.0116;
@@ -25,99 +27,6 @@ const COMPRESSION = 1000;
 // The envelope minus its moving mean over this long, clipped at 0: what's
 // left are the attacks, not the general loudness.
 const MEAN_SECONDS = 0.5;
-
-/**
- * An in-place radix-2 FFT for `n` (a power of two) points: returns
- * transform(re, im), with the tables worked out once.
- * @param {number} n
- */
-export function createFft(n) {
-  const reversed = new Uint32Array(n);
-  for (let i = 1, j = 0; i < n; i++) {
-    let bit = n >> 1;
-    for (; j & bit; bit >>= 1) j ^= bit;
-    j ^= bit;
-    reversed[i] = j;
-  }
-  const cos = Float64Array.from({ length: n / 2 }, (_, k) => Math.cos((-2 * Math.PI * k) / n));
-  const sin = Float64Array.from({ length: n / 2 }, (_, k) => Math.sin((-2 * Math.PI * k) / n));
-
-  /**
-   * @param {Float64Array} re
-   * @param {Float64Array} im
-   */
-  return function transform(re, im) {
-    for (let i = 1; i < n; i++) {
-      const j = reversed[i];
-      if (i < j) {
-        let swap = re[i];
-        re[i] = re[j];
-        re[j] = swap;
-        swap = im[i];
-        im[i] = im[j];
-        im[j] = swap;
-      }
-    }
-    for (let size = 2; size <= n; size <<= 1) {
-      const half = size >> 1;
-      const stride = n / size; // the twiddle table's step at this size
-      for (let k = 0; k < half; k++) {
-        const wRe = cos[k * stride];
-        const wIm = sin[k * stride];
-        for (let a = k; a < n; a += size) {
-          const b = a + half;
-          const tRe = re[b] * wRe - im[b] * wIm;
-          const tIm = re[b] * wIm + im[b] * wRe;
-          re[b] = re[a] - tRe;
-          im[b] = im[a] - tIm;
-          re[a] += tRe;
-          im[a] += tIm;
-        }
-      }
-    }
-  };
-}
-
-/**
- * The magnitudes of the first `bins` frequencies of `n` (a power of two)
- * real samples: returns magnitudes(samples, out). A real signal's
- * spectrum comes from a complex FFT of half the length (the even samples
- * as the real parts, the odd ones as the imaginary), which halves the work.
- * @param {number} n
- * @param {number} bins At most n / 2.
- */
-export function createSpectrum(n, bins) {
-  const half = n / 2;
-  const fft = createFft(half);
-  const re = new Float64Array(half);
-  const im = new Float64Array(half);
-  const cos = Float64Array.from({ length: half }, (_, k) => Math.cos((-2 * Math.PI * k) / n));
-  const sin = Float64Array.from({ length: half }, (_, k) => Math.sin((-2 * Math.PI * k) / n));
-
-  /**
-   * @param {ArrayLike<number>} samples
-   * @param {Float64Array} out
-   */
-  return function magnitudes(samples, out) {
-    for (let m = 0; m < half; m++) {
-      re[m] = samples[2 * m];
-      im[m] = samples[2 * m + 1];
-    }
-    fft(re, im);
-    for (let k = 0; k < bins; k++) {
-      // Z[k] and the conjugate of Z[half − k] give the even samples'
-      // spectrum (their mean) and the odd ones' (their difference / 2i).
-      const j = k === 0 ? 0 : half - k;
-      const evenRe = (re[k] + re[j]) / 2;
-      const evenIm = (im[k] - im[j]) / 2;
-      const oddRe = (im[k] + im[j]) / 2;
-      const oddIm = -(re[k] - re[j]) / 2;
-      const xRe = evenRe + cos[k] * oddRe - sin[k] * oddIm;
-      const xIm = evenIm + cos[k] * oddIm + sin[k] * oddRe;
-      out[k] = Math.sqrt(xRe * xRe + xIm * xIm);
-    }
-  };
-}
 
 /**
  * A streaming onset detector for mono sound at `sampleRate`. Frame k is
@@ -372,11 +281,20 @@ export function detectBeats(envelope, frameRate) {
   const period = estimateTempo(envelope, frameRate);
   const beats = period === null ? new Float64Array(0) : trackBeats(envelope, frameRate, period);
   if (beats.length < 2) return { beats: new Float64Array(0), bpm: null };
-  const gaps = Array.from({ length: beats.length - 1 }, (_, i) => beats[i + 1] - beats[i]).sort((a, b) => a - b);
-  return { beats, bpm: 60 / gaps[Math.floor(gaps.length / 2)] };
+  return { beats, bpm: 60 / medianGap(beats) };
 }
 
 /* ---------- Using them ---------- */
+
+/**
+ * The median gap between consecutive times (in order), or null for fewer than two.
+ * @param {ArrayLike<number>} times
+ */
+export function medianGap(times) {
+  if (times.length < 2) return null;
+  const gaps = Array.from({ length: times.length - 1 }, (_, i) => times[i + 1] - times[i]).sort((a, b) => a - b);
+  return gaps[Math.floor(gaps.length / 2)];
+}
 
 // The index of the first beat later than `time` (beats.length if none).
 function firstAfter(beats, time) {
@@ -399,6 +317,31 @@ function firstAfter(beats, time) {
 export function visibleBeats(beats, start, end) {
   // firstAfter(start − ε) is the first beat at or after `start`.
   return { from: firstAfter(beats, start - 1e-9), to: firstAfter(beats, end) };
+}
+
+/**
+ * When the beats play, on a clock (seconds), between clock times t0 and
+ * t1: `from` and `to` are the track positions then, playing at `rate`. If
+ * `to` is before `from`, the A–B `loop` wrapped in between. Each beat in
+ * [from, to) counts once, so back-to-back calls never repeat one. Each
+ * comes with its `index` in `beats`.
+ * @param {ArrayLike<number>} beats In order.
+ * @param {{ t0: number, t1: number, from: number, to: number, rate: number, loop?: { start: number, end: number } | null }} span
+ * @returns {{ time: number, index: number }[]}
+ */
+export function beatClockTimes(beats, { t0, t1, from, to, rate, loop = null }) {
+  const times = [];
+  const add = (start, end, clockOf) => {
+    for (let i = firstAfter(beats, start - 1e-9); i < beats.length && beats[i] < end - 1e-9; i++) {
+      times.push({ time: clockOf(beats[i]), index: i });
+    }
+  };
+  if (to >= from) add(from, to, (beat) => t0 + (beat - from) / rate);
+  else if (loop) {
+    add(from, loop.end, (beat) => t0 + (beat - from) / rate);
+    add(loop.start, to, (beat) => t1 - (to - beat) / rate);
+  }
+  return times;
 }
 
 // A step lands on the next beat beyond this distance, so a step taken just
@@ -426,14 +369,18 @@ export function beatStep(beats, position, direction, length, epsilon = BEAT_STEP
 }
 
 /**
- * The step sizes in order of length: `sizes` (seconds) with "beat" among
- * them by its `beatLength`, or just `sizes` if there are no beats (null).
+ * The step sizes in order of length: `sizes` (seconds) with "beat" and
+ * "bar" among them by their lengths (the average beat and bar, in
+ * seconds); either is left out when its length is null.
  * @param {readonly number[]} sizes In order.
- * @param {number | null} beatLength
- * @returns {(number | "beat")[]}
+ * @param {{ beat?: number | null, bar?: number | null }} lengths
+ * @returns {(number | "beat" | "bar")[]}
  */
-export function stepSizes(sizes, beatLength) {
-  if (beatLength === null) return [...sizes];
-  const at = sizes.findIndex((size) => size > beatLength);
-  return at < 0 ? [...sizes, "beat"] : [...sizes.slice(0, at), "beat", ...sizes.slice(at)];
+export function stepSizes(sizes, { beat = null, bar = null } = {}) {
+  /** @type {[number | "beat" | "bar", number][]} */
+  const all = sizes.map((size) => [size, size]);
+  if (beat !== null) all.push(["beat", beat]);
+  if (bar !== null) all.push(["bar", bar]);
+  // A stable sort keeps a seconds size before "beat" or "bar" of the same length.
+  return all.sort((a, b) => a[1] - b[1]).map(([size]) => size);
 }

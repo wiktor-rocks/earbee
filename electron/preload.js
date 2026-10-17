@@ -2,6 +2,7 @@
 //   - downloading a link, or searching by keywords (see downloader.js); the page hides its download
 //     buttons when this is missing (e.g. opened in a plain browser);
 //   - the memory available for a track (see system.js);
+//   - running the beat model on one window of a spectrogram (see beat-model.js);
 //   - saying the page is ready, so its window shows (see windows.js, "The splash");
 //   - project files (.sbee; see project-files.js): opening, saving, and
 //     whether there are unsaved changes; a File's path is found here, so
@@ -77,6 +78,13 @@ contextBridge.exposeInMainWorld("scribee", {
 
   // Bytes the system can still give programs, or null if unknown.
   availableMemory: () => ipcRenderer.invoke("system:available-memory"),
+
+  // The beat model on one spectrogram window (a Float32Array of 1500 × 128):
+  // resolves to { ok: true, beat, downbeat } (logits) or { ok: false, error }.
+  beatWindow: (input) =>
+    input instanceof Float32Array
+      ? ipcRenderer.invoke("beats:window", input)
+      : Promise.resolve({ ok: false, error: "not a Float32Array" }),
 
   // The page is built: the window shows and the splash closes.
   ready: () => ipcRenderer.send("app:ready"),

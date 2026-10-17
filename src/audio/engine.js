@@ -10,7 +10,7 @@ import { AppError } from "../core/errors.js";
  * Signalsmith → EQ chain → master volume → limiter → speakers.
  *
  * Exposes: init, useSampleRate, loadPieces, schedule, setVolume, setEq,
- *          now, outputDelay, resume
+ *          now, outputDelay, resume, click
  * Values set before init() are remembered and applied when the graph
  * is built, so settings can change before any audio is loaded.
  *
@@ -126,6 +126,31 @@ export function createAudioEngine({ onError }) {
     // Time from audio leaving the graph to it reaching the speakers.
     outputDelay: () => (context ? (context.baseLatency || 0) + (context.outputLatency || 0) : 0),
     resume: () => context?.resume(),
+
+    // A short click at `at` (AudioContext clock), into the master volume,
+    // so it reaches the speakers exactly as the track's sound at that
+    // time does (the beat click, features/beats.js); higher if `accent`
+    // (the first beat of a bar). Returns a function that cancels it.
+    click(at, accent = false) {
+      if (!context) return () => {};
+      const { frequency, accentFrequency, level, seconds } = CONFIG.beats.click;
+      const tone = context.createOscillator();
+      tone.frequency.value = accent ? accentFrequency : frequency;
+      const envelope = context.createGain();
+      envelope.gain.setValueAtTime(level, at);
+      envelope.gain.exponentialRampToValueAtTime(0.001, at + seconds);
+      tone.connect(envelope).connect(masterGain);
+      tone.start(at);
+      tone.stop(at + seconds);
+      tone.onended = () => envelope.disconnect();
+      return () => {
+        try {
+          tone.stop(); // before `at`: it never sounds
+        } catch {
+          // already over
+        }
+      };
+    },
 
     // Linear gain: 1 = 100%.
     setVolume(volume) {

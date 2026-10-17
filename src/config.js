@@ -123,9 +123,17 @@ export const CONFIG = {
     maxPeaksPerSecond: 8000,
   },
 
-  // The beat lines over the waveform (B; features/beats.js) are hidden when
-  // zoomed out so far that beats are closer than this.
-  beats: { minSpacingPx: 5 },
+  beats: {
+    // The beat lines over the waveform (B; features/beats.js) are hidden
+    // when zoomed out so far that beats are closer than this.
+    minSpacingPx: 5,
+    // The click on each beat (Settings › General): a short decaying sine,
+    // higher on the first beat of each bar.
+    click: { frequency: 1500, accentFrequency: 2200, level: 0.5, seconds: 0.04 },
+    // Clicks are put on the audio clock this far ahead, topped up this often.
+    clickLookaheadSeconds: 0.12,
+    clickTickMs: 25,
+  },
 
   // The notifications (ui/toast.js): how long one shows, and how many at
   // once (a new one pushes out the oldest).

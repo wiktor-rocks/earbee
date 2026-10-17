@@ -1,26 +1,37 @@
-// Finds the beats of one file, off the page's main thread (a module
-// Worker; features/beats.js is the page side). It decodes the file again
-// rather than use the player's samples: those were handed to the audio
-// thread when the file opened (audio/engine.js). The sound is mixed to
-// mono and streamed through the onset detector (core/beats.js) chunk by
-// chunk, so only the small onset envelope is ever kept.
+// Prepares one file for finding its beats, off the page's main thread (a
+// module Worker; features/beats.js is the page side). It decodes the file
+// again rather than use the player's samples: those were handed to the
+// audio thread when the file opened (audio/engine.js).
+//
+// One pass over the sound, mixed to mono, makes both:
+//   - the beat model's input: resampled to 22,050 Hz (core/resample.js)
+//     and turned into a log-mel spectrogram (core/melspec.js); the page
+//     has the model run on it (electron/beat-model.js);
+//   - the simple beat finder's answer (core/beats.js), the fallback for
+//     when the model can't run.
+// Both are streamed chunk by chunk; only the spectrogram (128 values per
+// 20 ms, ~6 MB for 4 minutes) and the onset envelope are kept.
 //
 // Messages:
-//   page → { type: "detect", media }  (a File, or { name, url }: core/media.js)
+//   page → { type: "prepare", media }  (a File, or { name, url }: core/media.js)
 //   ←      { type: "progress", fraction } …  (at most every 100 ms)
-//   ←      { type: "done", beats, bpm }  (beats: seconds from the track's
-//          first sample, as the player counts; none and bpm null if
-//          there is no pulse)
+//   ←      { type: "done", spect, frames, simple: { beats, bpm } }
+//          spect: frames × 128 values (core/melspec.js); times are
+//          seconds from the track's first sample, as the player counts
 // or      { type: "error", kind, message }, kind as in decode-worker.js
 import { AudioSampleSink } from "../../node_modules/mediabunny/dist/bundles/mediabunny.mjs";
 import { createOnsetDetector, detectBeats } from "../core/beats.js";
+import { createLogMelSpectrogram, MEL_RATE } from "../core/melspec.js";
+import { createResampler } from "../core/resample.js";
 import { DecodeError, openTrack } from "./open-track.js";
 
 const scope = /** @type {any} */ (self);
 
-async function detect(media) {
+async function prepare(media) {
   const { input, track, first, duration, sampleRate } = await openTrack(media);
-  const detector = createOnsetDetector(sampleRate);
+  const onsets = createOnsetDetector(sampleRate);
+  const resampler = createResampler(sampleRate, MEL_RATE);
+  const spectrogram = createLogMelSpectrogram();
   let plane = new Float32Array(0);
   let mono = new Float32Array(0);
   let reportedAt = -Infinity;
@@ -38,7 +49,10 @@ async function detect(media) {
     } finally {
       sample.close();
     }
-    detector.push(mono.subarray(0, frames));
+    const chunk = mono.subarray(0, frames);
+    onsets.push(chunk);
+    resampler.push(chunk);
+    spectrogram.push(resampler.take());
 
     const now = performance.now();
     if (now - reportedAt > 100 && duration > 0) {
@@ -48,15 +62,18 @@ async function detect(media) {
   }
   input.dispose?.();
 
-  const { envelope, frameRate } = detector.finish();
-  return detectBeats(envelope, frameRate);
+  resampler.finish();
+  spectrogram.push(resampler.take());
+  const { frames, data } = spectrogram.finish();
+  const { envelope, frameRate } = onsets.finish();
+  return { spect: data, frames, simple: detectBeats(envelope, frameRate) };
 }
 
 scope.onmessage = async ({ data }) => {
-  if (data.type !== "detect") return;
+  if (data.type !== "prepare") return;
   try {
-    const { beats, bpm } = await detect(data.media);
-    scope.postMessage({ type: "done", beats, bpm }, [beats.buffer]);
+    const { spect, frames, simple } = await prepare(data.media);
+    scope.postMessage({ type: "done", spect, frames, simple }, [spect.buffer, simple.beats.buffer]);
   } catch (error) {
     const kind = error instanceof DecodeError ? error.kind : error instanceof RangeError ? "out-of-memory" : "failed";
     scope.postMessage({ type: "error", kind, message: String(error?.message ?? error) });

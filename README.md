@@ -20,6 +20,7 @@ Get the latest version from the [releases page](https://github.com/wiktor-rocks/
 - **Loop the hard part:** Shift+drag across the waveform.
 - **Mark it:** points and named regions on the track, with a list beside it.
 - **Step through it from the keyboard:** short steps back and forward, Space replays from where you started listening, and Enter from where it last stopped. Press **?** in the app for every key.
+- **Find the beats** (B): a beat-tracking model marks every beat and the first of each bar on the waveform, shows the tempo, and lets ← / → step by beat or by bar. A click on each beat (Shift+B) checks them by ear.
 - **Videos too,** in sync at any speed; in their own window if you like.
 - **Save your session** (marks, loop, speed and EQ) in a `.sbee` project file.
 - **Open from YouTube:** paste a link or search, and it opens once downloaded (only download what you have the rights to).
@@ -38,7 +39,7 @@ npm run build:linux  # or build:win, build:mac: the app for your system, in dist
 
 ## Licence
 
-MIT: see [LICENSE](LICENSE). ScriBee is built on Signalsmith Stretch, Mediabunny, wavesurfer.js, Electron and the Righteous and Nunito fonts, each under its own licence: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+MIT: see [LICENSE](LICENSE). ScriBee is built on Signalsmith Stretch, Mediabunny, wavesurfer.js, the Beat This! beat tracker, ONNX Runtime, Electron and the Righteous and Nunito fonts, each under its own licence: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 # Development
 
@@ -49,6 +50,7 @@ MIT: see [LICENSE](LICENSE). ScriBee is built on Signalsmith Stretch, Mediabunny
 - **Node.js** 22 or newer, and npm.
 - **For the tests:** `ffmpeg` with libvpx and libopus (to generate the test media), and a display server. The test windows are invisible, but Electron still needs X11 or Wayland.
 - **For `scripts/make-images.py`:** Python 3 with Pillow.
+- **For `scripts/export-beat-model.py`** (only to export the beat model again): Python 3 with PyTorch and Beat This!; the script lists the packages.
 
 ## Commands
 
@@ -89,10 +91,14 @@ electron/          The main process (CommonJS, Node)
   media-files.js     serves downloaded files (or a slice of one) to the page by private URL
   project-files.js   reads and writes project files (.sbee); the close guard
   system.js          available memory; recovering from a crashed page
+  beat-model.js      runs the beat model for the page, in a utility process
+                     (beat-model-process.js) on the native ONNX Runtime
   preload.js         the page's bridge to the main process (window.scribee)
 src/               The page (ES modules, no build step), in layers:
   core/              pure helpers, no DOM (unit-tested); media.js: media files,
-                     the memory check, waveform levels, decoding in parts
+                     the memory check, waveform levels, decoding in parts;
+                     beats.js, beat-this.js, melspec.js, resample.js, fft.js:
+                     finding the beats
   themes/            colour themes: palettes.js (every theme) and the logic
   search/            searching: the sites (sources.js) and what a result is
   prefs/             settings: the sections (index.js) and the field types
@@ -100,7 +106,9 @@ src/               The page (ES modules, no build step), in layers:
   project/           project files: the header, its version, the media
   config.js          every tunable number
   audio/             engine.js (Web Audio + Signalsmith), transport.js,
-                     decoder.js + decode-worker.js (parallel decoding)
+                     decoder.js + decode-worker.js (parallel decoding),
+                     beat-worker.js (the beat model's input, and the simple
+                     beat finder), open-track.js (shared by the workers)
   video/             view.js (the picture), proxy.js (its low-res copy for
                      dragging), proxy-plan.js (where the proxy builds next)
   waveform.js        WaveSurfer: zoom, the loop region; its view (zoom,
@@ -112,7 +120,8 @@ src/               The page (ES modules, no build step), in layers:
   ui/                dom.js, controls.js, shortcuts.js, theme.js, prefs.js,
                      pref-fields.js, menu.js (popover menus), storage.js
                      (browser storage), toast.js (notifications)
-  features/          playback.js (and the A–B loop), marks.js, open-file.js,
+  features/          playback.js (and the A–B loop), beats.js (finding the
+                     beats, the beat click), marks.js, open-file.js,
                      download.js (and search), settings.js (and the theme
                      menu), file-menu.js, layout.js, big-video.js,
                      project/ (index.js: save and open; sections.js: what is saved),
@@ -125,7 +134,9 @@ index.html         The page: welcome screen, loading screen, player
 style.css          All styles; colour and font tokens at the top
 assets/            Logo and icons (generated from scribee-source.png
                    by scripts/make-images.py)
-scripts/           make-images.py
+models/            beat-this-small.onnx: the beat model (Beat This!, MIT)
+scripts/           make-images.py; export-beat-model.py (the beat model and
+                   its test data, from the Python original)
 docs/              maintaining.md: day-to-day git, releases, CI;
                    diagnostics/: how long files load, measured
 site/              The landing page, for GitHub Pages (see its README.md)

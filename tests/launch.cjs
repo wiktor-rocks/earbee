@@ -33,6 +33,7 @@ const needed = [
   "verse-chorus.wav",
   "long-counter.webm",
   "clicks.wav",
+  "bars.wav",
 ];
 
 if (!needed.every((name) => fs.existsSync(path.join(fixtures, name)))) {

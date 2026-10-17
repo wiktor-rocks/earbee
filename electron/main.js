@@ -12,6 +12,8 @@
 //   System     The memory available for a track (system.js); if the page's
 //              process dies, a message and a reload instead of a blank
 //              window.
+//   Beats      The beat model, run for the page in a utility process
+//              (beat-model.js) on the native ONNX Runtime.
 //   Settings   The user's preferences (prefs-store.js, prefs.json): read
 //              and changed by the page's Settings dialog through the
 //              preload; the folder picker is here. The colour theme
@@ -30,9 +32,10 @@
 //              rendering if the GPU process keeps crashing.
 //              `npm run start:no-gpu` forces software rendering;
 //              `npm run start:gpu-info` logs what the GPU is doing.
-const { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, protocol, shell } = require("electron");
+const { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, protocol, shell, utilityProcess } = require("electron");
 const fs = require("fs");
 const path = require("path");
+const { handleBeatModel } = require("./beat-model");
 const { handleDownloads } = require("./downloader");
 const { createMediaFiles, registerMediaScheme } = require("./media-files");
 const { handleRendererCrash, handleSystem } = require("./system");
@@ -203,6 +206,7 @@ app.whenReady().then(() => {
   });
   prefsStore.onChange((section) => section === "theme" && followTheme());
   handleSystem(ipcMain);
+  handleBeatModel(ipcMain, { utilityProcess });
   handleSplash(ipcMain);
   handleVideoWindows(ipcMain); // Video window (src/features/video-window/)
   nativeTheme.on("updated", followTheme); // "Automatic" follows the system

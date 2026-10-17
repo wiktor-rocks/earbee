@@ -3,14 +3,14 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+  beatClockTimes,
   beatStep,
   createOnsetDetector,
   detectBeats,
-  createFft,
-  createSpectrum,
   stepSizes,
   visibleBeats,
 } from "../../src/core/beats.js";
+import { createFft, createSpectrum } from "../../src/core/fft.js";
 
 const RATE = 44100;
 
@@ -83,8 +83,8 @@ describe("the real spectrum", () => {
     const re = Float64Array.from(samples);
     const im = new Float64Array(n);
     createFft(n)(re, im);
-    const out = new Float64Array(n / 2);
-    createSpectrum(n, n / 2)(samples, out);
+    const out = new Float64Array(n / 2 + 1);
+    createSpectrum(n, n / 2 + 1)(samples, out);
     out.forEach((value, k) => assert.ok(Math.abs(value - Math.hypot(re[k], im[k])) < 1e-9, `bin ${k}`));
   });
 });
@@ -192,11 +192,50 @@ describe("using the beats", () => {
     assert.equal(beatStep(beats, 3, -1, 0.5), 2.5);
   });
 
+  test("when the beats play on the clock, at any speed", () => {
+    const times = (span) => beatClockTimes(beats, span).map(({ time }) => time);
+    assert.deepEqual(times({ t0: 10, t1: 11, from: 1.2, to: 2.2, rate: 1 }), [10.3, 10.8]);
+    assert.deepEqual(times({ t0: 10, t1: 12, from: 1.2, to: 2.2, rate: 0.5 }), [10.6, 11.6]);
+    assert.deepEqual(
+      beatClockTimes(beats, { t0: 10, t1: 11, from: 1.2, to: 2.2, rate: 1 }).map(({ index }) => index),
+      [1, 2],
+    );
+  });
+
+  test("back-to-back spans give each beat once", () => {
+    const first = beatClockTimes(beats, { t0: 0, t1: 0.5, from: 1, to: 1.5, rate: 1 });
+    const second = beatClockTimes(beats, { t0: 0.5, t1: 1, from: 1.5, to: 2, rate: 1 });
+    assert.deepEqual(
+      [...first, ...second].map(({ time }) => time),
+      [0, 0.5],
+    );
+  });
+
+  test("a span where the loop wraps gives the beats on both sides", () => {
+    const loop = { start: 1, end: 2.25 };
+    // From 2.0 to the loop end (2.25), then from 1.0 to 1.25: half a second.
+    const times = beatClockTimes(beats, { t0: 5, t1: 5.5, from: 2, to: 1.25, rate: 1, loop });
+    assert.deepEqual(
+      times.map(({ time, index }) => [time, index]),
+      [
+        [5, 2],
+        [5.25, 0],
+      ],
+    );
+  });
+
   test("the step sizes have 'beat' by its length", () => {
     const sizes = [0.1, 0.25, 0.5, 1];
-    assert.deepEqual(stepSizes(sizes, 0.4), [0.1, 0.25, "beat", 0.5, 1]);
-    assert.deepEqual(stepSizes(sizes, 0.05), ["beat", 0.1, 0.25, 0.5, 1]);
-    assert.deepEqual(stepSizes(sizes, 2), [0.1, 0.25, 0.5, 1, "beat"]);
-    assert.deepEqual(stepSizes(sizes, null), sizes);
+    assert.deepEqual(stepSizes(sizes, { beat: 0.4 }), [0.1, 0.25, "beat", 0.5, 1]);
+    assert.deepEqual(stepSizes(sizes, { beat: 0.05 }), ["beat", 0.1, 0.25, 0.5, 1]);
+    assert.deepEqual(stepSizes(sizes, { beat: 2 }), [0.1, 0.25, 0.5, 1, "beat"]);
+    assert.deepEqual(stepSizes(sizes, { beat: null }), sizes);
+    assert.deepEqual(stepSizes(sizes, {}), sizes);
+  });
+
+  test("…and 'bar' by its length", () => {
+    const sizes = [0.1, 0.25, 0.5, 1, 2, 5];
+    assert.deepEqual(stepSizes(sizes, { beat: 0.5, bar: 2 }), [0.1, 0.25, 0.5, "beat", 1, 2, "bar", 5]);
+    assert.deepEqual(stepSizes(sizes, { beat: 0.4, bar: null }), [0.1, 0.25, "beat", 0.5, 1, 2, 5]);
   });
 });

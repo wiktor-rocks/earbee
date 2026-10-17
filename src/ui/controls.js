@@ -6,7 +6,7 @@
  * ===================================================================== */
 
 import { CONFIG } from "../config.js";
-import { beatLength, eqGains, player, settings } from "../context.js";
+import { barLength, beatLength, eqGains, player, settings } from "../context.js";
 import { stepSizes } from "../core/beats.js";
 import { clamp, formatFrequency, formatGain, formatPercent, formatSigned, formatSpeed } from "../core/format.js";
 import {
@@ -159,9 +159,9 @@ function resetEq() {
   for (const band of CONFIG.eq.bands) setSetting(band.id, CONFIG.eq.gain.initial);
 }
 
-// The step sizes in order: CONFIG.step.sizes, and "beat" among them by
-// its length while the track's beats are known.
-const currentStepSizes = () => stepSizes(CONFIG.step.sizes, beatLength());
+// The step sizes in order: CONFIG.step.sizes, and "beat" and "bar" among
+// them by their lengths while the track's beats (and downbeats) are known.
+const currentStepSizes = () => stepSizes(CONFIG.step.sizes, { beat: beatLength(), bar: barLength() });
 
 // ↑ / ↓: the next larger (+1) or smaller (−1) step size; stops at either end.
 export function changeStepSize(direction) {
@@ -179,12 +179,14 @@ export function cycleStepSize(direction) {
 }
 
 /**
- * One of CONFIG.step.sizes, or "beat" while there are beats (anything
- * else is ignored).
- * @param {number | "beat"} size
+ * One of CONFIG.step.sizes, or "beat" / "bar" while there are beats /
+ * downbeats (anything else is ignored).
+ * @param {number | "beat" | "bar"} size
  */
 export function setStepSize(size) {
-  if (size === "beat" ? beatLength() === null : !CONFIG.step.sizes.includes(size)) return;
+  const allowed =
+    size === "beat" ? beatLength() !== null : size === "bar" ? barLength() !== null : CONFIG.step.sizes.includes(size);
+  if (!allowed) return;
   settings.stepSize = size;
   renderStepSize();
 }

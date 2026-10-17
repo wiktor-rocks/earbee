@@ -12,9 +12,9 @@ export const settings = {
   semitones: CONFIG.semitones.initial,
   cents: CONFIG.cents.initial,
   eqEnabled: CONFIG.eq.enabledInitially,
-  // Seconds, one of CONFIG.step.sizes, or "beat" (to the next beat) while
-  // the track's beats are known.
-  stepSize: /** @type {number | "beat"} */ (CONFIG.step.initial),
+  // Seconds, one of CONFIG.step.sizes, or "beat" / "bar" (to the next
+  // beat or downbeat) while the track's beats (and downbeats) are known.
+  stepSize: /** @type {number | "beat" | "bar"} */ (CONFIG.step.initial),
   // One gain (dB) per EQ band, keyed by band id: eqLow, eqLowMid, …
   ...Object.fromEntries(CONFIG.eq.bands.map((band) => [band.id, CONFIG.eq.gain.initial])),
 };
@@ -25,18 +25,28 @@ export const settings = {
 export const marks = createMarks({ minSeconds: CONFIG.marks.minSeconds });
 
 // The open track's beats (features/beats.js). `status`: "idle" (not looked
-// for yet), "finding" (`progress` 0…1), "found" (`times` in seconds, in
-// order, and `bpm`), or "none" (no steady beat). `shown`: whether their
-// lines are drawn. A new file starts idle.
+// for yet), "finding" (`progress` 0…1), "found", or "none" (no steady
+// beat). Once found: `times` in seconds, in order; `bpm`; `downbeat`, one
+// flag per beat for the first of each bar, and `bars`, their times, with
+// `barLength` (null without downbeats: the simple finder has none);
+// `method`, which finder found them; `complete`, false while the beat
+// model is still filling in the rest of the track (`progress` goes on).
+// `shown`: whether their lines are drawn. A new file starts idle.
 export const beats = {
   status: /** @type {"idle" | "finding" | "found" | "none"} */ ("idle"),
   progress: 0,
   times: /** @type {Float64Array | null} */ (null),
   bpm: /** @type {number | null} */ (null),
+  downbeat: /** @type {Uint8Array | null} */ (null),
+  bars: /** @type {Float64Array | null} */ (null),
+  barLength: /** @type {number | null} */ (null),
+  method: /** @type {"model" | "simple" | null} */ (null),
+  complete: false,
   shown: true,
 };
-// The average beat in seconds, or null without beats.
+// The average beat and bar in seconds, or null without them.
 export const beatLength = () => (beats.status === "found" ? 60 / beats.bpm : null);
+export const barLength = () => (beats.status === "found" ? beats.barLength : null);
 
 export const totalSemitones = () => settings.semitones + settings.cents / 100;
 export const eqGains = () => Object.fromEntries(CONFIG.eq.bands.map((band) => [band.id, settings[band.id]]));

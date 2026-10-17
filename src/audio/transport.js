@@ -28,7 +28,11 @@ import { timelinePositionAt } from "../core/timeline.js";
  *     there: it starts at the loop start instead.
  *
  * Exposes: play, pause, stop, seek, retune, load, setLoop, on,
- *          playStartFor, positionAt, state, playing, position, duration
+ *          playStartFor, positionAt, positionAtOutput, state, playing,
+ *          position, duration, loop
+ *   positionAtOutput(time) is the position the graph plays at `time` on
+ *   the AudioContext clock (before the output delay), for sounds
+ *   scheduled to go with the track (the beat click).
  *   playStartFor(from) is where play() would start with the cursor at
  *   `from` (the start of the track after its end; the loop start outside
  *   an active loop), so a view can show where playback will start.
@@ -292,8 +296,14 @@ export function createTransport({ engine, getRate, getSemitones }) {
      * @param {number} eventTime
      */
     positionAt: (eventTime) => (isPlaying() ? positionHeardAt(eventTime) : currentPosition()),
+    /** @param {number} time On the AudioContext clock. */
+    positionAtOutput: (time) => timelinePositionAt(segments, time, duration),
     get duration() {
       return duration;
+    },
+    /** The active A–B loop, or null. */
+    get loop() {
+      return loop;
     },
   };
 }

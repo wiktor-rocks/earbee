@@ -43,6 +43,59 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-17: Beats by a beat-tracking model, with bars
+
+- **What:**
+  - **B** now finds the beats with **Beat This!**, a beat-tracking model trained on many kinds of music. It's much more reliable than the simple finder on soft attacks, swing, rubato, classical and sparse arrangements.
+  - It also finds the **first beat of each bar**, drawn as a stronger line.
+  - A new step size, **"1 bar"**, sits among the others by its length (↑ / ↓), so ← / → can jump bar to bar. The beat click is **higher on the 1**.
+  - **Progressive results:** the model works through the track 30 s at a time, starting around the cursor, so the part you're on has its beats within a few seconds. The chip shows the tempo with the progress ("♩ 120 BPM · 43 %") until the whole track is done.
+  - When the model can't run (an Intel Mac, which ONNX Runtime has no build for, or outside Electron), the **simple beat finder** is used as before, without bars. The chip's tooltip says which one found the beats.
+- **Why:** the user wanted beat detection that holds up across many kinds of music, with downbeats ("where is the 1").
+- **How:**
+  - **The model:** Beat This! (CPJKU, ISMIR 2024); its code and weights are MIT, unlike madmom's (non-commercial) or Essentia (AGPL). Its small checkpoint is exported to ONNX once by `scripts/export-beat-model.py`, which also writes reference values from the Python original for the tests.
+  - **Its input must match the original's exactly:** mono at 22,050 Hz (our own polyphase resampler, its cut-off tuned to match soxr's top bands), a 1024-point STFT every 441 samples with reflect padding, a slaney mel filterbank (128 bands, 30 Hz to 11 kHz), and log(1 + 1000·x).
+  - **Its windows and post-processing** are ported line for line: 1500-frame windows overlapping by 6 frames, joined keeping the earlier one; peaks are maxima within ±3 frames above 0, neighbours merged, and downbeats snapped to beats.
+  - **Where it runs:** WebAssembly in the page took about 4 s per window, and WebGPU (about 0.15 s) works on Linux only with Chromium's Vulkan switched on, which is risky for the whole app. So the model runs on the **native ONNX Runtime in an Electron utility process**, on 4 threads: about 1 s per 30 s of sound. The process starts on the first window and stops after a minute idle.
+  - **A crash to know about:** ONNX Runtime's memory-pattern planning crashed the utility process (SIGTRAP) on its second run, though not in plain Node. It's turned off, at the same speed.
+  - **Speed:** the model's time is in attention over 1500 frames (profiled), so quantizing the weights wouldn't help.
+  - **Data flow:** the worker decodes the file once and makes both the spectrogram and the simple finder's answer. The page sends the windows nearest the cursor first through the preload's `beatWindow` and re-picks the beats after each one.
+  - **Packaging:** the model and ONNX Runtime's native files are unpacked from the asar. Only the target platform and architecture's binary ships, and no CUDA (about 46 MB on Linux). A project `.npmrc` stops ONNX Runtime's install from downloading its CUDA libraries (about 270 MB).
+- **Where:**
+  - New `src/core/beat-this.js` (`windowStarts`, `windowInput`, `joinWindows`, `pickPeaks`, `beatsFromLogits`), `src/core/melspec.js`, `src/core/resample.js`, and `src/core/fft.js` (moved out of `core/beats.js`).
+  - New `electron/beat-model.js` and `beat-model-process.js`; `electron/preload.js` (`beatWindow`), `electron/main.js`.
+  - `src/audio/beat-worker.js` (prepares the spectrogram and the fallback), `src/features/beats.js` (`runModel`, `take`).
+  - `context.js` (`downbeat`, `bars`, `barLength`, `method`, `complete`), `core/beats.js` (`stepSizes` with "bar", `beatClockTimes` with indices, `medianGap`).
+  - `ui/controls.js`, `ui/dom.js`, `features/playback.js` (the "bar" step), `timeline.js` (`.guide-beat.downbeat`), `audio/engine.js` (the accented click).
+  - New `models/beat-this-small.onnx` and `scripts/export-beat-model.py`; `package.json` (`onnxruntime-node` 1.30.0, `asarUnpack`, file patterns), `.npmrc`, `THIRD_PARTY_NOTICES.md`, `README.md`.
+- **Verified by:**
+  - New `tests/unit/beat-this.test.mjs`, against the Python original's output for the same test clip:
+    - the mel filterbank and the spectrogram (within 0.001);
+    - **the model's logits, beats and downbeats on our spectrogram, exactly the original's**;
+    - at 44.1 kHz through our resampler, the beats within one frame of the original's (with soxr);
+    - windows run in any order give the same result;
+    - window cutting and joining, peak picking and downbeat snapping, and the resampler (five rates, the length, the low-pass, chunking).
+  - `tests/e2e/20-beats.cjs` with a new music-like `bars.wav`: 120 BPM by the model, a line per beat, bars every 2 s, ← / → by beat and by bar, and the simple finder when the model is unavailable (no bars). The same topic passes against a packaged Linux build (`TB_APP_PATH`).
+  - A 90 s file fills in progressively: the tempo after about 5 s, and all of it after about 8 s.
+  - `npm run check` and `npm test`.
+
+## 2026-10-17: A click on each beat
+
+- **What:** a new switch, Settings › General › **Click on each beat** (off by default), or **Shift+B** while listening. Once the beats are found, a short click plays on each one during playback, so you can hear whether the beat lines sit on the beat. It follows the speed, loops and seeks. A notification confirms Shift+B, and says to find the beats first if they aren't found yet.
+- **Why:** the user asked for a way to check the beat detection by ear.
+- **How:**
+  - Every 25 ms while playing, the clicks for the next 0.12 s are put on the AudioContext clock. The transport's timeline gives the track position at both ends of that span (`positionAtOutput`, the graph's time, before the output delay), and `beatClockTimes` turns the beats between them into clock times, including a span where the A–B loop wraps.
+  - The clicks go into the master volume, so they reach the speakers with the same delay as the track. What you hear is the detection's own accuracy, not a scheduling offset.
+  - A seek, a loop change (the transport's "jump" and "loop" events) or a new speed cancels the clicks not yet played and works them out again. Pausing, a new file or turning the switch off stops them.
+- **Where:**
+  - `features/beats.js` ("The beat click": `scheduleClicks`, `cancelClicks`, `updateClicks`, `toggleBeatClick`).
+  - `core/beats.js` (`beatClockTimes`), `audio/engine.js` (`click`), `audio/transport.js` (`positionAtOutput`, `loop`).
+  - `prefs/index.js` (`general.beatClick`), `config.js` (`beats.click`, `clickLookaheadSeconds`, `clickTickMs`), `app.js` (Shift+B).
+- **Verified by:**
+  - Unit tests for `beatClockTimes` (any speed, back-to-back spans giving each beat once, a loop wrap), and the General section's new default.
+  - `tests/e2e/20-beats.cjs`: Shift+B turns the pref on and off, and playing with it on raises no errors.
+  - `npm run check` and `npm test`. The sound itself is checked by ear.
+
 ## 2026-10-17: Finding the beats
 
 - **What:**
