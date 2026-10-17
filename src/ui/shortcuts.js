@@ -64,9 +64,20 @@ export const isTextField = (target) =>
 const isKeyboardFocusedSlider = (target, clickedElement) =>
   target.tagName === "INPUT" && target.type === "range" && target !== clickedElement;
 
+// Enter on a button, link or menu item reached with Tab activates it, as
+// everywhere (one clicked gives its focus back, see FOCUS below), so Enter
+// is only a shortcut while nothing like that is focused.
+const ACTIVATED_BY_ENTER = "button, a[href], select, summary, [role=button], [role^=menuitem], [role=option]";
+const isEnterForControl = (event) =>
+  (event.code === "Enter" || event.code === "NumpadEnter") &&
+  // (Not `instanceof Element`: the video window's elements are its own window's.)
+  typeof event.target?.closest === "function" &&
+  event.target.closest(ACTIVATED_BY_ENTER) !== null;
+
 function handleShortcutKey(shortcuts, isBlocked, event, clickedElement) {
   if (isBlocked()) return;
   if (event.code.startsWith("Arrow") && isKeyboardFocusedSlider(event.target, clickedElement)) return;
+  if (isEnterForControl(event)) return;
 
   const shortcut = findShortcut(shortcuts, event);
   if (!shortcut || (isTextField(event.target) && !shortcut.ctrl)) return;

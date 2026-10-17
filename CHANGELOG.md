@@ -57,10 +57,10 @@ The architecture overview, the file map and a list of where to make common chang
 ## 2026-10-17: Enter plays from the stop point; no menu bar
 
 - **Enter plays from where playback last stopped.**
-  - **What:** Enter (or the keypad's Enter) pauses while playing, as Space does. Otherwise it plays from the red stop point, wherever the cursor is. Space plays from where you last started. Before the first stop, Enter plays from the cursor. It is listed in the shortcuts dialog, and the ■ readout's tooltip mentions it. In text fields Enter stays Enter.
+  - **What:** Enter (or the keypad's Enter) pauses while playing, as Space does. Otherwise it plays from the red stop point, wherever the cursor is. Space plays from where you last started. Before the first stop, Enter plays from the cursor. It is listed in the shortcuts dialog, and the ■ readout's tooltip mentions it. In text fields Enter stays Enter. On a button, link or menu item reached with Tab, Enter still activates it; a clicked one gives its focus back, so after a click Enter is the shortcut.
   - **Why:** the user asked for a key to replay from the end point, as Space does from the start point.
-  - **How:** `replayFromStopOrPause` seeks to `stopPoint` (already kept for the ■ marker and readout), then plays. The transport still has the last word, so with a loop on, playback starts inside it.
-  - **Where:** `src/features/playback.js` (`replayFromStopOrPause`); the `SHORTCUTS` table in `src/app.js`; `#stopPoint`'s title in `index.html`; README.
+  - **How:** `replayFromStopOrPause` seeks to `stopPoint` (already kept for the ■ marker and readout), then plays. The transport still has the last word, so with a loop on, playback starts inside it. Shortcuts skip Enter on a control (`isEnterForControl`): the full test run caught Enter no longer opening the theme menu from the keyboard.
+  - **Where:** `src/features/playback.js` (`replayFromStopOrPause`); the `SHORTCUTS` table in `src/app.js`; `src/ui/shortcuts.js` (`isEnterForControl`); `#stopPoint`'s title in `index.html`; README.
 - **No menu bar.**
   - **What:** the main window and the video window no longer show Electron's File/Edit/View/Window/Help bar, which the app never used. (The video window used to show it on Alt.) A Mac's menu, at the top of the screen, is unchanged.
   - **Why:** the user asked; everything is in the page.
