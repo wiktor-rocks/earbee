@@ -836,7 +836,7 @@ body.dragging .welcome-hint {
   display: flex;
   flex: none;
   flex-direction: column;
-  gap: 2px;
+  gap: 6px;
   margin: 0 -4px;
   padding: 3px 4px;
   list-style: none;
@@ -853,7 +853,7 @@ body.dragging .welcome-hint {
   min-width: 0;
   justify-content: flex-start;
   gap: 14px;
-  padding: 6px;
+  padding: 8px 10px;
   border-color: transparent;
   background: transparent;
   text-align: left;
@@ -976,7 +976,7 @@ body.dragging .welcome-hint {
   flex: none;
   flex-direction: column;
   gap: 12px;
-  padding: 18px 20px 4px;
+  padding: 20px 22px;
 }
 
 /* The box: a magnifier, the words or link, where to search (words only),
@@ -986,8 +986,8 @@ body.dragging .welcome-hint {
   display: flex;
   align-items: center;
   gap: 8px;
-  height: 46px;
-  padding: 0 5px 0 14px;
+  height: 50px;
+  padding: 0 7px 0 16px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--bg);
@@ -1025,7 +1025,7 @@ body.dragging .welcome-hint {
 
 .youtube-search button.primary {
   flex: none;
-  height: 36px;
+  height: 38px;
   min-width: 104px;
 }
 
@@ -1033,7 +1033,11 @@ body.dragging .welcome-hint {
 .youtube-options {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 10px;
+  gap: 12px;
+}
+
+.youtube-options .pref-field {
+  padding: 16px 18px;
 }
 
 .youtube-options .pref-head label {
@@ -1049,9 +1053,9 @@ body.dragging .welcome-hint {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
   min-height: 0;
-  padding: 10px 14px 10px 20px;
+  padding: 4px 16px 18px 22px;
   overflow-y: auto;
   scrollbar-gutter: stable;
 }
@@ -1068,7 +1072,7 @@ body.dragging .welcome-hint {
 .youtube-footer {
   flex: none;
   margin: 0;
-  padding: 12px 22px 14px;
+  padding: 14px 22px 16px;
   border-top: 1px solid var(--border);
   color: var(--muted);
   font-size: 12px;

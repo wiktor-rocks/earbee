@@ -43,6 +43,27 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-17: More room in the From YouTube dialog
+
+- **What:** the From YouTube dialog is less cramped. Opened from the welcome screen (no results yet), the option cards no longer sit right on the footer's line. Search results start further below the cards and stop short of the footer, with more space around and between them. The search bar and its button are a little taller, the option cards have more padding, and every part of the dialog keeps the same 22 px side margin as its header.
+- **Why:** the user asked for more padding in several places in this dialog, before the 0.2.0 release.
+- **How:** spacing only, all in `style.css`:
+
+  | Rule                                    | Was                          | Now                                                                       |
+  | --------------------------------------- | ---------------------------- | ------------------------------------------------------------------------- |
+  | `.youtube-top` padding                  | `18px 20px 4px`              | `20px 22px` (empty dialog: 20 px between the cards and the footer, was 4) |
+  | `.youtube-results` padding, gap         | `10px 14px 10px 20px`, `8px` | `4px 16px 18px 22px`, `10px`                                              |
+  | `.search-results` gap                   | `2px`                        | `6px`                                                                     |
+  | `.search-result` padding                | `6px`                        | `8px 10px`                                                                |
+  | `.youtube-search` height, padding       | `46px`, `0 5px 0 14px`       | `50px`, `0 7px 0 16px`                                                    |
+  | `.youtube-search button.primary` height | `36px`                       | `38px`                                                                    |
+  | `.youtube-options` gap                  | `10px`                       | `12px`                                                                    |
+  | `.youtube-options .pref-field` (new)    | `.pref-field`'s `14px 16px`  | `16px 18px`, in this dialog only; Settings is unchanged                   |
+  | `.youtube-footer` padding               | `12px 22px 14px`             | `14px 22px 16px`                                                          |
+
+- **Where:** `style.css`, "From YouTube dialog" and the `.search-result*` rules above it.
+- **Verified by:** `npm run check`; `tests/e2e/02-welcome.cjs` and `09-downloads.cjs` (72) with the unit (269) and smoke (28) tests. Screenshots of the dialog opened from the welcome screen, with search results, at 1200×800 and 960×680, and in EarBee Light were checked by eye: nothing wraps, and only the results scroll.
+
 ## 2026-10-17: Two beat-finding edge cases
 
 - **What:**
