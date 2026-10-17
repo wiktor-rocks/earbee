@@ -561,6 +561,8 @@ function start() {
   // The welcome screen's entrance plays once (style.css), not again when a
   // failed first file brings the screen back.
   setTimeout(() => dom.welcome.classList.add("settled"), 1000);
+  // The window stays hidden behind a splash until now (electron/windows.js).
+  /** @type {any} */ (window).scribee?.ready?.();
 }
 
 start();

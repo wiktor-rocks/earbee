@@ -79,8 +79,10 @@ TB_APP_BINARY=$PWD/dist/linux-unpacked/scribee npm test
 ```
 electron/          The main process (CommonJS, Node)
   main.js            window, security, wiring
-  windows.js         remembers a window's size and position; allows the video
-                     window (the one other window)
+  windows.js         remembers a window's size and position; the splash shown
+                     while the app starts; allows the video window (the one
+                     other window)
+  splash.*           the splash window's page
   prefs-store.js     keeps the settings (prefs.json): checks, saves, the folder
                      picker; the colour theme, applied before the page shows
   downloader.js      downloading links, and searching by keywords, with yt-dlp

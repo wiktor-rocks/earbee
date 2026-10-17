@@ -24,7 +24,8 @@
 //              with unsaved changes asks first (guardClose).
 //   Window     Remembers its size, position and maximised state between
 //              runs (windows.js). The title follows the page's
-//              <title>, which names the open file.
+//              <title>, which names the open file. While the page loads,
+//              hidden, a splash shows the bee and a loader (windows.js).
 //   GPU        Chromium picks the GPU itself and falls back to software
 //              rendering if the GPU process keeps crashing.
 //              `npm run start:no-gpu` forces software rendering;
@@ -37,7 +38,7 @@ const { createMediaFiles, registerMediaScheme } = require("./media-files");
 const { handleRendererCrash, handleSystem } = require("./system");
 const { createPrefsStore, createThemeView, handlePrefs } = require("./prefs-store");
 const { createProjectFiles, guardClose, handleProjects } = require("./project-files");
-const { loadWindowState, rememberWindowState } = require("./windows");
+const { handleSplash, loadWindowState, rememberWindowState, showAfterSplash } = require("./windows");
 const { allowVideoWindow, handleVideoWindows } = require("./windows"); // Video window (src/features/video-window/)
 
 const ROOT = path.join(__dirname, ".."); // the app's files: index.html, src/, assets/
@@ -150,6 +151,7 @@ function createWindow() {
     minHeight: MIN_SIZE.height,
     title: "ScriBee",
     icon,
+    show: false, // until the page is ready; a splash shows meanwhile (showAfterSplash, below)
     backgroundColor: themeView.current().colors.bg, // the page background, so opening doesn't flash
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -158,7 +160,6 @@ function createWindow() {
       nodeIntegration: false,
     },
   });
-  if (maximized) win.maximize();
   // No menu bar: everything is in the page. (Linux and Windows; a Mac's
   // menu is the system's, at the top of the screen, and stays.)
   win.removeMenu();
@@ -171,6 +172,8 @@ function createWindow() {
   allowVideoWindow(win, { icon }); // Video window (src/features/video-window/); else deny all: setWindowOpenHandler(() => ({ action: "deny" }))
 
   rememberWindowState(win);
+  // Before handleRendererCrash: its dialog needs the window shown.
+  showAfterSplash(win, { around: { x, y, width, height }, colors: themeView.current().colors, icon, maximized });
   guardClose(win, { ipcMain, dialogs: projectDialogs, state: projectState });
   handleRendererCrash(win, dialog);
   win.loadFile(path.join(ROOT, "index.html"));
@@ -200,6 +203,7 @@ app.whenReady().then(() => {
   });
   prefsStore.onChange((section) => section === "theme" && followTheme());
   handleSystem(ipcMain);
+  handleSplash(ipcMain);
   handleVideoWindows(ipcMain); // Video window (src/features/video-window/)
   nativeTheme.on("updated", followTheme); // "Automatic" follows the system
   const mediaFiles = createMediaFiles();

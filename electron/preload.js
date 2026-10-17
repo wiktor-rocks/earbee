@@ -2,6 +2,7 @@
 //   - downloading a link, or searching by keywords (see downloader.js); the page hides its download
 //     buttons when this is missing (e.g. opened in a plain browser);
 //   - the memory available for a track (see system.js);
+//   - saying the page is ready, so its window shows (see windows.js, "The splash");
 //   - project files (.sbee; see project-files.js): opening, saving, and
 //     whether there are unsaved changes; a File's path is found here, so
 //     the page never names a path itself;
@@ -76,6 +77,9 @@ contextBridge.exposeInMainWorld("scribee", {
 
   // Bytes the system can still give programs, or null if unknown.
   availableMemory: () => ipcRenderer.invoke("system:available-memory"),
+
+  // The page is built: the window shows and the splash closes.
+  ready: () => ipcRenderer.send("app:ready"),
 
   // See src/features/project/. Each resolves to { ok: true, … } or
   // { ok: false, canceled?, error? }.

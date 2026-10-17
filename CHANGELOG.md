@@ -4,7 +4,7 @@ ScriBee is an Electron app for transcribing music. You open a song or a video, s
 
 **Files**
 
-- `electron/`: the Electron main process: `main.js` (window, security), `windows.js` (window state, the video window), `prefs-store.js` (settings and the colour theme), `downloader.js` (yt-dlp), `media-files.js` (serving downloads to the page), `project-files.js` (.sbee files), `system.js` and `preload.js` (the page's bridge to them).
+- `electron/`: the Electron main process: `main.js` (window, security), `windows.js` (window state, the splash, the video window), `prefs-store.js` (settings and the colour theme), `downloader.js` (yt-dlp), `media-files.js` (serving downloads to the page), `project-files.js` (.sbee files), `system.js` and `preload.js` (the page's bridge to them).
 - `src/`: the page, as ES modules in layers. `core/`, `themes/`, `search/` → `prefs/`, `marks/`, `project/` → `config.js` → `audio/`, `video/`, `waveform.js`, `timeline.js` → `context.js` → `ui/` → `features/` → `app.js`.
 - `index.html` and `style.css`: the page and its look.
 - `assets/`: the logo and icons; `scripts/make-images.py` makes them from the source image.
@@ -42,6 +42,30 @@ The architecture overview, the file map and a list of where to make common chang
 | `tests/run.cjs` (one sequence)           | `tests/run.cjs` + `tests/e2e/`                                                           |
 
 ---
+
+## 2026-10-17: A splash window while the app starts
+
+- **What:** starting ScriBee first shows a small frameless window with the bee and its pulsing aura, "ScriBee" and the 4-bar loader, in the current theme's colours. The main window appears, already built, once the page is ready, and the splash closes. On a fast start the splash stays up for at least 600 ms, so it doesn't blink.
+- **Why:** the main window used to open straight away as an empty, theme-coloured rectangle and stay that way until the page had loaded. On a slow start that looked broken.
+- **How:**
+  - The main window is made with `show: false`. `showAfterSplash` opens the splash, centred on where the main window will be. When the page calls `scribee.ready()` at the end of `start()` (IPC `app:ready`), the main window is shown and the splash is destroyed.
+  - Fallbacks: the main window shows at once if its page fails to load or its process dies (registered before `handleRendererCrash`, whose dialog needs a visible parent). It also shows after 15 s if the page never says it is ready.
+  - Closing the splash (Alt+F4) before the hand-over closes the main window too.
+  - `maximize()` moved into the hand-over, because it shows a hidden window.
+  - The splash gets its colours as URL query parameters, which `splash.js` sets as CSS variables. It has no preload, its own strict CSP, and its own copy of the few rules it needs from `style.css`.
+  - A hidden window's page still reports `document.visibilityState` as "visible", so the smoke test watches for the splash's DevTools target to disappear instead.
+- **Where:**
+  - `electron/windows.js`: "The splash" (`showAfterSplash`, `handleSplash`).
+  - New files `electron/splash.html`, `splash.css` and `splash.js`.
+  - `electron/main.js` (`createWindow`, `whenReady`).
+  - `electron/preload.js` (`ready`).
+  - `src/app.js` (`start`).
+  - `eslint.config.js` (`splash.js` is a browser script).
+  - `tests/smoke.cjs` (every session checks that the splash closes within 10 s, under the fallback).
+- **Verified by:**
+  - `npm run check` and the full `npm test` (211 unit, 411 e2e, 28 smoke).
+  - The smoke test run against a `build:dir` build, whose asar contains the splash files and the Righteous font.
+  - The splash rendered offscreen in a dark and a light theme.
 
 ## 2026-10-17: Version 0.1.1
 

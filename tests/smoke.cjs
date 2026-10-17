@@ -3,6 +3,8 @@
 //
 // The app is started as a user would start it, with a throwaway profile and
 // a DevTools port, and driven over the Chrome DevTools Protocol:
+//   - the splash: it closes, and the window shows, once the page says it
+//     is ready (well before the fallback timeout);
 //   - the window title, Content-Security-Policy and blocked navigation /
 //     pop-ups, and the download bridge (preload.js);
 //   - the window state: saved on close, restored on the next start, reset
@@ -27,6 +29,12 @@ const check = (name, ok, detail = "") => {
   console.log(`${ok ? "PASS" : "FAIL"} ${name} ${detail}`);
 };
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Waits up to `ms` for `test()` to resolve to true; resolves to whether it did.
+async function waitFor(test, ms) {
+  for (const end = Date.now() + ms; Date.now() < end; await sleep(100)) if (await test()) return true;
+  return false;
+}
 
 /* ---------- Starting the app and talking to it ---------- */
 
@@ -99,6 +107,16 @@ async function session(profile, steps) {
     await page.evaluate(
       `new Promise((resolve) => document.readyState === "complete" ? resolve() : addEventListener("load", resolve))`,
     );
+    // The window stays hidden behind the splash until the page is ready,
+    // and the splash closes as it shows. (A hidden window's page still
+    // says it's visible, so the splash is what can be watched.) 10 s is
+    // under the fallback (READY_TIMEOUT_MS), so this is the page's signal.
+    const splashOpen = async () => {
+      const targets = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
+      return targets.some((target) => target.url.includes("/splash.html"));
+    };
+    const handedOver = await waitFor(async () => !(await splashOpen()), 10000);
+    check("splash closes once the page is ready", handedOver);
     await steps(page);
     page.evaluate("window.close()").catch(() => {});
     page.close();

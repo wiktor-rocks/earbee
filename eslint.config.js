@@ -153,6 +153,11 @@ module.exports = [
     languageOptions: { globals: { ...globals.node, ...globals.browser } },
   },
   {
+    // The splash window's script: a plain browser script.
+    files: ["electron/splash.js"],
+    languageOptions: { sourceType: "script", globals: globals.browser },
+  },
+  {
     // The landing page (site/, for GitHub Pages): a plain browser script.
     files: ["site/**/*.js"],
     languageOptions: { sourceType: "script", globals: globals.browser },

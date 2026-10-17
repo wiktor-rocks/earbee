@@ -1,8 +1,9 @@
 // The app's windows. First, a window's size, position, maximised and
 // always-on-top state, kept between runs in <name>.json in the user-data
-// folder (window-state.json for the main window). Then the video window,
-// the one other window the page may open.
-const { app, screen } = require("electron");
+// folder (window-state.json for the main window). Then the splash, shown
+// while the main window loads, and the video window, the one other window
+// the page may open.
+const { app, BrowserWindow, screen } = require("electron");
 const fs = require("fs");
 const path = require("path");
 
@@ -57,6 +58,114 @@ function rememberWindowState(win, name = "window-state") {
   for (const event of ["resize", "move", "maximize", "unmaximize", "always-on-top-changed", "close"])
     win.on(event, remember);
   win.on("closed", () => saveWindowState(state, name));
+}
+
+/* ---------- The splash ---------- */
+
+// A small window with the bee, the name and a loader (splash.html), shown
+// while the main window loads hidden behind it, so a slow start doesn't
+// look like an empty window.
+//
+//   Hand-over  The page says when it's ready (the preload's ready(), at the
+//              end of start() in src/app.js); then the main window shows
+//              and the splash closes, after the splash has been up for
+//              MIN_SPLASH_MS, so a fast start doesn't blink. If the main
+//              window is ready before the splash has even painted, the
+//              splash never shows.
+//   Fallbacks  The main window shows at once if its page fails to load or
+//              its process dies (the crash dialog needs a window to sit
+//              on), and after READY_TIMEOUT_MS if the page never says.
+//   Closing    Closing the splash (Alt+F4) before then closes the main
+//              window too, so the app quits.
+const SPLASH_SIZE = { width: 360, height: 300 };
+const MIN_SPLASH_MS = 600;
+const READY_TIMEOUT_MS = 15000;
+
+// Each main window still behind a splash: its reveal(), by its webContents id.
+const waiting = new Map();
+
+function handleSplash(ipcMain) {
+  ipcMain.on("app:ready", (event) => waiting.get(event.sender.id)?.({ wait: true }));
+}
+
+// Opens a splash for `win`, which must have been made with show: false,
+// and shows `win` when its page is ready (above). `around` is where `win`
+// will be (the splash is centred on it; without x and y, on the screen);
+// `colors` the theme's (bg, text, accent); `maximized` whether `win`
+// opens maximised (maximize() shows a window, so it waits until then).
+function showAfterSplash(win, { around, colors, icon, maximized = false }) {
+  const { width, height } = SPLASH_SIZE;
+  const position = Number.isFinite(around.x)
+    ? {
+        x: Math.round(around.x + (around.width - width) / 2),
+        y: Math.round(around.y + (around.height - height) / 2),
+      }
+    : { center: true };
+  const splash = new BrowserWindow({
+    ...position,
+    width,
+    height,
+    frame: false,
+    resizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    show: false,
+    title: "ScriBee",
+    icon,
+    backgroundColor: colors.bg, // the theme's, so opening doesn't flash
+    webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false },
+  });
+  splash.removeMenu();
+  splash.webContents.on("will-navigate", (event) => event.preventDefault());
+  splash.webContents.setWindowOpenHandler(() => ({ action: "deny" }));
+  splash.loadFile(path.join(__dirname, "splash.html"), {
+    query: { bg: colors.bg, text: colors.text, accent: colors.accent },
+  });
+
+  let shownAt = null; // when the splash appeared; null while it hasn't
+  let revealed = false;
+  splash.once("ready-to-show", () => {
+    if (revealed) return;
+    splash.show();
+    shownAt = Date.now();
+  });
+
+  const id = win.webContents.id;
+  const finish = () => {
+    if (!win.isDestroyed()) {
+      if (maximized) win.maximize();
+      else win.show();
+      win.focus();
+    }
+    if (!splash.isDestroyed()) splash.destroy();
+  };
+  const reveal = ({ wait = false } = {}) => {
+    if (revealed) return;
+    revealed = true;
+    waiting.delete(id);
+    clearTimeout(timeout);
+    const left = wait && shownAt !== null ? MIN_SPLASH_MS - (Date.now() - shownAt) : 0;
+    if (left > 0) setTimeout(finish, left);
+    else finish();
+  };
+  waiting.set(id, reveal);
+
+  const timeout = setTimeout(() => {
+    console.warn("The page didn't say it was ready; showing it anyway.");
+    reveal();
+  }, READY_TIMEOUT_MS);
+  win.webContents.on("did-fail-load", (_event, _code, _description, _url, isMainFrame) => isMainFrame && reveal());
+  win.webContents.on("render-process-gone", () => reveal());
+
+  splash.on("closed", () => {
+    if (!revealed && !win.isDestroyed()) win.close();
+  });
+  win.on("closed", () => {
+    revealed = true;
+    waiting.delete(id);
+    clearTimeout(timeout);
+    if (!splash.isDestroyed()) splash.destroy();
+  });
 }
 
 /* ---------- The video window ---------- */
@@ -143,4 +252,11 @@ function allowVideoWindow(win, { icon, extraOptions = {} } = {}) {
   contents.on("render-process-gone", () => closeChild(true));
 }
 
-module.exports = { allowVideoWindow, handleVideoWindows, loadWindowState, rememberWindowState };
+module.exports = {
+  allowVideoWindow,
+  handleSplash,
+  handleVideoWindows,
+  loadWindowState,
+  rememberWindowState,
+  showAfterSplash,
+};
