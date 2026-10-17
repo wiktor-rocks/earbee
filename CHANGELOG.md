@@ -43,6 +43,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-18: A local/ folder for notes, with a to-do list
+
+- **What:** a `local/` folder at the top of the repo that git ignores, for files that stay on the user's computer. It holds `FOR-TOMORROW.md` (moved in from the top), a new `TODO.md` checklist and a short `README.md` saying what the folder is. AGENTS.md now points to both notes files there.
+- **Why:** the user wanted a to-do file as well, and one place for their local files.
+- **How:**
+  - The two notes files each have one job. FOR-TOMORROW.md is the handoff between sessions: what's in flight, with its next step, and context worth knowing. TODO.md is the checklist of things to do, decide, try, and parked ideas; those sections moved there from FOR-TOMORROW.md.
+  - `.gitignore` ignores `local/` instead of the single file. Prettier already skips what git ignores; ESLint's ignore list gets `local/`, so a script kept there can't break `npm run check`.
+- **Where:** `.gitignore`, `eslint.config.js`, `AGENTS.md` ("Read first"). The folder itself is local.
+- **Verified by:** `npm run check`; `git check-ignore` confirms git ignores the folder, and `git status` shows nothing from it.
+
 ## 2026-10-18: FOR-TOMORROW.md, the open threads between sessions (local only)
 
 - **What:** a file kept on the user's computer only, `FOR-TOMORROW.md` at the top of the folder (git ignores it), for what's still important but not done: in flight, to decide, not tried yet, parked ideas, good to know. Each entry says what it is, why it matters and the next step. AGENTS.md lists it first under "Read first", so an assistant starting fresh (after the context was cleared) checks it, and keeps it current.

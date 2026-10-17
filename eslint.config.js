@@ -125,7 +125,7 @@ const layering = [
 ];
 
 module.exports = [
-  { ignores: ["node_modules/", "dist/", "src/vendor/", "tests/fixtures/", "tests/output/"] },
+  { ignores: ["node_modules/", "dist/", "src/vendor/", "tests/fixtures/", "tests/output/", "local/"] },
   js.configs.recommended,
   {
     // The page: ES modules running in Chromium.

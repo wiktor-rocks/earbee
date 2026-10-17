@@ -10,5 +10,5 @@ tests/output/
 .claude/settings.local.json
 .claude/.cc-writes/
 
-# Notes kept on this computer only (open threads between sessions)
-FOR-TOMORROW.md
+# Files kept on this computer only: notes, to-dos (see local/README.md)
+local/
