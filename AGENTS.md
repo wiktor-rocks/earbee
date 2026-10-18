@@ -57,7 +57,7 @@ A small change (a comment, a CSS value, a typo) needs `npm run check` only.
 - **Formatting** is Prettier's, and lint is ESLint's. Don't hand-format; run `npm run format`.
 - **`style.css`:** new rules go in the section they belong to (see its outline); a new part gets its own `/* ---------- Name ---------- */` marker.
 - **Every change gets a CHANGELOG.md entry**, at the top, newest first: what, why, how, where, verified by (the format is in its header). Not on an `exp/` branch: the entry is written when the experiment is merged into `testing`.
-- **Commit messages** are one short line saying what changed.
+- **Commit messages** are one short line saying what changed, and nothing else: no `Co-Authored-By` or other trailer lines, even if your tool adds them by default.
 
 ## Pitfalls
 
