@@ -2,6 +2,14 @@
 
 How to find your way in EarBee, check your work and avoid the known pitfalls. People: the same is in README.md ("Development") and [docs/maintaining.md](docs/maintaining.md), with more explanation.
 
+## First, in every session: the owner's reminders
+
+**Before you answer the owner's first message, whatever it says** (a question, a task, even "hi"), read the "Reminders" section of `local/SCRATCHPAD.md` and show the owner every item in it, word for word, under a heading "Reminders". Then answer the message.
+
+- Do it once per session, at the start, every time, even if the reminders were shown in an earlier session.
+- If the file or the section is missing, or the section is empty, say nothing about it and go on.
+- Never remove or change a reminder yourself; only when the owner asks. To add one, put it in that section when the owner asks for a reminder.
+
 ## What this is
 
 A desktop player for transcribing music (Electron). There's no build step: the page is plain ES modules loaded by `index.html`, with types from JSDoc comments.
@@ -12,7 +20,7 @@ A desktop player for transcribing music (Electron). There's no build step: the p
 
 ## Read first
 
-0. **`local/FOR-TOMORROW.md` and `local/SCRATCHPAD.md`, if they exist:** the owner's notes from earlier sessions: what's in flight with its next step, and a scratchpad of loose notes and ideas. The `local/` folder is kept on the owner's computer only (git ignores it), so it may be missing. Check both before starting. Keep FOR-TOMORROW.md current: add what you leave half-done, with the next step, and remove what you finish. Never commit anything in `local/`.
+0. **`local/FOR-TOMORROW.md` and `local/SCRATCHPAD.md`, if they exist** (the scratchpad's "Reminders" are shown first; see above): the owner's notes from earlier sessions: what's in flight with its next step, and a scratchpad of loose notes and ideas. The `local/` folder is kept on the owner's computer only (git ignores it), so it may be missing. Check both before starting. Keep FOR-TOMORROW.md current: add what you leave half-done, with the next step, and remove what you finish. Never commit anything in `local/`.
 1. **The comment at the top of `src/app.js`:** the architecture, every file and its role, and "COMMON CHANGES", which says where to make the usual changes.
 2. **[docs/glossary.md](docs/glossary.md):** the app's words ("start point", "region", "Peak + loudness", "the dock") and their names in the code.
 3. **Imports only go downward** through the page's layers: `core`, `themes`, `search` → `prefs`, `marks`, `project` → `config` → `audio`, `video`, `waveform`, `timeline` → `context` → `ui` → `features` → `app.js`. ESLint enforces it (`eslint.config.js`); a forbidden import fails `npm run check`.

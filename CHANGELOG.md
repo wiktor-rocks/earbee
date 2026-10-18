@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-19: Reminders at the start of every session (AGENTS.md)
+
+- **What:** at the start of every session, before answering the owner's first message (whatever it is), an assistant shows the items in the "Reminders" section of `local/SCRATCHPAD.md`, word for word.
+- **Why:** the owner wants to be reminded of certain things in the next session, whatever they write to the assistant first.
+- **How:** a section at the top of AGENTS.md, which every session loads (CLAUDE.md includes it). Missing file or empty section: nothing is said. Reminders are only changed or removed when the owner asks.
+- **Where:** `AGENTS.md` ("First, in every session", and "Read first", item 0); the section itself is in `local/SCRATCHPAD.md` (on this computer only).
+- **Verified by:** `npm run format:check`.
+
 ## 2026-10-19: A blog on earbee.org (the website, built with Eleventy)
 
 - **What:** the website has a blog at earbee.org/blog/.
