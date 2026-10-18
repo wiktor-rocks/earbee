@@ -144,6 +144,14 @@ export const CONFIG = {
     // within this share of a beat.
     snapPx: 8,
     snapKeyFraction: 0.25,
+    // Finding the beats: this many workers prepare the model's input
+    // (audio/beat-worker.js), a window each, keeping ahead of the model.
+    // More prepare faster, but share the CPU with the model, which uses 4
+    // threads itself.
+    prepareWorkers: 2,
+    // A worker that hasn't opened the file by then counts as failed, so a
+    // search never hangs at 0 % (audio/beat-input.js).
+    startTimeoutMs: 30_000,
   },
 
   // The notifications (ui/toast.js): how long one shows, and how many at

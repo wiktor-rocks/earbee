@@ -1,17 +1,19 @@
 /* =====================================================================
  * BEATS
  * Finding the open track's beats, on demand (the ♩ chip or B):
- *   1. audio/beat-worker.js decodes the file again and makes the beat
- *      model's input (a log-mel spectrogram) and, as a fallback, the
- *      simple beat finder's answer (core/beats.js);
- *   2. the beat model (Beat This!; electron/beat-model.js, through the
- *      preload's beatWindow) runs on the spectrogram one 30 s window at a
- *      time, the window around the cursor first, then the ones nearest
- *      it; after each, the windows so far are joined and their beats and
- *      downbeats picked (core/beat-this.js), so the part you're working
- *      on has its beats within a second or two;
- *   3. if the model can't run (no bridge, an unsupported system), the
- *      simple finder's beats are used (no bars).
+ *   1. the beat model (Beat This!; electron/beat-model.js, through the
+ *      preload's beatWindow) runs on the track one 30 s window at a time,
+ *      the window around the cursor first, then the ones nearest it;
+ *   2. a few workers (audio/beat-input.js, beat-worker.js) decode the file
+ *      again and make each window's input (its part of a log-mel
+ *      spectrogram), keeping a window or two ahead of the model, so it
+ *      starts after one window's preparing, not the whole track's;
+ *   3. after each window, the windows so far are joined and their beats
+ *      and downbeats picked (core/beat-this.js), so the part you're
+ *      working on has its beats within a few seconds, on any length;
+ *   4. if the model can't run (no bridge, an unsupported system), the
+ *      simple beat finder (core/beats.js) goes through the whole track
+ *      instead, and its beats are used (no bars).
  * Once found, they're drawn as faint lines over the waveform, the first
  * of each bar stronger (timeline.js); the chip shows the tempo; and the
  * step size becomes "1 beat", so ← / → go from beat to beat (or bar to
@@ -34,6 +36,7 @@
  * ===================================================================== */
 
 import { CONFIG } from "../config.js";
+import { openBeatInput } from "../audio/beat-input.js";
 import { beatLength, beats, player, settings } from "../context.js";
 import { beatsFromLogits, CHUNK, FPS, joinWindows, windowInput, windowStarts } from "../core/beat-this.js";
 import { beatClockTimes, medianGap, snapTo } from "../core/beats.js";
@@ -49,12 +52,10 @@ import { notify } from "../ui/toast.js";
  */
 const bridge = /** @type {BeatBridge | undefined} */ (/** @type {any} */ (window).earbee);
 
-// Decoding and the spectrogram are this share of the progress; the model the rest.
-const PREPARING = 0.25;
-
 /** @type {import("../core/media.js").Media | null} */
 let media = null; // the open track's, to read again
-let worker = null; // while preparing
+/** @type {ReturnType<typeof openBeatInput> | null} */
+let preparing = null; // the workers preparing the model's input, while finding
 let search = 0; // counts searches; one that's no longer the latest stops
 
 // Why finding them failed, by the worker's error kind (decode-worker.js).
@@ -64,9 +65,9 @@ const FAILURES = {
   "out-of-memory": "there isn't enough memory",
 };
 
-function stopWorker() {
-  worker?.terminate();
-  worker = null;
+function stopPreparing() {
+  preparing?.close();
+  preparing = null;
 }
 
 function show() {
@@ -119,72 +120,86 @@ function take({ beats: times, downbeats = new Float64Array(0) }, { method, compl
   rescheduleClicks();
 }
 
-// The model, window by window from the cursor; the simple finder's answer
-// if it can't run.
-async function runModel(spect, frames, simple, mine, name) {
+// The simple beat finder, through the whole track: for when the model
+// can't run.
+async function runSimple(mine, name) {
+  const found = await preparing.simple((fraction) => {
+    if (mine !== search) return;
+    beats.progress = fraction;
+    renderBeatInfo();
+  });
+  if (mine === search) take(found, { method: "simple", complete: true, name });
+}
+
+// The model, window by window from the cursor, each window's input
+// prepared a little ahead by the workers; the simple finder if the model
+// can't run.
+async function runModel(frames, mine, name) {
   const starts = windowStarts(frames);
   const cursor = player.transport.position * FPS;
   const distance = (index) => Math.abs(starts[index] + CHUNK / 2 - cursor);
   const order = [...starts.keys()].sort((a, b) => distance(a) - distance(b));
+  // The k-th window in that order, being prepared: as many at once as
+  // there are workers, so one is always ready when the model is.
+  const inputs = [];
+  const prepare = (k) => {
+    if (k >= order.length) return;
+    inputs[k] = preparing.window(starts[order[k]]);
+    inputs[k].catch(() => {}); // seen when its turn comes
+  };
+  for (let k = 0; k < CONFIG.beats.prepareWorkers; k++) prepare(k);
+
   const windows = [];
   for (const [done, index] of order.entries()) {
-    const { input, length } = windowInput(spect, frames, starts[index]);
+    const spect = await inputs[done];
+    inputs[done] = null;
+    if (mine !== search) return; // stopped, or a new file
+    prepare(done + CONFIG.beats.prepareWorkers);
+    const start = starts[index];
+    const { input, length } = windowInput(spect, frames, start, Math.max(start, 0));
     let answer;
     try {
       answer = bridge?.beatWindow ? await bridge.beatWindow(input) : { ok: false, error: "no beat model here" };
     } catch (error) {
       answer = { ok: false, error: String(error?.message ?? error) };
     }
-    if (mine !== search) return; // stopped, or a new file
+    if (mine !== search) return;
     if (!answer.ok) {
       console.warn("The beat model couldn't run, so the simple beat finder's beats are used:", answer.error);
-      return take(simple, { method: "simple", complete: true, name });
+      return runSimple(mine, name);
     }
-    windows[index] = { start: starts[index], length, beat: answer.beat, downbeat: answer.downbeat };
-    beats.progress = PREPARING + ((1 - PREPARING) * (done + 1)) / order.length;
+    windows[index] = { start, length, beat: answer.beat, downbeat: answer.downbeat };
+    beats.progress = (done + 1) / order.length;
     const { beat, downbeat } = joinWindows(windows, frames);
     take(beatsFromLogits(beat, downbeat), { method: "model", complete: done === order.length - 1, name });
     if (beats.status === "finding") renderBeatInfo();
   }
 }
 
-function find() {
+async function find() {
   if (!media) return;
-  stopWorker();
+  stopPreparing();
   const mine = ++search;
   Object.assign(beats, { status: "finding", progress: 0 });
   renderBeatInfo();
   const name = media.name;
-  const prepared = new Worker(new URL("../audio/beat-worker.js", import.meta.url), { type: "module" });
-  worker = prepared;
-
-  // Forgets any beats found so far too (their lines, the beat step, the
-  // clicks), so nothing is left that the chip no longer accounts for.
-  const fail = (reason) => {
+  const opened = openBeatInput(media, CONFIG.beats.prepareWorkers);
+  preparing = opened;
+  try {
+    const { frames } = await opened.info;
+    if (mine !== search) return;
+    // Too short for the model's input: the simple finder it is.
+    if (frames) await runModel(frames, mine, name);
+    else await runSimple(mine, name);
+  } catch (error) {
+    // Forgets any beats found so far too (their lines, the beat step, the
+    // clicks), so nothing is left that the chip no longer accounts for.
     if (mine !== search) return; // stopped meanwhile, or a new file
     resetBeats(media);
-    showNotice(`Couldn't find the beats in “${name}”: ${reason}.`);
-  };
-  prepared.onmessage = ({ data }) => {
-    if (worker !== prepared) return; // stopped meanwhile
-    if (data.type === "progress") {
-      beats.progress = data.fraction * PREPARING;
-      renderBeatInfo();
-    } else if (data.type === "done") {
-      stopWorker();
-      beats.progress = PREPARING;
-      renderBeatInfo();
-      const { spect, frames, simple } = data;
-      if (!frames) take(simple, { method: "simple", complete: true, name });
-      else runModel(spect, frames, simple, mine, name).catch((error) => fail(String(error?.message ?? error)));
-    } else if (data.type === "error") {
-      fail(FAILURES[data.kind] ?? data.message);
-    }
-  };
-  prepared.onerror = (event) => {
-    if (worker === prepared) fail(event.message || "something went wrong");
-  };
-  prepared.postMessage({ type: "prepare", media });
+    showNotice(`Couldn't find the beats in “${name}”: ${FAILURES[error?.kind] ?? error?.message ?? error}.`);
+  } finally {
+    if (preparing === opened) stopPreparing();
+  }
 }
 
 // The chip or B: find the beats; while finding, stop; once found, show or
@@ -205,7 +220,7 @@ export function beatsAction() {
  * @param {import("../core/media.js").Media | null} next
  */
 export function resetBeats(next) {
-  stopWorker();
+  stopPreparing();
   search++;
   media = next;
   Object.assign(beats, {

@@ -32,6 +32,31 @@ function bessel0(x) {
 }
 
 /**
+ * The ratio `toRate / fromRate` reduced to `up / down` (L / M), and the
+ * filter's reach: how many input samples either side of its position an
+ * output sample is made from (0 if the rates are equal).
+ *
+ * Output sample n sits at input position n · down / up. So a stream that
+ * starts at input sample s, a multiple of `down`, makes output samples
+ * s · up / down onwards: exactly the whole stream's, once `reach` input
+ * samples have come in (before that, the resampler assumes silence where
+ * the whole stream had samples). That's how a part of a track is
+ * resampled on its own (audio/beat-worker.js).
+ * @param {number} fromRate
+ * @param {number} toRate
+ */
+export function resampleRatio(fromRate, toRate) {
+  const divisor = gcd(fromRate, toRate);
+  const up = toRate / divisor; // L
+  const down = fromRate / divisor; // M
+  if (up === down) return { up, down, reach: 0 };
+  // Cycles per input sample.
+  const cutoff = 0.5 * Math.min(1, up / down) * ROLLOFF;
+  const reach = 2 * Math.ceil(ZERO_CROSSINGS / (4 * cutoff)); // input samples either side (even)
+  return { up, down, reach, cutoff };
+}
+
+/**
  * A streaming resampler from `fromRate` to `toRate` (whole numbers of Hz).
  * @param {number} fromRate
  * @param {number} toRate
@@ -48,12 +73,7 @@ export function createResampler(fromRate, toRate) {
     };
   }
 
-  const divisor = gcd(fromRate, toRate);
-  const up = toRate / divisor; // L
-  const down = fromRate / divisor; // M
-  // Cycles per input sample.
-  const cutoff = 0.5 * Math.min(1, up / down) * ROLLOFF;
-  const reach = 2 * Math.ceil(ZERO_CROSSINGS / (4 * cutoff)); // input samples either side (even)
+  const { up, down, reach, cutoff } = resampleRatio(fromRate, toRate);
   const taps = 2 * reach; // a multiple of 4
   const norm = bessel0(KAISER_BETA);
   // weights[phase · taps + k] multiplies input sample base − reach + 1 + k.

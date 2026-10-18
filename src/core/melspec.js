@@ -13,8 +13,8 @@ import { createSpectrum } from "./fft.js";
 
 export const MEL_RATE = 22050;
 export const MEL_BANDS = 128;
-const N_FFT = 1024;
-const HOP = 441;
+export const N_FFT = 1024;
+export const HOP = 441;
 const BINS = N_FFT / 2 + 1;
 const F_MIN = 30;
 const F_MAX = 11000;
@@ -54,8 +54,19 @@ export function melFilterbank() {
 /**
  * A streaming log-mel spectrogram of mono samples at MEL_RATE. Frame k is
  * centred on sample k · 441 (at k / 50 s).
+ *
+ * By default it makes a whole track's frames: the samples from its start,
+ * with the signal reflected at the start (and at the end, by finish()).
+ * With `firstFrame` (2 or more), it makes those of a part of a track: the
+ * samples start at sample firstFrame · 441 − 512, where that frame's
+ * window begins, and frame `firstFrame` comes out first, the same as the
+ * whole track's (audio/beat-worker.js prepares the model's windows so).
+ * @param {{ firstFrame?: number }} [options]
  */
-export function createLogMelSpectrogram() {
+export function createLogMelSpectrogram({ firstFrame = 0 } = {}) {
+  if (firstFrame !== 0 && !(firstFrame * HOP >= N_FFT / 2)) {
+    throw new RangeError(`a part starts at frame 0, or at 2 or later (not ${firstFrame})`);
+  }
   // Each band's weights as a run of bins, skipping the zeros.
   const bank = melFilterbank();
   const bands = Array.from({ length: MEL_BANDS }, (_, band) => {
@@ -77,10 +88,11 @@ export function createLogMelSpectrogram() {
   let frames = new Float32Array(MEL_BANDS * 1024);
   let count = 0;
   // The padded signal not yet used up. Until half a window has come in,
-  // the start can't be reflected yet, so the samples wait in `head`.
-  let head = [];
+  // the start can't be reflected yet, so the samples wait in `head`. A
+  // part of a track isn't reflected: its samples go straight in.
+  let head = firstFrame ? null : [];
   let headLength = 0;
-  let buffer = null;
+  let buffer = firstFrame ? new Float32Array(1 << 16) : null;
   let filled = 0;
   // The last N_FFT / 2 + 1 samples, to reflect the end.
   const tail = new Float32Array(N_FFT / 2 + 1);
@@ -154,15 +166,21 @@ export function createLogMelSpectrogram() {
       } else append(samples);
     },
     /**
-     * The spectrogram: `frames` rows of MEL_BANDS values in `data`. Empty
-     * if the sound was too short to reflect (half a window or less).
+     * The spectrogram: `frames` rows of MEL_BANDS values in `data`, from
+     * `firstFrame` on. Empty if the sound was too short to reflect (half a
+     * window or less). `atEnd` false: the samples stop before the track's
+     * end, so it isn't reflected there; the frames are those whose window
+     * was all there.
+     * @param {{ atEnd?: boolean }} [options]
      */
-    finish() {
+    finish({ atEnd = true } = {}) {
       if (head) return { frames: 0, data: new Float32Array(0) };
-      // The reflected end: the samples before the last, backwards.
-      const reflected = new Float32Array(N_FFT / 2);
-      for (let i = 0; i < N_FFT / 2; i++) reflected[i] = tail[tail.length - 2 - i];
-      append(reflected);
+      if (atEnd) {
+        // The reflected end: the samples before the last, backwards.
+        const reflected = new Float32Array(N_FFT / 2);
+        for (let i = 0; i < N_FFT / 2; i++) reflected[i] = tail[tail.length - 2 - i];
+        append(reflected);
+      }
       return { frames: count, data: frames.slice(0, count * MEL_BANDS) };
     },
   };

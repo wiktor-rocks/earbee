@@ -7,12 +7,28 @@
 // split_piece, aggregate_prediction; model/postprocessor.py: the
 // "minimal" postprocessing), so the results match its; see
 // tests/unit/beat-this.test.mjs.
+import { createLogMelSpectrogram, HOP, MEL_BANDS, MEL_RATE, N_FFT } from "./melspec.js";
+import { createResampler, resampleRatio } from "./resample.js";
 
 export const FPS = 50; // spectrogram frames (and model outputs) per second
 export const CHUNK = 1500; // frames per model window (the model takes exactly this many)
 const BORDER = 6; // frames at either end of a window whose answers are dropped
 const BANDS = 128;
 const NOTHING = -1000; // a logit for "certainly not"
+
+/**
+ * How many spectrogram frames a whole track of `samples` samples at
+ * `sampleRate` has (core/melspec.js after core/resample.js), known before
+ * any of it is decoded: one every 441 samples at 22,050 Hz, and none for
+ * half a window or less.
+ * @param {number} samples
+ * @param {number} sampleRate
+ */
+export function framesFor(samples, sampleRate) {
+  const { up, down } = resampleRatio(sampleRate, MEL_RATE);
+  const resampled = Math.ceil((samples * up) / down);
+  return resampled > N_FFT / 2 ? Math.floor(resampled / HOP) + 1 : 0;
+}
 
 /**
  * Where each window starts (split_piece): the first and last are padded
@@ -29,22 +45,101 @@ export function windowStarts(frames) {
 }
 
 /**
+ * The frames of the piece the window at `start` covers: [from, to).
+ * @param {number} start
+ * @param {number} frames
+ */
+export const windowFrames = (start, frames) => ({ from: Math.max(start, 0), to: Math.min(start + CHUNK, frames) });
+
+/**
+ * What to decode for the window at `start` alone, so that its frames come
+ * out exactly as the whole track's (audio/beat-worker.js):
+ *   from, to    its frames, [from, to)
+ *   firstFrame  where its spectrogram starts (createLogMelSpectrogram's
+ *               option): `from`, or 0 for a window at the track's start
+ *   atEnd       whether it reaches the track's end (reflected there)
+ *   outFrom, outTo  the 22,050 Hz samples those frames are made from
+ *               [outFrom, outTo); outTo is Infinity at the end
+ *   inFrom, inTo    the input samples to resample for them, [inFrom, inTo):
+ *               from `reach` before (aligned to `down`, see resampleRatio),
+ *               so the resampler has warmed up by outFrom; inTo Infinity
+ *               at the end
+ *   outStart    the 22,050 Hz sample the resampler's output starts with
+ * @param {number} start
+ * @param {number} frames the track's (framesFor)
+ * @param {number} sampleRate the track's
+ */
+export function windowSource(start, frames, sampleRate) {
+  const { from, to } = windowFrames(start, frames);
+  const { up, down, reach } = resampleRatio(sampleRate, MEL_RATE);
+  const firstFrame = from * HOP >= N_FFT / 2 ? from : 0;
+  const atEnd = to >= frames;
+  const outFrom = firstFrame ? firstFrame * HOP - N_FFT / 2 : 0;
+  const outTo = atEnd ? Infinity : (to - 1) * HOP + N_FFT / 2;
+  // An output sample is made from the inputs reach − 1 before its position
+  // to reach after (and is that one input when the rates are equal).
+  const earliest = Math.floor((outFrom * down) / up) - Math.max(0, reach - 1);
+  const inFrom = Math.max(0, Math.floor(earliest / down) * down);
+  const inTo = atEnd ? Infinity : Math.floor(((outTo - 1) * down) / up) + reach + 1;
+  return { from, to, firstFrame, atEnd, outFrom, outTo, inFrom, inTo, outStart: (inFrom * up) / down };
+}
+
+/**
+ * The spectrogram of one window alone, from the track's mono samples
+ * [inFrom, inTo) of `source` (windowSource), pushed in order; more past
+ * inTo is fine. finish() gives its frames [from, to), the same as the
+ * whole track's (frames × BANDS; fewer at the end if the track turned out
+ * shorter than its duration said).
+ * @param {ReturnType<typeof windowSource>} source
+ * @param {number} sampleRate the track's
+ */
+export function createWindowSpectrogram(source, sampleRate) {
+  const resampler = createResampler(sampleRate, MEL_RATE);
+  const spectrogram = createLogMelSpectrogram({ firstFrame: source.firstFrame });
+  let at = source.outStart; // the 22,050 Hz sample the resampler's next output is
+  // Only [outFrom, outTo) goes on: before, the resampler is warming up;
+  // after, it's past the window.
+  function feed(samples) {
+    const from = Math.max(0, source.outFrom - at);
+    const to = Math.min(samples.length, source.outTo - at);
+    at += samples.length;
+    if (to > from) spectrogram.push(samples.subarray(from, to));
+  }
+  return {
+    /** @param {Float32Array} samples The next mono samples. */
+    push(samples) {
+      resampler.push(samples);
+      feed(resampler.take());
+    },
+    finish() {
+      // Past the end the whole track's resampler assumed silence; elsewhere
+      // every output needed has been made already.
+      if (source.atEnd) resampler.finish();
+      feed(resampler.take());
+      const { data } = spectrogram.finish({ atEnd: source.atEnd });
+      const skip = source.from - source.firstFrame; // a window at the start began at frame 0
+      return data.slice(skip * MEL_BANDS, (source.to - source.firstFrame) * MEL_BANDS);
+    },
+  };
+}
+
+/**
  * The model's input for the window at `start`: CHUNK frames of BANDS
  * values, the piece's frames with zeros around them, and `length`, how
  * many of them the original would give the model (less than CHUNK only
  * for a piece shorter than a window; the rest is padding, and its
  * answers are ignored).
- * @param {Float32Array} spect frames × BANDS
- * @param {number} frames
+ * @param {Float32Array} spect frames × BANDS, from frame `offset` of the piece
+ * @param {number} frames the piece's
  * @param {number} start
+ * @param {number} [offset] the piece's frame that `spect` starts with (0: all of it)
  */
-export function windowInput(spect, frames, start) {
+export function windowInput(spect, frames, start, offset = 0) {
   const input = new Float32Array(CHUNK * BANDS);
-  const from = Math.max(start, 0);
-  const to = Math.min(start + CHUNK, frames);
+  const { from, to } = windowFrames(start, frames);
   const left = Math.max(0, -start);
   const right = Math.max(0, Math.min(BORDER, start + CHUNK - frames));
-  input.set(spect.subarray(from * BANDS, to * BANDS), left * BANDS);
+  input.set(spect.subarray((from - offset) * BANDS, (to - offset) * BANDS), left * BANDS);
   return { input, length: left + (to - from) + right };
 }
 

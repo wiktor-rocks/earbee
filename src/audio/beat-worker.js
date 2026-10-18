@@ -1,79 +1,125 @@
 // Prepares one file for finding its beats, off the page's main thread (a
-// module Worker; features/beats.js is the page side). It decodes the file
-// again rather than use the player's samples: those were handed to the
-// audio thread when the file opened (audio/engine.js).
+// module Worker; features/beats.js is the page side, which runs a few of
+// these at once). It decodes the file again rather than use the player's
+// samples: those were handed to the audio thread when the file opened
+// (audio/engine.js).
 //
-// One pass over the sound, mixed to mono, makes both:
-//   - the beat model's input: resampled to 22,050 Hz (core/resample.js)
-//     and turned into a log-mel spectrogram (core/melspec.js); the page
-//     has the model run on it (electron/beat-model.js);
-//   - the simple beat finder's answer (core/beats.js), the fallback for
-//     when the model can't run.
-// Both are streamed chunk by chunk; only the spectrogram (128 values per
-// 20 ms, ~6 MB for 4 minutes) and the onset envelope are kept.
+// The beat model's input is made one 30 s window at a time, in the order
+// the page asks for them (the cursor's first), so the model can start on
+// the first window while the next ones are being prepared. Each is decoded
+// from a little before it (the decoder warms up, the resampler too), mixed
+// to mono, resampled to 22,050 Hz (core/resample.js) and turned into its
+// frames of the log-mel spectrogram (core/melspec.js): exactly the frames
+// the whole track's spectrogram has there (core/beat-this.js
+// windowSource, createWindowSpectrogram).
+//
+// For when the model can't run, it also gives the simple beat finder's
+// answer (core/beats.js), from one pass over the whole track.
 //
 // Messages:
-//   page → { type: "prepare", media }  (a File, or { name, url }: core/media.js)
+//   page → { type: "open", media }  (a File, or { name, url }: core/media.js)
+//   ←      { type: "info", duration, sampleRate, frames }
+//          frames: the whole track's spectrogram frames (core/beat-this.js framesFor)
+//   page → { type: "window", start }  a window's first frame (core/beat-this.js windowStarts)
+//   ←      { type: "window", start, spect }  its frames × 128 values, from
+//          frame max(start, 0)
+//   page → { type: "simple" }
 //   ←      { type: "progress", fraction } …  (at most every 100 ms)
-//   ←      { type: "done", spect, frames, simple: { beats, bpm } }
-//          spect: frames × 128 values (core/melspec.js); times are
-//          seconds from the track's first sample, as the player counts
-// or      { type: "error", kind, message }, kind as in decode-worker.js
+//   ←      { type: "simple", beats, bpm }  times in seconds from the track's
+//          first sample, as the player counts
+// or at any point ← { type: "error", kind, message }, kind as in decode-worker.js
 import { AudioSampleSink } from "../../node_modules/mediabunny/dist/bundles/mediabunny.mjs";
+import { CONFIG } from "../config.js";
+import { createWindowSpectrogram, framesFor, windowSource } from "../core/beat-this.js";
 import { createOnsetDetector, detectBeats } from "../core/beats.js";
-import { createLogMelSpectrogram, MEL_RATE } from "../core/melspec.js";
-import { createResampler } from "../core/resample.js";
 import { DecodeError, openTrack } from "./open-track.js";
 
 const scope = /** @type {any} */ (self);
 
-async function prepare(media) {
-  const { input, track, first, duration, sampleRate } = await openTrack(media);
-  const onsets = createOnsetDetector(sampleRate);
-  const resampler = createResampler(sampleRate, MEL_RATE);
-  const spectrogram = createLogMelSpectrogram();
+let opened = null; // the track (open-track.js), and its `frames`
+
+// Calls `each(mono, at)` with the track's samples mixed to mono, in
+// chunks, from input sample `from` (by the timestamps; decoding starts
+// `preRoll` seconds earlier, so the decoder has warmed up) until at least
+// `to` (Infinity: the end); `at` is the chunk's first sample. Mixed as the
+// beat finders always have: each channel / channels.
+async function eachMono({ track, first, sampleRate }, from, to, preRoll, each) {
+  const start = from === 0 ? first : Math.max(first, first + from / sampleRate - preRoll);
+  const end = Number.isFinite(to) ? first + to / sampleRate + 0.1 : undefined; // a little past: whole chunks
   let plane = new Float32Array(0);
   let mono = new Float32Array(0);
-  let reportedAt = -Infinity;
-
-  for await (const sample of new AudioSampleSink(track).samples(first)) {
-    const frames = sample.numberOfFrames;
-    const channels = sample.numberOfChannels;
+  let at = -1; // the input sample the next chunk starts with, once started
+  for await (const sample of new AudioSampleSink(track).samples(start, end)) {
     try {
-      if (plane.length < frames) [plane, mono] = [new Float32Array(frames), new Float32Array(frames)];
-      mono.fill(0, 0, frames);
-      for (let c = 0; c < channels; c++) {
-        sample.copyTo(plane, { planeIndex: c, format: "f32-planar" });
-        for (let i = 0; i < frames; i++) mono[i] += plane[i] / channels;
+      const frames = sample.numberOfFrames;
+      let skip = 0;
+      if (at < 0) {
+        // Warming up: drop what comes before `from`.
+        const position = Math.round((sample.timestamp - first) * sampleRate);
+        if (position + frames <= from) continue;
+        skip = Math.max(0, from - position);
+        at = position + skip;
       }
+      const count = frames - skip;
+      if (plane.length < count) [plane, mono] = [new Float32Array(count), new Float32Array(count)];
+      const channels = sample.numberOfChannels;
+      mono.fill(0, 0, count);
+      for (let c = 0; c < channels; c++) {
+        sample.copyTo(plane, { planeIndex: c, format: "f32-planar", frameOffset: skip, frameCount: count });
+        for (let i = 0; i < count; i++) mono[i] += plane[i] / channels;
+      }
+      each(mono.subarray(0, count), at);
+      at += count;
     } finally {
       sample.close();
     }
-    const chunk = mono.subarray(0, frames);
-    onsets.push(chunk);
-    resampler.push(chunk);
-    spectrogram.push(resampler.take());
+    if (at >= to) break; // also stops the decoder
+  }
+}
 
+async function open(media) {
+  const track = await openTrack(media);
+  const frames = framesFor(Math.round(track.duration * track.sampleRate), track.sampleRate);
+  opened = { ...track, frames };
+  return { duration: track.duration, sampleRate: track.sampleRate, frames };
+}
+
+async function prepareWindow(start) {
+  const source = windowSource(start, opened.frames, opened.sampleRate);
+  const spectrogram = createWindowSpectrogram(source, opened.sampleRate);
+  await eachMono(opened, source.inFrom, source.inTo, CONFIG.audio.parallel.preRoll, (mono) => spectrogram.push(mono));
+  return spectrogram.finish();
+}
+
+async function simple() {
+  const { sampleRate, duration } = opened;
+  const onsets = createOnsetDetector(sampleRate);
+  let reportedAt = -Infinity;
+  await eachMono(opened, 0, Infinity, 0, (mono, at) => {
+    onsets.push(mono);
     const now = performance.now();
     if (now - reportedAt > 100 && duration > 0) {
       reportedAt = now;
-      scope.postMessage({ type: "progress", fraction: Math.min(1, (sample.timestamp - first) / duration) });
+      scope.postMessage({ type: "progress", fraction: Math.min(1, at / sampleRate / duration) });
     }
-  }
-  input.dispose?.();
-
-  resampler.finish();
-  spectrogram.push(resampler.take());
-  const { frames, data } = spectrogram.finish();
+  });
   const { envelope, frameRate } = onsets.finish();
-  return { spect: data, frames, simple: detectBeats(envelope, frameRate) };
+  return detectBeats(envelope, frameRate);
 }
 
+// One request at a time: the page waits for each answer before it asks
+// this worker again.
 scope.onmessage = async ({ data }) => {
-  if (data.type !== "prepare") return;
   try {
-    const { spect, frames, simple } = await prepare(data.media);
-    scope.postMessage({ type: "done", spect, frames, simple }, [spect.buffer, simple.beats.buffer]);
+    if (data.type === "open") {
+      scope.postMessage({ type: "info", ...(await open(data.media)) });
+    } else if (data.type === "window") {
+      const spect = await prepareWindow(data.start);
+      scope.postMessage({ type: "window", start: data.start, spect }, [spect.buffer]);
+    } else if (data.type === "simple") {
+      const { beats, bpm } = await simple();
+      scope.postMessage({ type: "simple", beats, bpm }, [beats.buffer]);
+    }
   } catch (error) {
     const kind = error instanceof DecodeError ? error.kind : error instanceof RangeError ? "out-of-memory" : "failed";
     scope.postMessage({ type: "error", kind, message: String(error?.message ?? error) });

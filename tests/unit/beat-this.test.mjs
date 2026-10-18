@@ -6,7 +6,17 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { describe, test } from "node:test";
 import ort from "onnxruntime-node";
-import { beatsFromLogits, CHUNK, joinWindows, pickPeaks, windowInput, windowStarts } from "../../src/core/beat-this.js";
+import {
+  beatsFromLogits,
+  CHUNK,
+  createWindowSpectrogram,
+  framesFor,
+  joinWindows,
+  pickPeaks,
+  windowInput,
+  windowSource,
+  windowStarts,
+} from "../../src/core/beat-this.js";
 import { createLogMelSpectrogram, MEL_RATE, melFilterbank } from "../../src/core/melspec.js";
 import { createResampler } from "../../src/core/resample.js";
 
@@ -271,5 +281,76 @@ describe("resampling", () => {
     const mean = total / head.length;
     // Only the top bands, by the cut-off, differ at all.
     assert.ok(mean < 1e-3 && worst < 0.15, `mean difference ${mean}, worst ${worst}`);
+  });
+});
+
+describe("one window alone (as audio/beat-worker.js prepares them)", () => {
+  // Noise with a click every half second: quick to make at any length.
+  function noiseWithClicks(rate, seconds) {
+    const out = new Float32Array(Math.round(rate * seconds));
+    let state = 1;
+    const period = Math.round(rate / 2);
+    for (let i = 0; i < out.length; i++) {
+      state ^= state << 13;
+      state ^= state >>> 17;
+      state ^= state << 5;
+      const since = i % period;
+      out[i] = ((state >>> 0) / 2 ** 32 - 0.5) * 0.2 + (since < 400 ? 0.8 * Math.exp(-since / 60) : 0);
+    }
+    return out;
+  }
+  function wholeTrack(samples, rate) {
+    const resampler = createResampler(rate, MEL_RATE);
+    const mel = createLogMelSpectrogram();
+    for (let at = 0; at < samples.length; at += 4096) {
+      resampler.push(samples.subarray(at, at + 4096));
+      mel.push(resampler.take());
+    }
+    resampler.finish();
+    mel.push(resampler.take());
+    return mel.finish();
+  }
+  function window(samples, rate, frames, start, chunk = 1152) {
+    const source = windowSource(start, frames, rate);
+    const spectrogram = createWindowSpectrogram(source, rate);
+    // A little past the end it needs, as a decoder gives whole chunks.
+    const end = Math.min(samples.length, source.inTo + 3000);
+    for (let at = source.inFrom; at < end; at += chunk)
+      spectrogram.push(samples.subarray(at, Math.min(at + chunk, end)));
+    return { source, spect: spectrogram.finish() };
+  }
+
+  for (const [rate, seconds] of [
+    [44100, 75],
+    [48000, 75],
+    [MEL_RATE, 75],
+    [44100, 20],
+  ]) {
+    test(`every window of ${seconds} s at ${rate} Hz is the whole track's frames`, () => {
+      const samples = noiseWithClicks(rate, seconds);
+      const whole = wholeTrack(samples, rate);
+      const frames = framesFor(samples.length, rate);
+      assert.equal(frames, whole.frames);
+      for (const start of windowStarts(frames)) {
+        const { source, spect } = window(samples, rate, frames, start, start % 2 ? 1152 : 1024);
+        const expected = whole.data.subarray(source.from * 128, source.to * 128);
+        assert.equal(spect.length, expected.length, `window at ${start}`);
+        assert.ok(worstDifference(spect, expected) <= 1e-6, `window at ${start}: ${worstDifference(spect, expected)}`);
+        assert.deepEqual(
+          windowInput(spect, frames, start, source.from),
+          windowInput(whole.data, frames, start),
+          `window at ${start}`,
+        );
+      }
+    });
+  }
+
+  test("framesFor counts the whole track's frames, before decoding", () => {
+    for (const rate of [44100, 48000, MEL_RATE, 32000]) {
+      for (const seconds of [0, 0.01, 0.024, 0.03, 1, 3.7, 10.02]) {
+        const samples = noiseWithClicks(rate, seconds);
+        assert.equal(framesFor(samples.length, rate), wholeTrack(samples, rate).frames, `${seconds} s at ${rate} Hz`);
+      }
+    }
   });
 });
