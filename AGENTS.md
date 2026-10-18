@@ -84,3 +84,28 @@ A small change (a comment, a CSS value, a typo) needs `npm run check` only.
 - **`main`** is the stable version: the website is published from it, and releases are tagged on it. It only moves forward to `testing` (`git merge --ff-only testing`), and only when the owner asks. Never commit to it directly.
 - **An idea that might not work out** goes on its own experiment branch, `exp/<idea>`. Follow docs/maintaining.md, "Trying an idea: an experiment branch", exactly: procedures A to F, each step's command as written, then its check. When a command fails or a check doesn't give the expected result, stop and report; don't work around it. Ask the owner before merging an experiment into `testing` (D) or throwing it away (E).
 - Never rebase or force-push pushed work.
+
+## Ending a session
+
+When the owner says they're done ("done for today", "let's stop", "wrap up"), leave everything so the next session, maybe with a cleared context or another assistant, starts from a clean, known state. In order:
+
+1. **Stop what's running:** background test runs, measurements, `npm start`.
+2. **Put back anything temporary:** debug or timing lines in tracked files, a setting changed for a measurement. `git status` shows only changes that are meant to stay.
+3. **Commit finished work** on its branch, after the checks its change needs (see "Which checks for which change"), with its CHANGELOG entry where the conventions ask for one. Unfinished work:
+   - on an `exp/` branch, commit it there if `npm run check` passes;
+   - on `testing`, ask the owner: move it to a new experiment branch (procedure A, then commit), or leave it uncommitted and say so in FOR-TOMORROW.md.
+   - Don't `git stash` it: a stash is easy to forget.
+4. **Push** every branch with new commits (`testing`, `exp/*`), so GitHub has them; never `main`. Check: `git status -sb` on each shows nothing after `origin/…`.
+5. **Tidy what the session left behind:** a build's by-products in `dist/` (see "Test builds"), stray files in the repo outside `local/`. Ask before deleting anything the session didn't make.
+6. **Bring `local/FOR-TOMORROW.md` up to date:**
+   - each thread still in flight: its branch and last commit, where it stands, and the next step;
+   - what waits for the owner's decision;
+   - what's finished comes out (the CHANGELOG keeps the record);
+   - check that what it says still holds: branches, what's pushed, test results.
+   - Loose ideas from the session go to `local/SCRATCHPAD.md`.
+7. **Leave the working copy on `testing`**, clean, unless the owner wants another branch open; FOR-TOMORROW.md says which.
+8. **End with a short summary for the owner:**
+   - what was done and pushed;
+   - what's waiting for them;
+   - what's next;
+   - anything that wasn't verified.

@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-18: An end-of-session routine (AGENTS.md)
+
+- **What:** AGENTS.md has an "Ending a session" section: what an assistant does when the owner says they're done. Stop what's running, put back temporary changes, commit finished work (and decide with the owner about unfinished work), push, tidy up, update `local/FOR-TOMORROW.md`, leave the working copy on `testing`, and sum up.
+- **Why:** the owner wants each session to end in a clean, known state for the next one. "Read first" already covered the start of a session. During this one, temporary timing code had to be found and reverted, a commit stayed unpushed overnight, FOR-TOMORROW.md fell behind, and a build left by-products in `dist/`.
+- **How:** eight short steps, each with its check where there is one (`git status`, `git status -sb`). No `git stash`, which is easy to forget. Unfinished work on `testing` is the owner's call: a new experiment branch, or left uncommitted and noted in FOR-TOMORROW.md.
+- **Where:** `AGENTS.md` ("Ending a session", at the end).
+- **Verified by:** `npm run format:check`; followed for the first time at the end of this session.
+
 ## 2026-10-18: How to make a test build (AGENTS.md)
 
 - **What:** AGENTS.md has a "Test builds" section: when the owner asks for a test build of a branch, make an AppImage, named after the branch, with the build's by-products removed and the smoke test run on it.
