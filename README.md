@@ -8,7 +8,7 @@ A desktop player for transcribing music by ear. Open a song or a video, slow it 
 
 ## Download
 
-Get the latest version from the [releases page](https://github.com/wiktor-rocks/earbee/releases/latest), or from [the website](https://wiktor-rocks.github.io/earbee/).
+Get the latest version from the [releases page](https://github.com/wiktor-rocks/earbee/releases/latest), or from [the website](https://earbee.org/).
 
 - **Windows:** `EarBee-…-win-x64.exe`, a portable app: nothing to install. Windows may warn about an unrecognised app the first time; choose **More info**, then **Run anyway**.
 - **macOS:** `EarBee-…-mac-arm64.dmg` (Apple Silicon) or `…-mac-x64.dmg` (Intel). Drag it to Applications. It isn't signed by Apple, so the first time, right-click it and choose **Open**. On recent macOS: try to open it, then go to System Settings › Privacy & Security and choose **Open Anyway**. _The macOS builds haven't been tried on a Mac yet; please [report](https://github.com/wiktor-rocks/earbee/issues) how they do._

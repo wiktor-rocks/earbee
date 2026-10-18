@@ -12,12 +12,12 @@ The commands are for a terminal in the project folder.
   - `exp/<idea>` (say, `exp/tuner`) is for trying an idea that might not work out. Each idea gets its own branch, made from `testing`. If it works, it's merged into `testing`; if not, the branch is deleted. See [Trying an idea](#trying-an-idea-an-experiment-branch).
 - **Automatic on GitHub** (the [Actions tab](https://github.com/wiktor-rocks/earbee/actions) shows every run):
 
-  | When                                              | What runs                                                                           | How long         |
-  | ------------------------------------------------- | ----------------------------------------------------------------------------------- | ---------------- |
-  | Any push to `testing`, `main` or an `exp/` branch | **CI:** formatting, lint, types, unit tests                                         | about 1 minute   |
-  | A push to `main`                                  | **CI** also runs the end-to-end and smoke tests                                     | about 10 minutes |
-  | A push to `main` that changes `site/`             | **Landing page:** republishes [the website](https://wiktor-rocks.github.io/earbee/) | under a minute   |
-  | Pushing a version tag (`v0.2.0`)                  | **Release:** builds Windows, macOS and Linux, and makes a draft release             | about 15 minutes |
+  | When                                              | What runs                                                               | How long         |
+  | ------------------------------------------------- | ----------------------------------------------------------------------- | ---------------- |
+  | Any push to `testing`, `main` or an `exp/` branch | **CI:** formatting, lint, types, unit tests                             | about 1 minute   |
+  | A push to `main`                                  | **CI** also runs the end-to-end and smoke tests                         | about 10 minutes |
+  | A push to `main` that changes `site/`             | **Landing page:** republishes [the website](https://earbee.org/)        | under a minute   |
+  | Pushing a version tag (`v0.2.0`)                  | **Release:** builds Windows, macOS and Linux, and makes a draft release | about 15 minutes |
 
 - **Every change gets a CHANGELOG.md entry** (what, why, how, where, verified by), newest first.
 
