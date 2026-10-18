@@ -132,4 +132,20 @@ module.exports = async function (h) {
     !end.proxy && Math.abs(end.frame - end.pos) < 0.05,
     JSON.stringify(end),
   );
+
+  // Opening another video while one plays: the old one's decoding is cut
+  // off as it's put away. That's no problem with the new file, which used
+  // to be told "Part of the video couldn't be decoded". Ends on
+  // long-counter.webm again, as before.
+  await js(
+    `window.__videoProblems = 0; new MutationObserver(() => { if (/couldn't be decoded/.test(document.getElementById("message").textContent)) __videoProblems++; }).observe(document.getElementById("message"), { childList: true, subtree: true, characterData: true })`,
+  );
+  for (let i = 0; i < 4; i++) {
+    key("Space");
+    await sleep(300);
+    await openFile(path.join(FIXTURES, i % 2 ? "long-counter.webm" : "counter.webm"));
+  }
+  await ensurePaused();
+  const problems = await js(`__videoProblems`);
+  check("opening a video while another plays reports no decoding problem", problems === 0, `${problems} shown`);
 };

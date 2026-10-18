@@ -43,6 +43,20 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-18: No false "couldn't be decoded" when opening another video
+
+- **What:** opening a video while another was playing could show "Part of the video couldn't be decoded, so the picture may stop updating" under the timeline, about the new file, which was fine. That message no longer appears unless the video on screen really fails to decode.
+- **Why:** found while measuring performance (`local/performance-report.md`): switching between the demo clips logged `InputDisposedError: Input has been disposed`. Switching 10 times between a 1080p and a 4K clip showed the false message 4 times.
+- **How:**
+  - The old video's input is disposed as the new one is shown (`discard`), and its decoding loop then fails with Mediabunny's `InputDisposedError`.
+  - The loop's one `try` around everything caught that failure. It checked `current`, which by then was the new video, and reported a problem for it.
+  - Each pass of the loop now has its own `try`. A failure of a video that is no longer current, or has been discarded, closes its cursor and carries on with the current one. Any other failure goes to the existing handler, unchanged: logged once, and reported once per file.
+- **Where:** `src/video/view.js` (`run`); a new check at the end of `tests/e2e/08-video.cjs`.
+- **Verified by:**
+  - The new e2e check: open another video while one plays, 4 times, and count the messages. It fails without the fix ("1 shown") and passes with it.
+  - A local script switching the demo clips 10 times: before the fix 4–7 warnings and 4 false messages; after it, none.
+  - `npm run check`, `npm run test:unit`, `TB_TOPICS=03,08,09,18,19 npm test` (142 pass).
+
 ## 2026-10-18: The local to-do list becomes a scratchpad
 
 - **What:** `local/TODO.md` is now `local/SCRATCHPAD.md`: loose notes, ideas and things to do or try, with no checkboxes or format to keep. AGENTS.md names it, and says to check it with FOR-TOMORROW.md at the start of a session.

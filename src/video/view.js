@@ -526,30 +526,39 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     try {
       while (current) {
         const video = current;
-
-        if (mode === "frame") {
-          const version = targetVersion;
-          const frame = await frameAt(video, target, () => targetVersion !== version);
-          if (video !== current) continue;
-          const reached = targetVersion === version;
-          // The exact frame always replaces what's shown; a frame on the way
-          // (while dragging) only if it is closer than what's shown.
-          if (frame && mode === "frame") {
-            const closer = Math.abs(target - frame.timestamp) < Math.abs(target - (shownTime ?? Infinity));
-            if (reached || closer) draw(frame);
-          }
-          if (reached) break;
-        } else if (mode === "playing") {
-          if (nextFrame || streamEnded) break;
-          const frame = await nextPlaybackFrame(video);
-          if (video !== current || mode !== "playing") continue;
-          if (frame) {
-            nextFrame = frame;
+        try {
+          if (mode === "frame") {
+            const version = targetVersion;
+            const frame = await frameAt(video, target, () => targetVersion !== version);
+            if (video !== current) continue;
+            const reached = targetVersion === version;
+            // The exact frame always replaces what's shown; a frame on the way
+            // (while dragging) only if it is closer than what's shown.
+            if (frame && mode === "frame") {
+              const closer = Math.abs(target - frame.timestamp) < Math.abs(target - (shownTime ?? Infinity));
+              if (reached || closer) draw(frame);
+            }
+            if (reached) break;
+          } else if (mode === "playing") {
+            if (nextFrame || streamEnded) break;
+            const frame = await nextPlaybackFrame(video);
+            if (video !== current || mode !== "playing") continue;
+            if (frame) {
+              nextFrame = frame;
+              break;
+            }
+            if (streamEnded) break;
+          } else {
             break;
           }
-          if (streamEnded) break;
-        } else {
-          break;
+        } catch (error) {
+          closeCursor();
+          // The video was put away while it was being decoded (another file
+          // opened): its input is gone, which says nothing about the file.
+          // Carry on with whatever is shown now; only a failure of the
+          // current video is reported.
+          if (video !== current || video.discarded) continue;
+          throw error;
         }
       }
     } catch (error) {
