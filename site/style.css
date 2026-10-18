@@ -966,11 +966,11 @@ main > .post {
 }
 
 /* ---------- Narrower screens ----------
-   Under 1100 px the download buttons fill their cards; under 1000 px the
-   top bar drops its least-needed links; under 860 px (tablets) the hero's
-   bee goes and everything goes to one column, clips above their text; under
-   600 px (phones) spacing and type tighten, the h1 wraps by itself, and
-   the top bar keeps the brand, Download and the theme switch. */
+   Under 1100 px the download buttons fill their cards; under 860 px
+   (tablets) the hero's bee goes and everything goes to one column, clips
+   above their text; under 600 px (phones) spacing and type tighten, the h1
+   wraps by itself, and the top bar drops GitHub, keeping the brand, Blog,
+   Download and the theme switch. */
 
 /* Three narrow download cards: every download a full-width button, the
    Mac's two one under the other, rather than wrapping as they fit. */
@@ -996,13 +996,6 @@ main > .post {
   }
   .platform .alt:hover {
     border-color: var(--muted);
-  }
-}
-
-@media (max-width: 999px) {
-  .top nav a[href="/#keys"],
-  .top nav a[data-link="repo"] {
-    display: none;
   }
 }
 
@@ -1055,7 +1048,7 @@ main > .post {
   .top nav {
     gap: 10px;
   }
-  .top nav a:not(.nav-download) {
+  .top nav a[data-link="repo"] {
     display: none;
   }
   /* A button-sized target for a thumb. */
@@ -1134,6 +1127,31 @@ main > .post {
   .post-cta {
     flex-direction: column;
     padding: 20px;
+  }
+}
+
+/* Small phones: the top bar, tighter, so its four items stay on one line. */
+@media (max-width: 400px) {
+  .brand {
+    gap: 8px;
+  }
+  .brand img {
+    width: 34px;
+  }
+  .wordmark {
+    font-size: 21px;
+  }
+  .top nav {
+    gap: 8px;
+  }
+  .top nav .nav-download {
+    padding: 0 10px;
+  }
+}
+/* The smallest (320 px): no room for Blog; the footer links to it. */
+@media (max-width: 349px) {
+  .top nav .nav-blog {
+    display: none;
   }
 }
 
