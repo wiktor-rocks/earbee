@@ -47,7 +47,7 @@ The architecture overview, the file map and a list of where to make common chang
 
 - **What:** at the start of every session, before answering the owner's first message (whatever it is), an assistant shows the items in the "Reminders" section of `local/SCRATCHPAD.md`, word for word.
 - **Why:** the owner wants to be reminded of certain things in the next session, whatever they write to the assistant first.
-- **How:** a section at the top of AGENTS.md, which every session loads (CLAUDE.md includes it). Missing file or empty section: nothing is said. Reminders are only changed or removed when the owner asks.
+- **How:** a section at the top of AGENTS.md, which every session loads (CLAUDE.md includes it). Missing file or empty section: nothing is said. The scratchpad is the owner's alone: assistants read it but never change it, even when asked; they suggest, and the owner writes. So "Ending a session" now puts loose ideas in the summary instead of the scratchpad.
 - **Where:** `AGENTS.md` ("First, in every session", and "Read first", item 0); the section itself is in `local/SCRATCHPAD.md` (on this computer only).
 - **Verified by:** `npm run format:check`.
 
