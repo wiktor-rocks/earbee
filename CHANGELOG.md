@@ -43,6 +43,37 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-19: A blog on earbee.org (the website, built with Eleventy)
+
+- **What:** the website has a blog at earbee.org/blog/.
+  - Posts are Markdown files; one with `draft: true` shows in the preview only.
+  - New pages: the blog's own page, an RSS feed (`/blog/feed.xml`), a sitemap, `robots.txt` and a "page not found" page.
+  - Every page gets its own title, description, canonical address and social-sharing tags. The home page also carries `SoftwareApplication` data, and each post `BlogPosting` data, for search engines.
+  - The top bar is now Blog, Download, GitHub and the theme switch. The footer links to the blog and its feed.
+  - Links to the website point at earbee.org instead of the github.io address.
+  - A guide for the owner, `docs/blog.md`: writing, publishing and changing posts, writing posts that rank, post ideas, Google Search Console and Bing, troubleshooting, and moving to another server.
+  - No posts yet: the placeholder post was removed before the merge.
+- **Why:** the owner wants search traffic. The blog waited for a custom domain (now earbee.org), so published addresses never change.
+- **How:**
+  - `site/` is a small Eleventy project with its own `package.json`, apart from the app's. The build doesn't install Electron or ONNX Runtime.
+  - The home page's content stays in `index.html`. Its head, top bar and footer moved to `_includes/base.njk`, shared by every page; addresses there start with `/`, so they work from `/blog/<post>/`.
+  - Posts are plain Markdown (no Nunjucks), so braces in them stay text. Their address, `/blog/<file name>/`, is computed in `blog/blog.11tydata.js`; a template string isn't filled in there.
+  - Drafts are left out of `npm run build` by a preprocessor. `_site/` is ignored as input, in case a build was sent elsewhere with `--output`.
+  - `pages.yml` now builds the site and publishes `site/_site`. CI has a `site` job that builds it on every push, so a broken post shows up before `main`.
+  - Small-phone top bar: tighter under 400 px; Blog hides under 350 px and GitHub under 600 px.
+- **Where:**
+  - the site: `site/package.json`, `site/eleventy.config.js`, `site/_data/site.json`, `site/_includes/base.njk` and `post.njk`, `site/blog.njk`, `site/blog/blog.11tydata.js`, `site/sitemap.njk`, `site/robots.txt`, `site/404.md`, `site/index.html`, and `site/style.css` ("Blog", "Narrower screens");
+  - the workflows: `.github/workflows/pages.yml`, `ci.yml`;
+  - housekeeping: `.gitignore`, `.prettierignore`, `eslint.config.js`;
+  - the docs: `docs/blog.md`, `site/README.md`, `docs/maintaining.md`, `README.md`, `AGENTS.md`;
+  - earbee.org links: `package.json`, `.github/ISSUE_TEMPLATE/config.yml`.
+- **Verified by:**
+  - screenshots at 1280 and 390 px, dark and light: the home page is unchanged apart from the top bar and the footer, and the blog page, a post and the 404 page look right;
+  - the top bar measured from 430 down to 320 px: no overflow;
+  - a production build with a test post: valid feed and sitemap XML, the JSON-LD parses, drafts are left out, and braces and `\\` come out right;
+  - the guide's post template and picture command, followed as written;
+  - `npm run check`, CI (check and site) on `exp/blog`, and `npm test` after the merge.
+
 ## 2026-10-18: An end-of-session routine (AGENTS.md)
 
 - **What:** AGENTS.md has an "Ending a session" section: what an assistant does when the owner says they're done. Stop what's running, put back temporary changes, commit finished work (and decide with the owner about unfinished work), push, tidy up, update `local/FOR-TOMORROW.md`, leave the working copy on `testing`, and sum up.
