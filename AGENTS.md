@@ -8,6 +8,7 @@ A desktop player for transcribing music (Electron). There's no build step: the p
 
 - **The page** (`src/`, `index.html`, `style.css`) runs in the browser window: audio, video, waveform and UI.
 - **The main process** (`electron/`, CommonJS) handles the window, files, settings, downloads and the beat model, and talks to the page through `window.earbee` (`electron/preload.js`).
+- **The website** (`site/`) is apart from the app: earbee.org, the landing page and the blog, built with Eleventy, with its own `package.json`. Everything about it: [docs/blog.md](docs/blog.md).
 
 ## Read first
 
@@ -33,6 +34,7 @@ A desktop player for transcribing music (Electron). There's no build step: the p
 | One end-to-end topic             | `TB_TOPICS=20 npm test`: the unit tests, that topic, then the smoke test. Several: `TB_TOPICS=03,14 npm test`                              |
 | Everything (about 10 min)        | `npm test`                                                                                                                                 |
 | Make the test media              | `npm run test:fixtures` (needs ffmpeg; `npm test` does it when missing)                                                                    |
+| The website: preview, build      | `npm --prefix site start` (http://localhost:8080), `npm --prefix site run build`; once: `npm --prefix site install`                        |
 | A packaged build, and testing it | `npm run build:dir`, then `TB_APP_PATH=$PWD/dist/linux-unpacked/resources/app.asar TB_APP_BINARY=$PWD/dist/linux-unpacked/earbee npm test` |
 
 The end-to-end topics are the files in `tests/e2e/`: 01 static UI, 02 welcome screen, 03 audio and the loop, 04 Space replay, 05 stepping, 06 zoom, 07 errors, 08 video, 09 downloads and search, 10 themes, 11 parallel decoding, 12 resources, 13 settings, 14 marks, 15 security, 16 projects, 17 waveform, 18 video window, 19 big video, 20 beats. A topic may rely on what an earlier one left open; if one fails only when run alone, run it with the topics before it. Known: 09 needs a file open (`TB_TOPICS=03,09`).
@@ -53,7 +55,7 @@ When the owner asks for a test build of a branch (to try it before deciding, e.g
 | You changed                                  | Run                                                                                                                                      |
 | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | Only docs (`*.md`)                           | `npm run format:check`                                                                                                                   |
-| The landing page (`site/`)                   | `npm run check`                                                                                                                          |
+| The website (`site/`)                        | `npm run check`, `npm --prefix site run build`                                                                                           |
 | The page (`src/`, `index.html`, `style.css`) | `npm run check`, `npm run test:unit`, and the e2e topic for that area (e.g. waveform → `TB_TOPICS=17`, beats → `20`, marks → `14`)       |
 | The main process (`electron/`)               | `npm run check`, `npm run test:unit`, and one e2e topic for that area, which also runs the smoke test (the real app, `main.js` included) |
 | Before `main` moves up to `testing`          | `npm test`: everything must pass                                                                                                         |
@@ -76,7 +78,7 @@ A small change (a comment, a CSS value, a typo) needs `npm run check` only.
 - **The e2e and smoke tests need a display** (X11 or Wayland), although their windows are invisible. On a machine without one: `xvfb-run -a npm test`.
 - **The e2e harness empties `tests/output/downloads`** when it starts, and writes screenshots to `tests/output/`. Settings and downloads in progress go to temporary folders, never to your real ones.
 - **ONNX Runtime:** `.npmrc` stops its install from downloading CUDA libraries (about 270 MB). Keep it.
-- **`site/` is published as it is** from `main`. Don't put working files there (a source video, for instance); everything in it goes online.
+- **`site/` goes online** from `main`: every `.html`, `.md` and `.njk` file becomes a page (except `README.md` and posts with `draft: true`), and everything in `fonts/` and `img/` is copied (`site/eleventy.config.js`). Don't put working files there (a source video, for instance).
 
 ## Branches
 

@@ -1,5 +1,5 @@
 ---
-title: Why EarBee exists
+title: "Why EarBee exists"
 description: "Why I built EarBee, a free player for learning songs by ear: slow a song down without changing its pitch, loop the hard bar, and step through it."
 date: 2026-10-19
 draft: true
