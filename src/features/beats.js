@@ -121,8 +121,11 @@ function take({ beats: times, downbeats = new Float64Array(0) }, { method, compl
 }
 
 // The simple beat finder, through the whole track: for when the model
-// can't run.
+// can't run. A worker of its own: the others may still be preparing
+// windows, which are no longer needed.
 async function runSimple(mine, name) {
+  preparing?.close();
+  preparing = openBeatInput(media, 1);
   const found = await preparing.simple((fraction) => {
     if (mine !== search) return;
     beats.progress = fraction;
@@ -131,19 +134,21 @@ async function runSimple(mine, name) {
   if (mine === search) take(found, { method: "simple", complete: true, name });
 }
 
-// The model, window by window from the cursor, each window's input
-// prepared a little ahead by the workers; the simple finder if the model
-// can't run.
-async function runModel(frames, mine, name) {
+// The model, window by window, each window's input prepared a little
+// ahead by the workers; the simple finder if the model can't run. From
+// the cursor outwards where windows can be decoded on their own (`exact`,
+// see audio/beat-worker.js); otherwise from the start, as one pass over
+// the track makes them.
+async function runModel({ frames, exact }, mine, name) {
   const starts = windowStarts(frames);
   const cursor = player.transport.position * FPS;
   const distance = (index) => Math.abs(starts[index] + CHUNK / 2 - cursor);
-  const order = [...starts.keys()].sort((a, b) => distance(a) - distance(b));
+  const order = exact ? [...starts.keys()].sort((a, b) => distance(a) - distance(b)) : [...starts.keys()];
   // The k-th window in that order, being prepared: as many at once as
   // there are workers, so one is always ready when the model is.
-  const inputs = [];
+  const inputs = exact ? [] : preparing.stream(starts);
   const prepare = (k) => {
-    if (k >= order.length) return;
+    if (!exact || k >= order.length) return;
     inputs[k] = preparing.window(starts[order[k]]);
     inputs[k].catch(() => {}); // seen when its turn comes
   };
@@ -186,10 +191,10 @@ async function find() {
   const opened = openBeatInput(media, CONFIG.beats.prepareWorkers);
   preparing = opened;
   try {
-    const { frames } = await opened.info;
+    const info = await opened.info;
     if (mine !== search) return;
     // Too short for the model's input: the simple finder it is.
-    if (frames) await runModel(frames, mine, name);
+    if (info.frames) await runModel(info, mine, name);
     else await runSimple(mine, name);
   } catch (error) {
     // Forgets any beats found so far too (their lines, the beat step, the
@@ -198,7 +203,8 @@ async function find() {
     resetBeats(media);
     showNotice(`Couldn't find the beats in “${name}”: ${FAILURES[error?.kind] ?? error?.message ?? error}.`);
   } finally {
-    if (preparing === opened) stopPreparing();
+    // A newer search has workers of its own; this one's are done.
+    if (mine === search) stopPreparing();
   }
 }
 

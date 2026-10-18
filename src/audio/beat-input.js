@@ -7,13 +7,17 @@ import { CONFIG } from "../config.js";
  * asks for the windows and runs the model).
  *
  * openBeatInput(media, count):
- *   info           a Promise of { duration, sampleRate, frames }; rejects
+ *   info           a Promise of { duration, sampleRate, frames, exact }; rejects
  *                  if the file can't be read, or if no worker has answered
  *                  within CONFIG.beats.startTimeoutMs (a worker that never
  *                  starts would otherwise leave the search at 0 %)
  *   window(start)  a Promise of that window's spectrogram (beat-worker.js),
  *                  prepared by the next free worker; asking for more than
- *                  `count` at once queues them
+ *                  `count` at once queues them. Only when `exact`
+ *   stream(starts) every window, from one pass over the track by one
+ *                  worker (for files that aren't `exact`): a Promise of
+ *                  each window's spectrogram, in the order of `starts`;
+ *                  they're kept in time order, as the pass goes
  *   simple(onProgress)  a Promise of the simple beat finder's { beats, bpm }
  *                  for the whole track; onProgress(0…1) meanwhile
  *   close()        stops every worker; what's pending is never answered
@@ -33,6 +37,7 @@ export class BeatInputFailure extends Error {
 function startWorker(media, onProgress) {
   const worker = new Worker(new URL("./beat-worker.js", import.meta.url), { type: "module" });
   let pending = null;
+  let onWindow = null; // while streaming
   const settle = (outcome, value) => {
     const request = pending;
     pending = null;
@@ -44,6 +49,7 @@ function startWorker(media, onProgress) {
   });
   worker.addEventListener("message", ({ data }) => {
     if (data.type === "progress") onProgress(data.fraction);
+    else if (data.type === "window" && onWindow) onWindow(data);
     else if (data.type === "error") settle("reject", new BeatInputFailure(data.kind, data.message));
     else settle("resolve", data);
   });
@@ -54,7 +60,12 @@ function startWorker(media, onProgress) {
     });
   const opened = ask({ type: "open", media });
   opened.catch(() => {}); // seen through `info`, or by the first request
-  return { opened, ask, terminate: () => worker.terminate() };
+  /** @param {number[]} starts @param {(answer: any) => void} each */
+  const stream = (starts, each) => {
+    onWindow = each;
+    return ask({ type: "stream", starts }).finally(() => (onWindow = null));
+  };
+  return { opened, ask, stream, terminate: () => worker.terminate() };
 }
 
 /**
@@ -102,6 +113,26 @@ export function openBeatInput(media, count) {
     info,
     /** @param {number} start @returns {Promise<Float32Array>} */
     window: (start) => request({ type: "window", start }).then((answer) => answer.spect),
+    /** @param {number[]} starts @returns {Promise<Float32Array>[]} */
+    stream(starts) {
+      const worker = workers[0];
+      idle.splice(idle.indexOf(worker), 1); // its own from now on
+      const waiting = new Map();
+      for (const start of starts) {
+        const entry = {};
+        entry.promise = new Promise((resolve, reject) => Object.assign(entry, { resolve, reject }));
+        entry.promise.catch(() => {}); // seen when its turn comes
+        waiting.set(start, entry);
+      }
+      const failAll = (error) => {
+        for (const { reject } of waiting.values()) reject(error);
+      };
+      worker.opened
+        .then(() => worker.stream(starts, ({ start, spect }) => waiting.get(start)?.resolve(spect)))
+        // A window the pass didn't send (it never should) fails rather than waits.
+        .then(() => failAll(new BeatInputFailure("failed", "a part of the track was missing")), failAll);
+      return starts.map((start) => waiting.get(start).promise);
+    },
     /** @param {(fraction: number) => void} [progress] @returns {Promise<{ beats: Float64Array, bpm: number | null }>} */
     simple(progress) {
       onProgress = progress ?? (() => {});
