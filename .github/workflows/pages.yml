@@ -1,7 +1,8 @@
-# Publishes the landing page (site/) on GitHub Pages whenever it changes on
-# main. One-time setup: the repository's Settings › Pages › Source must be
-# "GitHub Actions".
-name: Landing page
+# Builds the website (site/, with Eleventy) and publishes it on GitHub
+# Pages, at earbee.org, whenever it changes on main. One-time setup: the
+# repository's Settings › Pages › Source must be "GitHub Actions", and its
+# custom domain earbee.org. How the blog works: docs/blog.md.
+name: Website
 
 on:
   push:
@@ -24,11 +25,21 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
+    defaults:
+      run:
+        working-directory: site
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - run: npm ci
+      - run: npm run build
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: site
+          path: site/_site
       - id: deployment
         uses: actions/deploy-pages@v4

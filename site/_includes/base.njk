@@ -1,0 +1,142 @@
+<!doctype html>
+{#- Every page of the site: the head, the top bar and the footer around the
+    page's own content. A page sets, in its header:
+      title        the page's title (" · EarBee" is added, except on the home page)
+      description  the line search engines and social sites show under it
+      image        optional: the picture for social sites (default: site.json's)
+      schema       optional: "app" (the home page) or "post" (blog posts), for
+                   the structured data search engines read
+    Addresses start with "/", so they work from any page (/blog/<post>/). -#}
+{%- set pageTitle = title if page.url == "/" else title + " · " + site.name -%}
+{%- set shareImage = (image or site.image) | absolute %}
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{{ pageTitle }}</title>
+    <meta name="description" content="{{ description }}" />
+    <link rel="canonical" href="{{ page.url | absolute }}" />
+    <meta name="theme-color" content="#0e1014" />
+    <meta property="og:site_name" content="{{ site.name }}" />
+    <meta property="og:type" content="{{ 'article' if schema == 'post' else 'website' }}" />
+    <meta property="og:title" content="{{ pageTitle }}" />
+    <meta property="og:description" content="{{ description }}" />
+    <meta property="og:url" content="{{ page.url | absolute }}" />
+    <meta property="og:image" content="{{ shareImage }}" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <link rel="icon" type="image/png" href="/img/favicon.png" />
+    <link rel="alternate" type="application/rss+xml" title="{{ site.blogTitle }}" href="/blog/feed.xml" />
+    <link rel="preload" href="/fonts/righteous-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="/style.css" />
+    <script>
+      // Set before the page shows, so nothing flashes:
+      //  - the theme chosen with the button in the top bar (download.js);
+      //    else the system's;
+      //  - "phone" on a phone or tablet, which can't run EarBee: the
+      //    page says so instead of offering a download (style.css).
+      try {
+        const theme = localStorage.getItem("theme");
+        if (theme === "dark" || theme === "light") document.documentElement.dataset.theme = theme;
+      } catch {}
+      const iPad = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
+      if (/android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent) || iPad) {
+        document.documentElement.classList.add("phone");
+      }
+    </script>
+    <script src="/download.js" defer></script>
+    {%- if schema == "app" %}
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "{{ site.name }}",
+        "description": {{ description | dump | safe }},
+        "url": "{{ site.url }}/",
+        "image": "{{ shareImage }}",
+        "applicationCategory": "MultimediaApplication",
+        "operatingSystem": "Windows, macOS, Linux",
+        "downloadUrl": "https://github.com/wiktor-rocks/earbee/releases/latest",
+        "license": "https://opensource.org/licenses/MIT",
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+      }
+    </script>
+    {%- elif schema == "post" %}
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "BlogPosting",
+        "headline": {{ title | dump | safe }},
+        "description": {{ description | dump | safe }},
+        "image": "{{ shareImage }}",
+        "datePublished": "{{ page.date | isoDate }}",
+        "dateModified": "{{ (updated or page.date) | isoDate }}",
+        "mainEntityOfPage": "{{ page.url | absolute }}",
+        "author": { "@type": "Person", "name": "{{ site.author }}" },
+        "publisher": { "@type": "Organization", "name": "{{ site.name }}", "url": "{{ site.url }}/" }
+      }
+    </script>
+    {%- endif %}
+  </head>
+  <body>
+    <header class="top">
+      <a class="brand" href="/">
+        <img src="/img/logo.webp" alt="" width="54" height="51" />
+        <span class="wordmark">Ear<b>Bee</b></span>
+      </a>
+      <nav>
+        <a href="/#beats">Beats</a>
+        <a href="/#what">What it does</a>
+        <a href="/#keys">Keys</a>
+        <a class="nav-blog" href="/blog/">Blog</a>
+        <a class="nav-download" href="/#download">Download</a>
+        <a data-link="repo" href="/#download">GitHub</a>
+        <button class="theme-switch" type="button" aria-label="Switch between dark and light" title="Dark or light">
+          <svg
+            class="sun"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="4" />
+            <path
+              d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
+            />
+          </svg>
+          <svg
+            class="moon"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />
+          </svg>
+        </button>
+      </nav>
+    </header>
+
+    <main>
+{{ content | safe }}
+    </main>
+
+    <footer>
+      <img src="/img/logo.webp" alt="" width="28" height="27" />
+      <p>
+        EarBee is free and open source (<a data-link="licence" href="/#download">MIT licence</a>). Time-stretching by
+        <a href="https://signalsmith-audio.co.uk/code/stretch/">Signalsmith Stretch</a>, beats by
+        <a href="https://github.com/CPJKU/beat_this">Beat This!</a> on
+        <a href="https://onnxruntime.ai">ONNX Runtime</a>, video by <a href="https://mediabunny.dev">Mediabunny</a>,
+        downloads by <a href="https://github.com/yt-dlp/yt-dlp">yt-dlp</a>.
+      </p>
+      <nav class="footer-links">
+        <a href="/blog/">Blog</a>
+        <a href="/blog/feed.xml">RSS</a>
+      </nav>
+    </footer>
+  </body>
+</html>
