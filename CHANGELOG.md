@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-18: Commit messages without trailer lines
+
+- **What:** AGENTS.md now says a commit message is one short line and nothing else: no `Co-Authored-By` or other trailer lines, even where an assistant's tool adds them by default.
+- **Why:** the user doesn't want the attribution line on every commit.
+- **How:** one sentence added to the commit-message convention. Commits already pushed with the line keep it; history isn't rewritten.
+- **Where:** `AGENTS.md` ("Conventions").
+- **Verified by:** `npm run format:check`.
+
 ## 2026-10-18: No false "couldn't be decoded" when opening another video
 
 - **What:** opening a video while another was playing could show "Part of the video couldn't be decoded, so the picture may stop updating" under the timeline, about the new file, which was fine. That message no longer appears unless the video on screen really fails to decode.
