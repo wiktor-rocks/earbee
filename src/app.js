@@ -95,9 +95,10 @@
  *                  and media; pure, shared with the main process
  *   config.js      CONFIG: every tunable number
  *   audio/         engine.js, transport.js, decoder.js (+ decode-worker.js),
- *                  beat-worker.js (the beat model's input, and the simple
- *                  beat finder's answer), open-track.js (opening a file's
- *                  audio track, for both workers)
+ *                  beat-input.js (+ beat-worker.js: the beat model's input,
+ *                  window by window, and the simple beat finder's answer),
+ *                  open-track.js (opening a file's audio track, for both
+ *                  workers)
  *   video/         view.js (the picture), proxy.js (low-res copy for seeking),
  *                  proxy-plan.js (where that copy is built next)
  *   waveform.js    The waveform, zoom, minimap, loop; its view for the lanes.
