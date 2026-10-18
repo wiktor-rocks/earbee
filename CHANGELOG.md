@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-18: How to make a test build (AGENTS.md)
+
+- **What:** AGENTS.md has a "Test builds" section: when the owner asks for a test build of a branch, make an AppImage, named after the branch, with the build's by-products removed and the smoke test run on it.
+- **Why:** asked for a test build of `exp/beat-windows`, an assistant made an unpacked build (`npm run build:dir`, the only build AGENTS.md listed) when an AppImage was wanted.
+- **How:** six steps: a clean checkout, `npm run build:linux`, renaming the file (`EarBee-<version>-<branch>-x86_64.AppImage`, so it isn't taken for a release), deleting `dist/linux-unpacked` and `dist/builder-debug.yml`, the smoke test against the AppImage (`TB_APP_BINARY`), and giving the owner its path. It also says `build:dir` is for testing a packaged build, not for trying one, and that Windows and Mac test builds aren't set up yet.
+- **Where:** `AGENTS.md` ("Test builds").
+- **Verified by:** the steps were followed for `exp/beat-windows` (the smoke test passed, 28 checks); `npm run format:check`.
+
 ## 2026-10-18: Commit messages without trailer lines
 
 - **What:** AGENTS.md now says a commit message is one short line and nothing else: no `Co-Authored-By` or other trailer lines, even where an assistant's tool adds them by default.

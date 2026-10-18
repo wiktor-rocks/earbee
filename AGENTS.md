@@ -37,6 +37,17 @@ A desktop player for transcribing music (Electron). There's no build step: the p
 
 The end-to-end topics are the files in `tests/e2e/`: 01 static UI, 02 welcome screen, 03 audio and the loop, 04 Space replay, 05 stepping, 06 zoom, 07 errors, 08 video, 09 downloads and search, 10 themes, 11 parallel decoding, 12 resources, 13 settings, 14 marks, 15 security, 16 projects, 17 waveform, 18 video window, 19 big video, 20 beats. A topic may rely on what an earlier one left open; if one fails only when run alone, run it with the topics before it. Known: 09 needs a file open (`TB_TOPICS=03,09`).
 
+## Test builds
+
+When the owner asks for a test build of a branch (to try it before deciding, e.g. an experiment), make an **AppImage**: one file that runs on Linux. Windows and Mac test builds aren't set up yet. `npm run build:dir` (above) is for running the tests against a packaged build, not for trying it.
+
+1. Check out the branch; `git status --porcelain` prints nothing.
+2. `npm run build:linux` (a few minutes). It writes `dist/EarBee-<version>-linux-x86_64.AppImage`.
+3. Rename it after the branch, so it isn't taken for a release: `/` becomes `-`, e.g. `mv dist/EarBee-0.2.0-linux-x86_64.AppImage dist/EarBee-0.2.0-exp-beat-windows-x86_64.AppImage`.
+4. Delete what the build leaves next to it: `rm -rf dist/linux-unpacked dist/builder-debug.yml`. Leave other files in `dist/` alone.
+5. Check it starts: `env -u ELECTRON_RUN_AS_NODE TB_APP_BINARY=$PWD/dist/<the AppImage> node tests/smoke.cjs` passes.
+6. Give the owner its path. It uses the same settings folder as the installed EarBee (`~/.config/EarBee`).
+
 ## Which checks for which change
 
 | You changed                                  | Run                                                                                                                                      |
