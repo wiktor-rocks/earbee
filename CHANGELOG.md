@@ -43,6 +43,36 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-19: The blog's first two posts, and "not freemium" under every post (the website)
+
+- **What:**
+  - Two posts:
+    - "Why transcribing music by ear makes you a better musician", at `/blog/why-transcribe-music-by-ear/`;
+    - "Easy songs to transcribe by ear: 8 to start hearing chords", at `/blog/easy-songs-to-transcribe/`. Each song comes with a way to work out its chords, never the chords themselves.
+
+    The two posts link to each other.
+
+  - Under every post, the EarBee box now says "No trial, no paid version, no account.", linked to the home page's "Free" section.
+  - Two new post ideas in `docs/blog.md`: 16 "how to learn a song by ear", and 17 "the importance of ear training drills".
+- **Why:** the blog had no posts.
+  - The owner wrote and rewrote the posts with an assistant.
+  - The keywords and wording come from the SEO tools' first analysis: people search "transcribing music by ear benefits" rather than "why transcribe songs", and "easy songs to transcribe" is the most-suggested search around the topic.
+  - The owner's rules for posts:
+    - describe EarBee in general terms (no exact ranges), so app changes don't outdate a post;
+    - always call it "a free, open-source player";
+    - no spoilers in song suggestions.
+  - The box line makes "free" unmistakable, so it isn't read as freemium.
+- **How:** the posts are Markdown with a `keyword:` in their headers. The box line is a `<p class="free-note">` in the post layout, styled small and muted under the buttons, with space before the phone note on phones.
+- **Where:**
+  - `site/blog/why-transcribe-music-by-ear.md`, `site/blog/easy-songs-to-transcribe.md`;
+  - `site/_includes/post.njk`, `site/style.css` (the "Blog" section, `.post-cta .free-note`);
+  - `docs/blog.md`.
+- **Verified by:**
+  - `node scripts/seo/check.cjs`: no errors; the two warnings are deliberate, since the first post's title and address leave out "benefits".
+  - `npm run check`.
+  - A clean `eleventy` build into a temporary folder: both posts and the feed.
+  - Screenshots of the post box in light, dark and at 390 px wide. A real phone wasn't checked.
+
 ## 2026-10-19: SEO tools for the website, in one removable folder
 
 - **What:** three commands for analysing the website for search engines.

@@ -964,6 +964,17 @@ main > .post {
 .post-cta .phone-note {
   margin: 0;
 }
+/* Under the buttons: free means free, not freemium. */
+.post-cta .free-note {
+  margin: 12px 0 0;
+  font-size: 14px;
+}
+.post-cta .free-note a {
+  color: inherit;
+}
+.phone .post-cta .free-note {
+  margin-bottom: 16px;
+}
 
 /* ---------- Narrower screens ----------
    Under 1100 px the download buttons fill their cards; under 860 px

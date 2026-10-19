@@ -245,6 +245,8 @@ Each idea gives the phrase it aims at, then the angle and how EarBee fits.
 13. **"how to map the structure of a song":** intro, verse, chorus, bridge: mark them first, then work section by section. EarBee: <kbd>R</kbd> marks a section, named and coloured.
 14. **"how to hear chords in a song":** start from the bass note, listen for major or minor, and slow down the changes. EarBee: loop and slow down.
 15. **"keyboard shortcuts for transcribing music":** a workflow without the mouse: play, replay, step, loop. EarBee: one key per step (a good page to link from other posts).
+16. **"how to learn a song by ear":** the whole song, start to finish: map its structure, then the chords, the riffs and the melody, section by section, and play along with the recording to check. The broad page the narrower ones (2, 4, 13, 14) link back to. EarBee: marks for the sections, loop and slow down.
+17. **"the importance of ear training drills" (or "are ear training exercises worth it"):** what drills (intervals, chord quality, rhythm) train well, and why they work: practising one skill on its own, like children drilling sums before adding up a real bill. How much to drill, and how to pair drills with transcribing real music. The other side of "Why transcribing music by ear makes you a better musician", and the two link to each other. EarBee: not a drill tool; it's where the drilled skills get used, on real recordings.
 
 ## Getting found
 
