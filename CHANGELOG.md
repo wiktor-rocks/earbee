@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-19: A share picture that every site shows (the website)
+
+- **What:** when a page of earbee.org is shared (Reddit, Facebook, LinkedIn, forums, chat apps), the preview shows a 1200×630 JPEG of the app instead of the 1280×800 WebP screenshot.
+- **Why:** 1200×630 is the size these sites expect, so it isn't cropped; and some (LinkedIn, some chat apps) show no picture at all for a WebP.
+- **How:** `site/img/share.jpg` is the dark screenshot scaled to 630 px high, with sides in the app's background colour (the ffmpeg command is in `site/README.md`). `site.json`'s `image`, the default for every page, points to it. The blog guide now suggests JPEG or PNG for a post's own share picture.
+- **Where:** `site/img/share.jpg`, `site/_data/site.json`, `site/README.md`, `docs/blog.md`.
+- **Verified by:** `npm run check`; `npm --prefix site run build`, whose pages name `https://earbee.org/img/share.jpg` as `og:image`.
+
 ## 2026-10-19: Reminders at the start of every session (AGENTS.md)
 
 - **What:** at the start of every session, before answering the owner's first message (whatever it is), an assistant shows the items in the "Reminders" section of `local/SCRATCHPAD.md`, word for word.

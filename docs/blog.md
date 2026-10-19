@@ -86,14 +86,14 @@ draft: true
 The first paragraph starts here.
 ```
 
-| Field         | What it's for                                                                                                                                                                                    |
-| ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `title`       | The post's heading, and the title in search results (" · EarBee" is added). Up to about 60 characters, or Google cuts it.                                                                        |
-| `description` | The two lines under the title in search results, and on the blog's page. 120 to 155 characters. Keep the quotes around it, as around the title: a colon inside would break the header otherwise. |
-| `date`        | The day it's published, as `YYYY-MM-DD`. Posts are sorted by it.                                                                                                                                 |
-| `draft`       | `true` while you work on it: it shows in the preview, with a "Draft" label, but isn't published. Delete the line when it's ready.                                                                |
-| `updated`     | Optional, as `YYYY-MM-DD`: when you changed a published post in a way that matters. Shown beside the date, and given to search engines.                                                          |
-| `image`       | Optional: the picture social sites show when the post is shared, such as `/img/blog/slow-down-cover.webp`. Ideally 1200×630. Without it, the app's screenshot is used.                           |
+| Field         | What it's for                                                                                                                                                                                                     |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`       | The post's heading, and the title in search results (" · EarBee" is added). Up to about 60 characters, or Google cuts it.                                                                                         |
+| `description` | The two lines under the title in search results, and on the blog's page. 120 to 155 characters. Keep the quotes around it, as around the title: a colon inside would break the header otherwise.                  |
+| `date`        | The day it's published, as `YYYY-MM-DD`. Posts are sorted by it.                                                                                                                                                  |
+| `draft`       | `true` while you work on it: it shows in the preview, with a "Draft" label, but isn't published. Delete the line when it's ready.                                                                                 |
+| `updated`     | Optional, as `YYYY-MM-DD`: when you changed a published post in a way that matters. Shown beside the date, and given to search engines.                                                                           |
+| `image`       | Optional: the picture social sites show when the post is shared, such as `/img/blog/slow-down-cover.jpg`. 1200×630, as a JPEG or PNG (some sites don't show WebP here). Without it, the app's screenshot is used. |
 
 ### 4. The text: Markdown
 

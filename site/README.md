@@ -48,6 +48,11 @@ instead.
   loudness waveform; the page shows the one for its mode (`download.js`,
   `showModeMedia`). All are recorded from the app by
   `scripts/record-site-media.cjs`.
+- `img/share.jpg` (1200×630): the picture social sites show when a page is
+  shared (`site.json`'s `image`). It's `screenshot-dark.webp` with dark sides,
+  a JPEG because some sites (LinkedIn) don't show WebP there. After recording
+  again, make it again:
+  `ffmpeg -i img/screenshot-dark.webp -vf "scale=-2:630:flags=lanczos,pad=1200:630:(ow-iw)/2:0:color=0x0d0f13" -q:v 3 img/share.jpg`
 
 **The demos.** The demo file is a stock concert video with music under it:
 
