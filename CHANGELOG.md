@@ -43,6 +43,36 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-19: SEO tools for the website, in one removable folder
+
+- **What:** three commands for analysing the website for search engines.
+  - `node scripts/seo/check.cjs` checks every page, drafts included: title and description lengths, canonical links, one `<h1>`, internal links and `#parts` (and no published page linking to a draft), the share picture, structured data. For posts, it also checks the keyword's use, duplicate keywords, heading levels, alt text, picture sizes, length, and the sitemap and feed.
+  - `node scripts/seo/keywords.cjs <post>` collects Google's search suggestions around a post's keyword and marks which ones the post answers.
+  - `node scripts/seo/console.cjs` reads Search Console: the searches per page, and what's worth acting on.
+
+  A new header field, `keyword:`, names the search a post aims at. A new workflow, "SEO", runs the check on pushes that touch the site.
+
+- **Why:** the owner wants posts analysed for SEO automatically, from free sources only. The tools are kept in one place so they can be removed without touching anything else.
+- **How:**
+  - Node's built-ins only, so there's no new dependency. The check builds a temporary copy of `site/` with its drafts made public, so the real site is never written.
+  - It exits with 1 only for an error on a published page.
+  - The suggestions come from Google's unofficial suggestion endpoint: about 60 requests, 300 ms apart, cached for 7 days in `local/seo/cache/`, and the run stops at the first refusal.
+  - Search Console is read with a service account's key (`local/seo/service-account.json`), signed into a token with `node:crypto`.
+  - Words are compared loosely (stop words dropped, common endings removed).
+  - Reports go to `local/seo/`.
+  - The assistant's analysis procedure, the Search Console setup and how to remove the tools are in the folder's README.
+- **Where:**
+  - `scripts/seo/`: `lib.cjs`, `check.cjs`, `keywords.cjs`, `console.cjs`, `README.md`;
+  - `.github/workflows/seo.yml`;
+  - one line in `AGENTS.md`;
+  - `keyword:` in `site/blog/why-transcribe-music-by-ear.md`.
+- **Verified by:**
+  - `check.cjs` on the site: no errors, and `site/` unchanged.
+  - Two deliberately broken posts (a draft, and a published post without a keyword) gave every expected `✗` and `!`, and exit code 1 for the published one.
+  - `keywords.cjs` on the first post: 60 searches, 14 suggestions with coverage. A rerun came entirely from the cache, and with no network it stopped with a clear message.
+  - `console.cjs` without a key prints the setup steps. Its signed token was checked against a throwaway key and a local fake token server; the real API call is untested until the owner has a key.
+  - `npm run check`.
+
 ## 2026-10-19: The home page's title and description fit search results (the website)
 
 - **What:** the home page's title is "EarBee: a free app for learning songs by ear" (was "EarBee: learn songs by ear"); its description is "A free desktop app for transcribing music: slow it down without changing the pitch, find the beats, loop the hard bar. Windows, macOS, Linux." (141 characters, was 203).

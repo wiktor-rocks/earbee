@@ -1,0 +1,27 @@
+# The website's on-page SEO check (scripts/seo/check.cjs) on every push
+# that changes the site or the check. Only an error on a published page
+# fails it; drafts are reported but never fail. Part of the SEO tools,
+# which can be removed as a whole: scripts/seo/README.md.
+name: SEO
+
+on:
+  push:
+    branches: [main, testing, "exp/**"]
+    paths: ["site/**", "scripts/seo/**", ".github/workflows/seo.yml"]
+  pull_request:
+    paths: ["site/**", "scripts/seo/**", ".github/workflows/seo.yml"]
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - run: npm ci
+        working-directory: site
+      - run: node scripts/seo/check.cjs

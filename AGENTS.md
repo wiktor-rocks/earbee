@@ -63,7 +63,7 @@ When the owner asks for a test build of a branch (to try it before deciding, e.g
 | You changed                                  | Run                                                                                                                                      |
 | -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
 | Only docs (`*.md`)                           | `npm run format:check`                                                                                                                   |
-| The website (`site/`)                        | `npm run check`, `npm --prefix site run build`                                                                                           |
+| The website (`site/`)                        | `npm run check`, `npm --prefix site run build`, `node scripts/seo/check.cjs` (SEO, and analysing a post: `scripts/seo/README.md`)        |
 | The page (`src/`, `index.html`, `style.css`) | `npm run check`, `npm run test:unit`, and the e2e topic for that area (e.g. waveform → `TB_TOPICS=17`, beats → `20`, marks → `14`)       |
 | The main process (`electron/`)               | `npm run check`, `npm run test:unit`, and one e2e topic for that area, which also runs the smoke test (the real app, `main.js` included) |
 | Before `main` moves up to `testing`          | `npm test`: everything must pass                                                                                                         |
