@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-19: The home page's title and description fit search results (the website)
+
+- **What:** the home page's title is "EarBee: a free app for learning songs by ear" (was "EarBee: learn songs by ear"); its description is "A free desktop app for transcribing music: slow it down without changing the pitch, find the beats, loop the hard bar. Windows, macOS, Linux." (141 characters, was 203).
+- **Why:** Google cuts a description at about 155 characters and social previews at fewer, so the end of the old one was never seen. The title had room for more of what people search for (an opengraph.xyz check found both).
+- **How:** the header of `site/index.html`. The same words go to the `<title>`, the `og:` tags and the `SoftwareApplication` data, which read them from there.
+- **Where:** `site/index.html`.
+- **Verified by:** `npm run check`; `npm --prefix site run build`, whose home page carries the new title and description.
+
 ## 2026-10-19: A share picture that every site shows (the website)
 
 - **What:** when a page of earbee.org is shared (Reddit, Facebook, LinkedIn, forums, chat apps), the preview shows a 1200×630 JPEG of the app instead of the 1280×800 WebP screenshot.
