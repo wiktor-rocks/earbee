@@ -33,6 +33,9 @@
   --accent-ink: #1a1400;
   --danger: #ff6b6b;
   --overlay-bg: color-mix(in srgb, var(--bg) 78%, transparent);
+  /* What floats on the waveform (the transport, its chips) */
+  --overlay: color-mix(in srgb, var(--bg) 85%, transparent);
+  --overlay-shadow: 0 4px 16px rgb(0 0 0 / 0.3);
 
   /* Amber glow around the bee (welcome and loading screens) */
   --screen-glow: color-mix(in srgb, var(--accent) 14%, transparent);
@@ -1774,10 +1777,9 @@ body.dragging .drop-card {
   height: 22px;
 }
 
-/* A card: the timeline, the transport, the sidebar, the dock, the video
-   pane and the minimap (some set their own radius or background). */
+/* A card: the timeline, the sidebar, the dock, the video pane and the
+   minimap (some set their own radius or background). */
 .timeline,
-.transport,
 .sidebar,
 .dock,
 .video-pane,
@@ -1788,14 +1790,11 @@ body.dragging .drop-card {
   box-shadow: var(--shadow);
 }
 
-/* The stage beside the marks sidebar, and the transport under both, the
-   whole width, so its chips have room. */
+/* The stage beside the marks sidebar (the transport floats on the
+   waveform, in the stage). */
 .workspace {
   display: grid;
-  grid-template:
-    "stage sidebar" minmax(0, 1fr)
-    "transport transport" auto
-    / minmax(0, 1fr) var(--sidebar-width);
+  grid-template: "stage sidebar" minmax(0, 1fr) / minmax(0, 1fr) var(--sidebar-width);
   gap: 10px 12px;
   min-height: 0;
 }
@@ -1803,19 +1802,12 @@ body.dragging .drop-card {
 /* The marks sidebar put away (its button in the top bar): the stage
    takes the whole width too. */
 .workspace.sidebar-hidden {
-  grid-template:
-    "stage" minmax(0, 1fr)
-    "transport" auto
-    / minmax(0, 1fr);
+  grid-template: "stage" minmax(0, 1fr) / minmax(0, 1fr);
 }
 
 .stage {
   grid-area: stage;
   min-width: 0;
-}
-
-.transport {
-  grid-area: transport;
 }
 
 .sidebar {
@@ -2319,19 +2311,45 @@ body.dragging .drop-card {
 
 /* ---------- Transport bar ---------- */
 
-/* The buttons, the step size, the time (large), any message, then the
-   chips: where Space plays from, where playback stopped, the loop. Always
-   one row: wrapping would
-   make the bar taller and take that height from the waveform. When room
-   runs out the message gives way first, then the chips (cut off with an
-   ellipsis; their tooltips have them in full). */
-.transport {
+/* No bar of its own: the transport floats on the waveform, in groups
+   (index.html, in .timeline-wave). Each group lets the pointer through
+   and only its boxes take it, so dragging on the waveform works around
+   them (the wheel doesn't zoom over them). Above the guide lines and
+   WaveSurfer's cursor. */
+.wave-overlay {
+  position: absolute;
+  z-index: 6;
   display: flex;
-  flex-wrap: nowrap;
   align-items: center;
-  gap: 6px 16px;
-  min-width: 0;
-  padding: 7px 10px;
+  pointer-events: none;
+}
+
+.wave-overlay > * {
+  pointer-events: auto;
+}
+
+/* Bottom left: Play and Stop, the steps, the time, on one translucent
+   pill, always one row. */
+.wave-transport {
+  bottom: 8px;
+  left: 10px;
+  gap: 14px;
+  padding: 4px 14px 4px 4px;
+  border-radius: 999px;
+  background: var(--overlay);
+  box-shadow: var(--overlay-shadow);
+  white-space: nowrap;
+}
+
+/* Above it: any message. It lets the pointer through too. */
+.wave-message {
+  bottom: 60px;
+  left: 14px;
+  max-width: 60%;
+}
+
+.wave-message > .message {
+  pointer-events: none;
 }
 
 .transport-buttons {
@@ -2440,16 +2458,21 @@ button.step-size:hover {
   font-weight: 600;
 }
 
-.transport-chips {
-  display: flex;
-  align-items: center;
+/* Top right: the chips, each on the overlay. */
+.wave-chips {
+  top: 8px;
+  right: 10px;
   gap: 6px;
-  min-width: 0;
-  margin-left: auto;
+  max-width: calc(100% - 20px);
 }
 
-/* Small rounded readouts; the start and stop points' are buttons. They shrink,
-   cut off, rather than wrap the transport (see .transport). */
+.wave-chips .chip-button {
+  background: var(--overlay);
+  box-shadow: var(--overlay-shadow);
+}
+
+/* Small rounded readouts; the start and stop points' are buttons. They
+   shrink, cut off, rather than wrap. */
 .chip-button {
   display: block; /* not a button's inline-flex: an ellipsis needs a block */
   min-width: 0;
@@ -2977,7 +3000,7 @@ button.mark-remove {
    measures. The sidebar's own remembered choice is untouched. */
 
 :root {
-  --big-video-wave: 26px; /* the strip's height */
+  --big-video-wave: 44px; /* the strip's height, with the transport on it */
 }
 
 .app.big-video {
@@ -3006,22 +3029,28 @@ button.mark-remove {
   gap: 0;
 }
 
-.app.big-video :is(.video-pane, .timeline, .transport) {
+.app.big-video :is(.video-pane, .timeline) {
   border: 0;
   border-radius: 0;
   box-shadow: none;
 }
 
-.app.big-video :is(.timeline, .transport) {
+.app.big-video .timeline {
   border-top: 1px solid var(--hairline);
 }
 
-/* A compact transport: the same controls, smaller, with room around
-   them still (the picture's edges are the window's, so the bar's padding
-   is all that keeps Play and the chips off them). */
-.app.big-video .transport {
-  gap: 6px 14px;
-  padding: 6px 16px;
+/* A compact transport on the strip: the same controls, smaller, at its
+   left; the chips at its right; both centred on its height. */
+.app.big-video :is(.wave-transport, .wave-chips) {
+  top: 50%;
+  bottom: auto;
+  transform: translateY(-50%);
+}
+
+.app.big-video .wave-transport {
+  left: 8px;
+  gap: 10px;
+  padding: 2px 10px 2px 2px;
 }
 
 .app.big-video .transport .icon {
