@@ -87,19 +87,23 @@ module.exports = async function (h) {
     (await js(`document.getElementById("speed").value`)) === speedBefore && Math.abs((await pos()) - p0 - 1) < 0.002,
     `${speedBefore} ${p0}→${await pos()}`,
   );
-  // Tab-focused slider keeps arrows
+  // Tab-focused slider keeps arrows (the volume: the speed slider is in a
+  // popover, which Tab doesn't reach while it's closed)
   await js(`document.getElementById("speed").blur(); document.getElementById("stepForward").focus()`);
-  for (let i = 0; i < 15 && !(await js(`document.activeElement.id === "speed"`)); i++) {
+  for (let i = 0; i < 30 && !(await js(`document.activeElement.id === "volume"`)); i++) {
     key("Tab");
     await sleep(30);
   }
-  const fv = await js(`document.getElementById("speed").matches(":focus-visible")`);
+  const fv = await js(`document.getElementById("volume").matches(":focus-visible")`);
   p0 = await pos();
-  const v0 = await js(`document.getElementById("speed").value`);
+  const v0 = await js(`document.getElementById("volume").value`);
   key("Right");
   await sleep(100);
-  const v1 = await js(`document.getElementById("speed").value`);
+  const v1 = await js(`document.getElementById("volume").value`);
   check("Tab-focused slider keeps arrows", v1 !== v0 && (await pos()) === p0, `focus-visible=${fv} ${v0}→${v1}`);
+  await js(
+    `(() => { const v = document.getElementById("volume"); v.value = "${v0}"; v.dispatchEvent(new Event("input")); })()`,
+  );
   await js(`document.querySelector('#speedChips [data-speed="1"]').click(); document.activeElement.blur()`);
   // Loop interplay and Space after stepping
   await click(5);

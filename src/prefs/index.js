@@ -7,7 +7,10 @@ import { defineSection, normalizeAll } from "./fields.js";
 
 // Settings › General: app-wide choices. `notifications` turns the small
 // confirmations (ui/toast.js) on and off; problems always show in the
-// transport bar. `beatClick` plays a click on each found beat
+// message line. `transport` (Play, Stop, the steps, the time, the chips)
+// and `dock` (speed, pitch, volume, EQ) each go floating on the waveform,
+// solid around it (a strip above or below it, in its card), or in a bar
+// of their own (features/layout.js). `beatClick` plays a click on each found beat
 // (features/beats.js), to hear whether the beat lines sit on the beat;
 // it's set in the beats menu (the ♩ chip) or with Shift+B, not here.
 const generalSection = defineSection({
@@ -21,6 +24,29 @@ const generalSection = defineSection({
       label: "Show notifications",
       help: "Short messages that confirm something worked, such as where a file was saved.",
       default: true,
+    },
+    {
+      key: "transport",
+      type: "choice",
+      label: "Transport",
+      help: "Play, Stop, stepping, the time, and where Space plays from.",
+      default: "waveform",
+      options: [
+        { value: "waveform", label: "Floating on the waveform", detail: "in its top corners" },
+        { value: "solid", label: "Solid, around the waveform", detail: "a strip above it, under the overview" },
+        { value: "bar", label: "In a bar", detail: "under the waveform" },
+      ],
+    },
+    {
+      key: "dock",
+      type: "choice",
+      label: "Speed, pitch, volume and EQ",
+      default: "waveform",
+      options: [
+        { value: "waveform", label: "Floating on the waveform", detail: "along its bottom" },
+        { value: "solid", label: "Solid, around the waveform", detail: "a strip below it" },
+        { value: "bar", label: "In a bar", detail: "along the bottom of the window" },
+      ],
     },
     {
       key: "beatClick",

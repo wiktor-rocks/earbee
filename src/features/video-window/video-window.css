@@ -31,9 +31,9 @@
   color: #fff;
 }
 
-/* The strip, then the timeline and minimap as for an audio file. */
+/* The strip, then the minimap and timeline as for an audio file. */
 .stage.video-popped {
-  grid-template-rows: auto minmax(0, 1fr) 44px;
+  grid-template-rows: auto 44px minmax(0, 1fr);
 }
 
 .video-away {
@@ -58,7 +58,7 @@
 
 @media (max-height: 719px) {
   .stage.video-popped {
-    grid-template-rows: auto minmax(0, 1fr) 34px;
+    grid-template-rows: auto 34px minmax(0, 1fr);
   }
 }
 

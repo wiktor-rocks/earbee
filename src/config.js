@@ -6,7 +6,7 @@ export const CONFIG = {
     max: 3,
     step: 0.01,
     initial: 1,
-    presets: [0.25, 0.3, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1],
+    presets: [0.5, 0.6, 0.75, 0.9, 1],
   },
   volume: { min: 0, max: 200, step: 1, initial: 100 }, // percent
   semitones: { min: -12, max: 12, step: 1, initial: 0 },

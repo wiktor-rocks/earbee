@@ -33,9 +33,13 @@
   --accent-ink: #1a1400;
   --danger: #ff6b6b;
   --overlay-bg: color-mix(in srgb, var(--bg) 78%, transparent);
+  /* The speed readout: the accent as text; darker on light themes (below),
+     where the bright accent on the pale page wouldn't read. */
+  --speed-ink: var(--accent);
   /* What floats on the waveform (the transport, its chips) */
   --overlay: color-mix(in srgb, var(--bg) 85%, transparent);
   --overlay-shadow: 0 4px 16px rgb(0 0 0 / 0.3);
+  --overlay-scale: 0.8; /* their size, relative to the usual */
 
   /* Amber glow around the bee (welcome and loading screens) */
   --screen-glow: color-mix(in srgb, var(--accent) 14%, transparent);
@@ -93,6 +97,12 @@
 
   color-scheme: dark;
   accent-color: var(--accent);
+}
+
+/* Light themes (data-scheme, set with the theme: ui/theme.js and the
+   preload). */
+:root[data-scheme="light"] {
+  --speed-ink: color-mix(in srgb, var(--accent) 55%, var(--text));
 }
 
 /* ============================================================
@@ -1721,9 +1731,10 @@ body.dragging .welcome-hint {
  * list scrolls inside its sidebar.
  * ============================================================ */
 
+/* The top bar, then the workspace (the dock floats on the waveform). */
 .app {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 10px;
   height: 100vh;
   padding: 10px 14px 12px;
@@ -1777,11 +1788,10 @@ body.dragging .drop-card {
   height: 22px;
 }
 
-/* A card: the timeline, the sidebar, the dock, the video pane and the
-   minimap (some set their own radius or background). */
+/* A card: the timeline, the sidebar, the video pane and the minimap (some
+   set their own radius or background). */
 .timeline,
 .sidebar,
-.dock,
 .video-pane,
 .waveform-minimap {
   border: 1px solid var(--hairline);
@@ -1912,26 +1922,27 @@ body.dragging .drop-card {
   white-space: nowrap;
 }
 
-/* ---------- Stage: video + timeline + minimap ---------- */
+/* ---------- Stage: video + minimap + timeline ---------- */
 
+/* The minimap above the timeline (the waveform). */
 .stage {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 44px;
+  grid-template-rows: 44px minmax(0, 1fr);
   gap: 8px;
   min-height: 0;
 }
 
-/* Video files: the picture on top, then a shorter timeline (its lanes
-   take 48 px), then the minimap. */
+/* Video files: the picture on top, then the minimap, then a shorter
+   timeline (its lanes take 48 px). */
 .stage.has-video {
-  grid-template-rows: minmax(0, 1fr) minmax(170px, 40%) 44px;
+  grid-template-rows: minmax(0, 1fr) 44px minmax(170px, 40%);
 }
 
 /* A short window's smaller minimap (as for songs, at the end of the
    file). Here, so big video and the popped-out layout still win. */
 @media (max-height: 719px) {
   .stage.has-video {
-    grid-template-rows: minmax(0, 1fr) minmax(170px, 40%) 34px;
+    grid-template-rows: minmax(0, 1fr) 34px minmax(170px, 40%);
   }
 }
 
@@ -2322,16 +2333,19 @@ body.dragging .drop-card {
   display: flex;
   align-items: center;
   pointer-events: none;
+  /* Everything on the waveform smaller than its usual size, so it covers
+     less of the waveform (the popovers they open follow). */
+  zoom: var(--overlay-scale);
 }
 
 .wave-overlay > * {
   pointer-events: auto;
 }
 
-/* Bottom left: Play and Stop, the steps, the time, on one translucent
+/* Top left: Play and Stop, the steps, the time, on one translucent
    pill, always one row. */
 .wave-transport {
-  bottom: 8px;
+  top: 8px;
   left: 10px;
   gap: 14px;
   padding: 4px 14px 4px 4px;
@@ -2341,9 +2355,9 @@ body.dragging .drop-card {
   white-space: nowrap;
 }
 
-/* Above it: any message. It lets the pointer through too. */
+/* Under it: any message. It lets the pointer through too. */
 .wave-message {
-  bottom: 60px;
+  top: 60px;
   left: 14px;
   max-width: 60%;
 }
@@ -2672,68 +2686,210 @@ button.mark-remove {
 
 /* ---------- Sound dock: speed, pitch, volume, EQ ---------- */
 
+/* One row along the bottom of the waveform, on the overlay like the
+   transport (see "Over the waveform"), the groups apart by short lines,
+   EQ at the right end. The sliders that need room (speed, pitch) open in
+   popovers. */
 .dock {
-  display: grid;
-  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1.15fr) minmax(0, 0.8fr) auto;
-  padding: 12px 0 18px;
+  right: 10px;
+  bottom: 8px;
+  left: 10px;
+  gap: 26px;
+  height: 60px;
+  padding: 0 16px;
+  border-radius: var(--radius);
+  background: var(--overlay);
+  box-shadow: var(--overlay-shadow);
 }
 
-/* Each group starts at the top, so the titles and the first row of
-   controls line up across the dock. */
 .dock-group {
   display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 6px;
+  align-items: center;
+  gap: 12px;
   min-width: 0;
-  padding: 0 16px;
 }
 
+/* The line before each group, halfway across the gap. */
 .dock-group + .dock-group {
-  border-left: 1px solid var(--hairline);
+  position: relative;
 }
 
-/* One height for every title row, whatever buttons it holds (Pitch's
-   reset, EQ's on/off). */
+.dock-group + .dock-group::before {
+  position: absolute;
+  top: 50%;
+  left: -13px;
+  width: 1px;
+  height: 40px;
+  background: var(--border);
+  transform: translateY(-50%);
+  content: "";
+}
+
+.eq-group {
+  margin-left: auto;
+}
+
+.dock .eq-group::before {
+  display: none;
+}
+
+/* SPEED, PITCH, VOLUME (h2, so outweigh its look). */
+.dock h2.dock-label {
+  margin: 0;
+  color: var(--muted);
+  font: 700 11px var(--sans);
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.dock-readout {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dock-big {
+  display: block;
+  min-width: 3.4em;
+  color: var(--speed-ink);
+  font: 400 30px/1 var(--display);
+}
+
+/* The speed presets, and "…" for any other speed, as one segmented
+   control; the speed in use lit. */
+.chips.segmented {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.segmented .chip,
+button#speedMore {
+  height: 34px;
+  min-width: 46px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: 700 13px var(--num);
+  font-variant-numeric: tabular-nums;
+}
+
+/* "…" sits just after the presets, a box of its own as tall as theirs. */
+button#speedMore {
+  height: 40px;
+  margin-left: -10px;
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.segmented .chip:hover,
+button#speedMore:hover {
+  background: var(--surface-hover);
+}
+
+.segmented .chip.active,
+button#speedMore.active {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+/* Pitch: − semitones +, then the cents (which open the sliders). */
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.stepper > button:not(.cents) {
+  width: 30px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface);
+  font: 700 15px var(--sans);
+}
+
+.stepper > button:not(.cents):hover {
+  background: var(--surface-hover);
+}
+
+#semitoneValue {
+  width: 64px;
+  font: 700 15px var(--num);
+  text-align: center;
+}
+
+button.cents {
+  margin-left: 6px;
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: 500 12px var(--num);
+  anchor-name: --cent-value;
+}
+
+button.cents:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* Volume: its label and value over the slider. */
+.volume-group {
+  flex: 1;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+  max-width: 240px;
+}
+
 .dock-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 8px;
-  height: 26px;
 }
 
-.dock-head h2 {
-  font-size: 12px;
-}
-
-.readout {
-  font-size: 16px;
-  font-weight: 800;
-}
-
-/* Speed in two columns: the title and slider on the left, the presets on
-   the right, their first row level with the title. (`.dock` so the short
-   window's `.dock-group` gap doesn't close up the columns.) */
-.dock .speed-group {
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 14px;
-}
-
-.speed-main {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 90px;
+.dock-head output {
+  font: 700 12px var(--num);
 }
 
 .dock-slider {
   display: flex;
-  flex: 1;
   flex-direction: column;
   gap: 3px;
   min-width: 90px;
+}
+
+/* The dock's sliders: a thin track, filled up to the thumb (--fill, set
+   by setSetting in ui/controls.js), and a round thumb. */
+.dock-slider input[type="range"] {
+  height: 16px;
+  appearance: none;
+  background: transparent;
+}
+
+.dock-slider input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  border-radius: 3px;
+  background:
+    linear-gradient(var(--accent), var(--accent)) 0 / var(--fill, 50%) 100% no-repeat,
+    var(--surface-2);
+}
+
+.dock-slider input[type="range"]::-webkit-slider-thumb {
+  width: 16px;
+  height: 16px;
+  margin-top: -5px;
+  border-radius: 50%;
+  appearance: none;
+  background: var(--text);
 }
 
 .scale {
@@ -2744,31 +2900,49 @@ button.mark-remove {
   font-variant-numeric: tabular-nums;
 }
 
-/* The speed presets: two rows of six, or three of four on a narrow
-   window. */
-.chips {
-  display: grid;
-  grid-template-columns: repeat(6, auto);
-  gap: 4px;
+/* The popovers for speed and pitch, built like the EQ bands' (below),
+   each above its own button. */
+.dock-popover {
+  position: fixed;
+  inset: auto;
+  position-area: top;
+  position-try-fallbacks: flip-block;
+  margin: 0 0 8px;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-lifted);
 }
 
-.chip {
-  min-width: 36px;
-  padding: 4px 6px;
-  border-radius: 6px;
-  font: 700 11.5px var(--num);
-  font-variant-numeric: tabular-nums;
+#speedMore {
+  anchor-name: --speed-more;
 }
 
-.chip.active {
-  border-color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 16%, var(--surface-2));
-  color: var(--accent);
+.speed-popover {
+  position-anchor: --speed-more;
+  width: 280px;
+}
+
+.pitch-popover {
+  position-anchor: --cent-value;
+  width: 300px;
+}
+
+.pitch-popover[popover]:popover-open {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pitch-popover #resetPitch {
+  align-self: flex-end;
 }
 
 .slider-row {
   display: grid;
-  grid-template-columns: 62px minmax(0, 1fr) 42px;
+  grid-template-columns: 72px minmax(0, 1fr);
   align-items: center;
   gap: 8px;
 }
@@ -2778,19 +2952,49 @@ button.mark-remove {
   font-size: 11.5px;
 }
 
-.slider-row output {
-  font-size: 11.5px;
-  text-align: right;
-}
-
 /* ---------- EQ: on/off in the dock, the bands in a popover ---------- */
 
+/* On/off and Bands in one pill, a line between them. ("EQ" comes before
+   the state from here, so #eqToggle's own text stays "On" / "Off".) */
+.eq-pill {
+  display: flex;
+  height: 40px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.eq-pill button {
+  height: 100%;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-weight: 700;
+}
+
+.eq-pill button:hover {
+  background: var(--surface-hover);
+}
+
+.eq-pill button + button {
+  border-left: 1px solid var(--border);
+}
+
+.eq-pill #eqToggle::before {
+  content: "EQ\00a0";
+  color: var(--text);
+}
+
+.eq-pill #eqToggle[aria-pressed="true"] {
+  color: var(--accent);
+}
+
 .eq-open {
-  align-self: flex-start;
   anchor-name: --eq-open;
 }
 
-.eq-group.bypassed .eq-open {
+.eq-group.bypassed :is(#eqToggle, .eq-open) {
   color: var(--muted);
 }
 
@@ -2860,6 +3064,156 @@ button.mark-remove {
   display: block;
   font-weight: 500;
   text-transform: none;
+}
+
+/* ---------- Controls solid around the waveform (Settings › General) ----------
+   The transport (and its message and chips) in a strip at the top of the
+   timeline's card, above the ruler; the dock in a strip at its bottom
+   (features/layout.js). They take rows of the card, so the waveform
+   between them gets smaller. Like the bars, they keep the controls'
+   smaller size and lose the floating box. */
+
+.app.transport-solid .timeline {
+  grid-template-rows: auto 22px 26px minmax(0, 1fr);
+}
+
+.app.dock-solid .timeline {
+  grid-template-rows: 22px 26px minmax(0, 1fr) auto;
+}
+
+.app.transport-solid.dock-solid .timeline {
+  grid-template-rows: auto 22px 26px minmax(0, 1fr) auto;
+}
+
+.timeline > .transport-bar {
+  grid-area: auto; /* a row of the card, not the workspace's area */
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.timeline > .dock {
+  height: 60px; /* as floating (both zoomed) */
+  padding: 0 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* Big video: the strip of waveform keeps its height under the transport. */
+.app.big-video.transport-solid .stage .timeline {
+  grid-template-rows: auto 0 0 minmax(0, 1fr);
+}
+
+.app.big-video.transport-solid {
+  --big-video-wave: 66px;
+}
+
+/* ---------- Controls in bars (Settings › General) ----------
+   The same controls moved off the waveform (features/layout.js), each
+   part on its own: the transport, the message and the chips in a bar
+   under the stage, the whole width (.transport-in-bar); the dock along
+   the bottom of the window, under a rule (.dock-in-bar). They keep their
+   smaller size (--overlay-scale); only what makes them float (position,
+   the translucent box) is undone here. */
+
+.app.dock-in-bar {
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding-bottom: 0;
+}
+
+.app.transport-in-bar .workspace {
+  grid-template:
+    "stage sidebar" minmax(0, 1fr)
+    "transport transport" auto
+    / minmax(0, 1fr) var(--sidebar-width);
+}
+
+.app.transport-in-bar .workspace.sidebar-hidden {
+  grid-template:
+    "stage" minmax(0, 1fr)
+    "transport" auto
+    / minmax(0, 1fr);
+}
+
+/* One row: the buttons, the steps and the time, any message, then the
+   chips at the right (cut off with an ellipsis when room runs out). */
+.transport-bar {
+  display: flex;
+  grid-area: transport;
+  align-items: center;
+  gap: 6px 12px;
+  min-width: 0;
+  padding: 5px 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--shadow);
+}
+
+.transport-bar > .wave-overlay,
+.app.dock-in-bar > .dock,
+.timeline > .dock {
+  position: static;
+  transform: none;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.transport-bar > .wave-transport {
+  padding: 0;
+}
+
+.transport-bar > .wave-message {
+  flex: 1;
+  min-width: 0;
+  max-width: none;
+}
+
+.transport-bar > .wave-chips {
+  min-width: 0;
+  max-width: none;
+  margin-left: auto;
+}
+
+.transport-bar .chip-button {
+  background: var(--surface-2);
+  box-shadow: none;
+}
+
+/* The dock: edge to edge (out over the page's side padding, which the
+   dock's zoom would otherwise shrink), under a rule. */
+.app.dock-in-bar > .dock {
+  height: 60px; /* as on the waveform (both zoomed) */
+  margin-inline: calc(-14px / var(--overlay-scale));
+  padding: 0 20px;
+  border-top: 1px solid var(--border);
+}
+
+/* Big video keeps the transport bar under the picture (the dock goes,
+   as always). */
+.app.big-video.transport-in-bar .workspace {
+  grid-template:
+    "stage" minmax(0, 1fr)
+    "transport" auto
+    / minmax(0, 1fr);
+}
+
+.app.big-video.transport-in-bar {
+  --big-video-wave: 26px;
+}
+
+.app.big-video .transport-bar {
+  gap: 6px 14px;
+  padding: 6px 16px;
+  border: 0;
+  border-top: 1px solid var(--hairline);
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.app.big-video .transport-bar > .wave-overlay {
+  transform: none;
 }
 
 /* ---------- Notifications (ui/toast.js) ----------
@@ -3010,7 +3364,7 @@ button.mark-remove {
 }
 
 .app.big-video > .topbar,
-.app.big-video > .dock,
+.app.big-video .dock,
 .app.big-video .sidebar,
 .app.big-video .waveform-minimap {
   display: none;
@@ -3126,18 +3480,15 @@ button.mark-remove {
 
 /* ---------- Smaller windows ----------
    The marks sidebar always stays in view, so half a screen (about 960 px
-   wide) still shows everything: under 1100 px it gets narrower, its
-   buttons show only their icons, and the speed presets take three rows;
-   the transport stays one row, its chips cut off when they don't fit.
-   Short windows: the dock and the minimap get more compact. */
+   wide) still shows everything: under 1100 px it gets narrower and its
+   buttons show only their icons; under 1000 px the dock's labels go
+   (screen readers still read them) and the volume slider gets shorter.
+   The transport stays one row, its chips cut off when they don't fit.
+   Short windows: the minimap gets more compact. */
 
 @media (max-width: 1099px) {
   :root {
     --sidebar-width: 240px;
-  }
-
-  .chips {
-    grid-template-columns: repeat(4, auto);
   }
 
   .sidebar-actions .label {
@@ -3145,26 +3496,40 @@ button.mark-remove {
   }
 }
 
+@media (max-width: 999px) {
+  .dock {
+    gap: 20px;
+  }
+
+  .dock-group + .dock-group::before {
+    left: -10px;
+  }
+
+  /* As .visually-hidden. */
+  .dock h2.dock-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+
+  .volume-group {
+    max-width: 120px;
+  }
+}
+
 @media (max-height: 719px) {
   .app {
     gap: 8px;
-    padding-block: 8px 10px;
+    padding-top: 8px;
   }
 
   .stage {
-    grid-template-rows: minmax(0, 1fr) 34px;
+    grid-template-rows: 34px minmax(0, 1fr);
   }
 
   .dock {
-    padding: 8px 0 12px;
-  }
-
-  .dock .scale {
-    display: none;
-  }
-
-  .dock-group,
-  .speed-main {
-    gap: 3px;
+    height: 52px;
   }
 }

@@ -422,6 +422,9 @@
             <canvas id="videoCanvas" aria-label="Video"></canvas>
           </div>
 
+          <!-- The whole track, above the waveform. -->
+          <div id="waveform-minimap" class="waveform-minimap" aria-label="Full track overview"></div>
+
           <div class="timeline">
             <div id="ruler" class="ruler" aria-hidden="true"></div>
             <div id="marksLane" class="marks-lane" aria-hidden="true"></div>
@@ -434,7 +437,7 @@
                    pointer, so dragging on the waveform works around them. -->
               <!-- Top right: the beats, where Space plays from, where
                    playback stopped, the loop. -->
-              <div class="wave-overlay wave-chips">
+              <div id="pointChips" class="wave-overlay wave-chips">
                 <button id="beatInfo" type="button" class="chip-button beat-info" hidden>♩ Find the beats</button>
                 <button
                   id="startPoint"
@@ -456,8 +459,8 @@
                 </button>
                 <output id="loopInfo" class="chip-button loop-info" aria-label="Loop" hidden></output>
               </div>
-              <!-- Bottom left: Play and Stop, the steps, the time. -->
-              <section class="wave-overlay wave-transport transport" aria-label="Transport">
+              <!-- Top left: Play and Stop, the steps, the time. -->
+              <section id="transportGroup" class="wave-overlay wave-transport transport" aria-label="Transport">
                 <div class="transport-buttons">
                   <button
                     id="play"
@@ -502,15 +505,100 @@
                   >0:00.000 / 0:00.000</output
                 >
               </section>
-              <!-- Above it: any message (an error, or a notice). -->
-              <div class="wave-overlay wave-message">
+              <!-- Along the bottom: the sound dock, one row of speed, pitch, volume
+                   and EQ; the sliders that need room open in popovers
+                   (popovertarget), like the EQ bands. -->
+              <section id="soundDock" class="wave-overlay dock" aria-label="Sound">
+                <div class="dock-group speed-group">
+                  <div class="dock-readout">
+                    <h2 id="speedTitle" class="dock-label">Speed</h2>
+                    <output id="speedValue" class="dock-big">1.00×</output>
+                  </div>
+                  <div id="speedChips" class="chips segmented" aria-label="Speed presets"></div>
+                  <!-- "…": any speed, on the slider in a popover. -->
+                  <button
+                    id="speedMore"
+                    class="chip"
+                    type="button"
+                    popovertarget="speedPopover"
+                    title="Any speed"
+                    aria-label="Any speed"
+                  >
+                    …
+                  </button>
+                  <div id="speedPopover" class="dock-popover speed-popover" popover aria-label="Speed">
+                    <div class="dock-slider">
+                      <input id="speed" type="range" aria-labelledby="speedTitle" />
+                      <div id="speedScale" class="scale"></div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="dock-group pitch-group">
+                  <h2 id="pitchTitle" class="dock-label">
+                    Pitch <output id="pitchValue" class="visually-hidden">+0.00 st</output>
+                  </h2>
+                  <div class="stepper">
+                    <button id="pitchDown" type="button" title="Down a semitone" aria-label="Down a semitone">−</button>
+                    <output id="semitoneValue">+0 st</output>
+                    <button id="pitchUp" type="button" title="Up a semitone" aria-label="Up a semitone">+</button>
+                    <button id="centValue" class="cents" type="button" popovertarget="pitchPopover" title="Fine tune">
+                      +0 ct
+                    </button>
+                  </div>
+                  <div id="pitchPopover" class="dock-popover pitch-popover" popover aria-label="Pitch">
+                    <div class="slider-row">
+                      <label for="semitoneShift">Semitones</label><input id="semitoneShift" type="range" />
+                    </div>
+                    <div class="slider-row">
+                      <label for="centShift">Fine</label><input id="centShift" type="range" />
+                    </div>
+                    <button id="resetPitch" class="small" type="button">Reset pitch</button>
+                  </div>
+                </div>
+
+                <div class="dock-group volume-group">
+                  <div class="dock-head">
+                    <h2 id="volumeTitle" class="dock-label">Volume</h2>
+                    <output id="volumeValue">100%</output>
+                  </div>
+                  <div class="dock-slider">
+                    <input id="volume" type="range" aria-labelledby="volumeTitle" />
+                    <div id="volumeScale" class="scale visually-hidden"></div>
+                  </div>
+                </div>
+
+                <div id="eqSection" class="dock-group eq-group bypassed">
+                  <div class="eq-pill">
+                    <button id="eqToggle" class="toggle" type="button" aria-pressed="false" aria-label="EQ on/off">
+                      Off
+                    </button>
+                    <button id="eqOpen" class="eq-open" type="button" popovertarget="eqPopover">
+                      <svg class="icon" aria-hidden="true"><use href="#i-sliders" /></svg>
+                      Bands
+                    </button>
+                  </div>
+                  <div id="eqPopover" class="eq-popover" popover aria-label="EQ bands">
+                    <div class="eq-popover-head">
+                      <h2>EQ bands</h2>
+                      <button id="resetEq" class="small" type="button">Reset</button>
+                    </div>
+                    <div id="eqFaders" class="eq-faders"></div>
+                  </div>
+                </div>
+              </section>
+              <!-- Under it: any message (an error, or a notice). -->
+              <div id="messageBox" class="wave-overlay wave-message">
                 <div id="message" class="message" role="status"></div>
               </div>
             </div>
           </div>
-
-          <div id="waveform-minimap" class="waveform-minimap" aria-label="Full track overview"></div>
         </div>
+
+        <!-- With Settings › General › Transport "In a bar", the transport,
+             the message and the chips move here; with the dock "In a bar",
+             it goes to the bottom of the window (features/layout.js). -->
+        <div id="transportBar" class="transport-bar" hidden></div>
 
         <aside id="sidebar" class="sidebar" aria-labelledby="marksTitle">
           <header class="sidebar-head">
@@ -548,79 +636,6 @@
           <ol id="marksList" class="marks-list" aria-labelledby="marksTitle"></ol>
         </aside>
       </div>
-
-      <section class="dock" aria-label="Sound">
-        <div class="dock-group speed-group">
-          <div class="speed-main">
-            <div class="dock-head">
-              <h2 id="speedTitle">Speed</h2>
-              <output id="speedValue" class="readout">1.00×</output>
-            </div>
-            <div class="dock-slider">
-              <input id="speed" type="range" aria-labelledby="speedTitle" />
-              <div id="speedScale" class="scale"></div>
-            </div>
-          </div>
-          <div id="speedChips" class="chips" aria-label="Speed presets"></div>
-        </div>
-
-        <div class="dock-group pitch-group">
-          <div class="dock-head">
-            <h2>Pitch</h2>
-            <output id="pitchValue" class="readout">+0.00 st</output>
-            <button
-              id="resetPitch"
-              class="icon-button small"
-              type="button"
-              title="Reset pitch"
-              aria-label="Reset pitch"
-            >
-              <svg class="icon" aria-hidden="true"><use href="#i-reset" /></svg>
-            </button>
-          </div>
-          <div class="slider-row">
-            <label for="semitoneShift">Semitones</label>
-            <input id="semitoneShift" type="range" />
-            <output id="semitoneValue">+0 st</output>
-          </div>
-          <div class="slider-row">
-            <label for="centShift">Fine</label>
-            <input id="centShift" type="range" />
-            <output id="centValue">+0 ct</output>
-          </div>
-        </div>
-
-        <div class="dock-group volume-group">
-          <div class="dock-head">
-            <h2 id="volumeTitle">Volume</h2>
-            <output id="volumeValue" class="readout">100%</output>
-          </div>
-          <div class="dock-slider">
-            <input id="volume" type="range" aria-labelledby="volumeTitle" />
-            <div id="volumeScale" class="scale"></div>
-          </div>
-        </div>
-
-        <div id="eqSection" class="dock-group eq-group bypassed">
-          <div class="dock-head">
-            <h2>EQ</h2>
-            <button id="eqToggle" class="small toggle" type="button" aria-pressed="false" aria-label="EQ on/off">
-              Off
-            </button>
-          </div>
-          <button id="eqOpen" class="small eq-open" type="button" popovertarget="eqPopover">
-            <svg class="icon" aria-hidden="true"><use href="#i-sliders" /></svg>
-            Bands
-          </button>
-          <div id="eqPopover" class="eq-popover" popover aria-label="EQ bands">
-            <div class="eq-popover-head">
-              <h2>EQ bands</h2>
-              <button id="resetEq" class="small" type="button">Reset</button>
-            </div>
-            <div id="eqFaders" class="eq-faders"></div>
-          </div>
-        </div>
-      </section>
     </div>
 
     <!-- The keyboard shortcuts, grouped (rendered from SHORTCUTS in app.js);

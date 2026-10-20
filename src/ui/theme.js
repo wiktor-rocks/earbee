@@ -23,6 +23,7 @@ function apply(theme) {
   const root = document.documentElement;
   for (const [variable, value] of Object.entries(cssVariables(theme))) root.style.setProperty(variable, value);
   root.style.colorScheme = theme.scheme; // native controls and scrollbars
+  root.dataset.scheme = theme.scheme; // for style.css's light-theme tokens
   root.dataset.theme = theme.id;
   const changed = current?.id !== theme.id;
   current = theme;

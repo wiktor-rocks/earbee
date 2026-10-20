@@ -4,6 +4,7 @@
  * only reads state; it never changes it.
  * ===================================================================== */
 
+import { CONFIG } from "../config.js";
 import { beats, hasAudio, player, settings, totalSemitones } from "../context.js";
 import { AppError } from "../core/errors.js";
 import { formatPitchTotal, formatSpeed, formatStepSize, formatTrackTime } from "../core/format.js";
@@ -73,6 +74,9 @@ export const dom = {
   startPointButton: $("startPoint"),
   stopPointButton: $("stopPoint"),
   speedChips: $("speedChips"),
+  speedMore: $("speedMore"),
+  pitchDown: $("pitchDown"),
+  pitchUp: $("pitchUp"),
   pitchValue: $("pitchValue"),
   resetPitchButton: $("resetPitch"),
   eqSection: $("eqSection"),
@@ -86,6 +90,13 @@ export const dom = {
   sidebarToggle: $("sidebarToggle"),
   sidebar: $("sidebar"),
   workspace: $("workspace"),
+  transportBar: $("transportBar"),
+  transportGroup: $("transportGroup"),
+  pointChips: $("pointChips"),
+  messageBox: $("messageBox"),
+  soundDock: $("soundDock"),
+  waveOverlays: /** @type {HTMLElement} */ (document.querySelector(".timeline-wave")),
+  timeline: /** @type {HTMLElement} */ (document.querySelector(".timeline")),
   marksList: $("marksList"),
   marksEmpty: $("marksEmpty"),
   marksCount: $("marksCount"),
@@ -199,10 +210,13 @@ export function renderLoopInfo(region) {
   dom.loopInfo.classList.toggle("disabled", !region.enabled);
 }
 
+// The presets, the current one lit; "…" lit instead for any other speed,
+// so one is always lit.
 export function renderSpeedChips() {
   for (const chip of speedChips()) {
     chip.classList.toggle("active", Number(chip.dataset.speed) === settings.speed);
   }
+  dom.speedMore.classList.toggle("active", !CONFIG.speed.presets.includes(settings.speed));
 }
 
 export function renderPitchTotal() {

@@ -131,7 +131,10 @@ export function setSetting(key, value) {
   const { min, max } = slider.range;
 
   settings[key] = clamp(Number(value), min, max);
-  sliderInput(slider).value = String(settings[key]);
+  const input = sliderInput(slider);
+  input.value = String(settings[key]);
+  // How far along it is, for the filled part of the dock's sliders (style.css).
+  input.style.setProperty("--fill", `${((settings[key] - min) / (max - min)) * 100}%`);
   $(slider.readoutId).textContent = slider.format(settings[key]);
   slider.onChange();
 }
@@ -213,6 +216,9 @@ export function bindSettingControls() {
     onClick(chip, () => setSetting("speed", chip.dataset.speed));
   }
 
+  // − and + beside the semitones (the slider is in the pitch popover).
+  onClick(dom.pitchDown, () => setSetting("semitones", settings.semitones - 1));
+  onClick(dom.pitchUp, () => setSetting("semitones", settings.semitones + 1));
   onClick(dom.resetPitchButton, resetPitch);
   onClick(dom.resetEqButton, resetEq);
   onClick(dom.eqToggle, () => setEqEnabled(!settings.eqEnabled));

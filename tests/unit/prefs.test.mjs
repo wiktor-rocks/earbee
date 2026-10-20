@@ -148,7 +148,12 @@ describe("the general section", () => {
   const general = getSection("general");
 
   test("defaults: notifications on, no beat click", () => {
-    assert.deepEqual(defaultsOf(general), { notifications: true, beatClick: false });
+    assert.deepEqual(defaultsOf(general), {
+      notifications: true,
+      transport: "waveform",
+      dock: "waveform",
+      beatClick: false,
+    });
   });
 
   test("anything but true or false falls back to on", () => {

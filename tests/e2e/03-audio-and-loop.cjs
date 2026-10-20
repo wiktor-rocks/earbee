@@ -237,7 +237,7 @@ module.exports = async function (h) {
   // the lanes and zooming go by).
   const sizes = () =>
     js(
-      `(() => { const wrapper = document.querySelector("#waveform > div").shadowRoot.querySelector(".wrapper"); return { wave: waveform.clientHeight, track: wrapper.scrollWidth, transport: document.querySelector(".transport").offsetHeight, chips: [...document.querySelectorAll(".transport-chips > :not([hidden])")].map((e) => e.id) }; })()`,
+      `(() => { const wrapper = document.querySelector("#waveform > div").shadowRoot.querySelector(".wrapper"); return { wave: waveform.clientHeight, track: wrapper.scrollWidth, transport: document.querySelector(".transport").offsetHeight, chips: [...document.querySelectorAll(".wave-chips > :not([hidden])")].map((e) => e.id) }; })()`,
     );
   const sameSize = (a, b) => a.wave === b.wave && a.track === b.track && a.transport === b.transport;
   const noLoop = await sizes();
