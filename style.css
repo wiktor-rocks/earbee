@@ -21,13 +21,13 @@
  * ============================================================ */
 
 :root {
-  --bg: #0e1014;
-  --surface: #161920;
-  --surface-2: #1d212a;
-  --surface-hover: #262b36;
-  --border: #2a2f3a;
-  --text: #e6e8ee;
-  --muted: #8b93a7;
+  --bg: #0b0c0f;
+  --surface: #13151a;
+  --surface-2: #1d2027;
+  --surface-hover: #262a33;
+  --border: #262a33;
+  --text: #ececf0;
+  --muted: #9097a8;
   --accent: #f5b301;
   --accent-hover: #ffc52e;
   --accent-ink: #1a1400;
@@ -42,9 +42,9 @@
 
   /* The waveform and minimap colours (the first five are read by
      src/waveform.js for its drawing; the rest are used here) */
-  --wave: #3b4252;
+  --wave: #303846;
   --wave-progress: var(--accent);
-  --minimap-wave: #343a48;
+  --minimap-wave: #303846;
   --minimap-progress: #8a6a12;
   /* The minimap's view box: the text colour, which contrasts with the
      background on every theme (the accent didn't, over the amber played part) */
@@ -52,7 +52,7 @@
   --minimap-overlay-edge: color-mix(in srgb, var(--text) 85%, transparent);
   --cursor: #ffffff;
   /* Where Space plays from (the start point): green */
-  --start: #5fd38d;
+  --start: #3ddc84;
   /* Where playback last stopped (the stop point): red */
   --stop: #ff6b6b;
 
@@ -60,6 +60,9 @@
   --loop: #4cc9f0;
   --loop-fill: color-mix(in srgb, var(--loop) 20%, transparent);
   --loop-edge: var(--loop);
+  /* Text on a loop-coloured fill (the loop toolbar's button): the
+     background, which every theme's loop stands out from. */
+  --loop-ink: var(--bg);
   --loop-fill-off: color-mix(in srgb, var(--muted) 8%, transparent);
   --loop-edge-off: var(--muted);
 
@@ -72,17 +75,39 @@
   --mark-violet: #b88cff;
   --mark-grey: #aab2c0;
 
-  /* Righteous for the logo and titles, Nunito for everything else */
+  /* Righteous for the logo, titles and big readouts (speed, the bar),
+     Space Grotesk for the text, JetBrains Mono for times and numbers */
   --display: "Righteous", system-ui, sans-serif;
-  --sans: "Nunito Variable", "Nunito", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --num: var(--sans);
+  --sans: "Space Grotesk", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --num: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+
+  /* Accent as text (the speed readout): the accent itself on dark themes,
+     darker on light ones (below), where the bright accent is a fill only. */
+  --accent-text: var(--accent);
+
+  /* The transport band: a raised neutral surface; only Play carries the
+     accent. */
+  --band: color-mix(in srgb, var(--surface) 70%, var(--text) 4%);
+  --band-ink: var(--text);
+  --band-soft: var(--surface-2); /* the step buttons on the band */
+  --band-rule: color-mix(in srgb, var(--text) 12%, transparent);
+
+  /* What floats on the waveform: the legend, start/stop, the loop
+     toolbar and the zoom buttons. */
+  --overlay: color-mix(in srgb, var(--bg) 85%, transparent);
+  --overlay-shadow: 0 4px 16px rgb(0 0 0 / 0.35);
+
+  /* The beat and bar lines over the waveform. */
+  --beat-rule: color-mix(in srgb, var(--text) 6%, transparent);
+  --bar-rule: color-mix(in srgb, var(--text) 18%, transparent);
 
   /* Shape and depth: cards (the timeline, transport, sidebar, dock) are
      set apart by their surface and a soft shadow rather than strong
      borders; a hairline keeps their edge on light themes. */
-  --radius: 12px;
-  --radius-sm: 8px;
+  --radius: 16px; /* the video, the waveform, the marks panel */
+  --radius-sm: 10px; /* the minimap, overlays, small panels */
+  --radius-btn: 8px; /* buttons, chips */
   --hairline: color-mix(in srgb, var(--border) 60%, transparent);
   --shadow: 0 1px 2px rgb(0 0 0 / 0.18), 0 8px 24px rgb(0 0 0 / 0.14);
   --shadow-lifted: 0 2px 6px rgb(0 0 0 / 0.25), 0 18px 48px rgb(0 0 0 / 0.3);
@@ -90,6 +115,16 @@
 
   color-scheme: dark;
   accent-color: var(--accent);
+}
+
+/* Light themes (data-scheme, set with the theme: ui/theme.js and the
+   preload): the band a soft tint, the overlays nearly opaque surface,
+   lighter shadows, and the accent darkened for text. */
+:root[data-scheme="light"] {
+  --accent-text: color-mix(in srgb, var(--accent) 50%, var(--text));
+  --band: color-mix(in srgb, var(--surface) 82%, var(--text) 8%);
+  --overlay: color-mix(in srgb, var(--surface) 94%, transparent);
+  --overlay-shadow: 0 4px 16px rgb(60 45 10 / 0.12);
 }
 
 /* ============================================================
@@ -1723,7 +1758,7 @@ body.dragging .welcome-hint {
   grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 10px;
   height: 100vh;
-  padding: 10px 14px 12px;
+  padding: 10px 20px 12px;
   overflow: hidden;
 }
 
@@ -1796,7 +1831,7 @@ body.dragging .drop-card {
     "stage sidebar" minmax(0, 1fr)
     "transport transport" auto
     / minmax(0, 1fr) var(--sidebar-width);
-  gap: 10px 12px;
+  gap: 10px 14px;
   min-height: 0;
 }
 
@@ -1832,19 +1867,24 @@ body.dragging .drop-card {
   height: 40px;
 }
 
-/* Its sections (the name, the File menu, the open file, the tools)
-   are set apart by thin lines. */
-.topbar > * + * {
-  padding-left: 14px;
-  border-left: 1px solid var(--hairline);
-}
-
-/* The name; the bee is only on the welcome screen. */
+/* The name, then a short line setting it apart from the rest. The bee
+   is only on the welcome screen. */
 .brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--text);
   font-family: var(--display);
   font-size: 22px;
   line-height: 1;
   white-space: nowrap;
+}
+
+.brand::after {
+  width: 1px;
+  height: 22px;
+  background: var(--border);
+  content: "";
 }
 
 .brand b {
@@ -1859,19 +1899,30 @@ body.dragging .drop-card {
   gap: 6px;
 }
 
-/* File: as quiet as the icon buttons beside the tools, with its name. */
+/* The tools: small squares on the surface. */
+.topbar-tools .icon-button {
+  border-radius: var(--radius-btn);
+  background: var(--surface);
+}
+
+.topbar-tools .icon-button:hover {
+  background: var(--surface-hover);
+}
+
+/* File: plain text with a chevron, no box. */
 .menu-button {
   gap: 4px;
-  padding-inline: 10px 7px;
+  padding-inline: 4px;
   border-color: transparent;
   background: transparent;
-  color: var(--muted);
+  color: var(--text);
+  font-weight: 500;
 }
 
 .menu-button:hover,
 .menu-button[aria-expanded="true"] {
-  background: var(--surface-hover);
-  color: var(--text);
+  background: transparent;
+  color: var(--accent-text);
 }
 
 .menu-button .chevron {
@@ -1915,7 +1966,8 @@ body.dragging .drop-card {
 
 .file-meta {
   flex: none;
-  font: 600 12px var(--num);
+  color: var(--muted);
+  font: 500 13px var(--sans);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
@@ -1943,9 +1995,14 @@ body.dragging .drop-card {
   }
 }
 
+/* The picture letterboxed in black, a little further from the ruler
+   than the waveform is from the minimap. */
 .video-pane {
   min-height: 0;
+  margin-bottom: 2px;
   overflow: hidden;
+  border-color: transparent;
+  border-radius: var(--radius);
   background: #000;
 }
 
@@ -3076,22 +3133,20 @@ button.mark-remove {
   position: relative;
 }
 
-.big-video-button {
+/* (button. to outweigh .icon-button.small.) */
+button.big-video-button {
   position: absolute;
   top: 8px;
   right: 40px;
-  opacity: 0;
-  background: color-mix(in srgb, #000 55%, transparent);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-btn);
+  background: rgb(255 255 255 / 0.12);
   color: #fff;
 }
 
-.video-pane:hover .big-video-button,
-.big-video-button:focus-visible {
-  opacity: 1;
-}
-
-.big-video-button:hover {
-  background: color-mix(in srgb, #000 75%, transparent);
+button.big-video-button:hover {
+  background: rgb(255 255 255 / 0.22);
   color: #fff;
 }
 

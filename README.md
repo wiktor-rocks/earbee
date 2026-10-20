@@ -39,7 +39,7 @@ npm run build:linux  # or build:win, build:mac: the app for your system, in dist
 
 ## Licence
 
-MIT: see [LICENSE](LICENSE). EarBee is built on Signalsmith Stretch, Mediabunny, wavesurfer.js, the Beat This! beat tracker, ONNX Runtime, Electron and the Righteous and Nunito fonts, each under its own licence: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+MIT: see [LICENSE](LICENSE). EarBee is built on Signalsmith Stretch, Mediabunny, wavesurfer.js, the Beat This! beat tracker, ONNX Runtime, Electron and the Righteous, Space Grotesk and JetBrains Mono fonts, each under its own licence: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 # Development
 

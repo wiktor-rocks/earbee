@@ -37,6 +37,7 @@ function applyInitialTheme() {
   const root = document.documentElement;
   for (const [variable, value] of Object.entries(initialTheme.variables)) root.style.setProperty(variable, value);
   root.style.colorScheme = initialTheme.scheme;
+  root.dataset.scheme = initialTheme.scheme;
 }
 
 if (initialTheme?.variables) {

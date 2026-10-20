@@ -7,11 +7,15 @@ module.exports = async function (h) {
   check("speed scale generated", (await js(`document.getElementById("speedScale").textContent`)) === "0.25×3×");
   check("volume scale generated", (await js(`document.getElementById("volumeScale").textContent`)) === "0%100%200%");
   await js(`document.fonts.ready`);
-  check(
-    "Nunito loaded offline",
-    (await js(`document.fonts.check('16px "Nunito Variable"')`)) &&
-      (await js(`[...document.fonts].some(f => f.family.includes("Nunito") && f.status === "loaded")`)),
-  );
+  // The welcome screen may not use them yet, so they're loaded here (from
+  // the bundled files: there is no network).
+  for (const family of ["Space Grotesk", "JetBrains Mono"]) {
+    check(
+      `${family} loaded offline`,
+      (await js(`document.fonts.load('500 16px "${family}"').then((faces) => faces.length > 0)`)) &&
+        (await js(`[...document.fonts].some(f => f.family.includes("${family}") && f.status === "loaded")`)),
+    );
+  }
   check(
     "Righteous loaded offline",
     await js(`[...document.fonts].some(f => f.family.includes("Righteous") && f.status === "loaded")`),

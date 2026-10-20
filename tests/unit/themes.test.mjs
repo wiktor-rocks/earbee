@@ -52,7 +52,7 @@ describe("every theme", () => {
       atLeast(4.5, "--danger", "--bg", "--surface");
       atLeast(4.5, "--accent-ink", "--accent", "--accent-hover");
       atLeast(4.5, "--cursor", "--surface");
-      // EarBee Light keeps the dark theme's yellow on purpose (one brand colour).
+      // EarBee Light's amber is a fill, soft on purpose (one brand colour); as text it's darkened in style.css.
       if (theme.id !== "earbee-light") atLeast(3, "--accent", "--surface");
       atLeast(3, "--loop", "--surface");
       atLeast(3, "--start", "--surface");
@@ -94,7 +94,7 @@ describe("cssVariables", () => {
   });
 
   test("a theme's own value wins over the derived one", () => {
-    assert.equal(cssVariables(getTheme("earbee"))["--surface-hover"], "#262b36");
+    assert.equal(cssVariables(getTheme("earbee"))["--surface-hover"], "#262a33");
   });
 });
 

@@ -14,22 +14,24 @@ const earbee = {
   name: "EarBee",
   scheme: "dark",
   colors: {
-    bg: "#0e1014",
-    surface: "#161920",
-    surface2: "#1d212a",
-    surfaceHover: "#262b36",
-    border: "#2a2f3a",
-    text: "#e6e8ee",
-    muted: "#8b93a7",
+    bg: "#0b0c0f",
+    surface: "#13151a",
+    surface2: "#1d2027",
+    surfaceHover: "#262a33",
+    border: "#262a33",
+    text: "#ececf0",
+    muted: "#9097a8",
     accent: "#f5b301",
     accentHover: "#ffc52e",
     accentInk: "#1a1400",
     danger: "#ff6b6b",
     loop: "#4cc9f0",
-    wave: "#3b4252",
-    minimapWave: "#343a48",
+    wave: "#303846",
+    minimapWave: "#303846",
     minimapProgress: "#8a6a12",
     cursor: "#ffffff",
+    start: "#3ddc84",
+    stop: "#ff6b6b",
   },
 };
 
@@ -234,29 +236,32 @@ const tokyoNight = {
 };
 
 // EarBee Light: the app's own theme for light mode, amber on honey
-// paper, the light counterpart of EarBee. The amber is the dark
-// theme's own yellow, so the brand colour is the same in both (it's soft on
-// the pale panels; tests/unit/themes.test.mjs exempts it from the 3:1 check).
+// paper, the light counterpart of EarBee. The amber is a deeper shade of
+// the dark theme's yellow, as a fill (it's soft on the pale panels;
+// tests/unit/themes.test.mjs exempts it from the 3:1 check); as text,
+// style.css darkens it further (--accent-text).
 /** @type {Theme} */
 const earbeeLight = {
   id: "earbee-light",
   name: "EarBee Light",
   scheme: "light",
   colors: {
-    bg: "#f5f1e8",
-    surface: "#fffcf5",
-    surface2: "#efe9dc",
-    surfaceHover: "#e7e0d1",
-    border: "#ddd3bf",
-    text: "#1f1b14",
-    muted: "#6b6252",
-    accent: "#f5b301",
-    accentHover: "#ffc52e",
+    bg: "#f6f1e5",
+    surface: "#fffdf7",
+    surface2: "#efe8d8",
+    surfaceHover: "#e6dfcd",
+    border: "#ddd3bd",
+    text: "#1d1a12",
+    muted: "#6b6455",
+    accent: "#d9a21a",
+    accentHover: "#e6b02a",
     accentInk: "#1a1400",
-    danger: "#c0392b",
-    loop: "#0b7fa8",
-    wave: "#d3c8b2",
-    cursor: "#1f1b14",
+    danger: "#a3262a",
+    loop: "#145f78",
+    wave: "#d9cfb8",
+    cursor: "#1d1a12",
+    start: "#237a33",
+    stop: "#a3262a",
   },
 };
 

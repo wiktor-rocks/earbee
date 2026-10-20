@@ -37,7 +37,7 @@ instead.
   footer are in `_includes/base.njk`, shared with the blog. `style.css`: the
   look of every page, in the app's own colours (EarBee, or EarBee Light on a
   light system).
-- `fonts/`: Righteous and Nunito, the app's fonts (from `node_modules/@fontsource*`).
+- `fonts/`: Righteous and Nunito, the website's fonts (copied from `@fontsource` packages).
 - `img/logo.webp`: the bee, from `assets/`; `img/favicon.png`: from
   `assets/icon-512.png`.
 - `img/screenshot-*.webp` (1280×800, shown at most 1017 px wide), and the two
