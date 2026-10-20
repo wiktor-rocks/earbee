@@ -43,6 +43,32 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-20: Finding the beats starts at once, on any length of file (experiment `exp/beat-windows`)
+
+- **What:** after B, the first tempo shows within 2–3 s on a file of any length. Before, it took about 14 s for 10 minutes of sound, 69 s for an hour of MP3 and 108 s for an hour of Opus. All the beats are found sooner too. A search whose worker doesn't start within 30 s now fails with a message instead of staying at "Finding the beats 0 %".
+- **Why:** the whole file was decoded and turned into the model's input (a log-mel spectrogram) before the model saw any of it, so on long files nothing showed for a long time. The worker that never started explains a CI failure seen twice ("B finds 120 BPM" stuck at 0 %).
+- **How:**
+  - The model's input is prepared one 30 s window at a time, by 2 workers, keeping a window or two ahead of the model.
+    - MP3, MP4/M4A, WAV and FLAC: from the cursor outwards, the model's order, so the part being worked on comes first.
+    - WebM, Matroska and Ogg: in one pass from the start, because their timestamps in the middle of a file are 1–3 ms off (measured with `local/bench/timestamps.cjs`).
+  - The resampler and the spectrogram can start mid-file and give exactly the frames a whole-file pass would.
+  - 2 workers were measured as the best: 1 took 153 s for an MP3 hour, 3 took 137 s, 2 took 134 s. They share the CPU with the model's 4 threads.
+- **Where:**
+  - `src/audio/beat-input.js` (new: the workers, the windows' order, the start timeout), `src/audio/beat-worker.js`;
+  - `src/core/beat-this.js` (`windowSource`, `createWindowSpectrogram`), `src/core/melspec.js`, `src/core/resample.js`;
+  - `src/features/beats.js` (`find`, `runModel`, `runSimple`, `stopPreparing`);
+  - `CONFIG.beats.prepareWorkers`, `CONFIG.beats.startTimeoutMs`.
+- **Verified by:**
+  - The demo song looped to 10 minutes and an hour (`local/bench/media/`):
+    - the first tempo in 2–3 s on every length;
+    - all the beats of an MP3 hour in 134 s (was 183) and of an Opus hour in 162 s (was 222);
+    - the beats identical to before, except 2 in the last 9 s of the Opus file, where the frame count comes from the duration.
+  - A bug hunt on the test build with real songs:
+    - while finding, video plays at the same frame rate (25 and 30 fps) and lag (~20 ms), with no low-resolution frames; the rest of the page redraws at ~52 fps instead of 60;
+    - switching files mid-search, edits while filling and projects with beats all work, with no console errors.
+  - Topic 20 ten times in a row on the branch.
+  - `npm test` after bringing in `testing` (the beat editing, merged with it): 294 unit, 489 e2e, 28 smoke.
+
 ## 2026-10-20: Test builds named with their date and time (AGENTS.md)
 
 - **What:** a test build's file name now has the date and time it was built after the branch, e.g. `EarBee-0.2.0-exp-beat-windows-2026-10-20-1518-x86_64.AppImage`. A new build of a branch no longer replaces the earlier one.
