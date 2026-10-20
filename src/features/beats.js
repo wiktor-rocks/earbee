@@ -474,9 +474,11 @@ function bindBeatMenu() {
 }
 
 export function bindBeats() {
-  // The chip finds the beats, or stops finding them; once they're found,
-  // it opens the beats menu (bindBeatMenu). B still shows or hides them.
-  onClick(dom.beatInfo, () => beats.status !== "found" && beatsAction());
+  // The chip finds the beats; once they're found (some of them, while
+  // the model goes on), it opens the beats menu (bindBeatMenu). Clicking
+  // it while finding does nothing: only B stops a search, so a stray
+  // click doesn't throw the work away. B also shows or hides the lines.
+  onClick(dom.beatInfo, () => beats.status === "idle" && beatsAction());
   bindBeatMenu();
   player.transport.on("state", updateClicks);
   player.transport.on("jump", rescheduleClicks);

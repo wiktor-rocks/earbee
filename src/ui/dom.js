@@ -163,7 +163,7 @@ export function renderBeatInfo() {
   chip.classList.toggle("disabled", beats.status === "found" && !beats.shown);
   if (beats.status === "finding") {
     chip.textContent = `♩ Finding the beats ${Math.floor(beats.progress * 100)} %`;
-    chip.title = "Finding the beats (click or B to stop)";
+    chip.title = "Finding the beats (B to stop)";
   } else if (beats.status === "found") {
     const bpm = Math.round(beats.bpm);
     const heard =

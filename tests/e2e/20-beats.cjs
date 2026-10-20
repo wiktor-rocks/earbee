@@ -55,6 +55,13 @@ module.exports = async function (h) {
   check("no beat lines yet", (await lines()) === 0);
 
   key("B");
+  await sleep(50);
+  await js(`document.getElementById("beatInfo").click()`);
+  await sleep(50);
+  c = await chip();
+  check("a click on the chip while finding doesn't stop it", /Finding|BPM/.test(c.text), JSON.stringify(c));
+  // If the first beats were in already, the click opened the menu instead.
+  await js(`(m => m.matches(":popover-open") && m.hidePopover())(document.getElementById("beatMenu"))`);
   c = await found();
   check("B finds 120 BPM", c.text === "♩ 120 BPM", JSON.stringify(c));
   check("…by the beat model", c.title.includes("Found by the beat model"), c.title);
