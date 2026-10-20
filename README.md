@@ -20,7 +20,7 @@ Get the latest version from the [releases page](https://github.com/wiktor-rocks/
 - **Loop the hard part:** Shift+drag across the waveform, or, once the beats are found, loop the bar you're in (`\`), double or halve it (`=` / `-`), and move it on phrase by phrase (Shift+`]` / Shift+`[`). Loop edges and marks snap to the beats.
 - **Mark it:** points and named regions on the track, with a list beside it.
 - **Step through it from the keyboard:** short steps back and forward, Space replays from where you started listening, and Enter from where it last stopped. Press **?** in the app for every key.
-- **Find the beats** (B): a beat-tracking model marks every beat and the first of each bar on the waveform, shows the tempo, and lets ← / → step by beat or by bar. A click on each beat (Shift+B) checks them by ear.
+- **Find the beats** (B): a beat-tracking model marks every beat and the first of each bar on the waveform, shows the tempo, and lets ← / → step by beat or by bar. A click on each beat (Shift+B) checks them by ear. The ▾ menu by the tempo fixes them for the song: a steady grid, half or double time, bars starting a beat earlier or later, and lines between the beats (halves, triplets, quarters). Projects keep the beats and the edits.
 - **Videos too,** in sync at any speed; in their own window if you like.
 - **Save your session** (marks, loop, speed and EQ) in a `.ebee` project file.
 - **Open from YouTube:** paste a link or search, and it opens once downloaded (only download what you have the rights to).
@@ -98,7 +98,7 @@ src/               The page (ES modules, no build step), in layers:
   core/              pure helpers, no DOM (unit-tested); media.js: media files,
                      the memory check, waveform levels, decoding in parts;
                      beats.js, beat-this.js, melspec.js, resample.js, fft.js:
-                     finding the beats
+                     finding the beats; beat-edits.js: editing them
   themes/            colour themes: palettes.js (every theme) and the logic
   search/            searching: the sites (sources.js) and what a result is
   prefs/             settings: the sections (index.js) and the field types

@@ -29,14 +29,20 @@ The words the app and its docs use, and what they are in the code. Each entry: w
 
 ## Beats
 
-| Word                      | What it is                                                                 | In the code                                                                                                     |
-| ------------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| **Beats**, **beat lines** | A line on each beat over the waveform, found on demand (B or the ♩ chip).  | `beats` in `src/context.js` (`beats.times`); `src/features/beats.js`; drawn by `src/timeline.js` (`setBeats`)   |
-| **Bars**, **downbeats**   | The first beat of each bar, a stronger line. Only the model finds them.    | `beats.bars`, `beats.downbeat`                                                                                  |
-| **Beat model**            | Beat This!, run on ONNX Runtime in a utility process.                      | `beats.method === "model"`; `electron/beat-model.js`, `electron/beat-model-process.js`; `src/core/beat-this.js` |
-| **Simple beat finder**    | The fallback without bars (Intel Macs, outside Electron).                  | `beats.method === "simple"`; `detectBeats` in `src/core/beats.js`                                               |
-| **The ♩ chip**            | Shows the tempo, the progress while finding, and hides or shows the lines. | `#beatInfo`; `renderBeatInfo` in `src/ui/dom.js`                                                                |
-| **Beat click**            | A click on each beat while playing (Shift+B, or Settings › General).       | `general.beatClick`; "The beat click" in `src/features/beats.js`                                                |
+| Word                           | What it is                                                                                          | In the code                                                                                                     |
+| ------------------------------ | --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| **Beats**, **beat lines**      | A line on each beat over the waveform, found on demand (B or the ♩ chip).                           | `beats` in `src/context.js` (`beats.times`); `src/features/beats.js`; drawn by `src/timeline.js` (`setBeats`)   |
+| **Bars**, **downbeats**        | The first beat of each bar, a stronger line. Only the model finds them.                             | `beats.bars`, `beats.downbeat`                                                                                  |
+| **Beat model**                 | Beat This!, run on ONNX Runtime in a utility process.                                               | `beats.method === "model"`; `electron/beat-model.js`, `electron/beat-model-process.js`; `src/core/beat-this.js` |
+| **Simple beat finder**         | The fallback without bars (Intel Macs, outside Electron).                                           | `beats.method === "simple"`; `detectBeats` in `src/core/beats.js`                                               |
+| **The ♩ chip**                 | Shows the tempo, the progress while finding, and hides or shows the lines.                          | `#beatInfo`; `renderBeatInfo` in `src/ui/dom.js`                                                                |
+| **Beat click**                 | A click on each beat while playing (Shift+B, or Settings › General).                                | `general.beatClick`; "The beat click" in `src/features/beats.js`                                                |
+| **Beats menu**                 | ▾ by the ♩ chip: this project's edits to the beats found.                                           | `#beatMenu`; "The beats menu" in `src/features/beats.js`; `beats.edits`                                         |
+| **Beats as found**             | What the finder gave, kept apart so every edit can be undone; projects save it.                     | `beats.raw`; the `beats` section in `src/features/project/sections.js`                                          |
+| **Steady grid**                | Drops stray beats and fills gaps, so the beats don't waver between two tempos. On by default.       | `edits.steady`; `steady` in `src/core/beat-edits.js`; `CONFIG.beats.steady`                                     |
+| **Half time**, **double time** | Every other beat (and bar), or a beat between each two.                                             | `edits.tempo` (0.5, 1, 2)                                                                                       |
+| **Subdivisions**               | Fainter lines between the beats (halves, triplets, quarters); snapped to, never stepped or clicked. | `edits.subdivide`, `beats.subdivisions`                                                                         |
+| **Bar shift**                  | Bars starting a beat earlier or later than the model put them.                                      | `edits.barShift`                                                                                                |
 
 ## The window
 
