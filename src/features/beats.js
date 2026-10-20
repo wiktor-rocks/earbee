@@ -413,6 +413,9 @@ export function toggleBeatClick() {
 
 /* ---------- The beats menu (▾ by the chip) ---------- */
 
+// While it's open, the app's shortcuts wait (app.js), as for the File menu.
+export const isBeatMenuOpen = () => dom.beatMenu.matches(":popover-open");
+
 /** @param {string} selector */
 const menuItems = (selector) => /** @type {HTMLElement[]} */ ([...dom.beatMenu.querySelectorAll(selector)]);
 

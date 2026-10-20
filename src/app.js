@@ -252,7 +252,7 @@ import {
 } from "./features/marks.js";
 import { bigVideoPictureChanged, bindBigVideo, toggleBigVideo } from "./features/big-video.js"; // Big video (src/features/big-video.js)
 import { bindLayout, openShortcuts } from "./features/layout.js";
-import { beatsAction, bindBeats, snapForDrag, toggleBeatClick } from "./features/beats.js";
+import { beatsAction, bindBeats, isBeatMenuOpen, snapForDrag, toggleBeatClick } from "./features/beats.js";
 import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
 import { bindProject, isSaveDialogOpen, openFile, saveProject, saveProjectAs } from "./features/project/index.js";
@@ -626,6 +626,7 @@ function start() {
     isSaveDialogOpen() ||
     isThemeMenuOpen() ||
     isFileMenuOpen() ||
+    isBeatMenuOpen() ||
     isSettingsOpen() ||
     dom.shortcutsDialog.open;
   bindShortcuts(SHORTCUTS, keysBlocked);
