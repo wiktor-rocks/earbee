@@ -12,7 +12,9 @@ import { formatRulerTime, rulerTicks } from "./core/ruler.js";
  * TIMELINE
  * The lanes above the waveform, where the markers live, so the waveform
  * itself only shows the sound:
- *   - the ruler: time ticks; a click or drag on it seeks. It carries the
+ *   - the ruler: time ticks, or the bar numbers once the beats with their
+ *     bars are found (the loop's bars stand out); a click or drag on it
+ *     seeks. It carries the
  *     start point's ▶ (where Space plays from: dragging moves it, a click
  *     goes there) and the stop point's ■ (where playback last stopped: a
  *     click goes there);
@@ -39,7 +41,7 @@ import { formatRulerTime, rulerTicks } from "./core/ruler.js";
  * The timeline only draws and reports what the pointer did; the marks and
  * the points belong to the features (features/marks.js, playback.js).
  *
- * Exposes: setMarks, setStartPoint, setStopPoint, setBeats
+ * Exposes: setMarks, setStartPoint, setStopPoint, setBeats, setLoop
  * ===================================================================== */
 
 /**
@@ -82,6 +84,8 @@ export function createTimeline({
   let startPoint = null; // as last set by setStartPoint()
   let startDraft = null; // while its ▶ is dragged
   let stopPoint = null; // as last set by setStopPoint()
+  /** @type {{ start: number, end: number } | null} */
+  let loop = null; // as last set by setLoop()
 
   const element = (className, parent) => {
     const created = document.createElement("div");
@@ -134,14 +138,36 @@ export function createTimeline({
 
     const span = end - start;
     rendered = { start: Math.max(0, start - span), end: Math.min(view.duration, end + span), width: view.width };
-    const { step, ticks } = rulerTicks(rendered.start, rendered.end, pxPerSecond);
     const fragment = document.createDocumentFragment();
-    for (const tick of ticks) {
-      const line = element(tick.major ? "ruler-tick major" : "ruler-tick", fragment);
-      line.style.left = percent(tick.time);
-      if (tick.major) line.textContent = formatRulerTime(tick.time, step);
+    if (spacingPx(bars, pxPerSecond) >= CONFIG.beats.minSpacingPx) renderBarNumbers(fragment, pxPerSecond);
+    else {
+      const { step, ticks } = rulerTicks(rendered.start, rendered.end, pxPerSecond);
+      for (const tick of ticks) {
+        const line = element(tick.major ? "ruler-tick major" : "ruler-tick", fragment);
+        line.style.left = percent(tick.time);
+        if (tick.major) line.textContent = formatRulerTime(tick.time, step);
+      }
     }
     rulerTicksLayer.replaceChildren(fragment);
+  }
+
+  // With the bars found: a tick at each bar, numbered from 1 (bar 1, then
+  // every `every`th, so the numbers don't crowd); the bars the loop
+  // covers are marked.
+  function renderBarNumbers(fragment, pxPerSecond) {
+    let every = 1;
+    while (spacingPx(bars, pxPerSecond) * every < CONFIG.beats.barLabelSpacingPx) every *= 2;
+    const { from, to } = visibleBeats(bars, rendered.start, rendered.end);
+    for (let i = from; i < to; i++) {
+      const labelled = i % every === 0;
+      const inLoop = loop !== null && bars[i] >= loop.start - 1e-3 && bars[i] < loop.end - 1e-3;
+      const line = element(
+        ["ruler-tick bar", labelled && "major", inLoop && "in-loop"].filter(Boolean).join(" "),
+        fragment,
+      );
+      line.style.left = percent(bars[i]);
+      if (labelled) line.textContent = String(i + 1);
+    }
   }
 
   /* ---------- The beats ---------- */
@@ -150,6 +176,7 @@ export function createTimeline({
   // either side. Hidden when zoomed out so far that they'd be a grey wash.
   let beats = null; // as last set by setBeats()
   let downbeat = null; // one flag per beat, or null
+  let bars = null; // the beats flagged in `downbeat`: the bars' starts, or null
   let subdivisions = null; // times between the beats, or null
   let beatsRendered = null; // { start, end, width }
 
@@ -499,9 +526,21 @@ export function createTimeline({
     setBeats(times, downbeats = null, parts = null) {
       beats = times;
       downbeat = downbeats;
+      bars = times && downbeats ? times.filter((_, i) => downbeats[i]) : null;
       subdivisions = parts;
       beatsRendered = null;
+      rendered = null;
       renderBeats();
+      renderRuler();
+    },
+    /**
+     * The loop while it's on, or null: its bars stand out on the ruler.
+     * @param {{ start: number, end: number } | null} next
+     */
+    setLoop(next) {
+      loop = next && { start: next.start, end: next.end };
+      rendered = null;
+      renderRuler();
     },
   };
 }

@@ -120,6 +120,8 @@ export const CONFIG = {
   waveform: {
     // How far the mouse wheel can zoom in, relative to fit-to-width.
     maxZoomMultiplier: 48,
+    // Each click on the zoom buttons over the waveform zooms this much.
+    zoomStep: 1.5,
     // A newly opened file starts zoomed in to show this many seconds from
     // its start (or the whole track, if shorter), within the zoom limits.
     initialViewSeconds: 15,
@@ -155,6 +157,9 @@ export const CONFIG = {
     steady: { periodBeats: 32, dropBelow: 0.6, fillTolerance: 0.2, maxFill: 16, barDropBelow: 0.6 },
     // Subdivision lines (the ♩ menu) are hidden when closer than this.
     minSubdivisionSpacingPx: 7,
+    // With bars found, the ruler numbers them: every bar, or every 2nd,
+    // 4th… so its labels stay at least this far apart.
+    barLabelSpacingPx: 28,
     // How far "Move bar start" can go, in beats, either way.
     maxBarShift: 16,
     // Finding the beats: this many workers prepare the model's input

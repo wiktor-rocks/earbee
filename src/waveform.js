@@ -60,6 +60,7 @@ import { drawWaveform } from "./waveform-draw.js";
  *          setAppearance (the look, from Settings › Waveform),
  *          getView / setView (the zoom and scroll, for project files),
  *          lockFit (the whole track in view, no zooming, for big video),
+ *          zoomBy (the zoom buttons),
  *          refreshColors (after the colour variables changed, e.g. a
  *          theme), and for the lanes: onView, timeAtClientX,
  *          clientXAt, wheel (an event handler), scrollNearEdge, holdFollow
@@ -543,6 +544,18 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     setScroll(waveSurfer.getScroll() + (clientXAt(anchorTime) - clientX));
   }
 
+  // The zoom buttons over the waveform: around the playback cursor while
+  // it's in view (which keeps following it), else the view's middle.
+  /** @param {number} factor Above 1 zooms in. */
+  function zoomAtCursor(factor) {
+    if (!duration || fitLocked) return;
+    const box = container.getBoundingClientRect();
+    const cursor = clientXAt(waveSurfer.getCurrentTime());
+    const inView = cursor >= box.left && cursor <= box.right;
+    if (!inView) followPaused = true;
+    zoomBy(factor, inView ? cursor : box.left + box.width / 2);
+  }
+
   // The wheel zooms at the pointer (a touchpad pinch arrives as a wheel
   // with ctrlKey, and zooms the same way); a touchpad's sideways swipe
   // scrolls.
@@ -799,6 +812,7 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     getView,
     setView,
     lockFit,
+    zoomBy: zoomAtCursor,
     /** Calls `listener` with the view whenever it changes. @param {(view: View) => void} listener */
     onView(listener) {
       return viewEvents.on("view", listener);

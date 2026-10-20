@@ -46,10 +46,11 @@
   --wave-progress: var(--accent);
   --minimap-wave: #303846;
   --minimap-progress: #8a6a12;
-  /* The minimap's view box: the text colour, which contrasts with the
-     background on every theme (the accent didn't, over the amber played part) */
+  /* The minimap's view box: framed in the muted colour (the text colour
+     on light themes), which contrasts with the background on every theme
+     (the accent didn't, over the amber played part) */
   --minimap-overlay: color-mix(in srgb, var(--text) 16%, transparent);
-  --minimap-overlay-edge: color-mix(in srgb, var(--text) 85%, transparent);
+  --minimap-overlay-edge: var(--muted);
   --cursor: #ffffff;
   /* Where Space plays from (the start point): green */
   --start: #3ddc84;
@@ -58,7 +59,7 @@
 
   /* A–B loop: its own colour, so it stands out on the amber played part */
   --loop: #4cc9f0;
-  --loop-fill: color-mix(in srgb, var(--loop) 20%, transparent);
+  --loop-fill: color-mix(in srgb, var(--loop) 10%, transparent);
   --loop-edge: var(--loop);
   /* Text on a loop-coloured fill (the loop toolbar's button): the
      background, which every theme's loop stands out from. */
@@ -125,6 +126,7 @@
   --band: color-mix(in srgb, var(--surface) 82%, var(--text) 8%);
   --overlay: color-mix(in srgb, var(--surface) 94%, transparent);
   --overlay-shadow: 0 4px 16px rgb(60 45 10 / 0.12);
+  --minimap-overlay-edge: var(--text);
 }
 
 /* ============================================================
@@ -1579,7 +1581,8 @@ body.dragging .welcome-hint {
   flex: 1;
 }
 
-/* The beats menu (features/beats.js), from the ♩ chip: what's on is
+/* The beats menu (features/beats.js), from the ♩ readout over the
+   waveform: what's on is
    ticked, like the colour-theme menu's choice. */
 .beat-menu {
   position-anchor: --beat-menu;
@@ -1976,22 +1979,22 @@ body.dragging .drop-card {
 
 .stage {
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 44px;
+  grid-template-rows: minmax(0, 1fr) 36px;
   gap: 8px;
   min-height: 0;
 }
 
 /* Video files: the picture on top, then a shorter timeline (its lanes
-   take 48 px), then the minimap. */
+   take 50 px), then the minimap. */
 .stage.has-video {
-  grid-template-rows: minmax(0, 1fr) minmax(170px, 40%) 44px;
+  grid-template-rows: minmax(0, 1fr) minmax(170px, 40%) 36px;
 }
 
 /* A short window's smaller minimap (as for songs, at the end of the
    file). Here, so big video and the popped-out layout still win. */
 @media (max-height: 719px) {
   .stage.has-video {
-    grid-template-rows: minmax(0, 1fr) minmax(170px, 40%) 34px;
+    grid-template-rows: minmax(0, 1fr) minmax(170px, 40%) 30px;
   }
 }
 
@@ -2061,14 +2064,18 @@ body.dragging .drop-card {
    a .timeline-track as wide as the zoomed waveform and moved by its
    scroll (timeline.js); markers are placed in percent of it. */
 
+/* The lanes sit on the page, the waveform under them is its own panel.
+   Neither has side borders (the panel's edge is an outline), so x = 0 is
+   the same pixel in all of them. */
 .timeline {
   position: relative;
   display: grid;
-  grid-template-rows: 22px 26px minmax(0, 1fr);
+  grid-template-rows: 22px 28px minmax(0, 1fr);
   min-height: 0;
-  /* The lanes and the waveform reach the border, with no gap; small
-     corners, so little at their edges hides behind them. */
-  border-radius: 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
   overflow: hidden;
   isolation: isolate;
 }
@@ -2077,6 +2084,11 @@ body.dragging .drop-card {
   position: relative;
   display: grid;
   min-height: 0;
+  overflow: hidden;
+  border-radius: var(--radius);
+  outline: 1px solid var(--hairline);
+  outline-offset: -1px;
+  background: var(--surface);
 }
 
 .timeline-track {
@@ -2090,8 +2102,6 @@ body.dragging .drop-card {
 .marks-lane {
   position: relative;
   overflow: hidden;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
   touch-action: none;
   user-select: none;
 }
@@ -2111,12 +2121,28 @@ body.dragging .drop-card {
 
 .ruler-tick.major {
   height: 100%;
-  padding: 2px 0 0 3px;
-  border-left-color: color-mix(in srgb, var(--muted) 60%, transparent);
+  padding: 3px 0 0 4px;
+  border-left-color: var(--border);
   color: var(--muted);
-  font: 10px/1 var(--num);
+  font: 500 11px/1 var(--num);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+/* With the bars found (timeline.js renderBarNumbers): a tick at each bar,
+   the numbered ones the whole height; the loop's bars in its colour. */
+.ruler-tick.bar {
+  height: 6px;
+}
+
+.ruler-tick.bar.major {
+  height: 100%;
+}
+
+.ruler-tick.bar.in-loop {
+  border-left-color: var(--loop);
+  color: var(--loop);
+  font-weight: 700;
 }
 
 /* The start point's ▶ (right of its time; drags) and the stop point's ■
@@ -2181,7 +2207,7 @@ body.dragging .drop-card {
   max-width: 100%;
   overflow: hidden;
   color: var(--text);
-  font: 600 11px/16px var(--sans);
+  font: 700 11px/16px var(--sans);
   white-space: nowrap;
   text-overflow: ellipsis;
   cursor: grab;
@@ -2199,24 +2225,32 @@ body.dragging .drop-card {
   display: none;
 }
 
+/* A region: a pill in its colour, lightly filled, its name in the colour. */
 .lane-region {
-  margin-block: 3px;
-  padding-inline: 5px;
-  border-inline: 2px solid var(--mark-color);
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--mark-color) 28%, var(--surface-2));
+  top: 50%;
+  bottom: auto;
+  height: 22px;
+  padding-inline: 8px;
+  border: 1px solid var(--mark-color);
+  border-radius: var(--radius-btn);
+  background: color-mix(in srgb, var(--mark-color) 12%, transparent);
+  transform: translateY(-50%);
   cursor: grab;
 }
 
+.lane-region .lane-label {
+  color: var(--mark-color);
+}
+
 .lane-region.pending {
-  border-inline-style: dashed;
-  background: color-mix(in srgb, var(--mark-color) 8%, transparent);
+  border-style: dashed;
+  background: color-mix(in srgb, var(--mark-color) 6%, transparent);
 }
 
 .lane-point.selected .lane-label,
 .lane-region.selected {
   outline: 1px solid var(--mark-color);
-  background: color-mix(in srgb, var(--mark-color) 40%, var(--surface-2));
+  background: color-mix(in srgb, var(--mark-color) 28%, var(--surface));
 }
 
 /* Guide lines: the start and stop points continued faintly over the
@@ -2253,12 +2287,12 @@ body.dragging .drop-card {
   top: 0;
   bottom: 0;
   margin-left: -0.5px;
-  border-left: 1px solid color-mix(in srgb, var(--text) 22%, transparent);
+  border-left: 1px solid var(--beat-rule);
 }
 
 /* The first beat of each bar (the beat model's downbeats): stronger. */
 .guide-beat.downbeat {
-  border-left-color: color-mix(in srgb, var(--text) 50%, transparent);
+  border-left-color: var(--bar-rule);
 }
 
 /* Subdivisions between the beats (the ♩ menu): fainter still, dashed. */
@@ -2296,6 +2330,168 @@ body.dragging .drop-card {
 .waveform ::part(hover-time-flip) {
   right: 4px;
   left: auto;
+}
+
+/* ---------- Over the waveform: legend, start/stop, loop toolbar, zoom ----------
+   Four groups in the waveform panel's corners and bottom centre, above
+   the guide lines and WaveSurfer's cursor. The groups let the pointer
+   through; only what's in them takes it, so dragging on the waveform
+   works around them (the wheel doesn't zoom over them). */
+
+.wave-overlay {
+  position: absolute;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+}
+
+.wave-overlay > * {
+  pointer-events: auto;
+}
+
+/* Top left: the bar and beat, the tempo, the loop, in a row on one
+   translucent box (gone when all three are). */
+.wave-legend {
+  top: 8px;
+  left: 10px;
+  gap: 12px;
+  max-width: calc(100% - 260px);
+  padding: 4px 10px;
+  border-radius: var(--radius-sm);
+  background: var(--overlay);
+  box-shadow: var(--overlay-shadow);
+  white-space: nowrap;
+}
+
+.wave-legend:not(:has(> :not([hidden]))) {
+  display: none;
+}
+
+.bar-beat {
+  color: var(--muted);
+  font: 500 12px var(--num);
+}
+
+.bar-beat b {
+  color: var(--text);
+  font: 400 18px/1 var(--display);
+}
+
+/* The tempo: plain text, a button all the same (finds the beats; then
+   the beats menu). (button. to outweigh button.) */
+button.beat-info {
+  min-width: 0;
+  padding: 2px 0;
+  overflow: hidden;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: 500 12px var(--num);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+}
+
+button.beat-info:hover {
+  background: transparent;
+  color: var(--text);
+}
+
+.beat-info.disabled {
+  opacity: 0.6;
+}
+
+.loop-info {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--loop);
+  font: 500 12px var(--num);
+  text-overflow: ellipsis;
+}
+
+.loop-info.disabled {
+  color: var(--muted);
+}
+
+/* Top right: where Space plays from, and where playback stopped. */
+.wave-points {
+  top: 8px;
+  right: 10px;
+  gap: 6px;
+}
+
+button.overlay-button {
+  height: 26px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: var(--radius-btn);
+  background: var(--overlay);
+  box-shadow: var(--overlay-shadow);
+  font: 500 12px var(--num);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+button.overlay-button:hover {
+  background: var(--surface-hover);
+}
+
+.start-point {
+  color: var(--start);
+}
+
+.stop-point {
+  color: var(--stop);
+}
+
+/* Bottom centre: the loop's actions; the middle one, looping the bar,
+   in the loop's colour while a loop is on. */
+.loop-tools {
+  bottom: 8px;
+  left: 50%;
+  gap: 2px;
+  padding: 3px;
+  border-radius: var(--radius-sm);
+  background: var(--overlay);
+  box-shadow: var(--overlay-shadow);
+  transform: translateX(-50%);
+}
+
+.loop-tools .icon-button {
+  width: 36px;
+  height: 32px;
+  border-radius: var(--radius-btn);
+  color: var(--text);
+}
+
+.loop-tools .loop-bar {
+  width: 40px;
+}
+
+.loop-tools .loop-bar[aria-pressed="true"],
+.loop-tools .loop-bar[aria-pressed="true"]:hover {
+  background: var(--loop);
+  color: var(--loop-ink);
+}
+
+/* Bottom right: zoom out and in. */
+.wave-zoom {
+  right: 10px;
+  bottom: 8px;
+  gap: 4px;
+}
+
+.wave-zoom .icon-button {
+  width: 30px;
+  height: 30px;
+  border-radius: var(--radius-btn);
+  background: var(--overlay);
+  box-shadow: var(--overlay-shadow);
+  color: var(--text);
+}
+
+.wave-zoom .icon-button:hover {
+  background: var(--surface-hover);
 }
 
 /* The minimap fills its card, inside a little padding (the stage's grid
@@ -2353,9 +2549,11 @@ body.dragging .drop-card {
   border-left: 1px solid var(--mark-color);
 }
 
+/* A region's span tinted in its colour, so the song's sections show in
+   the overview. */
 .minimap-region {
   border-right: 1px solid var(--mark-color);
-  background: color-mix(in srgb, var(--mark-color) 18%, transparent);
+  background: color-mix(in srgb, var(--mark-color) 12%, transparent);
 }
 
 .waveform-minimap:active {
@@ -2371,17 +2569,14 @@ body.dragging .drop-card {
   z-index: 6 !important;
   box-sizing: border-box;
   border: 2px solid var(--minimap-overlay-edge);
-  border-radius: 4px;
+  border-radius: 6px;
 }
 
 /* ---------- Transport bar ---------- */
 
-/* The buttons, the step size, the time (large), any message, then the
-   chips: where Space plays from, where playback stopped, the loop. Always
-   one row: wrapping would
-   make the bar taller and take that height from the waveform. When room
-   runs out the message gives way first, then the chips (cut off with an
-   ellipsis; their tooltips have them in full). */
+/* The buttons, the step size, the time (large), any message. Always one
+   row: wrapping would make the bar taller and take that height from the
+   waveform; when room runs out, the message gives way. */
 .transport {
   display: flex;
   flex-wrap: nowrap;
@@ -2495,51 +2690,6 @@ button.step-size:hover {
   color: var(--muted);
   font-size: 14px;
   font-weight: 600;
-}
-
-.transport-chips {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  margin-left: auto;
-}
-
-/* Small rounded readouts; the start and stop points' are buttons. They shrink,
-   cut off, rather than wrap the transport (see .transport). */
-.chip-button {
-  display: block; /* not a button's inline-flex: an ellipsis needs a block */
-  min-width: 0;
-  overflow: hidden;
-  padding: 4px 10px;
-  border: 1px solid var(--hairline);
-  border-radius: 999px;
-  background: var(--surface-2);
-  color: var(--muted);
-  font: 700 12px/1.3 var(--num);
-  font-variant-numeric: tabular-nums;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* Where Space plays from: green, like its ▶ on the ruler. */
-.start-point {
-  color: var(--start);
-}
-
-/* Where playback last stopped: red, like its ■ on the ruler. */
-.stop-point {
-  color: var(--stop);
-}
-
-.loop-info {
-  border-color: color-mix(in srgb, var(--loop) 35%, transparent);
-  color: var(--loop);
-}
-
-.loop-info.disabled {
-  border-color: var(--hairline);
-  color: var(--muted);
 }
 
 /* ---------- Marks sidebar ---------- */
@@ -3075,7 +3225,7 @@ button.mark-remove {
 
 /* A compact transport: the same controls, smaller, with room around
    them still (the picture's edges are the window's, so the bar's padding
-   is all that keeps Play and the chips off them). */
+   is all that keeps Play and the time off them). */
 .app.big-video .transport {
   gap: 6px 14px;
   padding: 6px 16px;
@@ -3114,13 +3264,19 @@ button.mark-remove {
   font-size: 11px;
 }
 
-.app.big-video .chip-button {
-  padding: 2px 8px;
-  font-size: 11px;
-}
-
 .app.big-video .stage .timeline {
   grid-template-rows: 0 0 minmax(0, 1fr);
+}
+
+/* The strip is too thin for what floats on the waveform: it goes, and
+   comes back with the usual layout. */
+.app.big-video .wave-overlay {
+  display: none;
+}
+
+.app.big-video .timeline-wave {
+  border-radius: 0;
+  outline: 0;
 }
 
 .app.big-video .stage :is(.ruler, .marks-lane) {
@@ -3178,7 +3334,7 @@ button.big-video-button:hover {
   }
 
   .stage {
-    grid-template-rows: minmax(0, 1fr) 34px;
+    grid-template-rows: minmax(0, 1fr) 30px;
   }
 
   .dock {

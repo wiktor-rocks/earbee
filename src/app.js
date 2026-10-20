@@ -238,6 +238,7 @@
  * ===================================================================== */
 
 import { createAudioEngine } from "./audio/engine.js";
+import { CONFIG } from "./config.js";
 import { createTransport } from "./audio/transport.js";
 import { player, settings, totalSemitones } from "./context.js";
 import { bindDownloads } from "./features/download.js";
@@ -292,7 +293,17 @@ import {
   initSliders,
   setEqEnabled,
 } from "./ui/controls.js";
-import { $, dom, renderStepSize, renderTrackTime, renderTransportState, reportError, showNotice } from "./ui/dom.js";
+import {
+  $,
+  dom,
+  onClick,
+  renderBarBeat,
+  renderStepSize,
+  renderTrackTime,
+  renderTransportState,
+  reportError,
+  showNotice,
+} from "./ui/dom.js";
 import { bindFocus, bindShortcuts, renderShortcutLegend } from "./ui/shortcuts.js";
 import { getPrefs, onPrefsChange } from "./ui/prefs.js";
 import { followThemePrefs, onThemeChange } from "./ui/theme.js";
@@ -361,6 +372,9 @@ onThemeChange(() => waveform.refreshColors());
 // Its look follows Settings › Waveform.
 waveform.setAppearance(getPrefs("waveform"));
 onPrefsChange("waveform", (values) => waveform.setAppearance(values));
+// The zoom buttons over the waveform (the wheel zooms too).
+onClick(dom.zoomIn, () => waveform.zoomBy(CONFIG.waveform.zoomStep));
+onClick(dom.zoomOut, () => waveform.zoomBy(1 / CONFIG.waveform.zoomStep));
 
 // Everything that follows playback subscribes here.
 transport.on("position", (time) => {
@@ -370,6 +384,7 @@ transport.on("position", (time) => {
     videoView.advance(time);
   }
   renderTrackTime(time);
+  renderBarBeat(time);
 });
 
 transport.on("state", (state) => {

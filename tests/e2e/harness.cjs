@@ -248,7 +248,9 @@ async function createHarness() {
   const loopRange = async () => {
     const l = await loopInfo();
     if (l.hidden) return null;
+    // "↻ 0:06.060–0:07.380", or with its length first: "↻ 1 bar · 0:06.060–…"
     const [a, b] = l.text
+      .replace(/^.*·/, "")
       .replace("↻", "")
       .split("–")
       .map((t) => js(`__parseTime(${JSON.stringify(t.trim())})`));

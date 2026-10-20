@@ -9,7 +9,7 @@ import { barLength, beatLength, beats, hasAudio, player, settings } from "../con
 import { beatStep, moveLoop, resizeLoop, spanAt } from "../core/beats.js";
 import { formatTrackTime } from "../core/format.js";
 import { cycleStepSize } from "../ui/controls.js";
-import { dom, guarded, onClick, renderLoopInfo, reportError } from "../ui/dom.js";
+import { dom, guarded, onClick, renderLoopInfo, renderLoopTools, reportError } from "../ui/dom.js";
 import { notify } from "../ui/toast.js";
 import { beatGrids, snapToBeat } from "./beats.js";
 
@@ -137,6 +137,13 @@ export function bindTransportButtons() {
   onClick(dom.stepSize, (event) => cycleStepSize(event.shiftKey ? -1 : 1));
   onClick(dom.startPointButton, () => player.transport.seek(startPoint()));
   onClick(dom.stopPointButton, () => stopPoint !== null && player.transport.seek(stopPoint));
+  // The loop toolbar over the waveform: the loop keys' actions.
+  onClick(dom.loopPrevPhrase, () => moveLoopBy(-1));
+  onClick(dom.loopHalve, () => resizeLoopBy(0.5));
+  onClick(dom.loopBar, (event) => loopThisBar(event));
+  onClick(dom.loopDouble, () => resizeLoopBy(2));
+  onClick(dom.loopNextPhrase, () => moveLoopBy(1));
+  renderLoopTools(loopRegion);
 }
 
 // Keeps returnPoint up to date, and releases held keys when the window
@@ -181,7 +188,9 @@ export function setLoopRegion(region) {
   loopRegion = valid ? { start: region.start, end: region.end, enabled: region.enabled } : null;
   player.transport.setLoop(loopRegion?.enabled ? loopRegion : null);
   player.waveform.setLoop(loopRegion);
+  player.timeline.setLoop(loopRegion?.enabled ? loopRegion : null);
   renderLoopInfo(loopRegion);
+  renderLoopTools(loopRegion);
 }
 
 // [ and ]: move one end of the loop to the cursor (onto a beat close by),
@@ -209,9 +218,10 @@ export const clearLoop = () => setLoopRegion(null);
 const NO_GRIDS = { beats: null, beatLength: null, bars: null, barLength: null };
 const loopLimits = () => ({ duration: player.transport.duration, minSeconds: CONFIG.loop.minSeconds });
 
-// \: loop the bar the cursor is in (what's heard, while playing), or
-// the beat when there are no bars (the simple beat finder).
-/** @param {KeyboardEvent} event */
+// \ (or the loop toolbar's button): loop the bar the cursor is in (what's
+// heard, while playing), or the beat when there are no bars (the simple
+// beat finder).
+/** @param {KeyboardEvent | MouseEvent} event */
 export function loopThisBar(event) {
   const grids = beatGrids();
   if (!grids) return notify("Find the beats first (B).");

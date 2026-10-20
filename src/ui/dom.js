@@ -5,6 +5,7 @@
  * ===================================================================== */
 
 import { beats, hasAudio, player, settings, totalSemitones } from "../context.js";
+import { BEAT_STEP_EPSILON, barBeatAt, onGrid } from "../core/beats.js";
 import { AppError } from "../core/errors.js";
 import { formatPitchTotal, formatSpeed, formatStepSize, formatTrackTime } from "../core/format.js";
 
@@ -60,6 +61,14 @@ export const dom = {
   message: $("message"),
   trackTime: $("trackTime"),
   loopInfo: $("loopInfo"),
+  barBeat: $("barBeat"),
+  loopPrevPhrase: /** @type {HTMLButtonElement} */ ($("loopPrevPhrase")),
+  loopHalve: /** @type {HTMLButtonElement} */ ($("loopHalve")),
+  loopBar: /** @type {HTMLButtonElement} */ ($("loopBar")),
+  loopDouble: /** @type {HTMLButtonElement} */ ($("loopDouble")),
+  loopNextPhrase: /** @type {HTMLButtonElement} */ ($("loopNextPhrase")),
+  zoomIn: $("zoomIn"),
+  zoomOut: $("zoomOut"),
   speedScale: $("speedScale"),
   volumeScale: $("volumeScale"),
   playButton: /** @type {HTMLButtonElement} */ ($("play")),
@@ -153,7 +162,26 @@ export function renderStepSize() {
   dom.stepSize.textContent = typeof stepSize === "string" ? `Step 1 ${stepSize}` : `Step ${formatStepSize(stepSize)} s`;
 }
 
-// The beats chip in the transport bar: a button that finds them, their
+// The bar and the beat in it, over the waveform ("Bar 5 · 3"), while the
+// beats with their bars are found and shown; follows the position.
+const barBeatParts = {
+  bar: element("b", {}),
+  beat: element("span", { className: "bar-beat-beat" }),
+};
+let shownBarBeat = "";
+export function renderBarBeat(position) {
+  const at = beats.status === "found" && beats.shown ? barBeatAt(beats.bars, beats.times, position) : null;
+  const key = at ? `${at.bar}·${at.beat}` : "";
+  if (key === shownBarBeat) return;
+  shownBarBeat = key;
+  dom.barBeat.hidden = !at;
+  if (!at) return;
+  if (!barBeatParts.bar.isConnected) dom.barBeat.replaceChildren(barBeatParts.bar, barBeatParts.beat);
+  barBeatParts.bar.textContent = `Bar ${at.bar}`;
+  barBeatParts.beat.textContent = ` · ${at.beat}`;
+}
+
+// The beats readout over the waveform: a button that finds them, their
 // progress, then the tempo (and the tempo heard, at another speed, and
 // the progress while the model fills in the rest); dimmed while their
 // lines are hidden. Its tooltip says which finder found them.
@@ -184,19 +212,47 @@ export function renderBeatInfo() {
     chip.textContent = "♩ Find the beats";
     chip.title = "Find the beats: lines on the waveform, the tempo, and ← / → stepping by beats (B)";
   }
+  // The loop's length in bars comes and goes with the beats.
+  renderLoopInfo(shownLoop);
+  renderBarBeat(player.transport?.position ?? 0);
 }
 
-// The loop readout next to the track time; dimmed while the loop is off.
-// Kept short (↻, like the ▶ and ■ chips) so the transport stays one row;
-// the tooltip has it in full in case the chip is cut off.
+// The loop readout over the waveform, dimmed while the loop is off: its
+// length in bars when it lies on whole bars ("1 bar ·"), then its start
+// and end (each part a span, so a narrow window can drop the times; the
+// tooltip has them in full). The loop is kept for the beats readout,
+// which redraws this when the bars change.
+/** @type {{ start: number, end: number, enabled: boolean } | null} */
+let shownLoop = null;
+const loopParts = {
+  bars: element("span", { className: "loop-bars" }),
+  range: element("span", { className: "loop-range" }),
+};
 export function renderLoopInfo(region) {
+  shownLoop = region;
   dom.loopInfo.hidden = !region;
   if (!region) return;
   const start = formatTrackTime(region.start);
   const end = formatTrackTime(region.end);
-  dom.loopInfo.textContent = `↻ ${start}–${end}`;
+  const onBars =
+    beats.status === "found" && beats.bars?.length
+      ? onGrid(beats.bars, region.start, region.end, beats.barLength, BEAT_STEP_EPSILON)
+      : null;
+  const count = onBars && onBars.to - onBars.from;
+  loopParts.bars.textContent = count ? `${count} ${count === 1 ? "bar" : "bars"} · ` : "";
+  loopParts.range.textContent = `${start}–${end}`;
+  if (!loopParts.bars.isConnected) dom.loopInfo.replaceChildren("↻ ", loopParts.bars, loopParts.range);
   dom.loopInfo.title = `Loop ${start} – ${end}${region.enabled ? "" : " (off)"}`;
   dom.loopInfo.classList.toggle("disabled", !region.enabled);
+}
+
+// The loop toolbar over the waveform: halving, doubling and moving need a
+// loop; the bar button shows whether one is on.
+export function renderLoopTools(region) {
+  for (const button of [dom.loopPrevPhrase, dom.loopHalve, dom.loopDouble, dom.loopNextPhrase]) {
+    button.disabled = !region;
+  }
+  dom.loopBar.setAttribute("aria-pressed", String(Boolean(region?.enabled)));
 }
 
 export function renderSpeedChips() {

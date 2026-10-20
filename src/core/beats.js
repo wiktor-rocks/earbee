@@ -319,6 +319,27 @@ export function visibleBeats(beats, start, end) {
   return { from: firstAfter(beats, start - 1e-9), to: firstAfter(beats, end) };
 }
 
+// A position this close before a beat counts as on it (a step lands
+// exactly on a beat, give or take rounding).
+const ON_BEAT = 1e-3;
+
+/**
+ * The bar and the beat in it at `time`, both counted from 1 (bar 1 starts
+ * at the first bar start), or null before the first bar, or without bars.
+ * For the waveform's legend ("Bar 5 · 3") and the ruler's bar numbers.
+ * @param {ArrayLike<number> | null} bars The bar starts, in order.
+ * @param {ArrayLike<number>} beats In order.
+ * @param {number} time
+ * @returns {{ bar: number, beat: number } | null}
+ */
+export function barBeatAt(bars, beats, time) {
+  if (!bars?.length) return null;
+  const bar = firstAfter(bars, time + ON_BEAT);
+  if (bar === 0) return null;
+  const beat = firstAfter(beats, time + ON_BEAT) - firstAfter(beats, bars[bar - 1] - ON_BEAT);
+  return { bar, beat: Math.max(1, beat) };
+}
+
 /**
  * When the beats play, on a clock (seconds), between clock times t0 and
  * t1: `from` and `to` are the track positions then, playing at `rate`. If

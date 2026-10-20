@@ -3,6 +3,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import {
+  barBeatAt,
   beatClockTimes,
   beatStep,
   gridTime,
@@ -177,6 +178,18 @@ describe("using the beats", () => {
     assert.deepEqual(visibleBeats(beats, 3, 4), { from: 4, to: 4 });
     assert.deepEqual(visibleBeats(beats, 0, 10), { from: 0, to: 4 });
     assert.deepEqual(visibleBeats(new Float64Array(0), 0, 10), { from: 0, to: 0 });
+  });
+
+  test("the bar and beat at a time", () => {
+    // A beat before the first bar (a pickup), then bars of two beats.
+    const times = Float64Array.from([0.5, 1, 1.5, 2, 2.5]);
+    const bars = Float64Array.from([1, 2]);
+    assert.equal(barBeatAt(bars, times, 0.7), null, "before the first bar");
+    assert.deepEqual(barBeatAt(bars, times, 1), { bar: 1, beat: 1 });
+    assert.deepEqual(barBeatAt(bars, times, 1.7), { bar: 1, beat: 2 });
+    assert.deepEqual(barBeatAt(bars, times, 1.9999), { bar: 2, beat: 1 }, "just before a bar counts as on it");
+    assert.deepEqual(barBeatAt(bars, times, 3), { bar: 2, beat: 2 });
+    assert.equal(barBeatAt(null, times, 1.5), null, "no bars (the simple finder)");
   });
 
   test("a step goes to the next or previous beat", () => {
