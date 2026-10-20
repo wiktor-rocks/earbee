@@ -53,7 +53,7 @@ When the owner asks for a test build of a branch (to try it before deciding, e.g
 
 1. Check out the branch; `git status --porcelain` prints nothing.
 2. `npm run build:linux` (a few minutes). It writes `dist/EarBee-<version>-linux-x86_64.AppImage`.
-3. Rename it after the branch, so it isn't taken for a release: `/` becomes `-`, e.g. `mv dist/EarBee-0.2.0-linux-x86_64.AppImage dist/EarBee-0.2.0-exp-beat-windows-x86_64.AppImage`.
+3. Rename it after the branch and the date and time of the build, so it isn't taken for a release and two builds of a branch can be told apart: `/` becomes `-`, then `YYYY-MM-DD-HHMM` (local time, `date +%Y-%m-%d-%H%M`), e.g. `mv dist/EarBee-0.2.0-linux-x86_64.AppImage dist/EarBee-0.2.0-exp-beat-windows-2026-10-20-1518-x86_64.AppImage`. An earlier build of the same branch stays; tell the owner it's there.
 4. Delete what the build leaves next to it: `rm -rf dist/linux-unpacked dist/builder-debug.yml`. Leave other files in `dist/` alone.
 5. Check it starts: `env -u ELECTRON_RUN_AS_NODE TB_APP_BINARY=$PWD/dist/<the AppImage> node tests/smoke.cjs` passes.
 6. Give the owner its path. It uses the same settings folder as the installed EarBee (`~/.config/EarBee`).

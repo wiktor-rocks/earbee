@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-20: Test builds named with their date and time (AGENTS.md)
+
+- **What:** a test build's file name now has the date and time it was built after the branch, e.g. `EarBee-0.2.0-exp-beat-windows-2026-10-20-1518-x86_64.AppImage`. A new build of a branch no longer replaces the earlier one.
+- **Why:** the owner asked for it: builds of the same branch had the same name, so which one was which (before or after a change) couldn't be seen.
+- **How:** step 3 of "Test builds" adds `YYYY-MM-DD-HHMM` (local time) to the name, and says an earlier build stays and is mentioned to the owner. The two test builds in `dist/` were renamed after their build times.
+- **Where:** `AGENTS.md` ("Test builds").
+- **Verified by:** `npm run format:check`.
+
 ## 2026-10-20: Editing the beats, and beats saved in projects (experiment `exp/beat-edits`)
 
 - **What:**
