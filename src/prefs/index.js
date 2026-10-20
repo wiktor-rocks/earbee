@@ -8,7 +8,8 @@ import { defineSection, normalizeAll } from "./fields.js";
 // Settings › General: app-wide choices. `notifications` turns the small
 // confirmations (ui/toast.js) on and off; problems always show in the
 // transport bar. `beatClick` plays a click on each found beat
-// (features/beats.js), to hear whether the beat lines sit on the beat.
+// (features/beats.js), to hear whether the beat lines sit on the beat;
+// it's set in the beats menu (the ♩ chip) or with Shift+B, not here.
 const generalSection = defineSection({
   id: "general",
   title: "General",
@@ -27,6 +28,7 @@ const generalSection = defineSection({
       label: "Click on each beat",
       help: "Once the beats are found (B), a click plays on each one, to hear whether they're right. Shift+B turns it on and off.",
       default: false,
+      inDialog: false,
     },
   ],
 });

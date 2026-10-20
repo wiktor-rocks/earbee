@@ -53,6 +53,7 @@ function beatEditsFrom(data) {
   const defaults = CONFIG.beats.edits;
   const max = CONFIG.beats.maxBarShift;
   return {
+    bars: typeof data?.bars === "boolean" ? data.bars : defaults.bars,
     steady: typeof data?.steady === "boolean" ? data.steady : defaults.steady,
     tempo: [0.5, 1, 2].includes(data?.tempo) ? data.tempo : defaults.tempo,
     subdivide: [1, 2, 3, 4].includes(data?.subdivide) ? data.subdivide : defaults.subdivide,

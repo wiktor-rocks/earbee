@@ -145,8 +145,8 @@ export const CONFIG = {
     snapPx: 8,
     snapKeyFraction: 0.25,
     // A project's edits to the beats found (core/beat-edits.js, the ♩ menu),
-    // as they start for a new track: the steady grid on, nothing else.
-    edits: { steady: true, tempo: 1, subdivide: 1, barShift: 0 },
+    // as they start for a new track: bars and the steady grid on, nothing else.
+    edits: { bars: true, steady: true, tempo: 1, subdivide: 1, barShift: 0 },
     // The steady grid: the local beat is the median gap over `periodBeats`
     // beats; a beat closer than `dropBelow` of it to the one before is a
     // stray; a gap within `fillTolerance` of a whole number of beats (up to

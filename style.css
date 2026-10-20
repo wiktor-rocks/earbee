@@ -1544,8 +1544,8 @@ body.dragging .welcome-hint {
   flex: 1;
 }
 
-/* The beats menu (features/beats.js), from ▾ by the ♩ chip: the edits
-   that are on are ticked, like the colour-theme menu's choice. */
+/* The beats menu (features/beats.js), from the ♩ chip: what's on is
+   ticked, like the colour-theme menu's choice. */
 .beat-menu {
   position-anchor: --beat-menu;
   min-width: 220px;
@@ -2483,13 +2483,6 @@ button.step-size:hover {
 .loop-info.disabled {
   border-color: var(--hairline);
   color: var(--muted);
-}
-
-/* ▾ by the ♩ chip: opens the beats menu. Never cut off; close to the chip. */
-.beat-menu-button {
-  flex: none;
-  margin-left: -3px;
-  padding: 4px 7px;
 }
 
 /* ---------- Marks sidebar ---------- */

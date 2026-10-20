@@ -46,6 +46,14 @@ describe("no edits", () => {
   });
 });
 
+test("bars off: no bar starts, all beats alike, nothing to shift", () => {
+  const raw = grid({ count: 16 });
+  const result = edit(raw, { bars: false, barShift: 1, tempo: 0.5 });
+  assert.equal(result.bars, null);
+  assert.equal(result.downbeat, null);
+  assert.equal(result.times.length, 8);
+});
+
 describe("steady grid", () => {
   test("fills a missing beat, and two in a row", () => {
     const raw = grid({ count: 40 });

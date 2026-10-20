@@ -484,18 +484,6 @@
           <div class="transport-chips">
             <button id="beatInfo" type="button" class="chip-button beat-info" hidden>♩ Find the beats</button>
             <button
-              id="beatMenuButton"
-              type="button"
-              class="chip-button beat-menu-button"
-              title="Edit the beats: steady grid, half or double time, subdivisions, bar starts"
-              aria-label="Edit the beats"
-              aria-haspopup="menu"
-              aria-expanded="false"
-              hidden
-            >
-              ▾
-            </button>
-            <button
               id="startPoint"
               type="button"
               class="chip-button start-point"
@@ -681,9 +669,22 @@
       </button>
     </div>
 
-    <!-- The beats menu (see features/beats.js), opened by ▾ next to the ♩
-         chip: this project's edits to the beats found. -->
+    <!-- The beats menu (see features/beats.js), opened by the ♩ chip once
+         the beats are found: the lines, the click, and this project's
+         edits to the beats. -->
     <div id="beatMenu" class="menu beat-menu" role="menu" aria-label="Beats" popover>
+      <button class="menu-item" type="button" role="menuitemcheckbox" data-shown>
+        <span class="menu-label">Show the beat lines</span>
+        <span class="menu-keys">B</span>
+      </button>
+      <button class="menu-item" type="button" role="menuitemcheckbox" data-click>
+        <span class="menu-label">Click on each beat</span>
+        <span class="menu-keys">Shift+B</span>
+      </button>
+      <hr />
+      <button class="menu-item" type="button" role="menuitemcheckbox" data-bars>
+        <span class="menu-label">Strong first beat of each bar</span>
+      </button>
       <button class="menu-item" type="button" role="menuitemcheckbox" data-steady>
         <span class="menu-label">Steady grid</span>
       </button>

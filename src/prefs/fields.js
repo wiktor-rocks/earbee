@@ -23,7 +23,9 @@
 //   folder   an absolute path, or null for the default. Only the main
 //            process sets one (its folder picker): the page can't send a
 //            path (`fromPage: false`).
-// Any field may have visibleWhen(values): shown only when it returns true.
+// Any field may have visibleWhen(values): shown only when it returns true;
+// and inDialog: false: kept like the others, but set elsewhere than the
+// Settings dialog (the beat click, in the beats menu).
 
 import { clamp } from "../core/format.js";
 
@@ -46,6 +48,7 @@ import { clamp } from "../core/format.js";
  * @property {number} [step] number
  * @property {string} [unit] number: shown after the value, e.g. "%"
  * @property {(values: Record<string, any>) => boolean} [visibleWhen]
+ * @property {boolean} [inDialog] false: not in the Settings dialog (set elsewhere).
  *
  * @typedef {object} Section
  * @property {string} id

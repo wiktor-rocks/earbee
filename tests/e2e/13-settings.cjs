@@ -96,6 +96,10 @@ module.exports = async function (h) {
   await js(`${notifySwitch}.click()`);
   await sleep(200);
   check("…and on again", saved().general.notifications === true);
+  check(
+    "the beat click isn't here: it's in the beats menu",
+    (await js(`${row("general", "beatClick")} === null`)) === true,
+  );
   await tab("theme");
   await sleep(100);
 

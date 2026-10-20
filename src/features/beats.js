@@ -15,16 +15,19 @@
  * Once found, they're drawn as faint lines over the waveform, the first
  * of each bar stronger (timeline.js); the chip shows the tempo; and the
  * step size becomes "1 beat", so ← / → go from beat to beat (or bar to
- * bar with "1 bar"; features/playback.js). The chip or B then shows or
- * hides the lines. A new file forgets them (resetBeats); a project saves
+ * bar with "1 bar"; features/playback.js). B then shows or hides the
+ * lines. A new file forgets them (resetBeats); a project saves
  * them and brings them back (restoreBeats; features/project/sections.js),
  * so they aren't looked for again.
  *
- * Editing them (the ▾ menu by the chip): what the finder found is kept as
+ * Once found, a click on the chip opens the beats menu: the lines shown or
+ * not, the beat click, and editing them. What the finder found is kept as
  * `beats.raw`, and the project's edits (core/beat-edits.js: a steady grid,
  * half or double time, bar starts moved, subdivisions) are applied to it
  * again whenever one changes (setBeatEdits). Everything else reads the
  * edited beats, so stepping, loops, snapping and the click follow.
+ * Turning bars off (no strong first beat) leaves the beats as the simple
+ * finder's are: all alike, no bar steps, \ loops a beat.
  *
  * The beat click (Settings › General, or Shift+B): while playing, a click
  * on each beat, higher on the first of each bar, to hear whether they're
@@ -411,7 +414,7 @@ export function toggleBeatClick() {
   );
 }
 
-/* ---------- The beats menu (▾ by the chip) ---------- */
+/* ---------- The beats menu (a click on the chip, once they're found) ---------- */
 
 // While it's open, the app's shortcuts wait (app.js), as for the File menu.
 export const isBeatMenuOpen = () => dom.beatMenu.matches(":popover-open");
@@ -419,33 +422,44 @@ export const isBeatMenuOpen = () => dom.beatMenu.matches(":popover-open");
 /** @param {string} selector */
 const menuItems = (selector) => /** @type {HTMLElement[]} */ ([...dom.beatMenu.querySelectorAll(selector)]);
 
-// The ▾ shows once there are beats (found or finding, so edits can be
-// chosen while the model fills in the rest); the items show the edits.
+// The items show what's on. The menu opens once there are beats (found,
+// or found so far, so edits can be chosen while the model fills in the rest).
 function renderBeatMenu() {
-  dom.beatMenuButton.hidden = beats.status !== "found";
-  if (dom.beatMenuButton.hidden && dom.beatMenu.matches(":popover-open")) dom.beatMenu.hidePopover();
+  if (beats.status !== "found" && isBeatMenuOpen()) dom.beatMenu.hidePopover();
   const { edits } = beats;
   const check = (item, on) => item.setAttribute("aria-checked", String(on));
+  for (const item of menuItems("[data-shown]")) check(item, beats.shown);
+  for (const item of menuItems("[data-click]")) check(item, Boolean(getPrefs("general")?.beatClick));
+  for (const item of menuItems("[data-bars]")) check(item, edits.bars);
   for (const item of menuItems("[data-steady]")) check(item, edits.steady);
   for (const item of menuItems("[data-tempo]")) check(item, Number(item.dataset.tempo) === edits.tempo);
   for (const item of menuItems("[data-subdivide]")) check(item, Number(item.dataset.subdivide) === edits.subdivide);
-  // Moving bar starts needs bars (the simple finder has none).
-  for (const item of menuItems("[data-bar-shift]")) item.hidden = !beats.raw?.bars;
+  // Bars need the model's bar starts (the simple finder has none); moving
+  // them, bars that are on.
+  for (const item of menuItems("[data-bars]")) item.hidden = !beats.raw?.bars;
+  for (const item of menuItems("[data-bar-shift]")) item.hidden = !beats.raw?.bars || !edits.bars;
 }
 
 function bindBeatMenu() {
   bindMenu({
     menu: dom.beatMenu,
-    buttons: () => [dom.beatMenuButton],
+    buttons: () => [dom.beatInfo],
     anchor: "--beat-menu",
     itemSelector: ".menu-item",
+    // Before the beats are found, the chip finds them (or stops) instead.
+    canOpen: () => beats.status === "found",
   });
   // The menu stays open while edits are tried, to hear and see each one.
   dom.beatMenu.addEventListener("click", (event) => {
     const item = /** @type {HTMLElement} */ (event.target).closest(".menu-item");
     if (!(item instanceof HTMLElement)) return;
-    const { steady, tempo, subdivide, barShift, findAgain: again } = item.dataset;
-    if (steady !== undefined) setBeatEdits({ steady: !beats.edits.steady });
+    const { shown, click, bars, steady, tempo, subdivide, barShift, findAgain: again } = item.dataset;
+    if (shown !== undefined) {
+      beats.shown = !beats.shown;
+      show();
+    } else if (click !== undefined) toggleBeatClick();
+    else if (bars !== undefined) setBeatEdits({ bars: !beats.edits.bars });
+    else if (steady !== undefined) setBeatEdits({ steady: !beats.edits.steady });
     else if (tempo)
       setBeatEdits({ tempo: Number(tempo) === beats.edits.tempo ? 1 : /** @type {0.5 | 2} */ (Number(tempo)) });
     else if (subdivide) setBeatEdits({ subdivide: /** @type {1 | 2 | 3 | 4} */ (Number(subdivide)) });
@@ -460,10 +474,15 @@ function bindBeatMenu() {
 }
 
 export function bindBeats() {
-  onClick(dom.beatInfo, beatsAction);
+  // The chip finds the beats, or stops finding them; once they're found,
+  // it opens the beats menu (bindBeatMenu). B still shows or hides them.
+  onClick(dom.beatInfo, () => beats.status !== "found" && beatsAction());
   bindBeatMenu();
   player.transport.on("state", updateClicks);
   player.transport.on("jump", rescheduleClicks);
   player.transport.on("loop", rescheduleClicks);
-  onPrefsChange("general", updateClicks);
+  onPrefsChange("general", () => {
+    updateClicks();
+    renderBeatMenu();
+  });
 }

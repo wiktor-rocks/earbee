@@ -2,7 +2,8 @@
 // finder gave is kept as it was, and these are worked out from it again
 // whenever an edit changes, so every edit can be undone. Pure.
 //
-// In order:
+// In order (bars may be turned off first: then all beats are alike, as
+// the simple finder's, and nothing below has bar starts to keep):
 //   1. a steady grid: beats crowded closer than a share of the local beat
 //      dropped (the model's stray extras), gaps of a whole number of
 //      beats filled, and stray bar starts dropped. The beat model can
@@ -20,6 +21,7 @@ import { medianGap } from "./beats.js";
 
 /**
  * @typedef {object} BeatEdits
+ * @property {boolean} bars Bar starts (a strong first beat) kept; false: none, all beats alike.
  * @property {boolean} steady
  * @property {0.5 | 1 | 2} tempo Half time, as found, or double time.
  * @property {1 | 2 | 3 | 4} subdivide Parts per beat (1: none).
@@ -36,7 +38,7 @@ import { medianGap } from "./beats.js";
  */
 
 /** @type {BeatEdits} */
-export const NO_EDITS = Object.freeze({ steady: false, tempo: 1, subdivide: 1, barShift: 0 });
+export const NO_EDITS = Object.freeze({ bars: true, steady: false, tempo: 1, subdivide: 1, barShift: 0 });
 
 /**
  * The beats with `edits` applied.
@@ -47,7 +49,7 @@ export const NO_EDITS = Object.freeze({ steady: false, tempo: 1, subdivide: 1, b
  * @returns {{ times: Float64Array, downbeat: Uint8Array | null, bars: Float64Array | null, subdivisions: Float64Array | null }}
  */
 export function applyBeatEdits(raw, edits, limits) {
-  const hasBars = Boolean(raw.bars?.length);
+  const hasBars = edits.bars !== false && Boolean(raw.bars?.length);
   let times = Array.from(raw.times);
   let down = downbeatFlags(times, hasBars ? raw.bars : []);
 

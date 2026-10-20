@@ -1,7 +1,8 @@
 /* =====================================================================
  * POPOVER MENUS
  * A [popover] menu opened by one or more buttons: the colour-theme menu
- * (features/settings.js) and the File menu (features/file-menu.js).
+ * (features/settings.js), the File menu (features/file-menu.js) and the
+ * beats menu (features/beats.js).
  * ===================================================================== */
 
 import { onClick } from "./dom.js";
@@ -15,8 +16,18 @@ import { onClick } from "./dom.js";
  * @param {() => void} [options.onOpen] Runs before it's shown.
  * @param {() => HTMLElement | null} [options.initialFocus] The item focused on opening (default: the first).
  * @param {boolean} [options.closeOnPick] Close when an item is clicked.
+ * @param {() => boolean} [options.canOpen] False: a click on the button does something else (not opening it).
  */
-export function bindMenu({ menu, buttons, anchor, itemSelector, onOpen, initialFocus, closeOnPick = false }) {
+export function bindMenu({
+  menu,
+  buttons,
+  anchor,
+  itemSelector,
+  onOpen,
+  initialFocus,
+  closeOnPick = false,
+  canOpen = () => true,
+}) {
   const isOpen = () => menu.matches(":popover-open");
   let opener = null; // the button that opened the menu
   const items = () => /** @type {HTMLElement[]} */ ([...menu.querySelectorAll(itemSelector)]);
@@ -26,6 +37,7 @@ export function bindMenu({ menu, buttons, anchor, itemSelector, onOpen, initialF
   // menu against it and keeps it there (a resized window, a flip near an edge).
   function openFrom(button) {
     if (isOpen()) return menu.hidePopover();
+    if (!canOpen()) return;
     for (const other of buttons()) other.style.removeProperty("anchor-name");
     button.style.setProperty("anchor-name", anchor);
     onOpen?.();
