@@ -16,8 +16,15 @@
  * of each bar stronger (timeline.js); the chip shows the tempo; and the
  * step size becomes "1 beat", so ← / → go from beat to beat (or bar to
  * bar with "1 bar"; features/playback.js). The chip or B then shows or
- * hides the lines. A new file forgets them (resetBeats); they aren't
- * saved in projects yet.
+ * hides the lines. A new file forgets them (resetBeats); a project saves
+ * them and brings them back (restoreBeats; features/project/sections.js),
+ * so they aren't looked for again.
+ *
+ * Editing them (the ▾ menu by the chip): what the finder found is kept as
+ * `beats.raw`, and the project's edits (core/beat-edits.js: a steady grid,
+ * half or double time, bar starts moved, subdivisions) are applied to it
+ * again whenever one changes (setBeatEdits). Everything else reads the
+ * edited beats, so stepping, loops, snapping and the click follow.
  *
  * The beat click (Settings › General, or Shift+B): while playing, a click
  * on each beat, higher on the first of each bar, to hear whether they're
@@ -35,10 +42,13 @@
 
 import { CONFIG } from "../config.js";
 import { beatLength, beats, player, settings } from "../context.js";
+import { applyBeatEdits } from "../core/beat-edits.js";
 import { beatsFromLogits, CHUNK, FPS, joinWindows, windowInput, windowStarts } from "../core/beat-this.js";
 import { beatClockTimes, medianGap, snapTo } from "../core/beats.js";
+import { createEmitter } from "../core/emitter.js";
 import { setStepSize } from "../ui/controls.js";
 import { dom, onClick, renderBeatInfo, showNotice } from "../ui/dom.js";
+import { bindMenu } from "../ui/menu.js";
 import { getPrefs, onPrefsChange, setPref } from "../ui/prefs.js";
 import { notify } from "../ui/toast.js";
 
@@ -56,6 +66,11 @@ const PREPARING = 0.25;
 let media = null; // the open track's, to read again
 let worker = null; // while preparing
 let search = 0; // counts searches; one that's no longer the latest stops
+let revision = 0; // counts the beats found or restored, for unsaved changes
+
+// "found": the beat model finished on its own, with nothing clicked, so
+// the project checks for unsaved changes (features/project/index.js).
+export const beatEvents = createEmitter();
 
 // Why finding them failed, by the worker's error kind (decode-worker.js).
 const FAILURES = {
@@ -70,8 +85,28 @@ function stopWorker() {
 }
 
 function show() {
-  player.timeline.setBeats(beats.shown ? beats.times : null, beats.downbeat);
+  const shown = beats.shown ? beats : null;
+  player.timeline.setBeats(shown?.times ?? null, beats.downbeat, shown?.subdivisions ?? null);
   renderBeatInfo();
+  renderBeatMenu();
+}
+
+// The edited beats from `beats.raw` and `beats.edits`.
+function applyEdits() {
+  const edited = applyBeatEdits(beats.raw, beats.edits, CONFIG.beats.steady);
+  Object.assign(beats, {
+    ...edited,
+    bpm: 60 / (medianGap(edited.times) ?? medianGap(beats.raw.times)),
+    barLength: edited.bars ? medianGap(edited.bars) : null,
+  });
+}
+
+// New beats, or new edits: everything that uses them follows.
+function refresh() {
+  if (settings.stepSize === "bar" && !beats.bars) setStepSize("beat");
+  show();
+  updateClicks();
+  rescheduleClicks();
 }
 
 /**
@@ -80,8 +115,7 @@ function show() {
  * @param {{ method: "model" | "simple", complete: boolean, name: string }} how
  */
 function take({ beats: times, downbeats = new Float64Array(0) }, { method, complete, name }) {
-  const gap = medianGap(times);
-  if (gap === null) {
+  if (medianGap(times) === null) {
     if (!complete) return; // nothing yet: keep going
     Object.assign(beats, { status: "none", complete: true });
     renderBeatInfo();
@@ -89,34 +123,66 @@ function take({ beats: times, downbeats = new Float64Array(0) }, { method, compl
     return;
   }
   const first = beats.status !== "found";
-  const bars = downbeats.length > 1 ? downbeats : null;
-  // Downbeats are beats (core/beat-this.js), and both are in order.
-  let downbeat = null;
-  if (bars) {
-    downbeat = new Uint8Array(times.length);
-    for (let i = 0, j = 0; i < times.length && j < bars.length;) {
-      if (times[i] === bars[j]) downbeat[i++] = (j++, 1);
-      else if (times[i] < bars[j]) i++;
-      else j++;
-    }
-  }
   Object.assign(beats, {
     status: "found",
-    times,
-    bpm: 60 / gap,
-    downbeat,
-    bars,
-    barLength: bars ? medianGap(bars) : null,
+    raw: { times, bars: downbeats.length > 1 ? downbeats : null },
     method,
     complete,
   });
+  if (complete) {
+    revision++;
+    beatEvents.emit("found");
+  }
+  applyEdits();
   if (first) {
     beats.shown = true;
     setStepSize("beat");
-  } else if (settings.stepSize === "bar" && !bars) setStepSize("beat");
-  show();
-  updateClicks();
-  rescheduleClicks();
+  }
+  refresh();
+}
+
+/**
+ * Changes some of the project's edits to the beats (the ▾ menu).
+ * @param {Partial<import("../core/beat-edits.js").BeatEdits>} changes
+ */
+export function setBeatEdits(changes) {
+  beats.edits = { ...beats.edits, ...changes };
+  if (beats.status !== "found") return renderBeatMenu();
+  applyEdits();
+  refresh();
+}
+
+/**
+ * Brings back beats a project saved (features/project/sections.js), as
+ * found, so they aren't looked for again.
+ * @param {{ times: Float64Array, bars: Float64Array | null, method: "model" | "simple", edits: import("../core/beat-edits.js").BeatEdits }} saved
+ */
+export function restoreBeats({ times, bars, method, edits }) {
+  stopWorker();
+  search++;
+  Object.assign(beats, {
+    status: "found",
+    progress: 1,
+    raw: { times, bars },
+    edits,
+    method,
+    complete: true,
+    shown: true,
+  });
+  revision++;
+  applyEdits();
+  refresh();
+}
+
+/**
+ * What a project saves of the beats: what was found and the edits, once
+ * all of it is found; null otherwise. `revision` changes with each new
+ * finding, so comparing it (and the edits) tells an unsaved change
+ * without comparing every beat.
+ */
+export function savedBeats() {
+  if (beats.status !== "found" || !beats.complete) return null;
+  return { revision, raw: beats.raw, method: beats.method, edits: beats.edits };
 }
 
 // The model, window by window from the cursor; the simple finder's answer
@@ -216,6 +282,9 @@ export function resetBeats(next) {
     downbeat: null,
     bars: null,
     barLength: null,
+    subdivisions: null,
+    raw: null,
+    edits: { ...CONFIG.beats.edits },
     method: null,
     complete: false,
     shown: true,
@@ -225,21 +294,43 @@ export function resetBeats(next) {
   updateClicks();
 }
 
+// "Find the beats again" (the ▾ menu): from scratch, keeping the edits.
+function findAgain() {
+  const { edits } = beats;
+  resetBeats(media);
+  beats.edits = edits;
+  find();
+}
+
 /* ---------- Snapping, and the grid for loops ---------- */
 
 const snapping = () => beats.status === "found" && beats.shown;
 
-/** A time set by a key ([ ] M R): onto a beat within a share of a beat. @param {number} time */
-export const snapToBeat = (time) =>
-  snapping() ? snapTo(beats.times, time, beatLength() * CONFIG.beats.snapKeyFraction) : time;
+// Onto the nearest beat or subdivision within `within` seconds.
+function snapToGrid(time, within) {
+  const onBeat = snapTo(beats.times, time, within);
+  const onPart = snapTo(beats.subdivisions, time, within);
+  if (onPart === time) return onBeat;
+  if (onBeat === time) return onPart;
+  return Math.abs(onPart - time) < Math.abs(onBeat - time) ? onPart : onBeat;
+}
 
 /**
- * A dragged time: onto a beat within CONFIG.beats.snapPx at this zoom.
+ * A time set by a key ([ ] M R): onto a beat (or subdivision) within a
+ * share of one.
+ * @param {number} time
+ */
+export const snapToBeat = (time) =>
+  snapping() ? snapToGrid(time, (beatLength() * CONFIG.beats.snapKeyFraction) / beats.edits.subdivide) : time;
+
+/**
+ * A dragged time: onto a beat (or subdivision) within CONFIG.beats.snapPx
+ * at this zoom.
  * @param {number} time
  * @param {number} pxPerSecond
  */
 export const snapForDrag = (time, pxPerSecond) =>
-  snapping() && pxPerSecond > 0 ? snapTo(beats.times, time, CONFIG.beats.snapPx / pxPerSecond) : time;
+  snapping() && pxPerSecond > 0 ? snapToGrid(time, CONFIG.beats.snapPx / pxPerSecond) : time;
 
 /**
  * The beats and bars, for looping by them (core/beats.js resizeLoop,
@@ -320,8 +411,54 @@ export function toggleBeatClick() {
   );
 }
 
+/* ---------- The beats menu (▾ by the chip) ---------- */
+
+/** @param {string} selector */
+const menuItems = (selector) => /** @type {HTMLElement[]} */ ([...dom.beatMenu.querySelectorAll(selector)]);
+
+// The ▾ shows once there are beats (found or finding, so edits can be
+// chosen while the model fills in the rest); the items show the edits.
+function renderBeatMenu() {
+  dom.beatMenuButton.hidden = beats.status !== "found";
+  if (dom.beatMenuButton.hidden && dom.beatMenu.matches(":popover-open")) dom.beatMenu.hidePopover();
+  const { edits } = beats;
+  const check = (item, on) => item.setAttribute("aria-checked", String(on));
+  for (const item of menuItems("[data-steady]")) check(item, edits.steady);
+  for (const item of menuItems("[data-tempo]")) check(item, Number(item.dataset.tempo) === edits.tempo);
+  for (const item of menuItems("[data-subdivide]")) check(item, Number(item.dataset.subdivide) === edits.subdivide);
+  // Moving bar starts needs bars (the simple finder has none).
+  for (const item of menuItems("[data-bar-shift]")) item.hidden = !beats.raw?.bars;
+}
+
+function bindBeatMenu() {
+  bindMenu({
+    menu: dom.beatMenu,
+    buttons: () => [dom.beatMenuButton],
+    anchor: "--beat-menu",
+    itemSelector: ".menu-item",
+  });
+  // The menu stays open while edits are tried, to hear and see each one.
+  dom.beatMenu.addEventListener("click", (event) => {
+    const item = /** @type {HTMLElement} */ (event.target).closest(".menu-item");
+    if (!(item instanceof HTMLElement)) return;
+    const { steady, tempo, subdivide, barShift, findAgain: again } = item.dataset;
+    if (steady !== undefined) setBeatEdits({ steady: !beats.edits.steady });
+    else if (tempo)
+      setBeatEdits({ tempo: Number(tempo) === beats.edits.tempo ? 1 : /** @type {0.5 | 2} */ (Number(tempo)) });
+    else if (subdivide) setBeatEdits({ subdivide: /** @type {1 | 2 | 3 | 4} */ (Number(subdivide)) });
+    else if (barShift) {
+      const max = CONFIG.beats.maxBarShift;
+      setBeatEdits({ barShift: Math.max(-max, Math.min(max, beats.edits.barShift + Number(barShift))) });
+    } else if (again !== undefined) {
+      dom.beatMenu.hidePopover();
+      findAgain();
+    }
+  });
+}
+
 export function bindBeats() {
   onClick(dom.beatInfo, beatsAction);
+  bindBeatMenu();
   player.transport.on("state", updateClicks);
   player.transport.on("jump", rescheduleClicks);
   player.transport.on("loop", rescheduleClicks);

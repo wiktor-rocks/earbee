@@ -69,6 +69,8 @@ export const dom = {
   stepForwardButton: /** @type {HTMLButtonElement} */ ($("stepForward")),
   stepSize: $("stepSize"),
   beatInfo: $("beatInfo"),
+  beatMenuButton: $("beatMenuButton"),
+  beatMenu: $("beatMenu"),
   startPointButton: $("startPoint"),
   stopPointButton: $("stopPoint"),
   speedChips: $("speedChips"),

@@ -484,6 +484,18 @@
           <div class="transport-chips">
             <button id="beatInfo" type="button" class="chip-button beat-info" hidden>♩ Find the beats</button>
             <button
+              id="beatMenuButton"
+              type="button"
+              class="chip-button beat-menu-button"
+              title="Edit the beats: steady grid, half or double time, subdivisions, bar starts"
+              aria-label="Edit the beats"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              hidden
+            >
+              ▾
+            </button>
+            <button
               id="startPoint"
               type="button"
               class="chip-button start-point"
@@ -666,6 +678,45 @@
       <button id="downloadButton" class="menu-item" type="button" role="menuitem" hidden>
         <svg class="icon" aria-hidden="true"><use href="#i-download" /></svg>
         <span class="menu-label">From YouTube…</span>
+      </button>
+    </div>
+
+    <!-- The beats menu (see features/beats.js), opened by ▾ next to the ♩
+         chip: this project's edits to the beats found. -->
+    <div id="beatMenu" class="menu beat-menu" role="menu" aria-label="Beats" popover>
+      <button class="menu-item" type="button" role="menuitemcheckbox" data-steady>
+        <span class="menu-label">Steady grid</span>
+      </button>
+      <hr />
+      <button class="menu-item" type="button" role="menuitemcheckbox" data-tempo="0.5">
+        <span class="menu-label">Half time</span>
+      </button>
+      <button class="menu-item" type="button" role="menuitemcheckbox" data-tempo="2">
+        <span class="menu-label">Double time</span>
+      </button>
+      <hr />
+      <button class="menu-item" type="button" role="menuitemradio" data-subdivide="1">
+        <span class="menu-label">No subdivisions</span>
+      </button>
+      <button class="menu-item" type="button" role="menuitemradio" data-subdivide="2">
+        <span class="menu-label">Halves</span>
+      </button>
+      <button class="menu-item" type="button" role="menuitemradio" data-subdivide="3">
+        <span class="menu-label">Thirds (triplets)</span>
+      </button>
+      <button class="menu-item" type="button" role="menuitemradio" data-subdivide="4">
+        <span class="menu-label">Quarters</span>
+      </button>
+      <hr />
+      <button class="menu-item" type="button" role="menuitem" data-bar-shift="-1">
+        <span class="menu-label">Bars start a beat earlier</span>
+      </button>
+      <button class="menu-item" type="button" role="menuitem" data-bar-shift="1">
+        <span class="menu-label">Bars start a beat later</span>
+      </button>
+      <hr />
+      <button class="menu-item" type="button" role="menuitem" data-find-again>
+        <span class="menu-label">Find the beats again</span>
       </button>
     </div>
 
