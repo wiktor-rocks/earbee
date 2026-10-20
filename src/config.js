@@ -144,6 +144,19 @@ export const CONFIG = {
     // within this share of a beat.
     snapPx: 8,
     snapKeyFraction: 0.25,
+    // A project's edits to the beats found (core/beat-edits.js, the ♩ menu),
+    // as they start for a new track: bars and the steady grid on, nothing else.
+    edits: { bars: true, steady: true, tempo: 1, subdivide: 1, barShift: 0 },
+    // The steady grid: the local beat is the median gap over `periodBeats`
+    // beats; a beat closer than `dropBelow` of it to the one before is a
+    // stray; a gap within `fillTolerance` of a whole number of beats (up to
+    // `maxFill`) is filled; a bar start closer than `barDropBelow` of the
+    // median bar to the one before isn't one.
+    steady: { periodBeats: 32, dropBelow: 0.6, fillTolerance: 0.2, maxFill: 16, barDropBelow: 0.6 },
+    // Subdivision lines (the ♩ menu) are hidden when closer than this.
+    minSubdivisionSpacingPx: 7,
+    // How far "Move bar start" can go, in beats, either way.
+    maxBarShift: 16,
     // Finding the beats: this many workers prepare the model's input
     // (audio/beat-worker.js), a window each, keeping ahead of the model.
     // More prepare faster, but share the CPU with the model, which uses 4

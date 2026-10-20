@@ -150,12 +150,16 @@ export function createTimeline({
   // either side. Hidden when zoomed out so far that they'd be a grey wash.
   let beats = null; // as last set by setBeats()
   let downbeat = null; // one flag per beat, or null
+  let subdivisions = null; // times between the beats, or null
   let beatsRendered = null; // { start, end, width }
+
+  // The average spacing of `times` in pixels at this zoom.
+  const spacingPx = (times, pxPerSecond) =>
+    times?.length > 1 ? ((times.at(-1) - times[0]) / (times.length - 1)) * pxPerSecond : 0;
 
   function renderBeats() {
     const pxPerSecond = view.duration && view.width ? view.width / view.duration : 0;
-    const spacing = beats?.length > 1 ? ((beats.at(-1) - beats[0]) / (beats.length - 1)) * pxPerSecond : 0;
-    if (spacing < CONFIG.beats.minSpacingPx) {
+    if (spacingPx(beats, pxPerSecond) < CONFIG.beats.minSpacingPx) {
       beatsRendered = null;
       beatsLayer.replaceChildren();
       return;
@@ -171,6 +175,13 @@ export function createTimeline({
     const fragment = document.createDocumentFragment();
     for (let i = from; i < to; i++) {
       element(downbeat?.[i] ? "guide-beat downbeat" : "guide-beat", fragment).style.left = percent(beats[i]);
+    }
+    // The subdivisions, once zoomed in far enough for them to stand apart.
+    if (spacingPx(subdivisions, pxPerSecond) >= CONFIG.beats.minSubdivisionSpacingPx) {
+      const parts = visibleBeats(subdivisions, beatsRendered.start, beatsRendered.end);
+      for (let i = parts.from; i < parts.to; i++) {
+        element("guide-beat subdivision", fragment).style.left = percent(subdivisions[i]);
+      }
     }
     beatsLayer.replaceChildren(fragment);
   }
@@ -479,13 +490,16 @@ export function createTimeline({
     },
     /**
      * The beats (seconds, in order), or null to hide them; `downbeats`
-     * flags the first beat of each bar, drawn stronger.
+     * flags the first beat of each bar, drawn stronger; `parts` are the
+     * subdivisions between them, drawn fainter.
      * @param {Float64Array | null} times
      * @param {Uint8Array | null} [downbeats]
+     * @param {Float64Array | null} [parts]
      */
-    setBeats(times, downbeats = null) {
+    setBeats(times, downbeats = null, parts = null) {
       beats = times;
       downbeat = downbeats;
+      subdivisions = parts;
       beatsRendered = null;
       renderBeats();
     },

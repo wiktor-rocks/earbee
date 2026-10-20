@@ -43,6 +43,175 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-20: Editing the beats, and beats saved in projects (experiment `exp/beat-edits`)
+
+- **What:**
+  - Once the beats are found, a click on the ♩ chip opens the beats menu:
+    - **Show the beat lines** (B);
+    - **Click on each beat** (Shift+B), moved here from Settings › General; still one setting for the whole app;
+    - **Strong first beat of each bar**: off gives no bars at all (all lines alike, no accent, no "1 bar" step, `\` loops a beat);
+    - **Steady grid**, on by default: stray extra beats dropped, gaps filled, so the beats don't waver between two tempos;
+    - **Half time**, **Double time**;
+    - **Subdivisions**: halves, thirds (triplets), quarters, as faint dashed lines that loop edges and marks snap to (never stepped or clicked);
+    - **Bars start a beat earlier / later**;
+    - **Find the beats again** (keeping the edits).
+  - While finding, a click on the chip no longer stops the search; only B does.
+  - Projects save the beats and the edits: reopening brings them back at once, without running the model, and the edits can still be undone. The step "1 beat" or "1 bar" now survives reopening.
+- **Why:**
+  - On a funk song (_Groove or Die_), the beat model counted everything in double time (a beat every 0.23 s; the song's is 0.46 s, 130 BPM), and around 0:08–0:14 it wavered between the two, so the lines looked wrong. Every other beat's score sat right at the model's threshold there.
+  - It isn't a porting bug: EarBee's beats matched the Python original's (602 of 602 within 20 ms).
+  - The full Beat This! model was measured too (`local/bench/model-compare.mjs`): 83 MB against 10.6 MB, about 1.7× slower, better on some songs, but also in double time on this one. So the small model stays, and choosing the tempo level is left to the user.
+  - The owner asked for beat editing as project settings, the menu on the chip itself, an option without strong beats, and the beat click in the beats menu.
+- **How:**
+  - `beats.raw` keeps what the finder found; `beats.edits` holds the project's edits; `applyBeatEdits` works the edited beats out again from both whenever an edit changes. Everything else (lines, stepping, loops, snapping, the click, the chip's tempo) reads the edited beats, unchanged.
+  - The steady grid takes the local beat as the median gap over 32 beats. Where that is about a whole multiple of the song's overall beat, the model counted that stretch at another level: it's brought to the song's level, so the grid fills there too. (On _Let There Be Rock_, the gaps off the grid went from 102 to 6.)
+  - Half time keeps the side (odd or even beats) most of the nearby bar starts fall on, so one bar of an odd length doesn't break the grid, and keeps every other bar, so a bar keeps its number of beats.
+  - A new project section, `beats`, saves the beats as found (to the ms) and the edits, before `playback`. Sections may now have a `dirtyKey()`, cheaper than `capture()`: the beats count as unsaved by a revision number and the edits, not by every beat. The model finishing in the background also checks for unsaved changes (`beatEvents`).
+  - Settings fields can be `inDialog: false`: kept like the others, set elsewhere (the beat click). `bindMenu` takes `canOpen()`, so the chip finds the beats before it opens the menu.
+  - The thresholds are in `CONFIG.beats.steady`, the defaults in `CONFIG.beats.edits`.
+- **Where:**
+  - `src/core/beat-edits.js` (new): `applyBeatEdits`, `steady`, `halfTime`, `doubleTime`;
+  - `src/features/beats.js` (`take`, `applyEdits`, `setBeatEdits`, `restoreBeats`, `savedBeats`, "The beats menu"), `src/context.js` (`beats.raw`, `edits`, `subdivisions`);
+  - `src/features/project/sections.js` (the `beats` section; `playback` keeps "beat" / "bar"), `src/features/project/index.js` (`dirtyKey`);
+  - `src/timeline.js` (subdivision lines), `src/ui/menu.js` (`canOpen`), `src/ui/dom.js`, `src/prefs/` (`inDialog`), `src/features/settings.js`, `src/config.js`, `index.html` (`#beatMenu`), `style.css`;
+  - `docs/glossary.md`, `README.md`.
+- **Verified by:**
+  - `npm test`: 289 unit (18 new in `tests/unit/beat-edits.test.mjs`, one on a fixture of the song's real beats, `tests/unit/fixtures/beats-double-time.json`), 489 e2e (new checks in topics 13, 16 and 20: the menu, every edit, snapping to subdivisions, saving and reopening beats), 28 smoke.
+  - The test AppImage's smoke test.
+  - The edits on the beats of six real songs (`local/bench/`): _Groove or Die_ gives 130 BPM with nothing off the grid, _Everlong_ is unchanged.
+  - Once, topic 20's simple-finder check stuck at "Finding the beats 0 %": the known flake, not reproduced in later runs.
+
+## 2026-10-19: The blog's first two posts, and "not freemium" under every post (the website)
+
+- **What:**
+  - Two posts:
+    - "Why transcribing music by ear makes you a better musician", at `/blog/why-transcribe-music-by-ear/`;
+    - "Easy songs to transcribe by ear: 8 to start hearing chords", at `/blog/easy-songs-to-transcribe/`. Each song comes with a way to work out its chords, never the chords themselves.
+
+    The two posts link to each other.
+
+  - Under every post, the EarBee box now says "No trial, no paid version, no account.", linked to the home page's "Free" section.
+  - Two new post ideas in `docs/blog.md`: 16 "how to learn a song by ear", and 17 "the importance of ear training drills".
+- **Why:** the blog had no posts.
+  - The owner wrote and rewrote the posts with an assistant.
+  - The keywords and wording come from the SEO tools' first analysis: people search "transcribing music by ear benefits" rather than "why transcribe songs", and "easy songs to transcribe" is the most-suggested search around the topic.
+  - The owner's rules for posts:
+    - describe EarBee in general terms (no exact ranges), so app changes don't outdate a post;
+    - always call it "a free, open-source player";
+    - no spoilers in song suggestions.
+  - The box line makes "free" unmistakable, so it isn't read as freemium.
+- **How:** the posts are Markdown with a `keyword:` in their headers. The box line is a `<p class="free-note">` in the post layout, styled small and muted under the buttons, with space before the phone note on phones.
+- **Where:**
+  - `site/blog/why-transcribe-music-by-ear.md`, `site/blog/easy-songs-to-transcribe.md`;
+  - `site/_includes/post.njk`, `site/style.css` (the "Blog" section, `.post-cta .free-note`);
+  - `docs/blog.md`.
+- **Verified by:**
+  - `node scripts/seo/check.cjs`: no errors; the two warnings are deliberate, since the first post's title and address leave out "benefits".
+  - `npm run check`.
+  - A clean `eleventy` build into a temporary folder: both posts and the feed.
+  - Screenshots of the post box in light, dark and at 390 px wide. A real phone wasn't checked.
+
+## 2026-10-19: SEO tools for the website, in one removable folder
+
+- **What:** three commands for analysing the website for search engines.
+  - `node scripts/seo/check.cjs` checks every page, drafts included: title and description lengths, canonical links, one `<h1>`, internal links and `#parts` (and no published page linking to a draft), the share picture, structured data. For posts, it also checks the keyword's use, duplicate keywords, heading levels, alt text, picture sizes, length, and the sitemap and feed.
+  - `node scripts/seo/keywords.cjs <post>` collects Google's search suggestions around a post's keyword and marks which ones the post answers.
+  - `node scripts/seo/console.cjs` reads Search Console: the searches per page, and what's worth acting on.
+
+  A new header field, `keyword:`, names the search a post aims at. A new workflow, "SEO", runs the check on pushes that touch the site.
+
+- **Why:** the owner wants posts analysed for SEO automatically, from free sources only. The tools are kept in one place so they can be removed without touching anything else.
+- **How:**
+  - Node's built-ins only, so there's no new dependency. The check builds a temporary copy of `site/` with its drafts made public, so the real site is never written.
+  - It exits with 1 only for an error on a published page.
+  - The suggestions come from Google's unofficial suggestion endpoint: about 60 requests, 300 ms apart, cached for 7 days in `local/seo/cache/`, and the run stops at the first refusal.
+  - Search Console is read with a service account's key (`local/seo/service-account.json`), signed into a token with `node:crypto`.
+  - Words are compared loosely (stop words dropped, common endings removed).
+  - Reports go to `local/seo/`.
+  - The assistant's analysis procedure, the Search Console setup and how to remove the tools are in the folder's README.
+- **Where:**
+  - `scripts/seo/`: `lib.cjs`, `check.cjs`, `keywords.cjs`, `console.cjs`, `README.md`;
+  - `.github/workflows/seo.yml`;
+  - one line in `AGENTS.md`;
+  - `keyword:` in `site/blog/why-transcribe-music-by-ear.md`.
+- **Verified by:**
+  - `check.cjs` on the site: no errors, and `site/` unchanged.
+  - Two deliberately broken posts (a draft, and a published post without a keyword) gave every expected `✗` and `!`, and exit code 1 for the published one.
+  - `keywords.cjs` on the first post: 60 searches, 14 suggestions with coverage. A rerun came entirely from the cache, and with no network it stopped with a clear message.
+  - `console.cjs` without a key prints the setup steps. Its signed token was checked against a throwaway key and a local fake token server; the real API call is untested until the owner has a key.
+  - `npm run check`.
+
+## 2026-10-19: The home page's title and description fit search results (the website)
+
+- **What:** the home page's title is "EarBee: a free app for learning songs by ear" (was "EarBee: learn songs by ear"); its description is "A free desktop app for transcribing music: slow it down without changing the pitch, find the beats, loop the hard bar. Windows, macOS, Linux." (141 characters, was 203).
+- **Why:** Google cuts a description at about 155 characters and social previews at fewer, so the end of the old one was never seen. The title had room for more of what people search for (an opengraph.xyz check found both).
+- **How:** the header of `site/index.html`. The same words go to the `<title>`, the `og:` tags and the `SoftwareApplication` data, which read them from there.
+- **Where:** `site/index.html`.
+- **Verified by:** `npm run check`; `npm --prefix site run build`, whose home page carries the new title and description.
+
+## 2026-10-19: A share picture that every site shows (the website)
+
+- **What:** when a page of earbee.org is shared (Reddit, Facebook, LinkedIn, forums, chat apps), the preview shows a 1200×630 JPEG of the app instead of the 1280×800 WebP screenshot.
+- **Why:** 1200×630 is the size these sites expect, so it isn't cropped; and some (LinkedIn, some chat apps) show no picture at all for a WebP.
+- **How:** `site/img/share.jpg` is the dark screenshot scaled to 630 px high, with sides in the app's background colour (the ffmpeg command is in `site/README.md`). `site.json`'s `image`, the default for every page, points to it. The blog guide now suggests JPEG or PNG for a post's own share picture.
+- **Where:** `site/img/share.jpg`, `site/_data/site.json`, `site/README.md`, `docs/blog.md`.
+- **Verified by:** `npm run check`; `npm --prefix site run build`, whose pages name `https://earbee.org/img/share.jpg` as `og:image`.
+
+## 2026-10-19: Reminders at the start of every session (AGENTS.md)
+
+- **What:** at the start of every session, before answering the owner's first message (whatever it is), an assistant shows the items in the "Reminders" section of `local/SCRATCHPAD.md`, word for word.
+- **Why:** the owner wants to be reminded of certain things in the next session, whatever they write to the assistant first.
+- **How:** a section at the top of AGENTS.md, which every session loads (CLAUDE.md includes it). Missing file or empty section: nothing is said. The scratchpad is the owner's alone: assistants read it but never change it, even when asked; they suggest, and the owner writes. So "Ending a session" now puts loose ideas in the summary instead of the scratchpad.
+- **Where:** `AGENTS.md` ("First, in every session", and "Read first", item 0); the section itself is in `local/SCRATCHPAD.md` (on this computer only).
+- **Verified by:** `npm run format:check`.
+
+## 2026-10-19: A blog on earbee.org (the website, built with Eleventy)
+
+- **What:** the website has a blog at earbee.org/blog/.
+  - Posts are Markdown files; one with `draft: true` shows in the preview only.
+  - New pages: the blog's own page, an RSS feed (`/blog/feed.xml`), a sitemap, `robots.txt` and a "page not found" page.
+  - Every page gets its own title, description, canonical address and social-sharing tags. The home page also carries `SoftwareApplication` data, and each post `BlogPosting` data, for search engines.
+  - The top bar is now Blog, Download, GitHub and the theme switch. The footer links to the blog and its feed.
+  - Links to the website point at earbee.org instead of the github.io address.
+  - A guide for the owner, `docs/blog.md`: writing, publishing and changing posts, writing posts that rank, post ideas, Google Search Console and Bing, troubleshooting, and moving to another server.
+  - No posts yet: the placeholder post was removed before the merge.
+- **Why:** the owner wants search traffic. The blog waited for a custom domain (now earbee.org), so published addresses never change.
+- **How:**
+  - `site/` is a small Eleventy project with its own `package.json`, apart from the app's. The build doesn't install Electron or ONNX Runtime.
+  - The home page's content stays in `index.html`. Its head, top bar and footer moved to `_includes/base.njk`, shared by every page; addresses there start with `/`, so they work from `/blog/<post>/`.
+  - Posts are plain Markdown (no Nunjucks), so braces in them stay text. Their address, `/blog/<file name>/`, is computed in `blog/blog.11tydata.js`; a template string isn't filled in there.
+  - Drafts are left out of `npm run build` by a preprocessor. `_site/` is ignored as input, in case a build was sent elsewhere with `--output`.
+  - `pages.yml` now builds the site and publishes `site/_site`. CI has a `site` job that builds it on every push, so a broken post shows up before `main`.
+  - Small-phone top bar: tighter under 400 px; Blog hides under 350 px and GitHub under 600 px.
+- **Where:**
+  - the site: `site/package.json`, `site/eleventy.config.js`, `site/_data/site.json`, `site/_includes/base.njk` and `post.njk`, `site/blog.njk`, `site/blog/blog.11tydata.js`, `site/sitemap.njk`, `site/robots.txt`, `site/404.md`, `site/index.html`, and `site/style.css` ("Blog", "Narrower screens");
+  - the workflows: `.github/workflows/pages.yml`, `ci.yml`;
+  - housekeeping: `.gitignore`, `.prettierignore`, `eslint.config.js`;
+  - the docs: `docs/blog.md`, `site/README.md`, `docs/maintaining.md`, `README.md`, `AGENTS.md`;
+  - earbee.org links: `package.json`, `.github/ISSUE_TEMPLATE/config.yml`.
+- **Verified by:**
+  - screenshots at 1280 and 390 px, dark and light: the home page is unchanged apart from the top bar and the footer, and the blog page, a post and the 404 page look right;
+  - the top bar measured from 430 down to 320 px: no overflow;
+  - a production build with a test post: valid feed and sitemap XML, the JSON-LD parses, drafts are left out, and braces and `\\` come out right;
+  - the guide's post template and picture command, followed as written;
+  - `npm run check`, CI (check and site) on `exp/blog`, and `npm test` after the merge.
+
+## 2026-10-18: An end-of-session routine (AGENTS.md)
+
+- **What:** AGENTS.md has an "Ending a session" section: what an assistant does when the owner says they're done. Stop what's running, put back temporary changes, commit finished work (and decide with the owner about unfinished work), push, tidy up, update `local/FOR-TOMORROW.md`, leave the working copy on `testing`, and sum up.
+- **Why:** the owner wants each session to end in a clean, known state for the next one. "Read first" already covered the start of a session. During this one, temporary timing code had to be found and reverted, a commit stayed unpushed overnight, FOR-TOMORROW.md fell behind, and a build left by-products in `dist/`.
+- **How:** eight short steps, each with its check where there is one (`git status`, `git status -sb`). No `git stash`, which is easy to forget. Unfinished work on `testing` is the owner's call: a new experiment branch, or left uncommitted and noted in FOR-TOMORROW.md.
+- **Where:** `AGENTS.md` ("Ending a session", at the end).
+- **Verified by:** `npm run format:check`; followed for the first time at the end of this session.
+
+## 2026-10-18: How to make a test build (AGENTS.md)
+
+- **What:** AGENTS.md has a "Test builds" section: when the owner asks for a test build of a branch, make an AppImage, named after the branch, with the build's by-products removed and the smoke test run on it.
+- **Why:** asked for a test build of `exp/beat-windows`, an assistant made an unpacked build (`npm run build:dir`, the only build AGENTS.md listed) when an AppImage was wanted.
+- **How:** six steps: a clean checkout, `npm run build:linux`, renaming the file (`EarBee-<version>-<branch>-x86_64.AppImage`, so it isn't taken for a release), deleting `dist/linux-unpacked` and `dist/builder-debug.yml`, the smoke test against the AppImage (`TB_APP_BINARY`), and giving the owner its path. It also says `build:dir` is for testing a packaged build, not for trying one, and that Windows and Mac test builds aren't set up yet.
+- **Where:** `AGENTS.md` ("Test builds").
+- **Verified by:** the steps were followed for `exp/beat-windows` (the smoke test passed, 28 checks); `npm run format:check`.
+
 ## 2026-10-18: Commit messages without trailer lines
 
 - **What:** AGENTS.md now says a commit message is one short line and nothing else: no `Co-Authored-By` or other trailer lines, even where an assistant's tool adds them by default.

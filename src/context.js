@@ -32,6 +32,10 @@ export const marks = createMarks({ minSeconds: CONFIG.marks.minSeconds });
 // `method`, which finder found them; `complete`, false while the beat
 // model is still filling in the rest of the track (`progress` goes on).
 // `shown`: whether their lines are drawn. A new file starts idle.
+// All of these are the beats as edited: `raw` is what the finder found
+// (beats and bar starts), which a project saves, and `edits` the
+// project's edits to it (core/beat-edits.js: steady grid, half or double
+// time, bar starts moved, `subdivisions` between the beats).
 export const beats = {
   status: /** @type {"idle" | "finding" | "found" | "none"} */ ("idle"),
   progress: 0,
@@ -40,6 +44,9 @@ export const beats = {
   downbeat: /** @type {Uint8Array | null} */ (null),
   bars: /** @type {Float64Array | null} */ (null),
   barLength: /** @type {number | null} */ (null),
+  subdivisions: /** @type {Float64Array | null} */ (null),
+  raw: /** @type {{ times: Float64Array, bars: Float64Array | null } | null} */ (null),
+  edits: /** @type {import("./core/beat-edits.js").BeatEdits} */ ({ ...CONFIG.beats.edits }),
   method: /** @type {"model" | "simple" | null} */ (null),
   complete: false,
   shown: true,

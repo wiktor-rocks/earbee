@@ -51,14 +51,16 @@ function buildPanel(section) {
   panel.setAttribute("aria-labelledby", `settings-tab-${section.id}`);
   const show = (values) => fields.forEach((field) => field.update(values));
   const refresh = () => show(getPrefs(section.id));
-  const fields = section.fields.map((field) =>
-    renderField(field, {
-      set: (value) => attempt(() => setPref(section.id, field.key, value), refresh),
-      reset: () => attempt(() => resetPref(section.id, field.key), refresh),
-      chooseFolder: () => attempt(() => chooseFolder(section.id, field.key), refresh),
-      defaultPath: defaultPaths[`${section.id}.${field.key}`],
-    }),
-  );
+  const fields = section.fields
+    .filter((field) => field.inDialog !== false)
+    .map((field) =>
+      renderField(field, {
+        set: (value) => attempt(() => setPref(section.id, field.key, value), refresh),
+        reset: () => attempt(() => resetPref(section.id, field.key), refresh),
+        chooseFolder: () => attempt(() => chooseFolder(section.id, field.key), refresh),
+        defaultPath: defaultPaths[`${section.id}.${field.key}`],
+      }),
+    );
   panel.append(...fields.map((field) => field.element));
   refresh();
   onPrefsChange(section.id, show);

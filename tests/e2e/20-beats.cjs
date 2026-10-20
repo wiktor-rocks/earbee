@@ -55,6 +55,13 @@ module.exports = async function (h) {
   check("no beat lines yet", (await lines()) === 0);
 
   key("B");
+  await sleep(50);
+  await js(`document.getElementById("beatInfo").click()`);
+  await sleep(50);
+  c = await chip();
+  check("a click on the chip while finding doesn't stop it", /Finding|BPM/.test(c.text), JSON.stringify(c));
+  // If the first beats were in already, the click opened the menu instead.
+  await js(`(m => m.matches(":popover-open") && m.hidePopover())(document.getElementById("beatMenu"))`);
   c = await found();
   check("B finds 120 BPM", c.text === "♩ 120 BPM", JSON.stringify(c));
   check("…by the beat model", c.title.includes("Found by the beat model"), c.title);
@@ -184,9 +191,83 @@ module.exports = async function (h) {
   await sleep(50);
   c = await chip();
   check("B again hides the lines, chip dimmed", (await lines()) === 0 && c.disabled, JSON.stringify(c));
-  await js(`document.getElementById("beatInfo").click()`);
+  key("B");
   await sleep(50);
-  check("a click on the chip shows them again", (await lines()) === count && !(await chip()).disabled);
+  check("B shows them again", (await lines()) === count && !(await chip()).disabled);
+
+  // The beats menu (a click on the chip, once found): the lines, the
+  // click, and this project's edits to the beats.
+  const menuOpen = () => js(`document.getElementById("beatMenu").matches(":popover-open")`);
+  const pick = async (selector) => {
+    await js(`document.querySelector('#beatMenu ${selector}').click()`);
+    await sleep(100);
+  };
+  const ticked = (selector) => js(`document.querySelector('#beatMenu ${selector}').getAttribute("aria-checked")`);
+  const subdivisionLines = () => js(`document.querySelectorAll(".guide-beat.subdivision").length`);
+  await js(`document.getElementById("beatInfo").click()`);
+  await sleep(100);
+  check("a click on the chip opens the beats menu", await menuOpen());
+  check(
+    "…with the lines shown, bars and the steady grid on, no click",
+    (await ticked("[data-shown]")) === "true" &&
+      (await ticked("[data-bars]")) === "true" &&
+      (await ticked("[data-steady]")) === "true" &&
+      (await ticked("[data-click]")) === "false",
+  );
+  await pick("[data-shown]");
+  check("Show the beat lines: off hides them", (await lines()) === 0 && (await chip()).disabled);
+  await pick("[data-shown]");
+  check("…on shows them", (await lines()) === count);
+  await pick("[data-click]");
+  check("Click on each beat: turns the beat click on", prefsStore.get("general").beatClick === true);
+  check("…ticked", (await ticked("[data-click]")) === "true");
+  await pick("[data-click]");
+  check("…and off", prefsStore.get("general").beatClick === false);
+  await pick("[data-bars]");
+  check(
+    "Strong first beat off: no bar lines, all beats alike",
+    (await downbeatTimes()).length === 0 && (await lines()) === count,
+  );
+  check("…and nothing to move bars by", await js(`document.querySelector('#beatMenu [data-bar-shift]').hidden`));
+  await pick("[data-bars]");
+  check("…on again: the bars are back", (await downbeatTimes()).length === bars.length);
+  await pick('[data-tempo="0.5"]');
+  c = await chip();
+  check("Half time: 60 BPM", c.text === "♩ 60 BPM", JSON.stringify(c));
+  check("…half the lines", Math.abs((await lines()) - count / 2) <= 1, await lines());
+  check("…ticked, and the menu stays open", (await ticked('[data-tempo="0.5"]')) === "true" && (await menuOpen()));
+  await pick('[data-tempo="0.5"]');
+  check("Half time again: back to 120 BPM", (await chip()).text === "♩ 120 BPM", (await chip()).text);
+  await pick('[data-tempo="2"]');
+  check("Double time: 240 BPM", (await chip()).text === "♩ 240 BPM", (await chip()).text);
+  await pick('[data-tempo="2"]');
+  await pick('[data-bar-shift="1"]');
+  const later = await downbeatTimes();
+  check(
+    "Bars start a beat later",
+    later.length >= 9 && later.every((time) => near((time - 0.75) % 2, 0) || near((time - 0.75) % 2, 2)),
+    JSON.stringify(later.map((time) => time.toFixed(2))),
+  );
+  await pick('[data-bar-shift="-1"]');
+  check("…and earlier again", near((await downbeatTimes())[0], bars[0]), JSON.stringify(await downbeatTimes()));
+  await pick('[data-subdivide="2"]');
+  check("Halves: a line between each two beats", Math.abs((await subdivisionLines()) - (count - 1)) <= 1);
+  check(
+    "…ticked",
+    (await ticked('[data-subdivide="2"]')) === "true" && (await ticked('[data-subdivide="1"]')) === "false",
+  );
+  key("Escape");
+  await sleep(100);
+  check("Escape closes the menu", !(await menuOpen()));
+  await drag(4.48, 6.03, ["shift"]);
+  check("a Shift+drag snaps onto subdivisions too", await loopIs(4.51, 6.01), JSON.stringify(await loopRange()));
+  key("L", ["shift"]);
+  await js(`document.getElementById("beatInfo").click()`);
+  await sleep(100);
+  await pick('[data-subdivide="1"]');
+  check("No subdivisions: their lines go", (await subdivisionLines()) === 0);
+  key("Escape");
+  await sleep(100);
 
   // Shift+B: the beat click (Settings › General) on, through a short play, and off.
   await clearToasts();

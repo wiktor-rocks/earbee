@@ -1,5 +1,6 @@
 node_modules/
 dist/
+site/_site/
 src/vendor/
 tests/fixtures/
 tests/output/

@@ -1,0 +1,48 @@
+---
+layout: base.njk
+schema: post
+---
+{#- A blog post (blog/*.md): its title, date and reading time, the post,
+    then a box about EarBee with a download button (download.js points it
+    at the visitor's system). -#}
+<article class="post">
+  <header class="post-head">
+    <p class="post-meta">
+      <a href="/blog/">Blog</a> ·
+      <time datetime="{{ page.date | isoDate }}">{{ page.date | readableDate }}</time>
+      {%- if updated %} · updated <time datetime="{{ updated | isoDate }}">{{ updated | readableDate }}</time>{% endif %}
+      · {{ content | readingTime }}
+    </p>
+    <h1>{{ title }}</h1>
+    {%- if draft %}
+    <p class="draft-note">Draft: shown in the preview only, not published.</p>
+    {%- endif %}
+  </header>
+
+  <div class="post-body">
+{{ content | safe }}
+  </div>
+
+  <aside class="post-cta">
+    <img src="/img/logo.webp" alt="" width="64" height="61" />
+    <div>
+      <p>
+        <strong>EarBee</strong> is a free, open-source player for learning songs by ear: slow a song down without
+        changing its pitch, find the beats and bars, and loop the hard bar.
+      </p>
+      <div class="cta">
+        <a class="button primary" data-link="mine" href="/#download">
+          <span data-label="mine">Download</span>
+          <small data-size="mine"></small>
+        </a>
+        <a class="button quiet" href="/">See what it does</a>
+      </div>
+      {#- So "free" isn't read as freemium: the home page's "Free" section says the rest. #}
+      <p class="free-note"><a href="/#free">No trial, no paid version, no account.</a></p>
+      <p class="phone-note">
+        <strong>EarBee is a desktop app</strong> for Windows, macOS and Linux. Open this page on a computer to
+        download it.
+      </p>
+    </div>
+  </aside>
+</article>

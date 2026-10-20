@@ -669,13 +669,65 @@
       </button>
     </div>
 
+    <!-- The beats menu (see features/beats.js), opened by the ♩ chip once
+         the beats are found: the lines, the click, and this project's
+         edits to the beats. -->
+    <div id="beatMenu" class="menu beat-menu" role="menu" aria-label="Beats" popover>
+      <button class="menu-item" type="button" role="menuitemcheckbox" data-shown>
+        <span class="menu-label">Show the beat lines</span>
+        <span class="menu-keys">B</span>
+      </button>
+      <button class="menu-item" type="button" role="menuitemcheckbox" data-click>
+        <span class="menu-label">Click on each beat</span>
+        <span class="menu-keys">Shift+B</span>
+      </button>
+      <hr />
+      <button class="menu-item" type="button" role="menuitemcheckbox" data-bars>
+        <span class="menu-label">Strong first beat of each bar</span>
+      </button>
+      <button class="menu-item" type="button" role="menuitemcheckbox" data-steady>
+        <span class="menu-label">Steady grid</span>
+      </button>
+      <hr />
+      <button class="menu-item" type="button" role="menuitemcheckbox" data-tempo="0.5">
+        <span class="menu-label">Half time</span>
+      </button>
+      <button class="menu-item" type="button" role="menuitemcheckbox" data-tempo="2">
+        <span class="menu-label">Double time</span>
+      </button>
+      <hr />
+      <button class="menu-item" type="button" role="menuitemradio" data-subdivide="1">
+        <span class="menu-label">No subdivisions</span>
+      </button>
+      <button class="menu-item" type="button" role="menuitemradio" data-subdivide="2">
+        <span class="menu-label">Halves</span>
+      </button>
+      <button class="menu-item" type="button" role="menuitemradio" data-subdivide="3">
+        <span class="menu-label">Thirds (triplets)</span>
+      </button>
+      <button class="menu-item" type="button" role="menuitemradio" data-subdivide="4">
+        <span class="menu-label">Quarters</span>
+      </button>
+      <hr />
+      <button class="menu-item" type="button" role="menuitem" data-bar-shift="-1">
+        <span class="menu-label">Bars start a beat earlier</span>
+      </button>
+      <button class="menu-item" type="button" role="menuitem" data-bar-shift="1">
+        <span class="menu-label">Bars start a beat later</span>
+      </button>
+      <hr />
+      <button class="menu-item" type="button" role="menuitem" data-find-again>
+        <span class="menu-label">Find the beats again</span>
+      </button>
+    </div>
+
     <!-- Save project as (see saveProjectAs in features/project/index.js):
          link to the media or put it inside. -->
     <dialog id="saveDialog" class="download-dialog" aria-labelledby="saveTitle">
       <form id="saveForm" class="download-form">
         <h2 id="saveTitle">Save project</h2>
         <p class="download-note">
-          A project keeps the marks, the speed, pitch, volume and EQ, the loop, and where you were, for
+          A project keeps the marks, the speed, pitch, volume and EQ, the loop, the beats, and where you were, for
           <span id="saveMediaName" class="download-folder"></span>.
         </p>
         <fieldset class="download-kind save-mode">

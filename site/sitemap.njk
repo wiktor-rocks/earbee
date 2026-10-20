@@ -1,0 +1,19 @@
+---
+permalink: /sitemap.xml
+eleventyExcludeFromCollections: true
+---
+{#- Every page (not the feed), for search engines; robots.txt points to it. A page with
+    `sitemap: false` in its header (the 404 page) is left out. -#}
+<?xml version="1.0" encoding="utf-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+{%- for item in collections.all %}
+{%- if item.data.sitemap !== false and (item.outputPath or "").endsWith(".html") %}
+  <url>
+    <loc>{{ item.url | absolute }}</loc>
+    {%- if "posts" in (item.data.tags or []) %}
+    <lastmod>{{ (item.data.updated or item.date) | isoDate }}</lastmod>
+    {%- endif %}
+  </url>
+{%- endif %}
+{%- endfor %}
+</urlset>

@@ -5,7 +5,7 @@
   "description": "A music-transcription player: slow down, pitch-shift, EQ and loop songs and videos, and step through them with the keyboard.",
   "author": "Wiktor Wieczorkiewicz",
   "license": "MIT",
-  "homepage": "https://wiktor-rocks.github.io/earbee/",
+  "homepage": "https://earbee.org/",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/wiktor-rocks/earbee.git"

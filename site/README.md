@@ -1,11 +1,24 @@
-# The landing page
+# The website
 
-EarBee's page for GitHub Pages: plain HTML, CSS and one script, with no
-build step. Open `index.html` in a browser to see it.
+earbee.org: the landing page and the blog, built with
+[Eleventy](https://www.11ty.dev). This folder is its own small project, with
+its own `package.json`, apart from the app's.
 
-**Publishing.** `.github/workflows/pages.yml` publishes this folder whenever
-it changes on `main`. Once, in the repository on GitHub, set Settings › Pages ›
-Source to **GitHub Actions**.
+```sh
+npm install      # once
+npm start        # a preview at http://localhost:8080, rebuilt on every save
+npm run build    # the site, into _site/ (as GitHub builds it)
+```
+
+**The blog,** and everything about writing, publishing and looking after
+posts: [docs/blog.md](../docs/blog.md). It also explains the layout files
+(`_includes/`), the site's data (`_data/site.json`) and what to do when
+something goes wrong.
+
+**Publishing.** `.github/workflows/pages.yml` builds this folder and
+publishes `_site/` whenever `site/` changes on `main`. Once, in the repository
+on GitHub, set Settings › Pages › Source to **GitHub Actions**, and the custom
+domain to earbee.org.
 
 **Downloads.** At the top of `download.js`:
 
@@ -20,8 +33,10 @@ instead.
 
 **Files**
 
-- `index.html`: the page; `style.css`: its look, in the app's own colours
-  (EarBee, or EarBee Light on a light system).
+- `index.html`: the home page's content; the head, the top bar and the
+  footer are in `_includes/base.njk`, shared with the blog. `style.css`: the
+  look of every page, in the app's own colours (EarBee, or EarBee Light on a
+  light system).
 - `fonts/`: Righteous and Nunito, the app's fonts (from `node_modules/@fontsource*`).
 - `img/logo.webp`: the bee, from `assets/`; `img/favicon.png`: from
   `assets/icon-512.png`.
@@ -33,6 +48,11 @@ instead.
   loudness waveform; the page shows the one for its mode (`download.js`,
   `showModeMedia`). All are recorded from the app by
   `scripts/record-site-media.cjs`.
+- `img/share.jpg` (1200×630): the picture social sites show when a page is
+  shared (`site.json`'s `image`). It's `screenshot-dark.webp` with dark sides,
+  a JPEG because some sites (LinkedIn) don't show WebP there. After recording
+  again, make it again:
+  `ffmpeg -i img/screenshot-dark.webp -vf "scale=-2:630:flags=lanczos,pad=1200:630:(ow-iw)/2:0:color=0x0d0f13" -q:v 3 img/share.jpg`
 
 **The demos.** The demo file is a stock concert video with music under it:
 
@@ -55,4 +75,5 @@ npx electron scripts/record-site-media.cjs --media="Rock City Ransom.mp4"
 
 The script clicks at times chosen for this file; another one needs new
 times (see the comments in the script). Keep the source files out of
-`site/`: everything in it is published.
+`site/`: every `.html`, `.md` and `.njk` file in it becomes a page (but this
+README), and everything in `fonts/` and `img/` goes online.

@@ -75,7 +75,8 @@
  *   core/          Pure helpers, no DOM: format, waveshape (scaling the
  *                  waveform), ruler, beats (the simple beat finder,
  *                  stepping by beats), beat-this (around the beat model:
- *                  its windows, picking beats from its answers), melspec
+ *                  its windows, picking beats from its answers),
+ *                  beat-edits (a project's edits to the beats), melspec
  *                  and resample (the model's input), fft, timeline (and the
  *                  Segment / Loop / LoopRegion types), emitter, errors,
  *                  media (the Media type, the memory check, waveform
@@ -117,7 +118,8 @@
  *                  (notifications: small confirmations, notify())
  *   features/      playback.js (and the A–B loop), beats.js (finding the
  *                  beats on demand: the worker, then the beat model window
- *                  by window; the ♩ chip; the beat click), marks.js (actions,
+ *                  by window; the ♩ chip and its menu of edits; the
+ *                  beat click), marks.js (actions,
  *                  selection, the marks list), open-file.js, download.js
  *                  (and searching in the download dialog), settings.js
  *                  (the Settings dialog and the theme menu), file-menu.js
@@ -253,7 +255,7 @@ import {
 } from "./features/marks.js";
 import { bigVideoPictureChanged, bindBigVideo, toggleBigVideo } from "./features/big-video.js"; // Big video (src/features/big-video.js)
 import { bindLayout, openShortcuts } from "./features/layout.js";
-import { beatsAction, bindBeats, snapForDrag, toggleBeatClick } from "./features/beats.js";
+import { beatsAction, bindBeats, isBeatMenuOpen, snapForDrag, toggleBeatClick } from "./features/beats.js";
 import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
 import { bindProject, isSaveDialogOpen, openFile, saveProject, saveProjectAs } from "./features/project/index.js";
@@ -627,6 +629,7 @@ function start() {
     isSaveDialogOpen() ||
     isThemeMenuOpen() ||
     isFileMenuOpen() ||
+    isBeatMenuOpen() ||
     isSettingsOpen() ||
     dom.shortcutsDialog.open;
   bindShortcuts(SHORTCUTS, keysBlocked);

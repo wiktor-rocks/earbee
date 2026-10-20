@@ -69,6 +69,7 @@ export const dom = {
   stepForwardButton: /** @type {HTMLButtonElement} */ ($("stepForward")),
   stepSize: $("stepSize"),
   beatInfo: $("beatInfo"),
+  beatMenu: $("beatMenu"),
   startPointButton: $("startPoint"),
   stopPointButton: $("stopPoint"),
   speedChips: $("speedChips"),
@@ -162,7 +163,7 @@ export function renderBeatInfo() {
   chip.classList.toggle("disabled", beats.status === "found" && !beats.shown);
   if (beats.status === "finding") {
     chip.textContent = `♩ Finding the beats ${Math.floor(beats.progress * 100)} %`;
-    chip.title = "Finding the beats (click or B to stop)";
+    chip.title = "Finding the beats (B to stop)";
   } else if (beats.status === "found") {
     const bpm = Math.round(beats.bpm);
     const heard =
@@ -175,7 +176,7 @@ export function renderBeatInfo() {
           ? "Found by the beat model"
           : "Found so far by the beat model, which is still going through the rest of the track"
         : "Found by the simple beat finder (no bars)";
-    chip.title = `About ${bpm} beats per minute${heard && ` (${heard})`}. ${by}. Click or B to ${beats.shown ? "hide" : "show"} the beat lines.`;
+    chip.title = `About ${bpm} beats per minute${heard && ` (${heard})`}. ${by}. Click for the beats menu; B ${beats.shown ? "hides" : "shows"} the beat lines.`;
   } else if (beats.status === "none") {
     chip.textContent = "♩ No steady beat";
     chip.title = "No steady beat was found in this track";

@@ -1544,6 +1544,32 @@ body.dragging .welcome-hint {
   flex: 1;
 }
 
+/* The beats menu (features/beats.js), from the ♩ chip: what's on is
+   ticked, like the colour-theme menu's choice. */
+.beat-menu {
+  position-anchor: --beat-menu;
+  min-width: 220px;
+}
+
+.beat-menu .menu-item[aria-checked]::after {
+  content: "✓";
+  flex: none;
+  font-weight: 700;
+  visibility: hidden;
+}
+
+.beat-menu .menu-item[aria-checked="true"] {
+  color: var(--accent);
+}
+
+.beat-menu .menu-item[aria-checked="true"]::after {
+  visibility: visible;
+}
+
+.beat-menu hr:has(+ [hidden]) {
+  display: none;
+}
+
 .menu-keys {
   color: var(--muted);
   font-size: 11.5px;
@@ -2176,6 +2202,11 @@ body.dragging .drop-card {
 /* The first beat of each bar (the beat model's downbeats): stronger. */
 .guide-beat.downbeat {
   border-left-color: color-mix(in srgb, var(--text) 50%, transparent);
+}
+
+/* Subdivisions between the beats (the ♩ menu): fainter still, dashed. */
+.guide-beat.subdivision {
+  border-left: 1px dashed color-mix(in srgb, var(--text) 14%, transparent);
 }
 
 /* The hover line: where a click would seek to (waveform.js), with its

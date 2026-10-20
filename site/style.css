@@ -1,4 +1,4 @@
-/* EarBee's landing page. Colours and fonts are the app's own
+/* earbee.org: the landing page and the blog. Colours and fonts are the app's own
    (style.css and src/themes/palettes.js at the top of the repository):
    the EarBee theme, or EarBee Light on a light system. */
 
@@ -38,8 +38,8 @@
 }
 
 /* EarBee Light: on a light system, or when chosen with the button in
-   the top bar (data-theme on <html>, set by the script in index.html's
-   head). The two blocks hold the same colours. */
+   the top bar (data-theme on <html>, set by the script in the head,
+   _includes/base.njk). The two blocks hold the same colours. */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme="dark"]) {
     --bg: #f5f1e8;
@@ -353,7 +353,7 @@ kbd {
   align-self: center;
 }
 
-/* On a phone or tablet ("phone" on <html>, set in index.html's head),
+/* On a phone or tablet ("phone" on <html>, set in the head, _includes/base.njk),
    which can't run EarBee, this note takes the download buttons' place. */
 .phone-note {
   display: none;
@@ -780,13 +780,208 @@ footer {
 footer p {
   margin: 0;
 }
+/* The blog and its feed, at the end of every page. */
+.footer-links {
+  display: flex;
+  gap: 16px;
+  margin-left: auto;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ---------- Blog ----------
+   The blog's page (blog.njk), a post (_includes/post.njk, its text from
+   blog/*.md) and the 404 page: one readable column, in the page's own
+   colours and fonts. */
+
+/* "main > section" to outrank the home page's sections (Sections, above). */
+main > section.blog,
+main > section.not-found,
+main > .post {
+  width: min(680px, 100% - 32px);
+  margin: 0 auto;
+  padding-top: 48px;
+}
+.blog h1,
+.post h1,
+.not-found h1 {
+  font-size: clamp(34px, 5vw, 48px);
+  margin-bottom: 20px;
+}
+.blog .section-intro {
+  margin: 0 0 40px;
+}
+
+/* The blog's page: the posts, newest first. */
+.post-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.post-list li {
+  padding: 24px 0;
+  border-top: 1px solid var(--border);
+}
+.post-list h2 {
+  font-size: 26px;
+  margin: 0;
+}
+.post-list h2 a {
+  text-decoration: none;
+}
+.post-list p {
+  margin: 6px 0 0;
+}
+.post-list li > p:last-child {
+  color: var(--muted);
+}
+
+/* Blog, date, reading time. */
+.post-head {
+  margin-bottom: 28px;
+}
+.post-meta {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 15px;
+}
+.post-list .post-meta {
+  margin: 4px 0 0;
+}
+.post-meta a {
+  color: var(--accent-text);
+  font-weight: 700;
+  text-decoration: none;
+}
+.draft-note {
+  display: inline-block;
+  margin: 0;
+  padding: 2px 10px;
+  border: 1px dashed var(--accent);
+  border-radius: 6px;
+  color: var(--accent-text);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* A post's text, from Markdown. */
+.post-body {
+  font-size: 18px;
+  line-height: 1.7;
+}
+.post-body h2 {
+  font-size: 30px;
+  margin: 48px 0 12px;
+}
+.post-body h3 {
+  font-size: 22px;
+  margin: 32px 0 8px;
+}
+.post-body p,
+.post-body ul,
+.post-body ol,
+.post-body blockquote,
+.post-body pre,
+.post-body figure {
+  margin: 0 0 20px;
+}
+.post-body li {
+  margin-bottom: 6px;
+}
+.post-body li::marker {
+  color: var(--accent-text);
+}
+.post-body a {
+  color: var(--accent-text);
+}
+.post-body img,
+.post-body video {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.post-body figcaption {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 15px;
+}
+.post-body blockquote {
+  padding: 4px 0 4px 18px;
+  border-left: 4px solid var(--accent);
+  color: var(--muted);
+}
+.post-body pre {
+  overflow-x: auto;
+  padding: 14px 16px;
+  border-radius: 10px;
+  background: var(--surface-2);
+}
+.post-body pre code {
+  padding: 0;
+  background: none;
+}
+.post-body hr {
+  margin: 40px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
+}
+.post-body table {
+  width: 100%;
+  margin: 0 0 20px;
+  border-collapse: collapse;
+  font-size: 16px;
+}
+.post-body th,
+.post-body td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+/* After the post: EarBee, and a download for the visitor's system. */
+.post-cta {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+  margin-top: 56px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+}
+.post-cta img {
+  flex: none;
+}
+.post-cta p {
+  margin: 0 0 16px;
+  color: var(--muted);
+}
+.post-cta strong {
+  color: var(--text);
+}
+.post-cta .phone-note {
+  margin: 0;
+}
+/* Under the buttons: free means free, not freemium. */
+.post-cta .free-note {
+  margin: 12px 0 0;
+  font-size: 14px;
+}
+.post-cta .free-note a {
+  color: inherit;
+}
+.phone .post-cta .free-note {
+  margin-bottom: 16px;
+}
 
 /* ---------- Narrower screens ----------
-   Under 1100 px the download buttons fill their cards; under 1000 px the
-   top bar drops its least-needed links; under 860 px (tablets) the hero's
-   bee goes and everything goes to one column, clips above their text; under
-   600 px (phones) spacing and type tighten, the h1 wraps by itself, and
-   the top bar keeps the brand, Download and the theme switch. */
+   Under 1100 px the download buttons fill their cards; under 860 px
+   (tablets) the hero's bee goes and everything goes to one column, clips
+   above their text; under 600 px (phones) spacing and type tighten, the h1
+   wraps by itself, and the top bar drops GitHub, keeping the brand, Blog,
+   Download and the theme switch. */
 
 /* Three narrow download cards: every download a full-width button, the
    Mac's two one under the other, rather than wrapping as they fit. */
@@ -812,13 +1007,6 @@ footer p {
   }
   .platform .alt:hover {
     border-color: var(--muted);
-  }
-}
-
-@media (max-width: 999px) {
-  .top nav a[href="#keys"],
-  .top nav a[data-link="repo"] {
-    display: none;
   }
 }
 
@@ -871,7 +1059,7 @@ footer p {
   .top nav {
     gap: 10px;
   }
-  .top nav a:not(.nav-download) {
+  .top nav a[data-link="repo"] {
     display: none;
   }
   /* A button-sized target for a thumb. */
@@ -928,9 +1116,53 @@ footer p {
     margin-top: 48px;
     height: 40px;
   }
+  /* The logo beside the text, the links under the text. */
   footer {
+    display: grid;
+    grid-template-columns: auto 1fr;
     margin-top: 64px;
     align-items: flex-start;
+  }
+  .footer-links {
+    grid-column: 2;
+    margin-left: 0;
+  }
+  main > section.blog,
+  main > section.not-found,
+  main > .post {
+    padding-top: 24px;
+  }
+  .post-body {
+    font-size: 17px;
+  }
+  .post-cta {
+    flex-direction: column;
+    padding: 20px;
+  }
+}
+
+/* Small phones: the top bar, tighter, so its four items stay on one line. */
+@media (max-width: 400px) {
+  .brand {
+    gap: 8px;
+  }
+  .brand img {
+    width: 34px;
+  }
+  .wordmark {
+    font-size: 21px;
+  }
+  .top nav {
+    gap: 8px;
+  }
+  .top nav .nav-download {
+    padding: 0 10px;
+  }
+}
+/* The smallest (320 px): no room for Blog; the footer links to it. */
+@media (max-width: 349px) {
+  .top nav .nav-blog {
+    display: none;
   }
 }
 

@@ -301,6 +301,45 @@ module.exports = async function (h) {
     projectDialogs.asked.at(-1)?.[0] === "locate" && (await js(`fileName.textContent`)) === "copy.wav",
   );
 
+  // The beats, as found and with the project's edits: back at once,
+  // without finding them again, and the step "1 beat" with them.
+  const chipText = () => js(`beatInfo.textContent`);
+  await open(path.join(FIXTURES, "bars.wav"));
+  key("B");
+  for (let i = 0; i < 400 && /Find|%/.test(await chipText()); i++) await sleep(50);
+  await js(`document.querySelector('#beatMenu [data-tempo="0.5"]').click()`);
+  await sleep(150);
+  check("the beats found and halved: 60 BPM", (await chipText()) === "♩ 60 BPM", await chipText());
+  check("finding and editing the beats is an unsaved change", await unsaved(), await title());
+  const withBeats = path.join(folder, "Beats.ebee");
+  projectDialogs.save = withBeats;
+  key("S", ["control", "shift"]);
+  await sleep(200);
+  await js(`saveModeLink.click(); saveForm.requestSubmit()`);
+  await sleep(500);
+  const beatsSaved = JSON.parse(fs.readFileSync(withBeats, "utf8")).sections.beats;
+  check(
+    "the project saves the beats as found (all 40), and the edits apart",
+    beatsSaved?.found?.times?.length >= 39 && beatsSaved.found.bars?.length >= 9 && beatsSaved.edits?.tempo === 0.5,
+    JSON.stringify(beatsSaved?.edits),
+  );
+  const beatLinesBefore = await js(`document.querySelectorAll(".guide-beat").length`);
+  await open(tone);
+  check("another file: no beats", (await chipText()) === "♩ Find the beats", await chipText());
+  await open(withBeats);
+  check("opening it brings the beats back at once, halved", (await chipText()) === "♩ 60 BPM", await chipText());
+  check(
+    "…their lines too, and the step 1 beat",
+    (await js(`document.querySelectorAll(".guide-beat").length`)) === beatLinesBefore &&
+      (await js(`stepSize.textContent`)) === "Step 1 beat",
+    await js(`stepSize.textContent`),
+  );
+  check("…with nothing unsaved", !(await unsaved()), await title());
+  await js(`document.querySelector('#beatMenu [data-tempo="0.5"]').click()`);
+  await sleep(150);
+  check("undoing the half time after reopening: 120 BPM", (await chipText()) === "♩ 120 BPM", await chipText());
+  check("…an unsaved change", await unsaved(), await title());
+
   // The shortcuts dialog lists the File keys.
   check(
     "the legend lists Ctrl+S",

@@ -1,0 +1,27 @@
+---
+layout: base.njk
+title: Blog
+description: "Learning songs by ear: how to transcribe solos, riffs and bass lines, practise them slowly, and get them right. From the makers of EarBee."
+permalink: /blog/
+---
+{#- The blog's page: every post, newest first. -#}
+<section class="blog">
+  <h1>Blog</h1>
+  <p class="section-intro">
+    {{ site.blogDescription }} <a href="/blog/feed.xml">RSS feed</a>
+  </p>
+  <ol class="post-list">
+    {%- for post in collections.posts | reverse %}
+    <li>
+      <h2><a href="{{ post.url }}">{{ post.data.title }}</a></h2>
+      <p class="post-meta">
+        <time datetime="{{ post.date | isoDate }}">{{ post.date | readableDate }}</time>
+        {%- if post.data.draft %} · <strong>draft</strong>{% endif %}
+      </p>
+      <p>{{ post.data.description }}</p>
+    </li>
+    {%- else %}
+    <li><p>No posts yet.</p></li>
+    {%- endfor %}
+  </ol>
+</section>

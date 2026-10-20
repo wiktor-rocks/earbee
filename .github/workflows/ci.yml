@@ -1,7 +1,7 @@
 # Checks every push (to main, testing and the exp/ experiment branches)
-# and pull request: formatting, lint and types, and the unit tests. On main
-# (and on demand) also the end-to-end and smoke tests, in a virtual display,
-# with the test media cached between runs.
+# and pull request: formatting, lint and types, the unit tests, and that the
+# website builds. On main (and on demand) also the end-to-end and smoke
+# tests, in a virtual display, with the test media cached between runs.
 name: CI
 
 on:
@@ -22,6 +22,23 @@ jobs:
       - run: npm ci
       - run: npm run check
       - run: npm run test:unit
+
+  # The website builds (site/, with Eleventy), so a broken page or post
+  # shows up here before it reaches main and pages.yml.
+  site:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+      - run: npm ci
+      - run: npm run build
 
   e2e:
     if: github.event_name == 'workflow_dispatch' || github.ref == 'refs/heads/main'

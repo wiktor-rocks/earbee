@@ -18,6 +18,7 @@ import { isProjectName } from "../../project/format.js";
 import { dom, guarded, onClick, reportError, showNotice } from "../../ui/dom.js";
 import { isTextField } from "../../ui/shortcuts.js";
 import { notify } from "../../ui/toast.js";
+import { beatEvents } from "../beats.js";
 import { importChapters } from "../marks.js";
 import { loadMediaFile, withLoading } from "../open-file.js";
 import { SECTIONS } from "./sections.js";
@@ -62,9 +63,12 @@ const session = {
 const captureProject = () =>
   Object.fromEntries(SECTIONS.map((section) => [section.id, { ...section.capture(), version: section.version }]));
 
-// What counts for unsaved changes: the sections that dirty.
+// What counts for unsaved changes: the sections that dirty (by their
+// dirtyKey, if they have a cheaper one than all they save).
 const dirtyingState = () =>
-  JSON.stringify(SECTIONS.filter((section) => section.dirties).map((section) => section.capture()));
+  JSON.stringify(
+    SECTIONS.filter((section) => section.dirties).map((section) => (section.dirtyKey ?? section.capture)()),
+  );
 
 /**
  * Brings back saved sections; returns notices about the ones that couldn't be.
@@ -309,6 +313,7 @@ export function bindProject() {
   for (const type of ["input", "change", "click", "pointerup", "keyup"])
     window.addEventListener(type, scheduleDirtyCheck, { capture: true });
   marks.on("change", scheduleDirtyCheck);
+  beatEvents.on("found", scheduleDirtyCheck);
 
   // The window is closing and the user chose Save.
   bridge.onSaveThenClose(

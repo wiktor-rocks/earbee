@@ -1,391 +1,303 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>EarBee: learn songs by ear</title>
-    <meta
-      name="description"
-      content="A free desktop player for transcribing music: slow it down without changing the pitch, find the beats and the bars, loop the hard bar, and step through it from the keyboard. For Windows, macOS and Linux."
-    />
-    <meta name="theme-color" content="#0e1014" />
-    <meta property="og:title" content="EarBee" />
-    <meta property="og:description" content="A desktop player for transcribing music by ear." />
-    <meta property="og:image" content="img/screenshot-dark.webp" />
-    <link rel="icon" type="image/png" href="img/favicon.png" />
-    <link rel="preload" href="fonts/righteous-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin />
-    <link rel="stylesheet" href="style.css" />
-    <script>
-      // Set before the page shows, so nothing flashes:
-      //  - the theme chosen with the button in the top bar (download.js);
-      //    else the system's;
-      //  - "phone" on a phone or tablet, which can't run EarBee: the
-      //    page says so instead of offering a download (style.css).
-      try {
-        const theme = localStorage.getItem("theme");
-        if (theme === "dark" || theme === "light") document.documentElement.dataset.theme = theme;
-      } catch {}
-      const iPad = navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1;
-      if (/android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent) || iPad) {
-        document.documentElement.classList.add("phone");
-      }
-    </script>
-    <script src="download.js" defer></script>
-  </head>
-  <body>
-    <header class="top">
-      <a class="brand" href="#">
-        <img src="img/logo.webp" alt="" width="54" height="51" />
-        <span class="wordmark">Ear<b>Bee</b></span>
+---
+layout: base.njk
+schema: app
+title: "EarBee: a free app for learning songs by ear"
+description: "A free desktop app for transcribing music: slow it down without changing the pitch, find the beats, loop the hard bar. Windows, macOS, Linux."
+---
+
+<!-- The home page's content. The head, the top bar and the footer, shared
+     with the blog, are in _includes/base.njk; the header above gives the
+     title and the description (docs/blog.md). -->
+<section class="hero">
+  <div class="hero-text">
+    <p class="kicker">A player for transcribing music</p>
+    <!-- The breaks are for wide screens; a phone wraps it naturally. -->
+    <h1>
+      Learn the song<br />
+      by ear, one bar<br />
+      at a time.
+    </h1>
+    <p class="lede">
+      Slow a song down without changing its pitch. Loop the hard part. Step through it from the keyboard.
+    </p>
+    <div class="cta">
+      <a class="button primary" data-link="mine" href="#download">
+        <span data-label="mine">Download</span>
+        <small data-size="mine"></small>
       </a>
-      <nav>
-        <a href="#beats">Beats</a>
-        <a href="#what">What it does</a>
-        <a href="#keys">Keys</a>
-        <a class="nav-download" href="#download">Download</a>
-        <a data-link="repo" href="#download">GitHub</a>
-        <button class="theme-switch" type="button" aria-label="Switch between dark and light" title="Dark or light">
-          <svg
-            class="sun"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            aria-hidden="true"
-          >
-            <circle cx="12" cy="12" r="4" />
-            <path
-              d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"
-            />
-          </svg>
-          <svg
-            class="moon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linejoin="round"
-            aria-hidden="true"
-          >
-            <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z" />
-          </svg>
-        </button>
-      </nav>
-    </header>
+      <a class="button quiet" href="#download">Other systems</a>
+    </div>
+    <!-- Instead of the buttons on a phone or tablet ("phone", set in the head). -->
+    <p class="phone-note">
+      <strong>EarBee is a desktop app</strong> for Windows, macOS and Linux. Open this page on a computer to download
+      it.
+      <a class="button quiet" href="#download">See the downloads</a>
+    </p>
+    <p class="release-note" data-release>Windows, macOS and Linux</p>
+  </div>
+  <div class="hero-bee" aria-hidden="true">
+    <img src="img/logo.webp" alt="" width="300" height="284" />
+  </div>
+</section>
 
-    <main>
-      <section class="hero">
-        <div class="hero-text">
-          <p class="kicker">A player for transcribing music</p>
-          <!-- The breaks are for wide screens; a phone wraps it naturally. -->
-          <h1>
-            Learn the song<br />
-            by ear, one bar<br />
-            at a time.
-          </h1>
-          <p class="lede">
-            Slow a song down without changing its pitch. Loop the hard part. Step through it from the keyboard.
-          </p>
-          <div class="cta">
-            <a class="button primary" data-link="mine" href="#download">
-              <span data-label="mine">Download</span>
-              <small data-size="mine"></small>
-            </a>
-            <a class="button quiet" href="#download">Other systems</a>
-          </div>
-          <!-- Instead of the buttons on a phone or tablet ("phone", set in the head). -->
-          <p class="phone-note">
-            <strong>EarBee is a desktop app</strong> for Windows, macOS and Linux. Open this page on a computer to
-            download it.
-            <a class="button quiet" href="#download">See the downloads</a>
-          </p>
-          <p class="release-note" data-release>Windows, macOS and Linux</p>
-        </div>
-        <div class="hero-bee" aria-hidden="true">
-          <img src="img/logo.webp" alt="" width="300" height="284" />
-        </div>
-      </section>
+<section id="free" class="free">
+  <h2>Free. The whole thing.</h2>
+  <p class="section-intro">Every feature on this page is in the download. Nothing is locked.</p>
+  <ul class="free-list">
+    <li><strong>No trial.</strong> Nothing expires.</li>
+    <li><strong>No subscription.</strong> There is no paid version.</li>
+    <li><strong>No account, no ads, no tracking.</strong> It all runs on your computer.</li>
+    <li>
+      <strong>Open source.</strong> The code is on <a data-link="repo" href="#download">GitHub</a>, under the
+      <a data-link="licence" href="#download">MIT licence</a>.
+    </li>
+  </ul>
+</section>
 
-      <section id="free" class="free">
-        <h2>Free. The whole thing.</h2>
-        <p class="section-intro">Every feature on this page is in the download. Nothing is locked.</p>
-        <ul class="free-list">
-          <li><strong>No trial.</strong> Nothing expires.</li>
-          <li><strong>No subscription.</strong> There is no paid version.</li>
-          <li><strong>No account, no ads, no tracking.</strong> It all runs on your computer.</li>
-          <li>
-            <strong>Open source.</strong> The code is on <a data-link="repo" href="#download">GitHub</a>, under the
-            <a data-link="licence" href="#download">MIT licence</a>.
-          </li>
-        </ul>
-      </section>
+<!-- img/screenshot-dark.webp and -light.webp, recorded from the app in
+     EarBee's two themes (site/README.md); the <picture> shows the
+     system's, and download.js the mode chosen with the button. A new
+     one needs its size in width and height here. -->
+<figure class="shot">
+  <div class="shot-frame">
+    <picture>
+      <source srcset="img/screenshot-light.webp" media="(prefers-color-scheme: light)" />
+      <img
+        src="img/screenshot-dark.webp"
+        width="1280"
+        height="800"
+        alt="EarBee playing a concert video at 0.75× speed: beat and bar lines on the waveform, a section named Main riff, and one bar looping."
+      />
+    </picture>
+  </div>
+  <figcaption>A concert video at 0.75× speed, looping one bar of the main riff.</figcaption>
+</figure>
 
-      <!-- img/screenshot-dark.webp and -light.webp, recorded from the app in
-           EarBee's two themes (site/README.md); the <picture> shows the
-           system's, and download.js the mode chosen with the button. A new
-           one needs its size in width and height here. -->
-      <figure class="shot">
-        <div class="shot-frame">
-          <picture>
-            <source srcset="img/screenshot-light.webp" media="(prefers-color-scheme: light)" />
-            <img
-              src="img/screenshot-dark.webp"
-              width="1280"
-              height="800"
-              alt="EarBee playing a concert video at 0.75× speed: beat and bar lines on the waveform, a section named Main riff, and one bar looping."
-            />
-          </picture>
-        </div>
-        <figcaption>A concert video at 0.75× speed, looping one bar of the main riff.</figcaption>
-      </figure>
+<!-- Beats and looping by the bar: two features with a clip each.
+     A clip is a silent looping video in its .clip frame (style.css;
+     --ratio is its width / height), recorded from the app in EarBee's
+     two themes (site/README.md): data-dark and data-light name its
+     files, and download.js gives it the page's mode, its poster being
+     the .webp beside it. With reduced motion, the clips stay still
+     and get controls. -->
+<section id="beats" class="beats">
+  <h2>
+    It hears the beat.<br />
+    You loop the bar.
+  </h2>
+  <p class="section-intro">EarBee finds the beats and bars for you, so you can loop one bar at a time.</p>
 
-      <!-- Beats and looping by the bar: two features with a clip each.
-           A clip is a silent looping video in its .clip frame (style.css;
-           --ratio is its width / height), recorded from the app in EarBee's
-           two themes (site/README.md): data-dark and data-light name its
-           files, and download.js gives it the page's mode, its poster being
-           the .webp beside it. With reduced motion, the clips stay still
-           and get controls. -->
-      <section id="beats" class="beats">
-        <h2>
-          It hears the beat.<br />
-          You loop the bar.
-        </h2>
-        <p class="section-intro">EarBee finds the beats and bars for you, so you can loop one bar at a time.</p>
+  <div class="spotlight">
+    <div class="clip" style="--ratio: 1280 / 800">
+      <video
+        autoplay
+        muted
+        loop
+        playsinline
+        preload="metadata"
+        data-dark="img/clip-beats-dark.mp4"
+        data-light="img/clip-beats-light.mp4"
+        aria-label="EarBee finding the beats: after B, a line appears on every beat, then → steps from beat to beat."
+      ></video>
+    </div>
+    <div class="spotlight-text">
+      <h3>Find the beats and bars</h3>
+      <p>Press <kbd>B</kbd>. A line marks every beat, a stronger line the start of every bar, and you see the tempo.</p>
+      <ul class="ticks">
+        <li>
+          <span class="combo"><kbd>←</kbd> <kbd>→</kbd></span> jump to the next beat or bar.
+        </li>
+        <li>
+          <span class="combo"><kbd>Shift</kbd> + <kbd>B</kbd></span> plays a click on every beat.
+        </li>
+      </ul>
+      <p class="small-print">On Intel Macs: beats only, no bars.</p>
+    </div>
+  </div>
 
-        <div class="spotlight">
-          <div class="clip" style="--ratio: 1280 / 800">
-            <video
-              autoplay
-              muted
-              loop
-              playsinline
-              preload="metadata"
-              data-dark="img/clip-beats-dark.mp4"
-              data-light="img/clip-beats-light.mp4"
-              aria-label="EarBee finding the beats: after B, a line appears on every beat, then → steps from beat to beat."
-            ></video>
-          </div>
-          <div class="spotlight-text">
-            <h3>Find the beats and bars</h3>
-            <p>
-              Press <kbd>B</kbd>. A line marks every beat, a stronger line the start of every bar, and you see the
-              tempo.
-            </p>
-            <ul class="ticks">
-              <li>
-                <span class="combo"><kbd>←</kbd> <kbd>→</kbd></span> jump to the next beat or bar.
-              </li>
-              <li>
-                <span class="combo"><kbd>Shift</kbd> + <kbd>B</kbd></span> plays a click on every beat.
-              </li>
-            </ul>
-            <p class="small-print">On Intel Macs: beats only, no bars.</p>
-          </div>
-        </div>
+  <div class="spotlight flip">
+    <div class="clip" style="--ratio: 1280 / 800">
+      <video
+        autoplay
+        muted
+        loop
+        playsinline
+        preload="metadata"
+        data-dark="img/clip-loop-dark.mp4"
+        data-light="img/clip-loop-light.mp4"
+        aria-label="EarBee looping by the bar: one bar loops, moves on to the next bar twice, then doubles."
+      ></video>
+    </div>
+    <div class="spotlight-text">
+      <h3>Loop a bar, then the next</h3>
+      <p>Press <kbd>\</kbd> to loop the bar you're in.</p>
+      <ul class="ticks">
+        <li><kbd>=</kbd> doubles the loop, <kbd>-</kbd> halves it.</li>
+        <li>
+          <span class="combo"><kbd>Shift</kbd> + <kbd>]</kbd></span> moves it to the next phrase,
+          <span class="combo"><kbd>Shift</kbd> + <kbd>[</kbd></span> back.
+        </li>
+        <li>Loop edges snap to the beats. Hold <kbd>Alt</kbd> to place them freely.</li>
+      </ul>
+    </div>
+  </div>
+</section>
 
-        <div class="spotlight flip">
-          <div class="clip" style="--ratio: 1280 / 800">
-            <video
-              autoplay
-              muted
-              loop
-              playsinline
-              preload="metadata"
-              data-dark="img/clip-loop-dark.mp4"
-              data-light="img/clip-loop-light.mp4"
-              aria-label="EarBee looping by the bar: one bar loops, moves on to the next bar twice, then doubles."
-            ></video>
-          </div>
-          <div class="spotlight-text">
-            <h3>Loop a bar, then the next</h3>
-            <p>Press <kbd>\</kbd> to loop the bar you're in.</p>
-            <ul class="ticks">
-              <li><kbd>=</kbd> doubles the loop, <kbd>-</kbd> halves it.</li>
-              <li>
-                <span class="combo"><kbd>Shift</kbd> + <kbd>]</kbd></span> moves it to the next phrase,
-                <span class="combo"><kbd>Shift</kbd> + <kbd>[</kbd></span> back.
-              </li>
-              <li>Loop edges snap to the beats. Hold <kbd>Alt</kbd> to place them freely.</li>
-            </ul>
-          </div>
-        </div>
-      </section>
+<div class="wave" aria-hidden="true"></div>
 
-      <div class="wave" aria-hidden="true"></div>
+<section id="what" class="what">
+  <h2>What it does</h2>
+  <dl class="features">
+    <div>
+      <dt>Slower, same pitch</dt>
+      <dd>Play from 0.25× to 3× speed without changing the pitch. Or change the pitch, not the speed.</dd>
+    </div>
+    <div>
+      <dt>Beats and bars</dt>
+      <dd>Press <kbd>B</kbd> to mark every beat and bar, and see the tempo.</dd>
+    </div>
+    <div>
+      <dt>Loops</dt>
+      <dd>Shift-drag across the waveform, or press <kbd>\</kbd> to loop the current bar. It repeats without a gap.</dd>
+    </div>
+    <div>
+      <dt>Marks</dt>
+      <dd>Press <kbd>M</kbd> to mark a point, <kbd>R</kbd> twice to mark a section. Name and colour them.</dd>
+    </div>
+    <div>
+      <dt>Video</dt>
+      <dd>Videos stay in sync at any speed. Show them big, or in a window on a second screen.</dd>
+    </div>
+    <div>
+      <dt>From YouTube</dt>
+      <dd>Paste a link, or search by name. Chapters become marked sections.</dd>
+    </div>
+    <div>
+      <dt>Projects</dt>
+      <dd>Save your marks, loop, speed and EQ in one <code>.ebee</code> file, with or without the song.</dd>
+    </div>
+    <div>
+      <dt>Long files, offline</dt>
+      <dd>An hour-long concert opens in seconds. No internet needed, except to download.</dd>
+    </div>
+  </dl>
+</section>
 
-      <section id="what" class="what">
-        <h2>What it does</h2>
-        <dl class="features">
-          <div>
-            <dt>Slower, same pitch</dt>
-            <dd>Play from 0.25× to 3× speed without changing the pitch. Or change the pitch, not the speed.</dd>
-          </div>
-          <div>
-            <dt>Beats and bars</dt>
-            <dd>Press <kbd>B</kbd> to mark every beat and bar, and see the tempo.</dd>
-          </div>
-          <div>
-            <dt>Loops</dt>
-            <dd>
-              Shift-drag across the waveform, or press <kbd>\</kbd> to loop the current bar. It repeats without a gap.
-            </dd>
-          </div>
-          <div>
-            <dt>Marks</dt>
-            <dd>Press <kbd>M</kbd> to mark a point, <kbd>R</kbd> twice to mark a section. Name and colour them.</dd>
-          </div>
-          <div>
-            <dt>Video</dt>
-            <dd>Videos stay in sync at any speed. Show them big, or in a window on a second screen.</dd>
-          </div>
-          <div>
-            <dt>From YouTube</dt>
-            <dd>Paste a link, or search by name. Chapters become marked sections.</dd>
-          </div>
-          <div>
-            <dt>Projects</dt>
-            <dd>Save your marks, loop, speed and EQ in one <code>.ebee</code> file, with or without the song.</dd>
-          </div>
-          <div>
-            <dt>Long files, offline</dt>
-            <dd>An hour-long concert opens in seconds. No internet needed, except to download.</dd>
-          </div>
-        </dl>
-      </section>
+<section id="keys" class="keys">
+  <div class="keys-intro">
+    <h2>Hands stay on the keys</h2>
+    <p>Listen, stop, go back, listen again: each step is one key. Press <kbd>?</kbd> in the app for the full list.</p>
+  </div>
+  <ul class="keylist">
+    <li>
+      <span class="k"><kbd>Space</kbd></span
+      ><span>Play, or replay from where you started</span>
+    </li>
+    <li>
+      <span class="k"><kbd>←</kbd><kbd>→</kbd></span
+      ><span>Step back and forward</span>
+    </li>
+    <li>
+      <span class="k"><kbd>↑</kbd><kbd>↓</kbd></span
+      ><span>Step size: 0.01 s to 10 s, a beat or a bar</span>
+    </li>
+    <li>
+      <span class="k"><kbd>B</kbd></span
+      ><span>Find the beats</span>
+    </li>
+    <li>
+      <span class="k"><kbd>[</kbd><kbd>]</kbd><kbd>L</kbd></span
+      ><span>Loop start, loop end, loop on or off</span>
+    </li>
+    <li>
+      <span class="k"><kbd>\</kbd></span
+      ><span>Loop the current bar</span>
+    </li>
+    <li>
+      <span class="k"><kbd>=</kbd><kbd>-</kbd></span
+      ><span>Double or halve the loop</span>
+    </li>
+    <li>
+      <span class="k"><kbd>Shift</kbd><kbd>[</kbd><kbd>]</kbd></span
+      ><span>Move the loop back or on</span>
+    </li>
+    <li>
+      <span class="k"><kbd>M</kbd></span
+      ><span>Mark a point</span>
+    </li>
+    <li>
+      <span class="k"><kbd>R</kbd></span
+      ><span>Mark a section: start, then end</span>
+    </li>
+    <li>
+      <span class="k"><kbd>S</kbd></span
+      ><span>Start from here next time</span>
+    </li>
+    <li>
+      <span class="k"><kbd>V</kbd><kbd>F</kbd></span
+      ><span>Video in a window, or big</span>
+    </li>
+  </ul>
+</section>
 
-      <section id="keys" class="keys">
-        <div class="keys-intro">
-          <h2>Hands stay on the keys</h2>
-          <p>
-            Listen, stop, go back, listen again: each step is one key. Press <kbd>?</kbd> in the app for the full list.
-          </p>
-        </div>
-        <ul class="keylist">
-          <li>
-            <span class="k"><kbd>Space</kbd></span
-            ><span>Play, or replay from where you started</span>
-          </li>
-          <li>
-            <span class="k"><kbd>←</kbd><kbd>→</kbd></span
-            ><span>Step back and forward</span>
-          </li>
-          <li>
-            <span class="k"><kbd>↑</kbd><kbd>↓</kbd></span
-            ><span>Step size: 0.01 s to 10 s, a beat or a bar</span>
-          </li>
-          <li>
-            <span class="k"><kbd>B</kbd></span
-            ><span>Find the beats</span>
-          </li>
-          <li>
-            <span class="k"><kbd>[</kbd><kbd>]</kbd><kbd>L</kbd></span
-            ><span>Loop start, loop end, loop on or off</span>
-          </li>
-          <li>
-            <span class="k"><kbd>\</kbd></span
-            ><span>Loop the current bar</span>
-          </li>
-          <li>
-            <span class="k"><kbd>=</kbd><kbd>-</kbd></span
-            ><span>Double or halve the loop</span>
-          </li>
-          <li>
-            <span class="k"><kbd>Shift</kbd><kbd>[</kbd><kbd>]</kbd></span
-            ><span>Move the loop back or on</span>
-          </li>
-          <li>
-            <span class="k"><kbd>M</kbd></span
-            ><span>Mark a point</span>
-          </li>
-          <li>
-            <span class="k"><kbd>R</kbd></span
-            ><span>Mark a section: start, then end</span>
-          </li>
-          <li>
-            <span class="k"><kbd>S</kbd></span
-            ><span>Start from here next time</span>
-          </li>
-          <li>
-            <span class="k"><kbd>V</kbd><kbd>F</kbd></span
-            ><span>Video in a window, or big</span>
-          </li>
-        </ul>
-      </section>
+<section class="themes">
+  <h2>Seventeen colour themes</h2>
+  <p class="section-intro">
+    EarBee's own dark and light themes, plus popular editor themes. Automatic follows your system.
+  </p>
+  <ul class="swatches" aria-label="Colour themes">
+    <li style="--bg: #0e1014; --ac: #f5b301; --fg: #e6e8ee">EarBee</li>
+    <li style="--bg: #f5f1e8; --ac: #f5b301; --fg: #1f1b14">EarBee Light</li>
+    <li style="--bg: #1e1f1c; --ac: #a6e22e; --fg: #f8f8f2">Monokai</li>
+    <li style="--bg: #21222c; --ac: #bd93f9; --fg: #f8f8f2">Dracula</li>
+    <li style="--bg: #2e3440; --ac: #88c0d0; --fg: #eceff4">Nord</li>
+    <li style="--bg: #21252b; --ac: #61afef; --fg: #dcdfe4">One Dark</li>
+    <li style="--bg: #1d2021; --ac: #fe8019; --fg: #ebdbb2">Gruvbox Dark</li>
+    <li style="--bg: #00212b; --ac: #2aa198; --fg: #eee8d5">Solarized Dark</li>
+    <li style="--bg: #181825; --ac: #cba6f7; --fg: #cdd6f4">Catppuccin Mocha</li>
+    <li style="--bg: #16161e; --ac: #7aa2f7; --fg: #c0caf5">Tokyo Night</li>
+    <li style="--bg: #eee8d5; --ac: #1b7d76; --fg: #073642">Solarized Light</li>
+    <li style="--bg: #e6e9ef; --ac: #8839ef; --fg: #4c4f69">Catppuccin Latte</li>
+    <li style="--bg: #f6f8fa; --ac: #0969da; --fg: #1f2328">GitHub Light</li>
+    <li style="--bg: #f2e5bc; --ac: #af3a03; --fg: #3c3836">Gruvbox Light</li>
+    <li style="--bg: #eaeaeb; --ac: #3a6cda; --fg: #383a42">One Light</li>
+    <li style="--bg: #d6d8e1; --ac: #2565bd; --fg: #343b58">Tokyo Night Day</li>
+    <li style="--bg: #f4f0d9; --ac: #687701; --fg: #5c6a72">Everforest Light</li>
+  </ul>
+</section>
 
-      <section class="themes">
-        <h2>Seventeen colour themes</h2>
-        <p class="section-intro">
-          EarBee's own dark and light themes, plus popular editor themes. Automatic follows your system.
-        </p>
-        <ul class="swatches" aria-label="Colour themes">
-          <li style="--bg: #0e1014; --ac: #f5b301; --fg: #e6e8ee">EarBee</li>
-          <li style="--bg: #f5f1e8; --ac: #f5b301; --fg: #1f1b14">EarBee Light</li>
-          <li style="--bg: #1e1f1c; --ac: #a6e22e; --fg: #f8f8f2">Monokai</li>
-          <li style="--bg: #21222c; --ac: #bd93f9; --fg: #f8f8f2">Dracula</li>
-          <li style="--bg: #2e3440; --ac: #88c0d0; --fg: #eceff4">Nord</li>
-          <li style="--bg: #21252b; --ac: #61afef; --fg: #dcdfe4">One Dark</li>
-          <li style="--bg: #1d2021; --ac: #fe8019; --fg: #ebdbb2">Gruvbox Dark</li>
-          <li style="--bg: #00212b; --ac: #2aa198; --fg: #eee8d5">Solarized Dark</li>
-          <li style="--bg: #181825; --ac: #cba6f7; --fg: #cdd6f4">Catppuccin Mocha</li>
-          <li style="--bg: #16161e; --ac: #7aa2f7; --fg: #c0caf5">Tokyo Night</li>
-          <li style="--bg: #eee8d5; --ac: #1b7d76; --fg: #073642">Solarized Light</li>
-          <li style="--bg: #e6e9ef; --ac: #8839ef; --fg: #4c4f69">Catppuccin Latte</li>
-          <li style="--bg: #f6f8fa; --ac: #0969da; --fg: #1f2328">GitHub Light</li>
-          <li style="--bg: #f2e5bc; --ac: #af3a03; --fg: #3c3836">Gruvbox Light</li>
-          <li style="--bg: #eaeaeb; --ac: #3a6cda; --fg: #383a42">One Light</li>
-          <li style="--bg: #d6d8e1; --ac: #2565bd; --fg: #343b58">Tokyo Night Day</li>
-          <li style="--bg: #f4f0d9; --ac: #687701; --fg: #5c6a72">Everforest Light</li>
-        </ul>
-      </section>
-
-      <section id="download" class="download">
-        <h2>Download</h2>
-        <p class="section-intro" data-release-long>For Windows, macOS and Linux. Free and open source.</p>
-        <div class="platforms">
-          <article class="platform" data-platform="windows">
-            <h3>Windows</h3>
-            <p class="file">Portable <code>.exe</code>: nothing to install</p>
-            <a class="button" data-link="windows" href="#download">Download <small data-size="windows"></small></a>
-            <p class="hint">If Windows warns you, choose <em>More info</em>, then <em>Run anyway</em>.</p>
-          </article>
-          <article class="platform" data-platform="mac">
-            <h3>macOS</h3>
-            <p class="file">Disk image, <code>.dmg</code>, for Apple Silicon or Intel</p>
-            <div class="platform-buttons">
-              <a class="button" data-link="mac" href="#download">Apple Silicon <small data-size="mac"></small></a>
-              <a class="alt" data-link="macIntel" href="#download">Intel <small data-size="macIntel"></small></a>
-            </div>
-            <p class="hint">
-              Drag it to Applications. The first time, right-click it and choose <em>Open</em> (it isn't signed by
-              Apple). Not yet tested on a real Mac: <a data-link="issues" href="#download">tell us how it went</a>.
-            </p>
-          </article>
-          <article class="platform" data-platform="linux">
-            <h3>Linux</h3>
-            <p class="file"><code>.AppImage</code>, any distribution</p>
-            <a class="button" data-link="linux" href="#download">Download <small data-size="linux"></small></a>
-            <p class="hint">Make it executable, then run it: <code>chmod +x EarBee*.AppImage</code></p>
-          </article>
-        </div>
-        <p class="elsewhere">
-          <a data-link="releases" href="#download">All releases</a> ·
-          <a data-link="repo" href="#download">Source code</a>, or build it yourself:
-          <code>npm install &amp;&amp; npm start</code>
-        </p>
-      </section>
-    </main>
-
-    <footer>
-      <img src="img/logo.webp" alt="" width="28" height="27" />
-      <p>
-        EarBee is free and open source (<a data-link="licence" href="#download">MIT licence</a>). Time-stretching by
-        <a href="https://signalsmith-audio.co.uk/code/stretch/">Signalsmith Stretch</a>, beats by
-        <a href="https://github.com/CPJKU/beat_this">Beat This!</a> on
-        <a href="https://onnxruntime.ai">ONNX Runtime</a>, video by <a href="https://mediabunny.dev">Mediabunny</a>,
-        downloads by <a href="https://github.com/yt-dlp/yt-dlp">yt-dlp</a>.
+<section id="download" class="download">
+  <h2>Download</h2>
+  <p class="section-intro" data-release-long>For Windows, macOS and Linux. Free and open source.</p>
+  <div class="platforms">
+    <article class="platform" data-platform="windows">
+      <h3>Windows</h3>
+      <p class="file">Portable <code>.exe</code>: nothing to install</p>
+      <a class="button" data-link="windows" href="#download">Download <small data-size="windows"></small></a>
+      <p class="hint">If Windows warns you, choose <em>More info</em>, then <em>Run anyway</em>.</p>
+    </article>
+    <article class="platform" data-platform="mac">
+      <h3>macOS</h3>
+      <p class="file">Disk image, <code>.dmg</code>, for Apple Silicon or Intel</p>
+      <div class="platform-buttons">
+        <a class="button" data-link="mac" href="#download">Apple Silicon <small data-size="mac"></small></a>
+        <a class="alt" data-link="macIntel" href="#download">Intel <small data-size="macIntel"></small></a>
+      </div>
+      <p class="hint">
+        Drag it to Applications. The first time, right-click it and choose <em>Open</em> (it isn't signed by Apple). Not
+        yet tested on a real Mac: <a data-link="issues" href="#download">tell us how it went</a>.
       </p>
-    </footer>
-  </body>
-</html>
+    </article>
+    <article class="platform" data-platform="linux">
+      <h3>Linux</h3>
+      <p class="file"><code>.AppImage</code>, any distribution</p>
+      <a class="button" data-link="linux" href="#download">Download <small data-size="linux"></small></a>
+      <p class="hint">Make it executable, then run it: <code>chmod +x EarBee*.AppImage</code></p>
+    </article>
+  </div>
+  <p class="elsewhere">
+    <a data-link="releases" href="#download">All releases</a> · <a data-link="repo" href="#download">Source code</a>, or
+    build it yourself:
+    <code>npm install &amp;&amp; npm start</code>
+  </p>
+</section>

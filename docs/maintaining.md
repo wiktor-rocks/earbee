@@ -12,12 +12,12 @@ The commands are for a terminal in the project folder.
   - `exp/<idea>` (say, `exp/tuner`) is for trying an idea that might not work out. Each idea gets its own branch, made from `testing`. If it works, it's merged into `testing`; if not, the branch is deleted. See [Trying an idea](#trying-an-idea-an-experiment-branch).
 - **Automatic on GitHub** (the [Actions tab](https://github.com/wiktor-rocks/earbee/actions) shows every run):
 
-  | When                                              | What runs                                                                           | How long         |
-  | ------------------------------------------------- | ----------------------------------------------------------------------------------- | ---------------- |
-  | Any push to `testing`, `main` or an `exp/` branch | **CI:** formatting, lint, types, unit tests                                         | about 1 minute   |
-  | A push to `main`                                  | **CI** also runs the end-to-end and smoke tests                                     | about 10 minutes |
-  | A push to `main` that changes `site/`             | **Landing page:** republishes [the website](https://wiktor-rocks.github.io/earbee/) | under a minute   |
-  | Pushing a version tag (`v0.2.0`)                  | **Release:** builds Windows, macOS and Linux, and makes a draft release             | about 15 minutes |
+  | When                                              | What runs                                                               | How long         |
+  | ------------------------------------------------- | ----------------------------------------------------------------------- | ---------------- |
+  | Any push to `testing`, `main` or an `exp/` branch | **CI:** formatting, lint, types, unit tests, the website builds         | about 1 minute   |
+  | A push to `main`                                  | **CI** also runs the end-to-end and smoke tests                         | about 10 minutes |
+  | A push to `main` that changes `site/`             | **Website:** builds and republishes [the website](https://earbee.org/)  | under a minute   |
+  | Pushing a version tag (`v0.2.0`)                  | **Release:** builds Windows, macOS and Linux, and makes a draft release | about 15 minutes |
 
 - **Every change gets a CHANGELOG.md entry** (what, why, how, where, verified by), newest first.
 
@@ -206,7 +206,7 @@ If a pushed tag doesn't start the build, start it by hand: `gh workflow run rele
 
 ## The website
 
-It's `site/`, plain HTML, CSS and one script; see [site/README.md](../site/README.md). Open `site/index.html` in a browser to see your changes. Pushing them to `main` publishes them. To republish without a change, run `gh workflow run pages.yml --ref main`.
+It's `site/`, built with Eleventy into earbee.org: the landing page and the blog. **Everything about it, from writing a post to publishing it and getting it found, is in [blog.md](blog.md).** In short: `cd site && npm install` once, then `npm start` for a preview at http://localhost:8080. Pushing changes to `main` publishes them. To republish without a change, run `gh workflow run pages.yml --ref main`.
 
 ## When CI fails
 
