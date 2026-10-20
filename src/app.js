@@ -117,7 +117,7 @@
  *                  (notifications: small confirmations, notify())
  *   features/      playback.js (and the A–B loop), beats.js (finding the
  *                  beats on demand: the worker, then the beat model window
- *                  by window; the ♩ chip and its ▾ menu of edits; the
+ *                  by window; the ♩ chip and its menu of edits; the
  *                  beat click), marks.js (actions,
  *                  selection, the marks list), open-file.js, download.js
  *                  (and searching in the download dialog), settings.js

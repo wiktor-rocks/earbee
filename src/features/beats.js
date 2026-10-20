@@ -145,7 +145,7 @@ function take({ beats: times, downbeats = new Float64Array(0) }, { method, compl
 }
 
 /**
- * Changes some of the project's edits to the beats (the ▾ menu).
+ * Changes some of the project's edits to the beats (the beats menu).
  * @param {Partial<import("../core/beat-edits.js").BeatEdits>} changes
  */
 export function setBeatEdits(changes) {
@@ -297,7 +297,7 @@ export function resetBeats(next) {
   updateClicks();
 }
 
-// "Find the beats again" (the ▾ menu): from scratch, keeping the edits.
+// "Find the beats again" (the beats menu): from scratch, keeping the edits.
 function findAgain() {
   const { edits } = beats;
   resetBeats(media);
