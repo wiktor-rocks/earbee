@@ -43,6 +43,44 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-20: Editing the beats, and beats saved in projects (experiment `exp/beat-edits`)
+
+- **What:**
+  - Once the beats are found, a click on the ♩ chip opens the beats menu:
+    - **Show the beat lines** (B);
+    - **Click on each beat** (Shift+B), moved here from Settings › General; still one setting for the whole app;
+    - **Strong first beat of each bar**: off gives no bars at all (all lines alike, no accent, no "1 bar" step, `\` loops a beat);
+    - **Steady grid**, on by default: stray extra beats dropped, gaps filled, so the beats don't waver between two tempos;
+    - **Half time**, **Double time**;
+    - **Subdivisions**: halves, thirds (triplets), quarters, as faint dashed lines that loop edges and marks snap to (never stepped or clicked);
+    - **Bars start a beat earlier / later**;
+    - **Find the beats again** (keeping the edits).
+  - While finding, a click on the chip no longer stops the search; only B does.
+  - Projects save the beats and the edits: reopening brings them back at once, without running the model, and the edits can still be undone. The step "1 beat" or "1 bar" now survives reopening.
+- **Why:**
+  - On a funk song (_Groove or Die_), the beat model counted everything in double time (a beat every 0.23 s; the song's is 0.46 s, 130 BPM), and around 0:08–0:14 it wavered between the two, so the lines looked wrong. Every other beat's score sat right at the model's threshold there.
+  - It isn't a porting bug: EarBee's beats matched the Python original's (602 of 602 within 20 ms).
+  - The full Beat This! model was measured too (`local/bench/model-compare.mjs`): 83 MB against 10.6 MB, about 1.7× slower, better on some songs, but also in double time on this one. So the small model stays, and choosing the tempo level is left to the user.
+  - The owner asked for beat editing as project settings, the menu on the chip itself, an option without strong beats, and the beat click in the beats menu.
+- **How:**
+  - `beats.raw` keeps what the finder found; `beats.edits` holds the project's edits; `applyBeatEdits` works the edited beats out again from both whenever an edit changes. Everything else (lines, stepping, loops, snapping, the click, the chip's tempo) reads the edited beats, unchanged.
+  - The steady grid takes the local beat as the median gap over 32 beats. Where that is about a whole multiple of the song's overall beat, the model counted that stretch at another level: it's brought to the song's level, so the grid fills there too. (On _Let There Be Rock_, the gaps off the grid went from 102 to 6.)
+  - Half time keeps the side (odd or even beats) most of the nearby bar starts fall on, so one bar of an odd length doesn't break the grid, and keeps every other bar, so a bar keeps its number of beats.
+  - A new project section, `beats`, saves the beats as found (to the ms) and the edits, before `playback`. Sections may now have a `dirtyKey()`, cheaper than `capture()`: the beats count as unsaved by a revision number and the edits, not by every beat. The model finishing in the background also checks for unsaved changes (`beatEvents`).
+  - Settings fields can be `inDialog: false`: kept like the others, set elsewhere (the beat click). `bindMenu` takes `canOpen()`, so the chip finds the beats before it opens the menu.
+  - The thresholds are in `CONFIG.beats.steady`, the defaults in `CONFIG.beats.edits`.
+- **Where:**
+  - `src/core/beat-edits.js` (new): `applyBeatEdits`, `steady`, `halfTime`, `doubleTime`;
+  - `src/features/beats.js` (`take`, `applyEdits`, `setBeatEdits`, `restoreBeats`, `savedBeats`, "The beats menu"), `src/context.js` (`beats.raw`, `edits`, `subdivisions`);
+  - `src/features/project/sections.js` (the `beats` section; `playback` keeps "beat" / "bar"), `src/features/project/index.js` (`dirtyKey`);
+  - `src/timeline.js` (subdivision lines), `src/ui/menu.js` (`canOpen`), `src/ui/dom.js`, `src/prefs/` (`inDialog`), `src/features/settings.js`, `src/config.js`, `index.html` (`#beatMenu`), `style.css`;
+  - `docs/glossary.md`, `README.md`.
+- **Verified by:**
+  - `npm test`: 289 unit (18 new in `tests/unit/beat-edits.test.mjs`, one on a fixture of the song's real beats, `tests/unit/fixtures/beats-double-time.json`), 489 e2e (new checks in topics 13, 16 and 20: the menu, every edit, snapping to subdivisions, saving and reopening beats), 28 smoke.
+  - The test AppImage's smoke test.
+  - The edits on the beats of six real songs (`local/bench/`): _Groove or Die_ gives 130 BPM with nothing off the grid, _Everlong_ is unchanged.
+  - Once, topic 20's simple-finder check stuck at "Finding the beats 0 %": the known flake, not reproduced in later runs.
+
 ## 2026-10-19: The blog's first two posts, and "not freemium" under every post (the website)
 
 - **What:**
