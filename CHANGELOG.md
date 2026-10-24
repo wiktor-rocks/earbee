@@ -43,6 +43,20 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-24: Blog post "Is ear training worth it?" (the website)
+
+- **What:** a third post, "Is ear training worth it? What drills can and can't do", at `/blog/is-ear-training-worth-it/`. Its answer: yes, if the training is active (singing, tapping, reading, writing, dictation) and used on real music, not only naming intervals in an app. It introduces Paul Hindemith's _Elementary Training for Musicians_ as the model of all-round basic musicianship, and links to a study in which adults learned absolute pitch. It links to both earlier posts.
+- **Why:** post idea 17 in `docs/blog.md`, the other side of "Why transcribing music by ear makes you a better musician".
+  - The owner wrote the core paragraphs (basic musical aptitude, basic musicianship and Hindemith, learning it like reading, "anything can be learned"); an assistant drafted the rest, polished it in the owner's style, and steered it toward Hindemith's views.
+  - The keyword, "is ear training worth it", is the most-suggested question around the topic (`keywords.cjs`); the sections answer the next ones: interval training, how much per day, how long it takes, why it's hard.
+  - Hindemith's views and quotes come from the preface of the 1949 Schott edition (the preface is dated 1946), not from memory.
+- **How:** a Markdown post with `keyword: "is ear training worth it"`.
+- **Where:** `site/blog/is-ear-training-worth-it.md`.
+- **Verified by:**
+  - `node scripts/seo/check.cjs`: no errors or warnings for the post.
+  - `npm run check`.
+  - `npm --prefix site run build`: the post is built.
+
 ## 2026-10-20: Finding the beats starts at once, on any length of file (experiment `exp/beat-windows`)
 
 - **What:** after B, the first tempo shows within 2–3 s on a file of any length. Before, it took about 14 s for 10 minutes of sound, 69 s for an hour of MP3 and 108 s for an hour of Opus. All the beats are found sooner too. A search whose worker doesn't start within 30 s now fails with a message instead of staying at "Finding the beats 0 %".
