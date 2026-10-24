@@ -43,6 +43,21 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-24: The two flaky CI checks (beats and the welcome screen's motion) (tests)
+
+- **What:** the e2e checks that failed now and then on CI, and passed on a rerun:
+  - beats (topic 20): "B finds 120 BPM" (2026-10-18) and "a steady tone has no steady beat" (2026-10-24, on `main`), both showing "♩ Finding the beats 0 %";
+  - the welcome screen (topic 02): "…and they move" (2026-10-18 and 2026-10-19), its two animations' clocks at 0 for the whole wait.
+- **Why:** the owner asked to fix the flakes for good.
+- **How:**
+  - **Beats: a race in the test, not the app.** The CI logs show both failures 4 ms after the check before them: the test's wait never ran. `key()` returns before the page has handled the key, and `found()` waited only while the chip read "Finding" or "%". When its first look came before B had been handled, the chip still read "♩ Find the beats", so it returned at once, and the next look saw 0 %. Now `found()` also waits while the chip offers to find the beats (up to 60 s), a new `started()` waits for B to start the finding before the test clicks the chip (a click first would start it, and the late B would then stop it), and `linesShown()` waits for the chip to dim or undim after B hides or shows the lines, in place of fixed 50 ms sleeps.
+  - **Welcome: a likely cause, not proven.** The window is offscreen and draws only when asked, and the animations' clocks advance only with frames. The wait now asks for a frame at each look (`wc.invalidate()`, as `shot()` does) and lasts up to 15 s instead of 5. It couldn't be reproduced here (no virtual display; with all cores busy the clocks still moved within 250 ms), so watch CI.
+- **Where:** `tests/e2e/20-beats.cjs` (`started`, `found`, `linesShown`); `tests/e2e/02-welcome.cjs` ("…and they move").
+- **Verified by:**
+  - Beats: with B delivered 300 ms late (a temporary change to `key()` in `tests/e2e/harness.cjs`, taken out again), the old test failed ("B finds 120 BPM" and 22 more) and the new one passed (64 pass). Without the delay, `TB_TOPICS=20 npm test` passed 3 times out of 3.
+  - Welcome: `TB_TOPICS=02 npm test` passed twice.
+  - `npm run check`.
+
 ## 2026-10-24: Blog post "Is ear training worth it?" (the website)
 
 - **What:** a third post, "Is ear training worth it? What drills can and can't do", at `/blog/is-ear-training-worth-it/`. Its answer: yes, if the training is active (singing, tapping, reading, writing, dictation) and used on real music, not only naming intervals in an app. It introduces Paul Hindemith's _Elementary Training for Musicians_ as the model of all-round basic musicianship, and links to a study in which adults learned absolute pitch. It links to both earlier posts.

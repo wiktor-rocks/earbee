@@ -39,10 +39,21 @@ module.exports = async function (h) {
     return lefts.map((percent) => (percent / 100) * duration);
   };
   const stepText = () => js(`document.getElementById("stepSize").textContent.trim()`);
-  // Waits for the chip to stop showing progress: all of the track is done.
+  // key() returns before the page has handled the key, so after B the chip
+  // may still offer to find the beats for a moment (longer on a busy CI
+  // machine). These wait for B to have started the finding, and for the
+  // finding to end: all of the track done, or no steady beat.
+  async function started() {
+    for (let i = 0; i < 250 && (await chip()).text === "♩ Find the beats"; i++) await sleep(20);
+  }
   async function found() {
-    for (let i = 0; i < 400 && /Finding|%/.test((await chip()).text); i++) await sleep(50);
+    for (let i = 0; i < 1200 && /Find the beats|Finding|%/.test((await chip()).text); i++) await sleep(50);
     return chip();
+  }
+  // Once they're found, B shows or hides the lines; waits for the chip to
+  // be dimmed (hidden) or not.
+  async function linesShown(shown) {
+    for (let i = 0; i < 250 && (await chip()).disabled === shown; i++) await sleep(20);
   }
   const near = (value, target, within = 0.025) => Math.abs(value - target) <= within;
 
@@ -55,7 +66,9 @@ module.exports = async function (h) {
   check("no beat lines yet", (await lines()) === 0);
 
   key("B");
-  await sleep(50);
+  // A click before B has arrived would start the finding itself, and the
+  // late B would then stop it.
+  await started();
   await js(`document.getElementById("beatInfo").click()`);
   await sleep(50);
   c = await chip();
@@ -171,13 +184,14 @@ module.exports = async function (h) {
   check("M near a beat puts the mark on it", (await markTimes()).includes("0:07.260"), await markTimes());
   key("Delete");
   key("B"); // hide the lines: no snapping
-  await sleep(50);
+  await linesShown(false);
   await click(5.32);
   key("[");
   await sleep(100);
   loop = await loopRange();
   check("with the lines hidden, nothing snaps", !near(loop.start, 5.26, 0.01), JSON.stringify(loop));
   key("B");
+  await linesShown(true);
   key("L", ["shift"]);
   await sleep(50);
 
@@ -188,11 +202,11 @@ module.exports = async function (h) {
   await slide("speed", 1);
 
   key("B");
-  await sleep(50);
+  await linesShown(false);
   c = await chip();
   check("B again hides the lines, chip dimmed", (await lines()) === 0 && c.disabled, JSON.stringify(c));
   key("B");
-  await sleep(50);
+  await linesShown(true);
   check("B shows them again", (await lines()) === count && !(await chip()).disabled);
 
   // The beats menu (a click on the chip, once found): the lines, the

@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 
 module.exports = async function (h) {
-  const { js, dbg, setFiles, shot, check, sleep, FIXTURES } = h;
+  const { js, wc, dbg, setFiles, shot, check, sleep, FIXTURES } = h;
 
   const screens = () =>
     js(
@@ -46,10 +46,14 @@ module.exports = async function (h) {
     JSON.stringify(names),
   );
   // They advance within a few seconds (a slow machine, like CI's, can take
-  // a while to draw its first frames, and the clocks wait for those).
+  // a while to draw its first frames, and the clocks wait for those). The
+  // window is offscreen, and draws only when asked: twice on CI the clocks
+  // stayed at 0 for the whole wait, so each look also asks for a frame, as
+  // shot() does.
   const motionBefore = await welcomeMotion();
   let motionAfter = motionBefore;
-  for (let waited = 0; waited < 5000 && motionAfter === motionBefore; waited += 250) {
+  for (let waited = 0; waited < 15000 && motionAfter === motionBefore; waited += 250) {
+    wc.invalidate();
     await sleep(250);
     motionAfter = await welcomeMotion();
   }
