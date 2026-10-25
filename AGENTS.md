@@ -72,6 +72,7 @@ A small change (a comment, a CSS value, a typo) needs `npm run check` only.
 
 ## Conventions
 
+- **Playback is king.** Audio and video play smoothly at all times, and so do the time indicator and the waveform. Everything else (finding the beats, the video's preview copy, downloads, analysis) gives way to playback: it runs at a lower priority, uses fewer threads or pauses while playing, and may take longer. Check smoothness in a real window (`npm start`): the tests' offscreen window hides most stutter.
 - **Comments** are plain sentences that say what something is for and why. Match the amount of comment around your change: most files explain each part.
 - **Types** are JSDoc (`/** @param {number} time */`). `npm run check` type-checks both the page (`jsconfig.json`) and the main process (`electron/jsconfig.json`), in the lenient mode.
 - **Numbers and lists come from data, not code:** speeds, step sizes, EQ bands and limits in `CONFIG` (`src/config.js`); settings in `src/prefs/index.js`; themes in `src/themes/palettes.js`. The UI for them is generated.
