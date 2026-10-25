@@ -43,6 +43,30 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-25: Blog post "Free alternative to Transcribe! for music" (the website)
+
+- **What:** a fourth post, "Free alternative to Transcribe! for music: 5 compared fairly", at `/blog/free-alternative-to-transcribe/`.
+  - What Transcribe! does and costs, what a transcribing tool needs, then EarBee, Sonic Visualiser, VLC, Audacity and Play it Slowly (plus YouTube's own speed setting), side by side in a table.
+  - When Transcribe! is still worth paying for, which to choose, and why AI transcription won't replace transcribing by ear.
+  - "Why transcribing music by ear makes you a better musician" now links to it, in its "Tools" section.
+- **Why:** post idea 3 in `docs/blog.md`. The owner wrote the post; an assistant reviewed it.
+- **How:**
+  - `keyword: "free alternative to transcribe"`. That search is mostly about speech-to-text, so the title and the description say "for music".
+  - Fact-checked against each tool's own pages (2026-10-25):
+    - Transcribe!: a twentieth of the speed, up to three octaves, the 30-day trial, $39, and lower prices for several copies bought together.
+    - Sonic Visualiser's slowest speed is an eighth (its source code; the draft said a tenth).
+    - Audacity: since version 3.4, a clip's Pitch and Speed setting keeps the pitch but can't change while it plays (its manual; the draft said Change Tempo only).
+    - Play it Slowly plays video.
+    - VLC's equaliser menu is named for Windows and Linux only.
+  - EarBee is described without keys or numbers (the blog's rule), and its claims were checked against the code.
+  - The AI section comes after the comparison, so the answer comes first.
+  - Playable was left out: the only listing found calls it a discontinued, paid Mac app.
+- **Where:** `site/blog/free-alternative-to-transcribe.md`, `site/blog/why-transcribe-music-by-ear.md`.
+- **Verified by:**
+  - `node scripts/seo/check.cjs`: no errors or warnings for the post.
+  - `npm --prefix site run build`: the post is built.
+  - `npm run check`.
+
 ## 2026-10-25: Blog posts go online from `testing` (the website)
 
 - **What:** a post goes online when it's pushed to `testing`, without moving `main`. The rest of the site (the home page, the layout, the styles) still goes online from `main`.

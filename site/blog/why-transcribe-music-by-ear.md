@@ -52,6 +52,6 @@ The first song takes a long time. The next ones go faster.
 
 ## Tools
 
-You need a player that loops a short passage, slows it down without changing the pitch, and lets you jump back to the start of a phrase without reaching for the mouse every few seconds.
+You need a player that loops a short passage, slows it down without changing the pitch, and lets you jump back to the start of a phrase without reaching for the mouse every few seconds. Several free ones do; they're compared in [free alternatives to Transcribe!](/blog/free-alternative-to-transcribe/).
 
 [EarBee](/) is a free, open-source player made for this. It slows a song or a video down without changing the pitch, loops the passage you're working on, and lets you step back and forth through a phrase from the keyboard. It can find the beats and bars, so a loop fits the music, and you can mark the sections of a song as you work through them. Everything is in the download: there's [no trial, no paid version and no account](/#free). It runs on Windows, macOS and Linux: [download it here](/#download).
