@@ -12,6 +12,16 @@ const FRAMES = 1500;
 // 1.4 on 2, 0.95 on 4, 1.3 on 6), and the page needs some CPU too.
 const THREADS = Math.max(1, Math.min(4, Math.floor(os.cpus().length / 2)));
 
+// Below normal priority, so finding the beats gives way to playback, the
+// video and drawing, and takes what CPU is left. Set here, before ONNX
+// Runtime starts its threads: on Linux a priority is per thread, and new
+// threads take their creator's. A system that refuses it still finds them.
+try {
+  os.setPriority(os.constants.priority.PRIORITY_BELOW_NORMAL);
+} catch (error) {
+  console.warn("The beat model runs at normal priority:", error?.message ?? error);
+}
+
 let session = null;
 
 async function load() {
