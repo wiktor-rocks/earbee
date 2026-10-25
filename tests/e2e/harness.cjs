@@ -12,6 +12,10 @@ const PROJECT = process.env.TB_APP_PATH || path.resolve(TESTS, "..");
 const FIXTURES = path.join(TESTS, "fixtures");
 const OUTPUT = path.join(TESTS, "output");
 const DOWNLOADS = path.join(OUTPUT, "downloads");
+// TB_VISIBLE=1: a real, visible window instead of the offscreen one, to
+// watch a run or measure what the screen shows (local/bench). The topics
+// expect the offscreen window; some checks may differ in a visible one.
+const VISIBLE = process.env.TB_VISIBLE === "1";
 
 const results = { pass: 0, fail: 0 };
 const check = (name, ok, detail = "") => {
@@ -123,11 +127,11 @@ async function createHarness() {
     filePath: path.join(PROJECT, "electron", "preload.js"),
   });
   const win = new BrowserWindow({
-    show: false,
+    show: VISIBLE,
     width: 1200,
     height: 800,
     webPreferences: {
-      offscreen: true,
+      offscreen: !VISIBLE,
       preload: path.join(TESTS, "preload.cjs"),
       sandbox: true, // as in main.js
       contextIsolation: true,
