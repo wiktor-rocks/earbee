@@ -7,6 +7,16 @@
  * element running its own time, so the picture can't drift from the
  * audio and is frame-exact when paused, after seeks and at any speed.
  *
+ * Off the page's thread: the decoding, the proxy and the drawing run in a
+ * Worker (video/video-worker.js), which draws on the canvas through an
+ * OffscreenCanvas. Drawing a big frame costs milliseconds of CPU; there it
+ * can't hold up the waveform, the cursor or the time readout ("playback
+ * is king", AGENTS.md). This file is the page side: it hands the worker
+ * the files, the canvases, their sizes and the transport's position (on
+ * each animation frame, with the time it was taken), and shows on the
+ * canvas what the worker drew. Between positions the worker's clock moves
+ * on by itself, so the picture keeps going while the page is busy.
+ *
  * Decoding cost: a frame can only be decoded after every frame since the
  * previous keyframe, which in real videos can be several seconds back.
  * So all decoding goes through one "cursor", a stream of frames in
@@ -42,7 +52,9 @@
  * Errors: the picture is never allowed to break playback. Failures are
  * logged with console.warn; the proxy is optional (without it, seeking is
  * just slower), and a decoding failure is reported once per file through
- * onProblem.
+ * onProblem. If the worker itself stops, the picture stops for the rest
+ * of the session (a canvas can be handed to a worker only once), with
+ * one onProblem message.
  *
  * Exposes: preload, prepare, overviewReady, show, clear, discard,
  *          start, advance, showFrameAt, attach
@@ -57,10 +69,6 @@
  *   screen is redrawn there and the old pane is hidden.
  * ===================================================================== */
 
-import { CONFIG } from "../config.js";
-import { mediaSource } from "../core/media.js";
-import { createVideoProxy } from "./proxy.js";
-
 /**
  * @param {object} options
  * @param {HTMLElement} options.pane The box the picture sits in (hidden for audio files).
@@ -69,221 +77,174 @@ import { createVideoProxy } from "./proxy.js";
  * @param {(message: string) => void} options.onProblem Tell the user the picture is in trouble.
  */
 export function createVideoView({ pane, canvas, onVisibilityChange, onProblem }) {
-  const { maxLagSeconds } = CONFIG.video;
-  let context2d = canvas.getContext("2d");
+  /** @type {Worker | null} */
+  let worker = null;
+  /** @type {Promise<void> | null} */
+  let ready = null; // settles once the worker has loaded Mediabunny
+  let stopped = false; // the worker failed: no picture this session
+  let nextId = 1;
+  /** @type {Map<number, (prepared: { video: { id: number } | null, reason: string | null }) => void>} */
+  const preparing = new Map();
+  /** @type {Map<number, { onProgress: (share: number) => void, done: () => void }>} */
+  const overviews = new Map();
+  // Each canvas's surface in the worker (a canvas is transferred once).
+  /** @type {WeakMap<HTMLCanvasElement, number>} */
+  const surfaces = new WeakMap();
+  let surfaceId = 0; // the one drawn in
+  let showing = false; // a video is on screen
   /** @type {ResizeObserver | undefined} */
   let resizeObserver;
 
-  let modulePromise = null;
-  // On screen: { input, track, sink, packets, firstTimestamp, proxy }
-  let current = null;
+  const now = () => performance.timeOrigin + performance.now();
+  const send = (message, transfer = []) => worker && !stopped && worker.postMessage(message, transfer);
 
-  // What the picture should do: follow playback, or show one frame.
-  let mode = "idle"; // "idle" | "playing" | "frame"
-  let target = 0; // playing: latest position; frame: time to show
-  let targetVersion = 0; // bumped on every new target
-  let seekTarget = null; // playing: a jump to resolve before continuing
-  let streamEnded = false; // playing: no frames left after the cursor
+  /* ---------- The worker ---------- */
 
-  // Samples held at any time: the cursor's last frame and nextFrame (often
-  // the same one). Everything else is closed right away.
-  let cursor = null; // { iterator, last, end }: frames in order
-  let nextFrame = null; // playing: decoded, waiting for its time
-  let looping = false; // only one decode loop at a time
-  let lastSkipCheckAt = 0;
-  let shownTime = null; // timestamp of the frame on screen
-  let shownIsProxy = false;
-  let proxyRequest = null; // time wanted from the proxy (latest wins)
-  let proxyBusy = false;
-  let sharpHeldUntil = 0; // performance.now() until which run() waits (head start)
-  /** @type {ReturnType<typeof setTimeout> | undefined} */
-  let heldRun; // timer for a run() waiting out the head start
-
-  // Loads Mediabunny without creating anything; safe at startup.
-  function preload() {
-    modulePromise ??= import("../../node_modules/mediabunny/dist/bundles/mediabunny.mjs").catch((error) => {
-      modulePromise = null; // let the next call retry
-      throw error;
+  function startWorker() {
+    if (worker) return;
+    worker = new Worker(new URL("./video-worker.js", import.meta.url), { type: "module" });
+    ready = new Promise((resolve, reject) => {
+      worker.addEventListener("message", ({ data }) => {
+        if (data.type === "ready") resolve();
+      });
+      worker.addEventListener("error", () => reject(new Error("the video worker couldn't start")), { once: true });
     });
-    return modulePromise;
+    ready.catch(() => {}); // seen by preload's caller
+    worker.addEventListener("message", ({ data }) => onMessage(data));
+    worker.addEventListener("error", (event) => {
+      event.preventDefault();
+      stop(event.message || "the video worker stopped");
+    });
+    surfaceId = surfaceFor(canvas);
+    send({ type: "use", id: surfaceId });
+  }
+
+  // The worker failed: whatever waits for it gives up, and the user
+  // hears about it once if a video is on screen.
+  function stop(reason) {
+    if (stopped) return;
+    stopped = true;
+    console.warn("Video worker failed:", reason);
+    for (const resolve of preparing.values()) resolve({ video: null, reason: "its video couldn't be read" });
+    preparing.clear();
+    for (const { done } of overviews.values()) done();
+    if (showing) onProblem("The video's picture stopped. The audio is unaffected.");
+  }
+
+  function onMessage(data) {
+    switch (data.type) {
+      case "prepared": {
+        const resolve = preparing.get(data.id);
+        preparing.delete(data.id);
+        return resolve?.({ video: data.ok ? { id: data.id } : null, reason: data.reason });
+      }
+      case "overview": {
+        const watch = overviews.get(data.id);
+        watch?.onProgress(data.share);
+        if (data.done) watch?.done();
+        return;
+      }
+      case "shown":
+        return showing && markShown(data.time, data.proxy);
+      case "built":
+        builtText = data.built;
+        overviewText = data.overview;
+        return showBuilt();
+      case "problem":
+        return onProblem(data.message);
+    }
+  }
+
+  // Loads the worker (and Mediabunny in it) without opening anything;
+  // safe at startup.
+  function preload() {
+    startWorker();
+    return /** @type {Promise<void>} */ (ready);
   }
 
   /* ---------- Opening files ---------- */
 
   /** @param {import("../core/media.js").Media} media */
-  async function prepare(media) {
-    let input = null;
-    try {
-      const { Input, BlobSource, UrlSource, ALL_FORMATS, VideoSampleSink, EncodedPacketSink } = await preload();
-      input = new Input({ formats: ALL_FORMATS, source: mediaSource(media, { BlobSource, UrlSource }) });
-
-      const track = await input.getPrimaryVideoTrack();
-      if (!track) return failed(input, "it has no video track");
-      if (!(await track.canDecode()))
-        return failed(input, `${track.codec?.toUpperCase() ?? "its"} video isn't supported`);
-
-      const sink = new VideoSampleSink(track);
-      const packets = new EncodedPacketSink(track); // for keyframe lookups
-      const firstTimestamp = await track.getFirstTimestamp();
-
-      // Decoding the first frame proves the picture really works.
-      const first = await sink.getSample(firstTimestamp);
-      if (!first) return failed(input, "its video couldn't be decoded");
-      first.close();
-
-      const video = { input, track, sink, packets, firstTimestamp, proxy: null };
-      startProxy(video, VideoSampleSink, await track.computeDuration());
-      return { video, reason: null };
-    } catch (error) {
-      console.warn("Video prepare failed:", error);
-      return failed(input, "its video couldn't be read");
-    }
-  }
-
-  // The proxy starts building at once, while the file still loads (its
-  // overview is what loading waits for: see overviewReady).
-  function startProxy(video, VideoSampleSink, duration) {
-    const proxy = createVideoProxy({
-      track: video.track,
-      makeSourceSink: () => new VideoSampleSink(video.track), // each with its own decoder
-      packets: video.packets,
-      duration,
-      onProgress: () => video === current && markBuilt(proxy),
+  function prepare(media) {
+    startWorker();
+    if (stopped) return Promise.resolve({ video: null, reason: "its video couldn't be read" });
+    const id = nextId++;
+    return new Promise((resolve) => {
+      preparing.set(id, resolve);
+      send({ type: "prepare", id, media });
     });
-    video.proxy = proxy;
-    // Gives way to this video's own sharp decoding, not another's.
-    proxy
-      .build(() => looping && video === current)
-      .catch((error) => {
-        if (!video.discarded) console.warn("Video proxy failed:", error);
-      });
   }
 
   // Waits (at most `ms`, or until `signal` aborts) until the proxy's
   // overview of a prepared video is done, so dragging anywhere shows a
   // picture at once; reports the share done meanwhile.
   /**
-   * @param {{ proxy: any } | null | undefined} video
+   * @param {{ id: number } | null | undefined} video
    * @param {number} ms
    * @param {AbortSignal | undefined} signal
    * @param {(share: number) => void} onProgress
    */
   async function overviewReady(video, ms, signal, onProgress) {
-    if (!video?.proxy || signal?.aborted) return;
+    if (!video || stopped || signal?.aborted) return;
     let timeout;
     let onAbort;
-    const progress = setInterval(() => onProgress(video.proxy.overviewProgress()), 100);
     try {
-      await Promise.race([
-        video.proxy.overviewReady,
-        new Promise((resolve) => {
-          timeout = setTimeout(resolve, ms);
-          onAbort = resolve;
-          signal?.addEventListener("abort", onAbort, { once: true });
-        }),
-      ]);
+      await new Promise((resolve) => {
+        overviews.set(video.id, { onProgress, done: () => resolve(undefined) });
+        send({ type: "watch-overview", id: video.id });
+        timeout = setTimeout(resolve, ms);
+        onAbort = resolve;
+        signal?.addEventListener("abort", onAbort, { once: true });
+      });
     } finally {
-      clearInterval(progress);
       clearTimeout(timeout);
       signal?.removeEventListener("abort", onAbort);
+      overviews.delete(video.id);
+      send({ type: "unwatch-overview", id: video.id });
     }
   }
 
-  function failed(input, reason) {
-    input?.dispose?.();
-    return { video: null, reason };
-  }
-
+  /** @param {{ id: number } | null | undefined} video */
   function discard(video) {
-    if (!video) return;
-    video.discarded = true;
-    video.proxy?.dispose(); // also stops its builder
-    video.input.dispose?.();
+    if (video) send({ type: "discard", id: video.id });
   }
 
+  /** @param {{ id: number }} video */
   function show(video) {
-    reset();
-    markBuilt(null);
-    if (current && current !== video) discard(current);
-    current = video;
+    startWorker();
+    showing = true;
     pane.hidden = false;
     onVisibilityChange(true);
     resizeCanvas();
-    showFrameAt(0);
-    markBuilt(video.proxy); // what was built while it loaded
+    send({ type: "show", id: video.id }); // at 0, with what was built while it loaded
   }
 
   function clear() {
-    reset();
-    discard(current);
-    current = null;
+    showing = false;
+    send({ type: "clear" });
     pane.hidden = true;
     onVisibilityChange(false);
-    context2d.clearRect(0, 0, canvas.width, canvas.height);
     delete canvas.dataset.frameTime;
-    markBuilt(null);
+    delete canvas.dataset.proxy;
+    builtText = null;
+    overviewText = null;
+    showBuilt();
   }
 
-  function reset() {
-    dropNextFrame();
-    closeCursor();
-    mode = "idle";
-    targetVersion++;
-    seekTarget = null;
-    shownTime = null;
-    shownIsProxy = false;
-    proxyRequest = null;
-    clearTimeout(heldRun);
-    sharpHeldUntil = 0;
-  }
-
-  /* ---------- Drawing ---------- */
-
-  // Letterboxes the frame into the canvas (honouring rotation metadata).
-  function draw(frame) {
-    context2d.fillStyle = "#000";
-    context2d.fillRect(0, 0, canvas.width, canvas.height);
-    frame.drawWithFit(context2d, { fit: "contain" });
-    markShown(frame.timestamp, false);
-  }
-
-  // Letterboxes a (low-resolution) proxy frame into the canvas.
-  function drawProxy(frame) {
-    const { width, height } = canvas;
-    const scale = Math.min(width / frame.displayWidth, height / frame.displayHeight);
-    const drawWidth = frame.displayWidth * scale;
-    const drawHeight = frame.displayHeight * scale;
-
-    context2d.fillStyle = "#000";
-    context2d.fillRect(0, 0, width, height);
-    context2d.drawImage(frame, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
-    markShown(frame.timestamp / 1e6, true);
-  }
+  /* ---------- What's on screen ---------- */
 
   // The canvas carries what's on screen (used by tests and handy in
   // DevTools): data-frame-time, plus data-proxy while a proxy frame shows.
   function markShown(time, isProxy) {
-    shownTime = time;
-    shownIsProxy = isProxy;
     canvas.dataset.frameTime = time.toFixed(3);
     if (isProxy) canvas.dataset.proxy = "";
     else delete canvas.dataset.proxy;
   }
 
-  // And data-proxy-built: the parts of `proxy` built so far, as
+  // And data-proxy-built: the parts of the proxy built so far, as
   // "start–end" in seconds; data-proxy-overview: its overview's frames.
   let builtText = null;
   let overviewText = null;
-  function markBuilt(proxy) {
-    builtText =
-      proxy &&
-      proxy
-        .built()
-        .map(([from, to]) => `${from.toFixed(1)}–${to.toFixed(1)}`)
-        .join(" ");
-    overviewText = proxy && String(proxy.overviewCount());
-    showBuilt();
-  }
   function showBuilt() {
     if (builtText === null) delete canvas.dataset.proxyBuilt;
     else canvas.dataset.proxyBuilt = builtText;
@@ -291,329 +252,89 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     else canvas.dataset.proxyOverview = overviewText;
   }
 
+  /* ---------- Canvases ---------- */
+
+  // The worker's surface for `target`, handing it over the first time.
+  /** @param {HTMLCanvasElement} target */
+  function surfaceFor(target) {
+    let id = surfaces.get(target);
+    if (id === undefined) {
+      id = nextId++;
+      surfaces.set(target, id);
+      const offscreen = target.transferControlToOffscreen();
+      send({ type: "surface", id, canvas: offscreen }, [offscreen]);
+    }
+    return id;
+  }
+
   // The pane's own window: another screen may have another pixel ratio.
   const paneWindow = () => pane.ownerDocument.defaultView ?? window;
 
+  // The canvas's size in pixels; the worker redraws the frame on screen
+  // when paused (while playing, the next frame redraws it).
   function resizeCanvas() {
     const ratio = paneWindow().devicePixelRatio;
-    canvas.width = Math.max(1, Math.round(pane.clientWidth * ratio));
-    canvas.height = Math.max(1, Math.round(pane.clientHeight * ratio));
+    send({
+      type: "size",
+      id: surfaceId,
+      width: Math.max(1, Math.round(pane.clientWidth * ratio)),
+      height: Math.max(1, Math.round(pane.clientHeight * ratio)),
+    });
   }
 
-  // Resizing clears the canvas; redraw the frame on screen when paused
-  // (while playing, the next frame redraws within a few milliseconds).
   // The observer comes from the pane's window, so it sees that window's
   // layout.
   function observePane() {
     resizeObserver?.disconnect();
     resizeObserver = new (paneWindow().ResizeObserver)(() => {
-      if (pane.hidden) return;
-      resizeCanvas();
-      if (current && mode !== "playing") showFrameAt(shownTime ?? target);
+      if (!pane.hidden) resizeCanvas();
     });
     resizeObserver.observe(pane);
   }
   observePane();
 
   // Draws from now on in `surface` (see the header); the old canvas is
-  // cleared and its pane hidden.
+  // emptied and its pane hidden.
   /** @param {{ pane: HTMLElement, canvas: HTMLCanvasElement }} surface */
   function attach(surface) {
     if (surface.pane === pane && surface.canvas === canvas) return;
+    startWorker();
     pane.hidden = true;
-    context2d.clearRect(0, 0, canvas.width, canvas.height);
     delete canvas.dataset.frameTime;
     delete canvas.dataset.proxy;
     delete canvas.dataset.proxyBuilt;
     delete canvas.dataset.proxyOverview;
 
     ({ pane, canvas } = surface);
-    context2d = canvas.getContext("2d");
+    surfaceId = surfaceFor(canvas);
     observePane();
-    if (!current) return;
-    showBuilt();
-
-    pane.hidden = false;
-    resizeCanvas();
-    // The new canvas is empty: redraw what was on screen. While playing,
-    // the next frame (or a proxy one, at once) draws it.
-    const time = shownTime ?? target;
-    shownTime = null;
-    shownIsProxy = false;
-    if (mode !== "playing") showFrameAt(time);
-  }
-
-  /* ---------- Proxy fill-in ---------- */
-
-  // Whether a proxy frame for `time` should be shown: once the proxy is on
-  // screen it keeps going (every frame) until a sharp frame takes over; a
-  // sharp frame is only replaced when it is clearly off.
-  function wantsProxy(time) {
-    if (shownIsProxy) return true;
-    const off = shownTime === null ? Infinity : Math.abs(time - shownTime);
-    return off >= CONFIG.video.proxy.useWhenOffBySeconds;
-  }
-
-  // Asks for the proxy frame at `time`. One decode at a time; while it
-  // runs, newer requests replace older ones. Returns whether it asked.
-  function requestProxy(time) {
-    if (!current?.proxy || !wantsProxy(time)) return false;
-    proxyRequest = time;
-    if (!proxyBusy) serveProxy();
-    return true;
-  }
-
-  // After a seek: show the proxy first, then decode sharp frames.
-  function requestProxyWithHeadStart(time) {
-    if (requestProxy(time)) sharpHeldUntil = performance.now() + CONFIG.video.proxy.headStartMs;
-  }
-
-  async function serveProxy() {
-    proxyBusy = true;
-    try {
-      while (proxyRequest !== null && current?.proxy) {
-        const video = current;
-        const time = proxyRequest;
-        proxyRequest = null;
-
-        const frame = await video.proxy.frameAt(time);
-        if (!frame) continue;
-        try {
-          // Draw only if still useful: the sharp picture may have caught up,
-          // or be nearer than this frame (one from the overview can be off
-          // by a keyframe gap).
-          const wanted = mode === "playing" ? target : time;
-          const nearer = shownTime === null || Math.abs(frame.timestamp / 1e6 - wanted) < Math.abs(shownTime - wanted);
-          if (video === current && wantsProxy(wanted) && nearer) drawProxy(frame);
-        } finally {
-          frame.close();
-        }
-      }
-    } catch (error) {
-      console.warn("Proxy frame failed:", error);
-    } finally {
-      proxyBusy = false;
-      // The proxy frame is on screen: end the head start early.
-      if (sharpHeldUntil > performance.now()) {
-        sharpHeldUntil = 0;
-        run();
-      }
+    if (showing) {
+      showBuilt();
+      pane.hidden = false;
+      resizeCanvas();
     }
-  }
-
-  /* ---------- Decode cursor ---------- */
-
-  // Closes a sample unless it is still in use (as the cursor's last frame
-  // or as nextFrame).
-  function release(sample) {
-    if (sample && sample !== cursor?.last && sample !== nextFrame) sample.close();
-  }
-
-  function dropNextFrame() {
-    const sample = nextFrame;
-    nextFrame = null;
-    release(sample);
-  }
-
-  // Starts decoding at the keyframe before `time` (frames before `time`
-  // are pulled and skipped by the caller, which can stop at any frame).
-  async function openCursor(video, time) {
-    closeCursor();
-    const keyframe = await keyframeBefore(video, Math.max(time, video.firstTimestamp));
-    if (video !== current) return;
-    cursor = { iterator: video.sink.samples(keyframe), last: null, end: -Infinity };
-  }
-
-  function closeCursor() {
-    if (!cursor) return;
-    const { iterator, last } = cursor;
-    cursor = null;
-    iterator.return?.().catch(() => {});
-    release(last);
-  }
-
-  // Next frame from the cursor, or null at the end of the video (or if the
-  // cursor was replaced while decoding).
-  async function pullFrame() {
-    const own = cursor;
-    const result = await own.iterator.next();
-    if (own !== cursor) {
-      result.value?.close();
-      return null;
-    }
-    if (result.done) {
-      closeCursor();
-      return null;
-    }
-    const previous = own.last;
-    own.last = result.value;
-    own.end = result.value.timestamp + result.value.duration;
-    release(previous);
-    return result.value;
-  }
-
-  async function keyframeBefore(video, time) {
-    const packet = await video.packets.getKeyPacket(time, { metadataOnly: true });
-    return packet ? packet.timestamp : video.firstTimestamp;
-  }
-
-  // Whether continuing the cursor reaches `time` with less work than
-  // opening a new one (which decodes from the keyframe before `time`).
-  async function cursorCanReach(video, time) {
-    if (!cursor?.last || time < cursor.last.timestamp) return false;
-    if (time < cursor.end) return true;
-    return (await keyframeBefore(video, time)) <= cursor.last.timestamp;
-  }
-
-  /* ---------- Decode loop ---------- */
-
-  // Frame shown at `time`. If `interrupted()` turns true on the way (a newer
-  // target while dragging), returns the latest frame so progress is visible.
-  async function frameAt(video, time, interrupted) {
-    const t = Math.max(time, video.firstTimestamp);
-    if (!(await cursorCanReach(video, t))) await openCursor(video, t);
-    if (!cursor) return null;
-    if (cursor.last && t < cursor.end) return cursor.last;
-
-    for (;;) {
-      const frame = await pullFrame();
-      if (!frame) return null;
-      if (frame.timestamp + frame.duration > t || interrupted()) return frame;
-    }
-  }
-
-  // Next frame still worth showing during playback; frames whose time has
-  // already passed are skipped without drawing.
-  async function nextPlaybackFrame(video) {
-    if (seekTarget !== null) {
-      const jumpTo = seekTarget;
-      seekTarget = null;
-      if (!(await cursorCanReach(video, jumpTo))) await openCursor(video, jumpTo);
-    }
-
-    for (;;) {
-      if (!cursor) await openCursor(video, target);
-      if (!cursor || video !== current) return null;
-
-      // Falling behind (heavy file at high speed): jump ahead, but only if a
-      // later keyframe makes that cheaper than decoding on.
-      if (target - cursor.end > maxLagSeconds && performance.now() - lastSkipCheckAt > 250) {
-        lastSkipCheckAt = performance.now();
-        if ((await keyframeBefore(video, target)) > cursor.end) await openCursor(video, target);
-        if (!cursor) return null;
-      }
-
-      const frame = await pullFrame();
-      if (mode !== "playing" || video !== current || seekTarget !== null) return null;
-      if (!frame) {
-        if (!cursor) streamEnded = true;
-        return null;
-      }
-      if (frame.timestamp + frame.duration > target) return frame;
-    }
-  }
-
-  async function run() {
-    if (looping) return;
-    const wait = sharpHeldUntil - performance.now();
-    if (wait > 0) {
-      clearTimeout(heldRun);
-      heldRun = setTimeout(run, wait);
-      return;
-    }
-    looping = true;
-
-    try {
-      while (current) {
-        const video = current;
-        try {
-          if (mode === "frame") {
-            const version = targetVersion;
-            const frame = await frameAt(video, target, () => targetVersion !== version);
-            if (video !== current) continue;
-            const reached = targetVersion === version;
-            // The exact frame always replaces what's shown; a frame on the way
-            // (while dragging) only if it is closer than what's shown.
-            if (frame && mode === "frame") {
-              const closer = Math.abs(target - frame.timestamp) < Math.abs(target - (shownTime ?? Infinity));
-              if (reached || closer) draw(frame);
-            }
-            if (reached) break;
-          } else if (mode === "playing") {
-            if (nextFrame || streamEnded) break;
-            const frame = await nextPlaybackFrame(video);
-            if (video !== current || mode !== "playing") continue;
-            if (frame) {
-              nextFrame = frame;
-              break;
-            }
-            if (streamEnded) break;
-          } else {
-            break;
-          }
-        } catch (error) {
-          closeCursor();
-          // The video was put away while it was being decoded (another file
-          // opened): its input is gone, which says nothing about the file.
-          // Carry on with whatever is shown now; only a failure of the
-          // current video is reported.
-          if (video !== current || video.discarded) continue;
-          throw error;
-        }
-      }
-    } catch (error) {
-      console.warn("Video decoding failed:", error);
-      closeCursor();
-      // The next request retries; the user hears about it once per file.
-      if (current && !current.problemReported) {
-        current.problemReported = true;
-        onProblem("Part of the video couldn't be decoded, so the picture may stop updating. The audio is unaffected.");
-      }
-    } finally {
-      looping = false;
-    }
+    // The new canvas is empty: the worker redraws what was on screen.
+    send({ type: "use", id: surfaceId });
   }
 
   /* ---------- Following the transport ---------- */
 
   // Not playing: show exactly the frame at `time`.
+  /** @param {number} time */
   function showFrameAt(time) {
-    if (!current) return;
-    mode = "frame";
-    target = time;
-    targetVersion++;
-    dropNextFrame();
-    if (!(cursor?.last && cursor.last.timestamp <= time && time < cursor.end)) requestProxyWithHeadStart(time);
-    run();
+    if (showing) send({ type: "frame", time });
   }
 
   // Playing (or jumped while playing) from `time`.
+  /** @param {number} time */
   function start(time) {
-    if (!current) return;
-    mode = "playing";
-    target = time;
-    targetVersion++;
-    seekTarget = time;
-    streamEnded = false;
-    dropNextFrame();
-    requestProxyWithHeadStart(time);
-    run();
+    if (showing) send({ type: "start", time, at: now() });
   }
 
-  // Called every animation frame while playing.
+  // Called every animation frame while playing: the worker's clock.
+  /** @param {number} position */
   function advance(position) {
-    if (!current || mode !== "playing") return;
-    target = position;
-
-    if (nextFrame && nextFrame.timestamp <= position) {
-      draw(nextFrame);
-      dropNextFrame(); // stays open while it is still the cursor's last frame
-    } else {
-      // Sharp frames are behind (just jumped, or a heavy file at high
-      // speed): keep the picture moving with the proxy meanwhile.
-      requestProxy(position);
-    }
-    if (!nextFrame && !streamEnded) run();
+    if (showing) send({ type: "position", position, at: now() });
   }
 
   return {

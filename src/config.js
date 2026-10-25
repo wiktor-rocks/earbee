@@ -80,6 +80,11 @@ export const CONFIG = {
     // If decoding falls this far behind playback (heavy file at high
     // speed), restart decoding at the current position instead of lagging.
     maxLagSeconds: 0.5,
+    // The video worker's clock (video/video-worker.js): between the page's
+    // positions it moves on by itself, at the rate measured over at least
+    // rateWindowMs, for at most maxAheadMs past the latest (if the page
+    // stops sending them, the picture stops there).
+    clock: { rateWindowMs: 100, maxAheadMs: 250 },
     // Low-resolution proxy: a small copy of the video, encoded in the
     // background after it loads. Its frames are cheap to decode anywhere,
     // so it fills in at full frame rate (blurry) wherever the sharp frame

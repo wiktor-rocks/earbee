@@ -100,8 +100,10 @@
  *                  window by window, and the simple beat finder's answer),
  *                  open-track.js (opening a file's audio track, for both
  *                  workers)
- *   video/         view.js (the picture), proxy.js (low-res copy for seeking),
- *                  proxy-plan.js (where that copy is built next)
+ *   video/         view.js (the picture, the page side), video-worker.js (its
+ *                  decoding and drawing, off the page's thread), proxy.js
+ *                  (low-res copy for seeking), proxy-plan.js (where that
+ *                  copy is built next)
  *   waveform.js    The waveform, zoom, minimap, loop; its view for the lanes.
  *                  waveform-draw.js draws it (bars, continuous, two-tone)
  *   timeline.js    The lanes: ruler, start/stop points, marks; guide lines
