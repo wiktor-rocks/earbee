@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-25: "Playback is king" (AGENTS.md)
+
+- **What:** a new first convention in `AGENTS.md`: audio and video play smoothly at all times, with the time indicator and the waveform. Background work (finding the beats, the video's preview copy, downloads, analysis) gives way: lower priority, fewer threads or a pause while playing, and it may take longer.
+- **Why:** the owner's guiding rule for the program, said after measuring that finding the beats made a video stutter (experiment `exp/beats-low-priority`).
+- **How:** a convention, so any assistant weighs trade-offs the same way. Smoothness is checked in a real window, since the offscreen test window hid nearly all of that stutter.
+- **Where:** `AGENTS.md`, "Conventions".
+- **Verified by:** `npm run format:check`.
+
 ## 2026-10-25: Blog post "Free alternative to Transcribe! for music" (the website)
 
 - **What:** a fourth post, "Free alternative to Transcribe! for music: 5 compared fairly", at `/blog/free-alternative-to-transcribe/`.
