@@ -35,6 +35,9 @@ async function load() {
     // (SIGTRAP) in Electron's utility process, though not in plain Node.
     // Off, it's as fast (measured, ONNX Runtime 1.30).
     enableMemPattern: false,
+    // Its threads wait for work without spinning (busy-waiting), which
+    // would keep the CPU busy between windows for nothing.
+    extra: { session: { intra_op: { allow_spinning: "0" }, inter_op: { allow_spinning: "0" } } },
   });
   return { ort, created };
 }
