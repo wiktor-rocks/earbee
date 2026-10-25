@@ -43,6 +43,25 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-25: The video is decoded and drawn off the page's thread (experiment `exp/video-worker`)
+
+- **What:** a video's picture is decoded and drawn in a worker of its own, not on the page's main thread. The waveform, the cursor and the time readout no longer slow down with the video, and the picture keeps moving when the page is busy. It shows most on big videos: on 4K while finding the beats, the page dropped 2 frames in 20 s instead of 74.
+- **Why:** a CPU profile of the page while playing 4K showed drawing the video's frames (`drawImage`) taking 1.7 s of the main thread in 15 s, 4.4 s while finding the beats, on the thread that also moves the waveform and the readout. "Playback is king".
+- **How:**
+  - `src/video/video-worker.js` (a module Worker) holds what `view.js` did with frames: Mediabunny, the prepared videos, the proxy (`proxy.js`, unchanged), the decode cursor and loop, and the drawing, on OffscreenCanvases. Each canvas is handed over once (`transferControlToOffscreen`). A canvas not in use (the video window's, after it's closed) is shrunk to a pixel.
+  - `src/video/view.js` is now the page side, with the same interface, so its callers don't change. It sends the files, the canvases' sizes and the transport's position on each animation frame, with the time it was taken. It puts what the worker drew on the canvas (`data-frame-time`, `data-proxy`, `data-proxy-built`, `data-proxy-overview`).
+  - The worker draws on its own animation frames, at the page's latest position moved on by the rate the positions move (`CONFIG.video.clock`, at most 250 ms ahead), so a busy page doesn't hold the picture. Jumps and loops come as `start`, as before.
+  - If the worker itself fails, the picture stops for the rest of the session (a canvas can be handed over only once), with one message. The audio is unaffected.
+  - The tests' worker count (`tests/preload.cjs`) leaves out the video worker, which runs for the whole session.
+- **Where:** `src/video/video-worker.js` (new), `src/video/view.js`; `CONFIG.video.clock`; `eslint.config.js` (worker globals); the file map in `src/app.js`; `tests/preload.cjs`.
+- **Verified by:**
+  - Visible-window benchmarks (`local/bench/`), 20 s of playing while finding the beats, before → after (with the low priority above):
+    - 4K: page frames over 50 ms 74 → 2, p95 67 → 33 ms, the readout's longest stand-still 136 → 94 ms, video 22 → 23.4 fps;
+    - 1080p: 11 → 0, p95 33 → 17 ms.
+    - The page's main thread was busy 9.9 s of 15 → 4.5 s, with no drawing in it.
+  - On the owner's 1080p 25 fps video: every frame shown, the position within 3–4 ms of steady, and the worker's own draws even (uneven 0.8–2.7 %, as on the page before). The 2/3-refresh rhythm of 25 fps on a 60 Hz screen remains, as in any player.
+  - `npm test` after merging: 294 unit, 489 e2e, 28 smoke.
+
 ## 2026-10-25: Finding the beats gives way to playback (experiment `exp/beats-low-priority`)
 
 - **What:** while the beats are found, a playing video stutters less: the beat model runs at below normal priority, and uses about a quarter less CPU. Finding them is as fast as before where it matters (the first beats in 3–4 s); all of an hour's beats take about 5 % longer (149 s instead of 142).
