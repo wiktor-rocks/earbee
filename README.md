@@ -142,7 +142,7 @@ docs/              maintaining.md: day-to-day git, releases, CI;
                    diagnostics/: how long files load, measured
 site/              The website, earbee.org: the landing page and the blog,
                    built with Eleventy (its own package.json; see docs/blog.md)
-.github/           workflows/pages.yml: builds site/ and publishes it from main
+.github/           workflows/pages.yml: builds site/ and publishes it (main, with testing's posts)
 tests/
   unit/              node:test unit tests (core, transport, decoding parts,
                      downloader, media files, system, themes, prefs, marks,

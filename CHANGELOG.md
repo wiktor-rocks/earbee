@@ -43,6 +43,21 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-25: Blog posts go online from `testing` (the website)
+
+- **What:** a post goes online when it's pushed to `testing`, without moving `main`. The rest of the site (the home page, the layout, the styles) still goes online from `main`.
+- **Why:** the owner didn't want to move `main` up to `testing` for every post. Moving `main` also takes the app's changes along, which should wait until they're tested.
+- **How:**
+  - The "Website" workflow now runs on a push to `main` or `testing` that changes `site/`. It always builds `main`'s `site/` with `testing`'s `site/blog/` and `site/img/blog/` in place of `main`'s (`git archive` of those two folders, after removing `main`'s, so a post deleted on `testing` goes too).
+  - Every run builds the same mix, whichever branch started it, so a push to one branch can't take back what the other published. A change on `testing` outside the posts republishes the same site.
+  - The home page stays with `main` because it describes the released app.
+  - GitHub's `github-pages` environment must allow `testing` to deploy as well as `main` (Settings › Environments).
+- **Where:** `.github/workflows/pages.yml`; `docs/blog.md` ("How it works", "Publish a post", "Change or remove a post", "When something goes wrong", "Quick reference"); `docs/maintaining.md`; `site/README.md`; `README.md`; `AGENTS.md` ("Pitfalls", "Branches").
+- **Verified by:**
+  - The workflow's posts step, run by hand on a copy of `main` with `testing`'s commit: it takes `testing`'s posts, removes a post that isn't on `testing`, and the site builds.
+  - The workflow itself hasn't run on GitHub yet.
+  - `npm run check`.
+
 ## 2026-10-24: The two flaky CI checks (beats and the welcome screen's motion) (tests)
 
 - **What:** the e2e checks that failed now and then on CI, and passed on a rerun:

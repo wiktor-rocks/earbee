@@ -1,12 +1,20 @@
 # Builds the website (site/, with Eleventy) and publishes it on GitHub
-# Pages, at earbee.org, whenever it changes on main. One-time setup: the
-# repository's Settings › Pages › Source must be "GitHub Actions", and its
-# custom domain earbee.org. How the blog works: docs/blog.md.
+# Pages, at earbee.org. One-time setup: the repository's Settings › Pages ›
+# Source must be "GitHub Actions", its custom domain earbee.org, and
+# Settings › Environments › github-pages must let both main and testing
+# deploy. How the blog works: docs/blog.md.
+#
+# The site is main's, with the posts from testing: a post goes online when
+# it's pushed to testing, without moving main, while the landing page stays
+# with main (it describes the released app). Every build takes the same
+# mix, whichever branch started it, so the two can't undo each other.
 name: Website
 
 on:
+  # On testing, only the posts are used, so another change to site/ there
+  # republishes the same site.
   push:
-    branches: [main]
+    branches: [main, testing]
     paths: ["site/**", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
@@ -25,18 +33,29 @@ jobs:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
-    defaults:
-      run:
-        working-directory: site
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
+      # The posts (site/blog/) and their pictures (site/img/blog/) as they
+      # are on testing, in place of main's: a post deleted there goes too.
+      - name: The posts from testing
+        run: |
+          git fetch --depth=1 origin testing
+          rm -rf site/blog site/img/blog
+          paths=$(git ls-tree --name-only FETCH_HEAD site/blog site/img/blog)
+          # Without them, git archive would take all of testing.
+          if [ -z "$paths" ]; then echo "testing has no site/blog/"; exit 1; fi
+          git archive FETCH_HEAD $paths | tar -x
       - uses: actions/setup-node@v4
         with:
           node-version: 22
           cache: npm
           cache-dependency-path: site/package-lock.json
       - run: npm ci
+        working-directory: site
       - run: npm run build
+        working-directory: site
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

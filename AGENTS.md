@@ -86,12 +86,12 @@ A small change (a comment, a CSS value, a typo) needs `npm run check` only.
 - **The e2e and smoke tests need a display** (X11 or Wayland), although their windows are invisible. On a machine without one: `xvfb-run -a npm test`.
 - **The e2e harness empties `tests/output/downloads`** when it starts, and writes screenshots to `tests/output/`. Settings and downloads in progress go to temporary folders, never to your real ones.
 - **ONNX Runtime:** `.npmrc` stops its install from downloading CUDA libraries (about 270 MB). Keep it.
-- **`site/` goes online** from `main`: every `.html`, `.md` and `.njk` file becomes a page (except `README.md` and posts with `draft: true`), and everything in `fonts/` and `img/` is copied (`site/eleventy.config.js`). Don't put working files there (a source video, for instance).
+- **`site/` goes online** from `main`, except the posts and their pictures (`site/blog/`, `site/img/blog/`), which go online from `testing` as soon as they're pushed there (`.github/workflows/pages.yml`). So a post pushed to `testing` without `draft: true` is published: only push one the owner has said is ready. Every `.html`, `.md` and `.njk` file becomes a page (except `README.md` and posts with `draft: true`), and everything in `fonts/` and `img/` is copied (`site/eleventy.config.js`). Don't put working files there (a source video, for instance).
 
 ## Branches
 
 - **`testing`** is where work happens. Commit there, unless the owner says otherwise.
-- **`main`** is the stable version: the website is published from it, and releases are tagged on it. It only moves forward to `testing` (`git merge --ff-only testing`), and only when the owner asks. Never commit to it directly.
+- **`main`** is the stable version: the website is published from it (all but the posts), and releases are tagged on it. It only moves forward to `testing` (`git merge --ff-only testing`), and only when the owner asks. Never commit to it directly.
 - **An idea that might not work out** goes on its own experiment branch, `exp/<idea>`. Follow docs/maintaining.md, "Trying an idea: an experiment branch", exactly: procedures A to F, each step's command as written, then its check. When a command fails or a check doesn't give the expected result, stop and report; don't work around it. Ask the owner before merging an experiment into `testing` (D) or throwing it away (E).
 - Never rebase or force-push pushed work.
 

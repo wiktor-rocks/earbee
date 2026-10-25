@@ -24,7 +24,14 @@ earbee.org is built from the `site/` folder by [Eleventy](https://www.11ty.dev),
 | `site/eleventy.config.js`        | Eleventy's settings: what's copied as it is, the RSS feed, drafts, dates.                          |
 | `site/_site/`                    | **The built site**, made by Eleventy. Never edit it; it's rebuilt every time, and git ignores it.  |
 
-**From a push to the live site.** When `main` on GitHub gets a change in `site/`, the "Website" workflow (`.github/workflows/pages.yml`) builds the site and publishes `_site/` on GitHub Pages, at earbee.org. It takes about a minute. On every other branch, CI only checks that the site builds (the "site" job), so nothing goes online until `main` moves.
+**From a push to the live site.** The live site is **`main`'s site with `testing`'s posts**: everything in `site/` comes from `main`, except the posts (`site/blog/`) and their pictures (`site/img/blog/`), which come from `testing`. So:
+
+- **A post goes online when you push it to `testing`** (without `draft: true`). You don't need to move `main`.
+- **The rest of the site** (the home page, the layout, the styles) goes online when `main` moves up to `testing`. The home page describes the released app, so it waits for `main`, like the app does.
+
+When `site/` changes on either branch, the "Website" workflow (`.github/workflows/pages.yml`) builds that mix and publishes it on GitHub Pages, at earbee.org. It takes about a minute. Whichever branch starts it, the result is the same. On `exp/` branches, CI only checks that the site builds (the "site" job), so nothing from them goes online.
+
+One thing to watch: a post that needs a change to the layout or the styles (a new kind of box, say) only looks right once that change is on `main` too. Plain Markdown and pictures need nothing else.
 
 **What search engines get.** Every page has its own title, description and canonical address. Every post also gets:
 
@@ -171,7 +178,7 @@ With `npm start` running, open http://localhost:8080/blog/. Your post is in the 
 
    Its last line says how many files it wrote (`… Wrote 6 files in 0.32 seconds`). If it prints an error, see "When something goes wrong".
 
-3. **Commit and push it** to `testing`. A commit is a saved snapshot of your changes; a push sends it to GitHub.
+3. **Commit and push it** to `testing`. A commit is a saved snapshot of your changes; a push sends it to GitHub. **The push publishes it:** posts go online from `testing` (see "How it works").
 
    ```sh
    git add site/blog/slow-down-a-song.md site/img/blog/
@@ -179,37 +186,19 @@ With `npm start` running, open http://localhost:8080/blog/. Your post is in the 
    git push
    ```
 
-4. **Publish: move `main` up to `testing`.** The site is published from `main`, so the post goes online when `main` reaches it. First, see what `main` would get:
+   `main` doesn't need to move. It catches up with the post the next time it moves up to `testing`, with the app.
 
-   ```sh
-   git log --oneline main..testing
-   ```
-
-   This lists the commits on `testing` that aren't on `main` yet.
-   - **Only your post (and other site changes):** go ahead.
-   - **App changes too:** they go to `main` with your post. Follow step 4 of [maintaining.md](maintaining.md#4-when-testing-is-good-move-main-up-to-it) (it runs all the tests first), or ask an assistant to check.
-
-   ```sh
-   git checkout main
-   git pull
-   git merge --ff-only testing
-   git push
-   git checkout testing
-   ```
-
-   `--ff-only` ("fast-forward only") means `main` simply moves forward to where `testing` is, without a merge commit.
-
-5. **Check it's live.**
+4. **Check it's live.**
    - On the [Actions tab](https://github.com/wiktor-rocks/earbee/actions), the "Website" run turns green after about a minute.
    - Open `https://earbee.org/blog/<post-name>/`.
    - Optionally, ask Google to index it now instead of in a few days: see [Getting found](#getting-found).
 
 ## Change or remove a post
 
-- **A fix** (a typo, a better sentence): edit the file, then commit, push and publish as above.
+- **A fix** (a typo, a better sentence): edit the file, then commit and push to `testing`, as above.
 - **A change that matters** (new steps, a new section, outdated advice fixed): also add `updated: YYYY-MM-DD` to the header. Search engines favour pages that are kept up to date. Leave `date` as it was.
 - **Keep the file name.** It's the address (see "Create the file").
-- **Removing a post:** delete its file and its pictures, then commit, push and publish. Its address then shows the "page not found" page, and search engines drop it after a while. If other posts link to it, fix those links first: `grep -rn "/blog/<post-name>/" site/` finds them.
+- **Removing a post:** delete its file and its pictures, then commit and push to `testing`. Its address then shows the "page not found" page, and search engines drop it after a while. If other posts link to it, fix those links first: `grep -rn "/blog/<post-name>/" site/` finds them.
 
 ## Write posts that get found
 
@@ -288,8 +277,9 @@ Check every change with `npm start` (both themes, phone width), then `npm run ch
   - a missing `---` line;
   - a `title` or `description` containing a colon (`:`), without quotes around it (the error then says `bad indentation of a mapping entry`);
   - a date that isn't `YYYY-MM-DD`.
-- **A post doesn't appear on the site:** it still has `draft: true`; or `main` hasn't moved yet (`git log --oneline main..testing` lists it); or the "Website" run failed.
-- **The "Website" run failed:** on the [Actions tab](https://github.com/wiktor-rocks/earbee/actions), open the red run and the step with the ✗; the error is at the bottom. Fix it, then commit, push and move `main` again. To publish again without a change: `gh workflow run pages.yml --ref main`.
+- **A post doesn't appear on the site:** it still has `draft: true`; or it isn't pushed (`git status -sb` shows `ahead`); or the "Website" run failed.
+- **The "Website" run failed:** on the [Actions tab](https://github.com/wiktor-rocks/earbee/actions), open the red run and the step with the ✗; the error is at the bottom. Fix it, then commit and push again. To publish again without a change: `gh workflow run pages.yml --ref testing`.
+  - **"Branch 'testing' is not allowed to deploy":** the repository's Settings › Environments › **github-pages** › Deployment branches must list both `main` and `testing`.
 - **The site doesn't load, or the address is wrong:** check the repository's Settings › Pages: the source is **GitHub Actions**, the custom domain is `earbee.org`, and **Enforce HTTPS** is ticked. The domain's DNS records at the registrar must be:
 
   | Type  | Host  | Value                                                                                     |
@@ -318,9 +308,10 @@ cd site && npm install                 # once
 cd site && npm start                   # preview at http://localhost:8080 (Ctrl+C stops it)
 cd site && npm run build               # build the site, as GitHub does
 
-# publish (after committing and pushing the post to testing)
-git log --oneline main..testing        # what main would get
-git checkout main && git pull && git merge --ff-only testing && git push && git checkout testing
+# publish: without draft: true, commit and push to testing
+git add site/blog/<post-name>.md site/img/blog/
+git commit -m "Blog: <the title>"
+git push
 ```
 
 A new post, `site/blog/<words-people-search-for>.md`:

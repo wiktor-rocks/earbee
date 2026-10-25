@@ -8,16 +8,16 @@ The commands are for a terminal in the project folder.
 - **The code** is on GitHub at [wiktor-rocks/earbee](https://github.com/wiktor-rocks/earbee). Your copy talks to it as `origin`, over SSH.
 - **Branches:**
   - `testing` is where you work. Push to it as often as you like.
-  - `main` is the stable version. It's what people see on GitHub, and what the website is published from. It only moves forward to where `testing` is, once that's tested.
+  - `main` is the stable version. It's what people see on GitHub, and what the website is published from (all but the blog's posts, which come from `testing`). It only moves forward to where `testing` is, once that's tested.
   - `exp/<idea>` (say, `exp/tuner`) is for trying an idea that might not work out. Each idea gets its own branch, made from `testing`. If it works, it's merged into `testing`; if not, the branch is deleted. See [Trying an idea](#trying-an-idea-an-experiment-branch).
 - **Automatic on GitHub** (the [Actions tab](https://github.com/wiktor-rocks/earbee/actions) shows every run):
 
-  | When                                              | What runs                                                               | How long         |
-  | ------------------------------------------------- | ----------------------------------------------------------------------- | ---------------- |
-  | Any push to `testing`, `main` or an `exp/` branch | **CI:** formatting, lint, types, unit tests, the website builds         | about 1 minute   |
-  | A push to `main`                                  | **CI** also runs the end-to-end and smoke tests                         | about 10 minutes |
-  | A push to `main` that changes `site/`             | **Website:** builds and republishes [the website](https://earbee.org/)  | under a minute   |
-  | Pushing a version tag (`v0.2.0`)                  | **Release:** builds Windows, macOS and Linux, and makes a draft release | about 15 minutes |
+  | When                                               | What runs                                                                                         | How long         |
+  | -------------------------------------------------- | ------------------------------------------------------------------------------------------------- | ---------------- |
+  | Any push to `testing`, `main` or an `exp/` branch  | **CI:** formatting, lint, types, unit tests, the website builds                                   | about 1 minute   |
+  | A push to `main`                                   | **CI** also runs the end-to-end and smoke tests                                                   | about 10 minutes |
+  | A push to `main` or `testing` that changes `site/` | **Website:** republishes [the website](https://earbee.org/): `main`'s site with `testing`'s posts | under a minute   |
+  | Pushing a version tag (`v0.2.0`)                   | **Release:** builds Windows, macOS and Linux, and makes a draft release                           | about 15 minutes |
 
 - **Every change gets a CHANGELOG.md entry** (what, why, how, where, verified by), newest first.
 
@@ -206,7 +206,7 @@ If a pushed tag doesn't start the build, start it by hand: `gh workflow run rele
 
 ## The website
 
-It's `site/`, built with Eleventy into earbee.org: the landing page and the blog. **Everything about it, from writing a post to publishing it and getting it found, is in [blog.md](blog.md).** In short: `cd site && npm install` once, then `npm start` for a preview at http://localhost:8080. Pushing changes to `main` publishes them. To republish without a change, run `gh workflow run pages.yml --ref main`.
+It's `site/`, built with Eleventy into earbee.org: the landing page and the blog. **Everything about it, from writing a post to publishing it and getting it found, is in [blog.md](blog.md).** In short: `cd site && npm install` once, then `npm start` for a preview at http://localhost:8080. A post goes online when it's pushed to `testing`; the rest of the site, when `main` moves up to it. To republish without a change, run `gh workflow run pages.yml --ref testing`.
 
 ## When CI fails
 

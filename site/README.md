@@ -15,10 +15,12 @@ posts: [docs/blog.md](../docs/blog.md). It also explains the layout files
 (`_includes/`), the site's data (`_data/site.json`) and what to do when
 something goes wrong.
 
-**Publishing.** `.github/workflows/pages.yml` builds this folder and
-publishes `_site/` whenever `site/` changes on `main`. Once, in the repository
-on GitHub, set Settings › Pages › Source to **GitHub Actions**, and the custom
-domain to earbee.org.
+**Publishing.** `.github/workflows/pages.yml` builds this folder as it is on
+`main`, with the posts (`blog/`, `img/blog/`) from `testing`, and publishes
+`_site/` whenever `site/` changes on either branch. Once, in the repository on
+GitHub, set Settings › Pages › Source to **GitHub Actions**, the custom domain
+to earbee.org, and let both `main` and `testing` deploy in Settings ›
+Environments › github-pages.
 
 **Downloads.** At the top of `download.js`:
 
