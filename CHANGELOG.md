@@ -43,6 +43,21 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-25: Finding the beats gives way to playback (experiment `exp/beats-low-priority`)
+
+- **What:** while the beats are found, a playing video stutters less: the beat model runs at below normal priority, and uses about a quarter less CPU. Finding them is as fast as before where it matters (the first beats in 3–4 s); all of an hour's beats take about 5 % longer (149 s instead of 142).
+- **Why:** the owner's note "finding beats slows down the whole app: video lags, the time indicator lags in the waveform", and "playback is king".
+- **How:**
+  - `os.setPriority(PRIORITY_BELOW_NORMAL)` at the top of the beat model's process (nice 10 on Linux and macOS, "below normal" on Windows). It's set before ONNX Runtime starts its threads, because on Linux a priority is per thread and new threads take their creator's. If a system refuses it, finding still works.
+  - ONNX Runtime's threads wait without spinning (`allow_spinning: "0"`, intra- and inter-op): spinning kept the CPU busy between windows for nothing.
+  - For measuring such things: `TB_VISIBLE=1` runs the e2e harness in a real, visible window. The offscreen one hid nearly all of the stutter.
+- **Where:** `electron/beat-model-process.js`; `tests/e2e/harness.cjs` (`TB_VISIBLE`).
+- **Verified by:**
+  - A new local benchmark (`BENCH=lag` in `local/bench/app-bench.cjs`) in a visible window, 20 s of playing while finding: on a 5-min 1080p video, frames over 50 ms went from 0–3 to 0, and the worst frame from 33–67 to 33–34 ms. The model's threads showed nice 10.
+  - Finding times: first beats 3–4 s, all of an hour's 141–143 s with low priority alone, 149 s with no spinning too.
+  - Fewer model threads (2) and one preparing worker were tried and didn't help further: on 4K the remaining stutter came from drawing the video on the page's thread (experiment `exp/video-worker`).
+  - `npm test` after merging: 294 unit, 489 e2e, 28 smoke.
+
 ## 2026-10-25: "Playback is king" (AGENTS.md)
 
 - **What:** a new first convention in `AGENTS.md`: audio and video play smoothly at all times, with the time indicator and the waveform. Background work (finding the beats, the video's preview copy, downloads, analysis) gives way: lower priority, fewer threads or a pause while playing, and it may take longer.
