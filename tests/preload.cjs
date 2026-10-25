@@ -32,11 +32,17 @@ webFrame.executeJavaScript(`
 
   // Decode workers (src/audio/decoder.js): counted, to check none is left
   // running, and their "done" message is held back by __slowDecode ms, to
-  // observe the loading states.
+  // observe the loading states. The video worker (src/video/video-worker.js)
+  // isn't counted: it runs for the whole session, by design.
   window.__workers = { created: 0, terminated: 0, live: () => __workers.created - __workers.terminated };
   const NativeWorker = Worker;
   window.Worker = class extends NativeWorker {
-    constructor(...args) { super(...args); __workers.created++; this.__live = true; }
+    constructor(...args) {
+      super(...args);
+      if (String(args[0]).includes("video-worker")) return;
+      __workers.created++;
+      this.__live = true;
+    }
     terminate() { if (this.__live) { this.__live = false; __workers.terminated++; } return super.terminate(); }
     addEventListener(type, listener, options) {
       if (type !== "message") return super.addEventListener(type, listener, options);
