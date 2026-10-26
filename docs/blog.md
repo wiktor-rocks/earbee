@@ -219,7 +219,7 @@ Search engines send visitors to the page that best answers what they typed. So:
 
 Each idea gives the phrase it aims at, then the angle and how EarBee fits.
 
-1. **"how to slow down a song without changing the pitch":** what time-stretching is, which speeds work for practice (start at 50–70 %), and the artefacts to expect at very low speeds. EarBee: 0.25× to 3×, same pitch.
+1. **"how to slow down a song without changing the pitch":** what time-stretching is, which speeds work for practice (start at 50–70 %), and the artefacts to expect at very low speeds. EarBee: 0.05× to 3×, same pitch.
 2. **"how to transcribe a guitar solo by ear":** a step-by-step method: map the structure, loop one phrase, slow it down, find the first note, sing it, then write it down. EarBee: marks, loop the bar, step through it.
 3. **"free alternative to Transcribe!":** an honest comparison of what you need for transcribing (speed, loops, EQ, markers, video) and the free options, with EarBee among them. Fair to the others.
 4. **"how to learn bass lines by ear":** EQ to bring the bass forward and cut the rest, pitch up an octave to hear it better, and loop a bar at a time. EarBee: the EQ and pitch shift.

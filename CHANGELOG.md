@@ -43,6 +43,19 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-27: Slower speeds, down to 0.05×, and Shift+, / Shift+. for the speed
+
+- **What:**
+  - The speed now goes down to 0.05× (was 0.25×). The presets start at 0.1× (in place of 0.3×), so there are still twelve.
+  - **Shift+,** slows down by 1 %, **Shift+.** speeds up by 1 %; held, they repeat. The shortcuts list shows them under Playback.
+- **Why:** the owner wanted to slow very fast passages further than a quarter, and to nudge the speed from the keyboard. Z was the first idea for the keys, but it is "Play while held"; < and > are YouTube's keys for speed.
+- **How:**
+  - `CONFIG.speed.min` is 0.05; the slider's scale, the clamping and projects follow from it. The video's picture is drawn by its worker, not by `playbackRate`, so Chromium's 0.0625 floor doesn't apply.
+  - `nudgeSpeed()` moves by `CONFIG.speed.nudge` (0.01) and rounds to it, so a step lands exactly on a preset and lights its chip (`renderSpeedChips` compares with `===`).
+  - The shortcuts are Shift + the physical Comma and Period keys; Shift is matched exactly, so plain , (pause) and . (stop) are unchanged.
+- **Where:** `src/config.js` (`speed.min`, `presets`, `nudge`), `src/ui/controls.js` (`nudgeSpeed`), `src/app.js` (`SHORTCUTS`); `README.md`, `docs/glossary.md`, `docs/blog.md`, `site/index.html` (the speed range); tests 01 and 03.
+- **Verified by:** `npm run check`; `npm run test:unit` (294); `TB_TOPICS=01,03,04,05,08 npm test` (115 e2e, 28 smoke), with new checks in topic 03: Shift+. from 1× gives 1.01×, Shift+, twice 0.99×, from 0.5× down to 0.49× with no preset lit and back up onto the 0.5× preset.
+
 ## 2026-10-26: The website's themes section shows the themes in a clip
 
 - **What:** on earbee.org, "Seventeen colour themes" has a clip above the swatches: the screenshot's scene (a bar of "Main riff" looping at 0.75×) playing while the theme changes every 1.5 s, through all seventeen. The swatch of the theme on screen gets an amber ring. A click on a swatch shows its theme and holds it there; a second click, or a click on the clip, lets it cycle again. The clip is at most 720 px wide, so the swatches show with it. Silent and looping like the other clips; still, with controls, for reduced motion (a swatch then just shows its theme).

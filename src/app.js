@@ -292,6 +292,7 @@ import {
   buildSpeedChips,
   changeStepSize,
   initSliders,
+  nudgeSpeed,
   setEqEnabled,
 } from "./ui/controls.js";
 import { $, dom, renderStepSize, renderTrackTime, renderTransportState, reportError, showNotice } from "./ui/dom.js";
@@ -439,6 +440,24 @@ const SHORTCUTS = [
     description: "Play while held",
     down: holdToPlay,
     up: releaseHold,
+  },
+  {
+    group: "Playback",
+    codes: ["Comma"],
+    shift: true,
+    keys: [","],
+    description: "Slower (1 %)",
+    repeat: true,
+    down: () => nudgeSpeed(-1),
+  },
+  {
+    group: "Playback",
+    codes: ["Period"],
+    shift: true,
+    keys: ["."],
+    description: "Faster (1 %)",
+    repeat: true,
+    down: () => nudgeSpeed(1),
   },
   {
     group: "Moving around",

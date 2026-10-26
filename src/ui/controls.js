@@ -170,6 +170,15 @@ export function changeStepSize(direction) {
   setStepSize(sizes[clamp(index + direction, 0, sizes.length - 1)]);
 }
 
+// Shift+, / Shift+.: the speed down (−1) or up (+1) by CONFIG.speed.nudge.
+// Rounded to it, so steps land exactly on the presets (renderSpeedChips
+// compares with ===).
+export function nudgeSpeed(direction) {
+  const { nudge } = CONFIG.speed;
+  const steps = Math.round(settings.speed / nudge) + direction;
+  setSetting("speed", Number((steps * nudge).toFixed(10)));
+}
+
 // A click on the step size: the next larger (+1) or smaller (−1) one,
 // going round from either end.
 export function cycleStepSize(direction) {

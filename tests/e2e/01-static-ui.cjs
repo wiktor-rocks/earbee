@@ -4,7 +4,7 @@
 module.exports = async function (h) {
   const { js, check } = h;
 
-  check("speed scale generated", (await js(`document.getElementById("speedScale").textContent`)) === "0.25×3×");
+  check("speed scale generated", (await js(`document.getElementById("speedScale").textContent`)) === "0.05×3×");
   check("volume scale generated", (await js(`document.getElementById("volumeScale").textContent`)) === "0%100%200%");
   await js(`document.fonts.ready`);
   check(

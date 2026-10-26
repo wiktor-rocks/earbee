@@ -97,6 +97,29 @@ module.exports = async function (h) {
   await loopRun("0.5x loop", 3500, 1);
   await js(`document.querySelector('#speedChips [data-speed="1"]').click()`);
 
+  // Shift+, / Shift+.: the speed by 1 %, landing exactly on the presets.
+  const speedNow = () =>
+    js(`({ text: speedValue.textContent, chip: document.querySelector(".chip.active")?.dataset.speed ?? null })`);
+  key(".", ["shift"]);
+  await sleep(100);
+  check("Shift+. speeds up by 1 %", (await speedNow()).text === "1.01×", JSON.stringify(await speedNow()));
+  key(",", ["shift"]);
+  key(",", ["shift"]);
+  await sleep(100);
+  check("Shift+, twice slows down by 2 %", (await speedNow()).text === "0.99×", JSON.stringify(await speedNow()));
+  await js(`document.querySelector('#speedChips [data-speed="0.5"]').click()`);
+  key(",", ["shift"]);
+  await sleep(100);
+  const below = await speedNow();
+  key(".", ["shift"]);
+  await sleep(100);
+  check(
+    "from 0.5×: 0.49× with no preset lit, then back on the 0.5× preset",
+    below.text === "0.49×" && below.chip === null && (await speedNow()).chip === "0.5",
+    `${JSON.stringify(below)} ${JSON.stringify(await speedNow())}`,
+  );
+  await js(`document.querySelector('#speedChips [data-speed="1"]').click()`);
+
   // Edge drag: B from 2 to 4
   await drag(null, 4, [], await xAt(loop.end), undefined);
   loop = await loopRange();
