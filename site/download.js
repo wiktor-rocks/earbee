@@ -166,7 +166,61 @@ function calmClips() {
   }
 }
 
+// The themes clip shows each theme for data-seconds, in the swatches'
+// order; the swatch of the theme on screen is lit (class "on"). Each new
+// frame is checked where the browser tells of frames, else four times a
+// second. A click on a swatch holds the clip on its theme (paused in the
+// middle of its turn); a second click, or a click on the clip, lets it
+// cycle again. With reduced motion it just shows that theme, still.
+function followThemesClip() {
+  const video = document.querySelector(".themes-clip video");
+  const swatches = [...document.querySelectorAll(".swatches li")];
+  if (!video || swatches.length === 0) return;
+  const seconds = Number(video.dataset.seconds);
+  const buttons = swatches.map((swatch) => swatch.querySelector("button"));
+  const light = () => {
+    const shown = Math.min(swatches.length - 1, Math.floor(video.currentTime / seconds));
+    swatches.forEach((swatch, i) => swatch.classList.toggle("on", i === shown));
+  };
+  if ("requestVideoFrameCallback" in video) {
+    const onFrame = () => {
+      light();
+      video.requestVideoFrameCallback(onFrame);
+    };
+    video.requestVideoFrameCallback(onFrame);
+  } else {
+    video.addEventListener("timeupdate", light);
+  }
+  video.addEventListener("seeked", light);
+
+  /** @type {number | null} */
+  let held = null;
+  const hold = (/** @type {number | null} */ index) => {
+    held = index;
+    buttons.forEach((button, i) => button?.setAttribute("aria-pressed", String(i === held)));
+  };
+  const cycle = () => {
+    hold(null);
+    if (!video.controls) video.play().catch(() => {}); // the controls are there for reduced motion
+  };
+  hold(null);
+  buttons.forEach((button, i) =>
+    button?.addEventListener("click", () => {
+      if (held === i) return cycle();
+      hold(i);
+      video.pause();
+      video.currentTime = (i + 0.5) * seconds;
+    }),
+  );
+  // Playing again by any way (the clip's controls too) ends the hold.
+  video.addEventListener("play", () => hold(null));
+  video.addEventListener("click", () => {
+    if (held !== null && !video.controls) cycle();
+  });
+}
+
 calmClips(); // before the clips get their files, so they don't start
+followThemesClip();
 setUpThemeSwitch();
 fillDownloads();
 drawWave();

@@ -48,8 +48,15 @@ instead.
   with a poster (`.webp`, its last frame) for reduced motion. Each comes in
   `-dark` (the EarBee theme) and `-light` (EarBee Light), with the Peak +
   loudness waveform; the page shows the one for its mode (`download.js`,
-  `showModeMedia`). All are recorded from the app by
-  `scripts/record-site-media.cjs`.
+  `showModeMedia`).
+- `img/clip-themes.mp4` (and its poster, the first theme), above the
+  swatches: the screenshot's scene while the theme changes every 1.5 s, in
+  the swatches' order (their `data-id`). One file for both modes; the page
+  rings the swatch on screen, and a click on a swatch holds the clip on its
+  theme (which needs a server that answers range requests: the preview
+  does, Python's `http.server` doesn't). A new theme: add its swatch, then record this
+  clip again (`--only=themes`, below).
+- All are recorded from the app by `scripts/record-site-media.cjs`.
 - `img/share.jpg` (1200×630): the picture social sites show when a page is
   shared (`site.json`'s `image`). It's `screenshot-dark.webp` with dark sides,
   a JPEG because some sites (LinkedIn) don't show WebP there. After recording
@@ -73,6 +80,7 @@ ffmpeg -i 16803490-uhd_3840_2160_24fps.mp4 -ss 20 -t 19.07 \
   -af "afade=t=in:d=0.3,afade=t=out:st=18.6:d=0.45" -c:a aac -shortest \
   "Rock City Ransom.mp4"
 npx electron scripts/record-site-media.cjs --media="Rock City Ransom.mp4"
+# just the themes clip: add --only=themes
 ```
 
 The script clicks at times chosen for this file; another one needs new

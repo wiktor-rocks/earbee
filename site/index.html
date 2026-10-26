@@ -243,26 +243,74 @@ description: "A free desktop app for transcribing music: slow it down without ch
 <section class="themes">
   <h2>Seventeen colour themes</h2>
   <p class="section-intro">
-    EarBee's own dark and light themes, plus popular editor themes. Automatic follows your system.
+    EarBee's own dark and light themes, plus popular editor themes. Automatic follows your system. Click one to see it.
   </p>
-  <ul class="swatches" aria-label="Colour themes">
-    <li style="--bg: #0e1014; --ac: #f5b301; --fg: #e6e8ee">EarBee</li>
-    <li style="--bg: #f5f1e8; --ac: #f5b301; --fg: #1f1b14">EarBee Light</li>
-    <li style="--bg: #1e1f1c; --ac: #a6e22e; --fg: #f8f8f2">Monokai</li>
-    <li style="--bg: #21222c; --ac: #bd93f9; --fg: #f8f8f2">Dracula</li>
-    <li style="--bg: #2e3440; --ac: #88c0d0; --fg: #eceff4">Nord</li>
-    <li style="--bg: #21252b; --ac: #61afef; --fg: #dcdfe4">One Dark</li>
-    <li style="--bg: #1d2021; --ac: #fe8019; --fg: #ebdbb2">Gruvbox Dark</li>
-    <li style="--bg: #00212b; --ac: #2aa198; --fg: #eee8d5">Solarized Dark</li>
-    <li style="--bg: #181825; --ac: #cba6f7; --fg: #cdd6f4">Catppuccin Mocha</li>
-    <li style="--bg: #16161e; --ac: #7aa2f7; --fg: #c0caf5">Tokyo Night</li>
-    <li style="--bg: #eee8d5; --ac: #1b7d76; --fg: #073642">Solarized Light</li>
-    <li style="--bg: #e6e9ef; --ac: #8839ef; --fg: #4c4f69">Catppuccin Latte</li>
-    <li style="--bg: #f6f8fa; --ac: #0969da; --fg: #1f2328">GitHub Light</li>
-    <li style="--bg: #f2e5bc; --ac: #af3a03; --fg: #3c3836">Gruvbox Light</li>
-    <li style="--bg: #eaeaeb; --ac: #3a6cda; --fg: #383a42">One Light</li>
-    <li style="--bg: #d6d8e1; --ac: #2565bd; --fg: #343b58">Tokyo Night Day</li>
-    <li style="--bg: #f4f0d9; --ac: #687701; --fg: #5c6a72">Everforest Light</li>
+  <!-- img/clip-themes.mp4: the screenshot's scene playing while the theme
+       changes every data-seconds, in the order of the swatches below
+       (their data-id), recorded by scripts/record-site-media.cjs. It's the
+       same file in both modes; download.js lights the swatch on screen,
+       and a click on a swatch shows its theme until clicked again. -->
+  <div class="clip themes-clip" style="--ratio: 1280 / 800">
+    <video
+      autoplay
+      muted
+      loop
+      playsinline
+      preload="metadata"
+      data-dark="img/clip-themes.mp4"
+      data-light="img/clip-themes.mp4"
+      data-seconds="1.5"
+      aria-label="EarBee looping a bar while its colour theme changes, one theme after another, in the order of the list below."
+    ></video>
+  </div>
+  <ul class="swatches" aria-label="Colour themes: choose one to see it in the clip">
+    <li data-id="earbee" style="--bg: #0e1014; --ac: #f5b301; --fg: #e6e8ee"><button type="button">EarBee</button></li>
+    <li data-id="earbee-light" style="--bg: #f5f1e8; --ac: #f5b301; --fg: #1f1b14">
+      <button type="button">EarBee Light</button>
+    </li>
+    <li data-id="monokai" style="--bg: #1e1f1c; --ac: #a6e22e; --fg: #f8f8f2">
+      <button type="button">Monokai</button>
+    </li>
+    <li data-id="dracula" style="--bg: #21222c; --ac: #bd93f9; --fg: #f8f8f2">
+      <button type="button">Dracula</button>
+    </li>
+    <li data-id="nord" style="--bg: #2e3440; --ac: #88c0d0; --fg: #eceff4"><button type="button">Nord</button></li>
+    <li data-id="one-dark" style="--bg: #21252b; --ac: #61afef; --fg: #dcdfe4">
+      <button type="button">One Dark</button>
+    </li>
+    <li data-id="gruvbox-dark" style="--bg: #1d2021; --ac: #fe8019; --fg: #ebdbb2">
+      <button type="button">Gruvbox Dark</button>
+    </li>
+    <li data-id="solarized-dark" style="--bg: #00212b; --ac: #2aa198; --fg: #eee8d5">
+      <button type="button">Solarized Dark</button>
+    </li>
+    <li data-id="catppuccin-mocha" style="--bg: #181825; --ac: #cba6f7; --fg: #cdd6f4">
+      <button type="button">Catppuccin Mocha</button>
+    </li>
+    <li data-id="tokyo-night" style="--bg: #16161e; --ac: #7aa2f7; --fg: #c0caf5">
+      <button type="button">Tokyo Night</button>
+    </li>
+    <li data-id="solarized-light" style="--bg: #eee8d5; --ac: #1b7d76; --fg: #073642">
+      <button type="button">Solarized Light</button>
+    </li>
+    <li data-id="catppuccin-latte" style="--bg: #e6e9ef; --ac: #8839ef; --fg: #4c4f69">
+      <button type="button">Catppuccin Latte</button>
+    </li>
+    <li data-id="github-light" style="--bg: #f6f8fa; --ac: #0969da; --fg: #1f2328">
+      <button type="button">GitHub Light</button>
+    </li>
+    <li data-id="gruvbox-light" style="--bg: #f2e5bc; --ac: #af3a03; --fg: #3c3836">
+      <button type="button">Gruvbox Light</button>
+    </li>
+    <li data-id="one-light" style="--bg: #eaeaeb; --ac: #3a6cda; --fg: #383a42">
+      <button type="button">One Light</button>
+    </li>
+    <li data-id="tokyo-night-day" style="--bg: #d6d8e1; --ac: #2565bd; --fg: #343b58">
+      <button type="button">Tokyo Night Day</button>
+    </li>
+    <li data-id="everforest-light" style="--bg: #f4f0d9; --ac: #687701; --fg: #5c6a72">
+      <button type="button">Everforest Light</button>
+    </li>
   </ul>
 </section>
 
