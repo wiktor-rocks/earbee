@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-27: The website lists matching your tuning (the website)
+
+- **What:** "What it does" on earbee.org has a new item, **Match your tuning**: "Band tuned down to E♭ or D? Shift the song to match your guitar, in semitones and cents, at the same speed." "Slower, same pitch" is about the speed only now (it ended with "Or change the pitch, not the speed.").
+- **Why:** the owner's idea, first as "Tune the song to any guitar tuning". Shifting the pitch moves the whole song, so it matches a guitar tuned down as a whole, or a recording off A440; it can't give Drop D or DADGAD, which change single strings. Hence "match your tuning", not "any tuning".
+- **How:** the item sits next to "Slower, same pitch" in the first row; there are nine items now, so "Long files, offline" is alone in the last row.
+- **Where:** `site/index.html` ("What it does").
+- **Verified by:** `npm run check`, `npm --prefix site run build`, `node scripts/seo/check.cjs` (0 errors; its 2 warnings are an existing post's); the built page captured at 1280 px wide.
+
 ## 2026-10-27: Esc leaves big video
 
 - **What:** Esc brings the usual layout back from big video, as F does. Esc still stops marking a region and deselects a mark, one thing per press: first a region being marked, then big video, then the selected mark. The button over the picture says "Back to normal (F or Esc)".
