@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-27: Esc leaves big video
+
+- **What:** Esc brings the usual layout back from big video, as F does. Esc still stops marking a region and deselects a mark, one thing per press: first a region being marked, then big video, then the selected mark. The button over the picture says "Back to normal (F or Esc)".
+- **Why:** the owner asked for it; Esc is what leaves a video player's big or fullscreen view.
+- **How:** a key has one entry in `SHORTCUTS`, so Esc's entry calls `escape()` in `app.js`, which tries each in turn. `leaveBigVideo()` acts only while the big layout is on screen, so with the video in its own window Esc doesn't quietly turn off big video for when it comes back.
+- **Where:** `src/features/big-video.js` (`leaveBigVideo`), `src/features/marks.js` (`isMarkingRegion`), `src/app.js` (`escape`, the Esc entry); `docs/glossary.md`; test 19.
+- **Verified by:** `npm run check`; `TB_TOPICS=14,19 npm test` (60 e2e, 28 smoke), with new checks in topic 19: Esc goes back from big video, a second Esc changes nothing, and a double-click makes it big again; topic 14's Esc checks (stop marking, deselect) still pass.
+
 ## 2026-10-27: Slower speeds, down to 0.05×, and Shift+, / Shift+. for the speed
 
 - **What:**

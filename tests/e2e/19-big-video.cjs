@@ -119,6 +119,14 @@ module.exports = async function (h) {
   check("a double-click on the picture goes back", isNormal(await layout()));
   await doubleClickPicture();
   check("…and another makes it big again", (await layout()).big);
+  key("Escape");
+  await sleep(300);
+  check("Esc goes back", isNormal(await layout()));
+  key("Escape");
+  await sleep(100);
+  check("…and does nothing more then", isNormal(await layout()));
+  await doubleClickPicture();
+  check("…and a double-click makes it big again", (await layout()).big);
 
   key("V");
   await sleep(800);

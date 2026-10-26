@@ -247,6 +247,7 @@ import {
   bindMarks,
   cancelMarking,
   deleteSelectedMark,
+  isMarkingRegion,
   markPoint,
   markRegion,
   moveMark,
@@ -255,7 +256,7 @@ import {
   renameMark,
   selectMark,
 } from "./features/marks.js";
-import { bigVideoPictureChanged, bindBigVideo, toggleBigVideo } from "./features/big-video.js"; // Big video (src/features/big-video.js)
+import { bigVideoPictureChanged, bindBigVideo, leaveBigVideo, toggleBigVideo } from "./features/big-video.js"; // Big video (src/features/big-video.js)
 import { bindLayout, openShortcuts } from "./features/layout.js";
 import { beatsAction, bindBeats, isBeatMenuOpen, snapForDrag, toggleBeatClick } from "./features/beats.js";
 import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
@@ -394,6 +395,13 @@ transport.on("jump", (time) => {
  * dialog (the ? button or key) is rendered from this table; how keys reach
  * it is in ui/shortcuts.js.
  * ===================================================================== */
+
+// Esc undoes one thing at a time: a region being marked, then big video,
+// then the selected mark.
+function escape() {
+  if (!isMarkingRegion() && leaveBigVideo()) return; // Big video (src/features/big-video.js)
+  cancelMarking();
+}
 
 /** @type {Shortcut[]} */
 const SHORTCUTS = [
@@ -582,8 +590,8 @@ const SHORTCUTS = [
     group: "Marks",
     codes: ["Escape"],
     keys: ["Esc"],
-    description: "Stop marking a region / deselect the mark",
-    down: cancelMarking,
+    description: "Stop marking a region / leave big video / deselect the mark",
+    down: escape,
   },
   // Video window (src/features/video-window/)
   {

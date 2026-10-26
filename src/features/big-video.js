@@ -7,7 +7,7 @@
  * no zooming) and the transport.
  *
  *   On / off   F, the button over the picture (on hover), or a
- *              double-click on the picture. It lasts while videos follow
+ *              double-click on the picture; Esc leaves it. It lasts while videos follow
  *              one another; an audio file or a restart ends it. Leaving
  *              it gives the waveform its zoom back, on what is playing.
  *   How        One class on #app, while big video is on and a video is on
@@ -41,7 +41,7 @@ function render() {
   dom.app.classList.toggle("big-video", shown);
   if (!shown) player.waveform.lockFit(false);
   button.setAttribute("aria-pressed", String(on));
-  button.title = on ? "Back to normal (F)" : "Big video (F)";
+  button.title = on ? "Back to normal (F or Esc)" : "Big video (F)";
   button.ariaLabel = on ? "Back to normal" : "Big video";
   button.querySelector("use")?.setAttribute("href", on ? "#i-shrink" : "#i-enlarge");
 }
@@ -51,6 +51,17 @@ export function toggleBigVideo() {
   if (!on && !stage.classList.contains("has-video")) return;
   on = !on;
   render();
+}
+
+/**
+ * Esc: back to the usual layout, if the picture is big now. Returns
+ * whether it was (so Esc does nothing else).
+ */
+export function leaveBigVideo() {
+  if (!dom.app.classList.contains("big-video")) return false;
+  on = false;
+  render();
+  return true;
 }
 
 /**

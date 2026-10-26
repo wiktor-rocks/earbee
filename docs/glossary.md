@@ -66,7 +66,7 @@ The words the app and its docs use, and what they are in the code. Each entry: w
 | Word             | What it is                                                                                | In the code                                                              |
 | ---------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
 | **Proxy**        | A low-resolution copy of a video, built in memory, so seeking and odd speeds stay smooth. | `src/video/proxy.js`; `CONFIG.video.proxy`                               |
-| **Big video**    | The picture as large as the window allows (F).                                            | `src/features/big-video.js`                                              |
+| **Big video**    | The picture as large as the window allows (F; Esc leaves it).                             | `src/features/big-video.js`                                              |
 | **Video window** | The picture in its own window, e.g. on a second screen (V).                               | `src/features/video-window/`; `electron/windows.js` (`allowVideoWindow`) |
 
 ## Files, settings, downloads

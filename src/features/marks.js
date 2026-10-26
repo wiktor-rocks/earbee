@@ -117,6 +117,9 @@ export function deleteSelectedMark() {
 }
 
 // Esc: stops marking a region, or else deselects.
+/** Whether R was pressed once: a region's start is set, its end not yet. */
+export const isMarkingRegion = () => pendingStart !== null;
+
 export function cancelMarking() {
   if (pendingStart !== null) pendingStart = null;
   else selected = null;
