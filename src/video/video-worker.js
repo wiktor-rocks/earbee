@@ -628,6 +628,10 @@ async function preroll(video, time) {
   standbys.set(time, standby);
   const gone = () => standby.closed || video !== current;
   try {
+    // Not even a decoder while busy: the start point moves with every
+    // click and drag, and the sharp decoding comes first then.
+    while (busyForPoints() && !gone()) await sleep(waitMs);
+    if (gone()) return closeStandby(standby);
     const keyframe = await keyframeBefore(video, point);
     if (gone()) return closeStandby(standby);
     standby.iterator = new VideoSampleSink(video.track).samples(keyframe);
