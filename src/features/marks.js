@@ -221,5 +221,20 @@ export function bindMarks() {
   });
   // The region being marked grows with the cursor.
   player.transport.on("position", () => pendingStart !== null && drawMarks());
+  // The marks Shift+← / Shift+→ would go to are the video's ready points.
+  marks.on("change", readyNearestMarks);
+  player.transport.on("position", readyNearestMarks);
   renderList();
+}
+
+// Video ready points (video/view.js): the marks previousMark and nextMark
+// would go to from here. Sent only when they change.
+function readyNearestMarks() {
+  const { transport } = player;
+  const tolerance = transport.playing ? CONFIG.marks.jumpBackSeconds : 0;
+  const times = [marks.previous(transport.position, tolerance), marks.next(transport.position)];
+  player.videoView.setReadyPoints(
+    "marks",
+    times.map((mark) => mark?.start),
+  );
 }

@@ -133,6 +133,54 @@ module.exports = async function (h) {
     JSON.stringify(end),
   );
 
+  // Ready points: a decoder waits at the loop start, far from a keyframe
+  // (15 s; the one before is at 0), so the loop wraps to a sharp frame at
+  // once, and a jump there while paused is sharp at once too.
+  const app = `Promise.all([import("./src/context.js"), import("./src/features/playback.js")])`;
+  const readyPoints = () => js(`document.getElementById("videoCanvas").dataset.readyPoints ?? ""`);
+  const isReady = (text, time) => text.split(" ").some((t) => t !== "" && Math.abs(Number(t) - time) < 0.001);
+  async function waitReady(time) {
+    let ready = "";
+    for (let i = 0; i < 100 && !isReady(ready, time); i++) {
+      await sleep(100);
+      ready = await readyPoints();
+    }
+    return ready;
+  }
+  await js(
+    `${app}.then(([{ player }, { setLoopRegion }]) => { setLoopRegion({ start: 15, end: 17, enabled: true }); player.transport.seek(16); })`,
+  );
+  let ready = await waitReady(15);
+  check("a decoder gets ready at the loop start", isReady(ready, 15), `ready: ${ready}`);
+  key("Space");
+  s = await js(`__sampleCanvas(3500)`);
+  await ensurePaused();
+  const wraps = [];
+  for (let i = 1; i < s.length; i++) if (s[i].pos < s[i - 1].pos - 0.5) wraps.push(i);
+  // The frames on screen from the wrap on (the readout may lag it by one).
+  const afterWraps = wraps.map((i) => s.slice(i - 1, i + 10).filter((q) => q.frame < 15.5));
+  check(
+    "…and the loop wraps to a sharp frame there at once",
+    wraps.length >= 1 && afterWraps[0].length > 0 && afterWraps[0].every((q) => !q.proxy && q.frame >= 14.96),
+    `wraps ${wraps.length}; after them: ${JSON.stringify(afterWraps.map((qs) => qs.slice(0, 3)))}`,
+  );
+  // Paused elsewhere, its sharp frame on screen, then the jump: from the
+  // first frame at 15 s on, none is the proxy.
+  await js(`${app}.then(([{ player }]) => player.transport.seek(16.5))`);
+  ready = await waitReady(15);
+  for (let i = 0; i < 30 && (await js(`document.getElementById("videoCanvas").dataset.proxy !== undefined`)); i++)
+    await sleep(100);
+  await js(`window.__jump = __sampleCanvas(400); 0`);
+  await js(`${app}.then(([{ player }]) => player.transport.seek(15))`);
+  s = await js(`window.__jump`);
+  const from = s.findIndex((q) => Math.abs(q.frame - 15) < 0.05);
+  check(
+    "a jump to it while paused shows the sharp frame at once",
+    isReady(ready, 15) && from >= 0 && s.slice(from).every((q) => !q.proxy && Math.abs(q.frame - 15) < 0.05),
+    `ready: ${ready}; ${JSON.stringify(s.slice(0, 4))}`,
+  );
+  await js(`${app}.then(([, { setLoopRegion }]) => setLoopRegion(null))`);
+
   // Opening another video while one plays: the old one's decoding is cut
   // off as it's put away. That's no problem with the new file, which used
   // to be told "Part of the video couldn't be decoded". Ends on
