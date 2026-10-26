@@ -45,6 +45,14 @@
  * canvas's data-proxy-built shows what is built, data-proxy-overview the
  * overview's frames.
  *
+ * Ready points: where jumps are expected (the loop start, the start
+ * point, the marks Shift+← / Shift+→ go to), set by those features with
+ * setReadyPoints. Each gets a decoder of its own waiting there, decoded
+ * up to its frame (CONFIG.video.readyPoints), so a jump there shows the
+ * sharp frame at once, with no proxy, and plays on from it; then the
+ * point gets a new one. They get ready only while the sharp decoding is
+ * idle. The canvas's data-ready-points lists the ones ready.
+ *
  * Frames are decoded as lightweight VideoSamples; only the ones actually
  * drawn are painted, and every sample is closed as soon as it isn't
  * needed (they hold decoder memory).
@@ -57,17 +65,21 @@
  * one onProblem message.
  *
  * Exposes: preload, prepare, overviewReady, show, clear, discard,
- *          start, advance, showFrameAt, attach
+ *          start, advance, showFrameAt, attach, setReadyPoints
  *   prepare(media) → { video, reason }: opens a file (a File, or a
  *   download's { name, url }; core/media.js) without touching the
  *   video on screen; `video` is null (with a reason) if it has no
  *   picture this app can decode. Never throws.
  *   overviewReady(video, ms, signal, onProgress) waits (at most `ms`)
  *   for a prepared video's proxy overview, reporting the share done.
+ *   setReadyPoints(group, times) sets one caller's ready points
+ *   ("start", "loop", "marks"); all groups together are the points.
  *   attach({ pane, canvas }) moves the picture to another pane and
  *   canvas, which may be in another same-origin window; the frame on
  *   screen is redrawn there and the old pane is hidden.
  * ===================================================================== */
+
+import { CONFIG } from "../config.js";
 
 /**
  * @param {object} options
@@ -117,6 +129,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     });
     surfaceId = surfaceFor(canvas);
     send({ type: "use", id: surfaceId });
+    send({ type: "points", times: sentPoints }); // set before the worker started
   }
 
   // The worker failed: whatever waits for it gives up, and the user
@@ -152,6 +165,9 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
         return showBuilt();
       case "problem":
         return onProblem(data.message);
+      case "ready-points":
+        readyText = data.times.length ? data.times.map((time) => time.toFixed(3)).join(" ") : null;
+        return showBuilt();
     }
   }
 
@@ -228,6 +244,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     delete canvas.dataset.proxy;
     builtText = null;
     overviewText = null;
+    readyText = null;
     showBuilt();
   }
 
@@ -242,14 +259,18 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
   }
 
   // And data-proxy-built: the parts of the proxy built so far, as
-  // "start–end" in seconds; data-proxy-overview: its overview's frames.
+  // "start–end" in seconds; data-proxy-overview: its overview's frames;
+  // data-ready-points: the ready points with a decoder ready.
   let builtText = null;
   let overviewText = null;
+  let readyText = null;
   function showBuilt() {
     if (builtText === null) delete canvas.dataset.proxyBuilt;
     else canvas.dataset.proxyBuilt = builtText;
     if (overviewText === null) delete canvas.dataset.proxyOverview;
     else canvas.dataset.proxyOverview = overviewText;
+    if (readyText === null) delete canvas.dataset.readyPoints;
+    else canvas.dataset.readyPoints = readyText;
   }
 
   /* ---------- Canvases ---------- */
@@ -304,6 +325,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     delete canvas.dataset.proxy;
     delete canvas.dataset.proxyBuilt;
     delete canvas.dataset.proxyOverview;
+    delete canvas.dataset.readyPoints;
 
     ({ pane, canvas } = surface);
     surfaceId = surfaceFor(canvas);
@@ -337,6 +359,29 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     if (showing) send({ type: "position", position, at: now() });
   }
 
+  /* ---------- Ready points ---------- */
+
+  /** @type {Record<string, number[]>} */
+  const pointGroups = {};
+  /** @type {number[]} */
+  let sentPoints = [];
+
+  // One caller's points (see the header). All groups' points, in group
+  // order, without near-duplicates (within 1 ms), at most CONFIG's max;
+  // sent only when they change (this is called on every frame).
+  /** @param {string} group @param {(number | null | undefined)[]} times */
+  function setReadyPoints(group, times) {
+    pointGroups[group] = times.filter((time) => typeof time === "number" && Number.isFinite(time));
+    const points = [];
+    for (const time of Object.values(pointGroups).flat()) {
+      if (points.length < CONFIG.video.readyPoints.max && points.every((point) => Math.abs(point - time) >= 0.001))
+        points.push(time);
+    }
+    if (points.length === sentPoints.length && points.every((point, i) => point === sentPoints[i])) return;
+    sentPoints = points;
+    send({ type: "points", times: points });
+  }
+
   return {
     preload,
     prepare,
@@ -348,6 +393,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     advance,
     showFrameAt,
     attach,
+    setReadyPoints,
   };
 }
 

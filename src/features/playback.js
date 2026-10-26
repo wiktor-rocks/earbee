@@ -61,6 +61,7 @@ function showStartPoint() {
   const loaded = hasAudio();
   const time = loaded ? startPoint() : null;
   player.timeline.setStartPoint(time);
+  player.videoView.setReadyPoints("start", [time]); // the video is sharp there at once
   dom.startPointButton.hidden = !loaded;
   if (loaded) dom.startPointButton.textContent = `▶ ${formatTrackTime(time)}`;
 }
@@ -181,6 +182,7 @@ export function setLoopRegion(region) {
   loopRegion = valid ? { start: region.start, end: region.end, enabled: region.enabled } : null;
   player.transport.setLoop(loopRegion?.enabled ? loopRegion : null);
   player.waveform.setLoop(loopRegion);
+  player.videoView.setReadyPoints("loop", [loopRegion?.enabled ? loopRegion.start : null]); // sharp there at once
   renderLoopInfo(loopRegion);
 }
 
