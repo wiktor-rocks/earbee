@@ -81,6 +81,12 @@ export const CONFIG = {
     // If decoding falls this far behind playback (heavy file at high
     // speed), restart decoding at the current position instead of lagging.
     maxLagSeconds: 0.5,
+    // Ready points (video/view.js): the loop start, the start point and the
+    // nearest marks each get a decoder waiting there, so a jump there is
+    // sharp at once. At most `max` of them; one gets ready while the sharp
+    // decoding is idle and playback isn't behind by `pauseWhenBehindSeconds`,
+    // looking again every `waitMs` meanwhile.
+    readyPoints: { max: 4, pauseWhenBehindSeconds: 0.1, waitMs: 20 },
     // The video worker's clock (video/video-worker.js): between the page's
     // positions it moves on by itself, at the rate measured over at least
     // rateWindowMs, for at most maxAheadMs past the latest (if the page

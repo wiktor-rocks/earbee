@@ -32,10 +32,12 @@
 //   page → { type: "clear" }  no video
 //   page → { type: "start", time, at } / { type: "frame", time }
 //   page → { type: "position", position, at }  while playing
+//   page → { type: "points", times }  the ready points, in seconds
 //   ←      { type: "ready" }  once Mediabunny is loaded
 //   ←      { type: "shown", time, proxy }  each frame drawn
 //   ←      { type: "built", built, overview }  the proxy's progress (text or null)
 //   ←      { type: "problem", message }  once per file
+//   ←      { type: "ready-points", times }  the points with a decoder ready
 import {
   ALL_FORMATS,
   BlobSource,
@@ -51,6 +53,7 @@ import { createVideoProxy } from "./proxy.js";
 const scope = /** @type {any} */ (self);
 const post = (message) => scope.postMessage(message);
 const { maxLagSeconds } = CONFIG.video;
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // The worker's own animation frames; a timer where there are none.
 const nextFrameTick = scope.requestAnimationFrame
@@ -166,9 +169,9 @@ function startProxy(video, duration) {
     onProgress: () => video === current && markBuilt(proxy),
   });
   video.proxy = proxy;
-  // Gives way to this video's own sharp decoding, not another's.
+  // Gives way to this video's own sharp decoding (and ready points), not another's.
   proxy
-    .build(() => looping && video === current)
+    .build(() => (looping || prerolling) && video === current)
     .catch((error) => {
       if (!video.discarded) console.warn("Video proxy failed:", error);
     });
@@ -202,6 +205,7 @@ function unwatchOverview(id) {
 function discard(video) {
   if (!video || video.discarded) return;
   video.discarded = true;
+  for (const standby of [...standbys.values()]) if (standby.video === video) closeStandby(standby);
   video.proxy?.dispose(); // also stops its builder
   video.input.dispose?.();
   for (const [id, other] of videos) if (other === video) videos.delete(id);
@@ -211,13 +215,16 @@ function show(video) {
   reset();
   markBuilt(null);
   if (current && current !== video) discard(current);
+  closeStandbys();
   current = video;
   showFrameAt(0);
   markBuilt(video.proxy); // what was built while it loaded
+  prerollNext();
 }
 
 function clear() {
   reset();
+  closeStandbys();
   discard(current);
   current = null;
   surface?.context.clearRect(0, 0, surface.canvas.width, surface.canvas.height);
@@ -550,6 +557,123 @@ async function run() {
   }
 }
 
+/* ---------- Ready points ---------- */
+
+// A decoder waiting at each ready point (see view.js): it has decoded from
+// the keyframe before its point up to the frame there, and holds that
+// frame. A jump to the point takes it as the cursor, so the sharp frame is
+// on screen at once and the frames after it follow without a keyframe's
+// worth of decoding; then the point gets a new one. Each has a decoder of
+// its own (its own VideoSampleSink), and they get ready one at a time,
+// only while the sharp decoding is idle ("playback is king").
+/** @type {Map<number, { time: number, video: any, iterator: any, last: any, end: number, ready: boolean, closed: boolean }>} */
+const standbys = new Map(); // by point, for the video on screen
+let points = []; // the page's ready points, in seconds
+const failedPoints = new Set(); // points whose decoder failed, for this video
+let prerolling = false;
+
+/** @param {number[]} times */
+function setPoints(times) {
+  points = times;
+  for (const standby of [...standbys.values()]) if (!points.includes(standby.time)) closeStandby(standby);
+  postReadyPoints();
+  prerollNext();
+}
+
+function closeStandby(standby) {
+  if (standbys.get(standby.time) === standby) standbys.delete(standby.time);
+  if (standby.closed) return;
+  standby.closed = true;
+  standby.iterator?.return?.().catch(() => {});
+  standby.last?.close();
+}
+
+function closeStandbys() {
+  for (const standby of [...standbys.values()]) closeStandby(standby);
+  failedPoints.clear();
+  postReadyPoints();
+}
+
+function postReadyPoints() {
+  const times = [...standbys.values()].filter((standby) => standby.ready).map((standby) => standby.time);
+  post({ type: "ready-points", times: times.sort((a, b) => a - b) });
+}
+
+// Busy: the sharp decoding is working, or playback is behind (a proxy
+// frame on screen, or the cursor not far enough ahead).
+const { pauseWhenBehindSeconds, waitMs } = CONFIG.video.readyPoints;
+const busyForPoints = () =>
+  looping ||
+  (mode === "playing" && (shownIsProxy || (cursor !== null && target - cursor.end > pauseWhenBehindSeconds)));
+
+// Gets the points without a decoder ready, one after another.
+async function prerollNext() {
+  if (prerolling) return;
+  prerolling = true;
+  try {
+    for (;;) {
+      const video = current;
+      const time = points.find((point) => !standbys.has(point) && !failedPoints.has(point));
+      if (!video || time === undefined) break;
+      await preroll(video, time);
+    }
+  } finally {
+    prerolling = false;
+  }
+}
+
+async function preroll(video, time) {
+  const point = Math.max(time, video.firstTimestamp);
+  const standby = { time, video, iterator: null, last: null, end: -Infinity, ready: false, closed: false };
+  standbys.set(time, standby);
+  const gone = () => standby.closed || video !== current;
+  try {
+    const keyframe = await keyframeBefore(video, point);
+    if (gone()) return closeStandby(standby);
+    standby.iterator = new VideoSampleSink(video.track).samples(keyframe);
+    for (;;) {
+      while (busyForPoints() && !gone()) await sleep(waitMs);
+      if (gone()) return closeStandby(standby);
+      const result = await standby.iterator.next();
+      if (gone()) {
+        result.value?.close();
+        return closeStandby(standby);
+      }
+      if (result.done) break; // the point is past the last frame: that one
+      standby.last?.close();
+      standby.last = result.value;
+      standby.end = result.value.timestamp + result.value.duration;
+      if (standby.end > point) break;
+    }
+    if (!standby.last) throw new Error("no frame there");
+    standby.ready = true;
+    postReadyPoints();
+  } catch (error) {
+    if (gone()) return closeStandby(standby);
+    console.warn("Video ready point failed:", error);
+    failedPoints.add(time);
+    closeStandby(standby);
+  }
+}
+
+// A jump to `time`: if a decoder is ready there, it becomes the cursor
+// and its frame is returned (to draw at once); the point gets a new one.
+function takeStandby(time) {
+  if (!current) return null;
+  const t = Math.max(time, current.firstTimestamp);
+  for (const standby of standbys.values()) {
+    if (!standby.ready || standby.video !== current) continue;
+    if (t < standby.last.timestamp - 0.001 || t >= standby.end) continue;
+    standbys.delete(standby.time);
+    closeCursor();
+    cursor = { iterator: standby.iterator, last: standby.last, end: standby.end };
+    postReadyPoints();
+    prerollNext();
+    return cursor.last;
+  }
+  return null;
+}
+
 /* ---------- Following the transport ---------- */
 
 // Not playing: show exactly the frame at `time`.
@@ -559,6 +683,9 @@ function showFrameAt(time) {
   target = time;
   targetVersion++;
   dropNextFrame();
+  // A ready point: its sharp frame now, and nothing left to decode.
+  const ready = takeStandby(time);
+  if (ready) return draw(ready);
   if (!(cursor?.last && cursor.last.timestamp <= time && time < cursor.end)) requestProxyWithHeadStart(time);
   run();
 }
@@ -574,7 +701,12 @@ function start(time, at) {
   clock = { position: time, at };
   rateFrom = null;
   dropNextFrame();
-  requestProxyWithHeadStart(time);
+  // A ready point: its sharp frame now, and the cursor is already there.
+  const ready = takeStandby(time);
+  if (ready) {
+    seekTarget = null;
+    draw(ready);
+  } else requestProxyWithHeadStart(time);
   run();
   if (!ticking) {
     ticking = true;
@@ -628,6 +760,8 @@ scope.onmessage = ({ data }) => {
       return showFrameAt(data.time);
     case "position":
       return mode === "playing" && setClock(data.position, data.at);
+    case "points":
+      return setPoints(Array.isArray(data.times) ? data.times.filter(Number.isFinite) : []);
   }
 };
 
