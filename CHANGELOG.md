@@ -43,6 +43,23 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-27: The sound dock: drag knobs instead of sliders
+
+- **What:** speed, semitones, fine pitch and volume are round knobs, each with its name and value beside it, and the dock is one slim row (about 64 px tall instead of about 100), so the waveform gets the room. The EQ bands are knobs too, in the Bands popover as before.
+  - **Turning one:** drag up to turn it up, down to turn it down; Shift turns it 5× finer. The cursor hides while dragging and comes back where it was. The wheel turns it too (with Shift, one step a notch). Double-clicking a value swaps in a field to type one (Enter sets it, Escape doesn't). Tab and the arrow keys work as before.
+  - **The ring** shows the value: from the minimum for speed and volume, from the default in the middle for pitch and the EQ, so up or down reads at a glance.
+  - **Speed presets:** 0.5×, 0.75× and 1× next to the knob; all 12 behind "…".
+  - **Settings › General › Knob sensitivity** (25–400 %, default 100 %): how far a drag turns a knob.
+- **Why:** an idea from the owner's scratchpad ("Visual knobs that you can drag precisely, kind of like oldschool sony vegas"): the sliders took a lot of room and were hard to set precisely. The owner chose the flat ring look, the one-row dock, and the drag, pointer lock, wheel and typing (not a double-click reset); asked for the EQ to stay in its popover; and found 200 and then 400 px for the whole range too sensitive, hence 800, and asked for the setting.
+- **How:**
+  - The `<input type="range">` of each setting stays, out of sight inside the knob: it still holds the value, so `setSetting()`, project files, the arrow keys and screen readers are unchanged. `buildKnob()` wraps it with an SVG dial (a 270° track, the value's arc and a pointer) and returns `render(value)`, which `setSetting()` calls.
+  - A drag keeps an unrounded value (so a slow fine drag still gets from step to step) and sends it snapped to the slider's step (`snapToStep`), only when it changes. Locked, the distance comes from `movementY`; without a lock (refused, or the test window) from the pointer's position. Moves and the release are listened for on the window, because the lock takes over the pointer capture.
+  - The drag covers the whole range in `CONFIG.knob.travel` (800 px) at 100 %, divided by `fine` (5) with Shift; a wheel notch is `wheelPixels` (40) of drag at 100 %, whatever the setting.
+  - A typed value is read leniently ("−3", "0,75") and snapped; a text field blocks the shortcuts while it's open.
+  - The knob doesn't take the focus on a click, so ← / → still step the cursor after a drag (as with a clicked slider).
+- **Where:** `src/ui/knob.js` (new: `buildKnob`, `snapToStep`); `src/ui/controls.js` (`initSliders`, `bindTypedValue`, `buildEqKnobs`, `buildSpeedChips`; `buildScales` gone); `src/ui/dom.js` (`speedChips` returns both sets); `src/config.js` (`knob`, `speed.dockPresets`); `src/prefs/index.js` (`knobSensitivity`); `index.html` (the dock); `style.css` ("Sound dock", "EQ", a new "Knobs" section, the narrow and short window rules); `src/app.js` (the header); `docs/glossary.md` (a "Knob" row); `tests/e2e/01-static-ui.cjs`, `tests/e2e/05-stepping.cjs`, `tests/unit/prefs.test.mjs`.
+- **Verified by:** `npm run check`; `npm test` on the branch (306 unit, 507 e2e, 28 smoke) and after the merge (306 unit, 508 e2e, 28 smoke). New checks: every slider has a knob, the five EQ knobs are in their popover, the presets (3 and 12) (01); a drag up turns the speed up, Shift turns it 5× finer, Knob sensitivity 200 % turns it twice as far, Shift+wheel moves one step, a typed value sets it (05). Screenshots: `tests/output/dock-knobs.png`, `dock-eq-knobs.png`. The owner tried the drag in a real window (the sensitivity); not yet checked there: the pointer lock, narrow and short windows, light themes.
+
 ## 2026-10-27: Settings › Advanced: how much memory sharp video jumps may use
 
 - **What:** a new Settings section, **Advanced**, with **Memory for sharp video jumps**: Off, Low, Normal (the default, as before) or High. Off lets no decoder wait (a jump shows the blurry picture for a moment, as before the ready points); High gives more of them to big videos (two at 4K, with enough memory free). A change applies at once, to the open video too.
