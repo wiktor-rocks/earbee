@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-27: The next release's scope, in a file of its own (AGENTS.md)
+
+- **What:** what goes into the next release is kept in `local/NEXT-RELEASE-<version>.md`: a few things to finish (each with "done when"), what's already in (written for the release notes), and the release steps with the number filled in. Assistants show its open items at the start of every session, after the reminders, tick them off, and say so when a request isn't in its scope; only the owner changes the scope. The first is `NEXT-RELEASE-0.3.0.md`.
+- **Why:** the owner's reminder: "Keep a 'Next release' doc, that will keep only the changes you want to make in the next release, so that you don't drown in ideas", to keep the scope narrow enough to keep releasing.
+- **How:** next to the scratchpad and FOR-TOMORROW.md in `local/` (not committed). 0.3.0 is the next number: new features since 0.2.0 (docs/maintaining.md, "Choose the number"). Its scope, chosen by the owner: what's on `testing`, plus the video zoom (edge cases, then the merge), Electron's credit on the site, new screenshots and clips, and the Mac notes.
+- **Where:** `AGENTS.md` ("First, in every session", "Read first" item 0, "Ending a session" step 6), `docs/maintaining.md` ("Putting out a new version"), `local/README.md` and `local/NEXT-RELEASE-0.3.0.md` (local).
+- **Verified by:** `npm run format:check`; the file read back against the CHANGELOG since 0.2.0 and the site (the footer already credits the other parts, so only Electron is missing; the README's picture points to a file that doesn't exist).
+
 ## 2026-10-27: earbee.org: questions on the home page, and llms.txt
 
 - **What:** the home page gets a "Questions" section before Download: ten short questions and answers (is it free, does slowing down change the pitch, which computers, YouTube, files, the internet, the beats, whether it writes out the notes, Transcribe!, projects), each opening on a click. The same questions go into the page's FAQ structured data, and earbee.org/llms.txt describes the site in plain text for AI assistants: what EarBee is (and isn't), the links, every post and the questions. On `testing` only: they go online with the next release, when `main` moves up (only the posts are published from `testing`).
