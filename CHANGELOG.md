@@ -43,6 +43,21 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-27: The video is sharp at once after jumps to the loop start, the start point and the marks (experiment `exp/sharp-jump-points`)
+
+- **What:** up to four "ready points" each have a decoder waiting, already decoded up to their frame: the loop start, the start point (green ▶), and the marks Shift+← / Shift+→ would go to from where playback is. A loop going round, Space, a mark jump, or a jump there while paused, shows the sharp frame at once, with no proxy, and plays on from it.
+- **Why:** the owner's idea. After a jump, the blurry proxy showed until the sharp decoder had worked forward from the keyframe before, which in real videos can be seconds back; these are the jumps made over and over while transcribing.
+- **How:**
+  - Each point gets a decoder of its own (a `VideoSampleSink`), opened at `keyframeBefore` the point and pulled up to the frame there, which it holds. `takeStandby()` makes it the cursor in `start()` and `showFrameAt()`, draws its frame, and the point gets a new one.
+  - They get ready one at a time, only while the sharp decoding is idle and playback isn't behind (`busyForPoints`); even the decoder is opened only then, because the start point moves with every click and drag. The proxy builders give way to them.
+  - The page sends the points from `showStartPoint` and `setLoopRegion` (`features/playback.js`) and `readyNearestMarks` (`features/marks.js`, on every position, with `previousMark`'s tolerance while playing). `setReadyPoints` merges the groups, drops near-duplicates, caps them at `CONFIG.video.readyPoints.max` and sends only changes. The canvas's `data-ready-points` lists the ones ready.
+- **Where:** `src/video/video-worker.js` ("Ready points"), `src/video/view.js` (`setReadyPoints`, the header's "Ready points"), `src/features/playback.js`, `src/features/marks.js`, `src/config.js` (`video.readyPoints`); `tests/e2e/08-video.cjs`.
+- **Verified by:**
+  - Three new checks in topic 08, on `long-counter.webm` (a loop at 15 s; the keyframe before is at 0): a decoder gets ready there, both wraps show a sharp frame at 15 s at once, and a jump there while paused is sharp at once. With `max: 0` all three fail (the proxy shows), so they measure the change.
+  - `npm test` on the merge: 294 unit, 498 e2e, 28 smoke. The test AppImage's smoke test.
+  - The owner tried the AppImage on real videos: "it looks pretty good".
+  - Not measured: the memory with four decoders waiting on a 4K video (each holds a frame, about 12 MB at 4K, plus its queue).
+
 ## 2026-10-27: The website lists matching your tuning (the website)
 
 - **What:** "What it does" on earbee.org has a new item, **Match your tuning**: "Band tuned down to E♭ or D? Shift the song to match your guitar, in semitones and cents, at the same speed." "Slower, same pitch" is about the speed only now (it ended with "Or change the pitch, not the speed.").
