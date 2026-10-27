@@ -17,7 +17,8 @@ export const CONFIG = {
 
   // The knobs in the dock (ui/knob.js), for every setting above and the
   // EQ bands. `travel`: pixels of drag from one end of the range to the
-  // other (speed: about 0.004× a pixel); `fine`: how many times slower
+  // other at the Knob sensitivity setting's 100 % (speed: about 0.004× a
+  // pixel); `fine`: how many times slower
   // with Shift; `wheelPixels`: how far one wheel notch turns it, as
   // pixels of drag (with Shift, a notch is one step).
   knob: { travel: 800, fine: 5, wheelPixels: 40 },

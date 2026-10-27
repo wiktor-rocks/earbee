@@ -6,7 +6,8 @@
  * and turns it with the pointer.
  *
  * Dragging up turns it up, down turns it down (CONFIG.knob.travel pixels
- * for the whole range, Shift for fine). The pointer is locked while
+ * for the whole range at the Knob sensitivity setting's 100 %, Shift for
+ * fine). The pointer is locked while
  * dragging, so the cursor hides and can't run into the screen's edge; it
  * comes back where it was. The wheel turns it too.
  * ===================================================================== */
@@ -14,6 +15,7 @@
 import { CONFIG } from "../config.js";
 import { clamp } from "../core/format.js";
 import { element } from "./dom.js";
+import { getPrefs } from "./prefs.js";
 
 const SVG = "http://www.w3.org/2000/svg";
 
@@ -87,8 +89,12 @@ export function buildKnob(input, { range, centred = false, onInput }) {
     if (snapped !== Number(input.value)) onInput(snapped);
   };
 
-  // How much a pixel of drag turns it.
-  const perPixel = (fine) => (max - min) / CONFIG.knob.travel / (fine ? CONFIG.knob.fine : 1);
+  // How much a pixel of drag turns it, at the Knob sensitivity setting
+  // (Settings › General, a percentage).
+  const perPixel = (fine) => {
+    const sensitivity = (getPrefs("general")?.knobSensitivity ?? 100) / 100;
+    return ((max - min) * sensitivity) / CONFIG.knob.travel / (fine ? CONFIG.knob.fine : 1);
+  };
 
   /* ---------- Dragging ---------- */
 
@@ -131,8 +137,9 @@ export function buildKnob(input, { range, centred = false, onInput }) {
 
   /* ---------- The wheel ---------- */
 
-  // A notch turns it as far as CONFIG.knob.wheelPixels of drag; with Shift
-  // (which makes the wheel scroll sideways, hence deltaX), by one step.
+  // A notch turns it as far as CONFIG.knob.wheelPixels of drag at 100 %
+  // (the setting doesn't change the wheel); with Shift (which makes the
+  // wheel scroll sideways, hence deltaX), by one step.
   knob.addEventListener(
     "wheel",
     (event) => {
@@ -140,7 +147,7 @@ export function buildKnob(input, { range, centred = false, onInput }) {
       if (!delta) return;
       event.preventDefault();
       const direction = delta < 0 ? 1 : -1;
-      const amount = event.shiftKey ? range.step : CONFIG.knob.wheelPixels * perPixel(false);
+      const amount = event.shiftKey ? range.step : ((max - min) * CONFIG.knob.wheelPixels) / CONFIG.knob.travel;
       send(Number(input.value) + direction * amount);
     },
     { passive: false },

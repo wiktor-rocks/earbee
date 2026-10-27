@@ -10,6 +10,8 @@ import { defineSection, normalizeAll } from "./fields.js";
 // transport bar. `beatClick` plays a click on each found beat
 // (features/beats.js), to hear whether the beat lines sit on the beat;
 // it's set in the beats menu (the ♩ chip) or with Shift+B, not here.
+// `knobSensitivity` is how far a drag turns the dock's knobs
+// (ui/knob.js): 100 % is CONFIG.knob.travel, 200 % twice as far.
 const generalSection = defineSection({
   id: "general",
   title: "General",
@@ -29,6 +31,17 @@ const generalSection = defineSection({
       help: "Once the beats are found (B), a click plays on each one, to hear whether they're right. Shift+B turns it on and off.",
       default: false,
       inDialog: false,
+    },
+    {
+      key: "knobSensitivity",
+      type: "number",
+      label: "Knob sensitivity",
+      help: "How far a knob turns as you drag it. Lower is finer; Shift makes any drag finer still.",
+      default: 100,
+      min: 25,
+      max: 400,
+      step: 25,
+      unit: "%",
     },
   ],
 });
