@@ -1923,6 +1923,7 @@ body.dragging .drop-card {
 /* ---------- Stage: video + timeline + minimap ---------- */
 
 .stage {
+  position: relative;
   display: grid;
   grid-template-rows: minmax(0, 1fr) 44px;
   gap: 8px;
@@ -1930,17 +1931,77 @@ body.dragging .drop-card {
 }
 
 /* Video files: the picture on top, then a shorter timeline (its lanes
-   take 48 px), then the minimap. */
+   take 48 px), then the minimap. The timeline's part is 40 % and at least
+   170 px, until the handle between them is dragged
+   (features/stage-split.js): then #stage has its own --timeline-share
+   and a lower --timeline-min (CONFIG.stage.minTimeline). */
 .stage.has-video {
-  grid-template-rows: minmax(0, 1fr) minmax(170px, 40%) 44px;
+  grid-template-rows:
+    minmax(0, 1fr) minmax(var(--timeline-min, 170px), calc(var(--timeline-share, 0.4) * 100%))
+    44px;
 }
 
 /* A short window's smaller minimap (as for songs, at the end of the
    file). Here, so big video and the popped-out layout still win. */
 @media (max-height: 719px) {
   .stage.has-video {
-    grid-template-rows: minmax(0, 1fr) minmax(170px, 40%) 34px;
+    grid-template-rows:
+      minmax(0, 1fr) minmax(var(--timeline-min, 170px), calc(var(--timeline-share, 0.4) * 100%))
+      34px;
   }
+}
+
+/* ---------- Stage split handle (features/stage-split.js) ----------
+   In the gap between the picture and the timeline, only while a video
+   is on the stage (not in big video, nor with the video in its own
+   window). Placed in the timeline's grid area, so it takes no room of
+   its own, and moved 8 px up, into the gap. */
+
+.stage-split {
+  display: none;
+  position: absolute;
+  top: -8px;
+  right: 0;
+  left: 0;
+  grid-row: 2;
+  grid-column: 1;
+  z-index: 2;
+  height: 8px;
+  cursor: row-resize;
+  touch-action: none;
+}
+
+.stage.has-video > .stage-split {
+  display: block;
+}
+
+.app.big-video .stage-split {
+  display: none;
+}
+
+/* The grip: a small pill in the middle, brighter while it can be or is
+   being dragged. */
+.stage-split::before {
+  content: "";
+  position: absolute;
+  top: 2px;
+  left: calc(50% - 18px);
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--muted) 45%, transparent);
+}
+
+.stage-split:hover::before,
+.stage-split.dragging::before {
+  background: var(--accent);
+}
+
+/* While dragging, the resize cursor stays wherever the pointer goes
+   (the handle has the pointer captured, so nothing else reacts). */
+body.stage-split-dragging,
+body.stage-split-dragging * {
+  cursor: row-resize;
 }
 
 .video-pane {
@@ -1964,6 +2025,17 @@ body.dragging .drop-card {
   min-height: 0;
   overflow: hidden;
   cursor: crosshair;
+}
+
+/* WaveSurfer's own box (its host, scroll area and wrapper) fills the
+   waveform's height, whatever height it was last drawn at. Otherwise it is
+   as tall as its drawing, and when the timeline grows (the stage split
+   handle) an empty band shows below it until the redraw; meanwhile the
+   drawing is stretched to fill it (waveform.js, bindResizeClamp). */
+.waveform > div,
+.waveform ::part(scroll),
+.waveform ::part(wrapper) {
+  height: 100%;
 }
 
 .waveform.near-loop-edge {

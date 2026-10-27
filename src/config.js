@@ -91,6 +91,10 @@ export const CONFIG = {
     // If decoding falls this far behind playback (heavy file at high
     // speed), restart decoding at the current position instead of lagging.
     maxLagSeconds: 0.5,
+    // A paused picture whose canvas was resized is shown scaled at once,
+    // then drawn again, sharp, this long after the last resize (the stage
+    // split handle resizes it every frame while dragged).
+    resizeRedrawMs: 150,
     // Ready points (video/view.js): the loop start, the start point and the
     // nearest marks each get a decoder waiting there, so a jump there is
     // sharp at once. At most `max` of them; one gets ready while the sharp
@@ -170,6 +174,14 @@ export const CONFIG = {
     minPeaksPerSecond: 50,
     maxPeaksPerSecond: 8000,
   },
+
+  // With a video, the handle between the picture and the timeline
+  // (features/stage-split.js). `timelineShare`: the timeline's part of the
+  // stage's height at first (and for each new file). A drag keeps the
+  // timeline at least `minTimeline` px (style.css's --timeline-min is the
+  // same) and the picture at least `minVideo` px; a share read from a
+  // project file is kept within `minShare`–`maxShare`.
+  stage: { timelineShare: 0.4, minTimeline: 110, minVideo: 120, minShare: 0.1, maxShare: 0.9 },
 
   beats: {
     // The beat lines over the waveform (B; features/beats.js) are hidden

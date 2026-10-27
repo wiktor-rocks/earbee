@@ -86,6 +86,8 @@ let looping = false; // only one decode loop at a time
 let lastSkipCheckAt = 0;
 let shownTime = null; // timestamp of the frame on screen
 let shownIsProxy = false;
+let shownAspect = 0; // the frame on screen's width / height
+let sharpRedraw; // timer: the frame drawn again, sharp, once resizing stops
 let proxyRequest = null; // time wanted from the proxy (latest wins)
 let proxyBusy = false;
 let sharpHeldUntil = 0; // performance.now() until which run() waits (head start)
@@ -273,14 +275,46 @@ function useSurface(id) {
   if (mode !== "playing") showFrameAt(time);
 }
 
-// Resizing clears the canvas; redraw the frame on screen when paused
-// (while playing, the next frame redraws within a few milliseconds).
+// Where a frame of `aspect` (width / height) goes, letterboxed, in a
+// canvas of `width` × `height`.
+function fitRect(width, height, aspect) {
+  const drawWidth = Math.min(width, height * aspect);
+  const drawHeight = drawWidth / aspect;
+  return { x: (width - drawWidth) / 2, y: (height - drawHeight) / 2, width: drawWidth, height: drawHeight };
+}
+
+// Resizing clears the canvas. What was on screen is drawn straight back,
+// scaled to the new size, so the picture never goes black (the stage
+// split handle resizes it every frame while dragged). Paused, the frame
+// is then drawn again, sharp, once the resizing stops; playing, the next
+// frame does it within a few milliseconds.
 function resizeSurface(id, width, height) {
   const resized = surfaces.get(id);
   if (!resized) return;
-  resized.canvas.width = width;
-  resized.canvas.height = height;
-  if (resized === surface && current && mode !== "playing") showFrameAt(shownTime ?? target);
+  const { canvas, context } = resized;
+  const onScreen = resized === surface && current && shownTime !== null && shownAspect > 0 && canvas.width > 1;
+  const from = onScreen ? fitRect(canvas.width, canvas.height, shownAspect) : null;
+  // The picture, copied out before the resize clears it.
+  let picture = null;
+  if (from) {
+    picture = new OffscreenCanvas(Math.max(1, Math.round(from.width)), Math.max(1, Math.round(from.height)));
+    picture
+      .getContext("2d")
+      .drawImage(canvas, from.x, from.y, from.width, from.height, 0, 0, picture.width, picture.height);
+  }
+  canvas.width = width;
+  canvas.height = height;
+  if (picture) {
+    const to = fitRect(width, height, shownAspect);
+    context.fillStyle = "#000";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(picture, to.x, to.y, to.width, to.height);
+  }
+  if (resized !== surface || !current || mode === "playing") return;
+  clearTimeout(sharpRedraw);
+  sharpRedraw = setTimeout(() => {
+    if (current && mode !== "playing") showFrameAt(shownTime ?? target);
+  }, CONFIG.video.resizeRedrawMs);
 }
 
 /* ---------- Drawing ---------- */
@@ -292,6 +326,7 @@ function draw(frame) {
   context.fillStyle = "#000";
   context.fillRect(0, 0, canvas.width, canvas.height);
   frame.drawWithFit(context, { fit: "contain" });
+  shownAspect = frame.displayWidth / frame.displayHeight;
   markShown(frame.timestamp, false);
 }
 
@@ -307,6 +342,7 @@ function drawProxy(frame) {
   context.fillStyle = "#000";
   context.fillRect(0, 0, width, height);
   context.drawImage(frame, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
+  shownAspect = frame.displayWidth / frame.displayHeight;
   markShown(frame.timestamp / 1e6, true);
 }
 

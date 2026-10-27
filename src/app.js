@@ -133,7 +133,9 @@
  *                  its own video-window.css; self-contained, its wiring
  *                  marked "Video window ("),
  *                  big-video.js (the picture large, the rest put away;
- *                  its wiring marked "Big video (")
+ *                  its wiring marked "Big video ("), stage-split.js (the
+ *                  handle between the picture and the timeline; its
+ *                  wiring marked "Stage split (")
  *   app.js         This file: creates and wires the components, the
  *                  SHORTCUTS table, start()
  *   vendor/        Signalsmith Stretch, patched to read across several
@@ -259,6 +261,7 @@ import {
 } from "./features/marks.js";
 import { bigVideoPictureChanged, bindBigVideo, leaveBigVideo, toggleBigVideo } from "./features/big-video.js"; // Big video (src/features/big-video.js)
 import { bindLayout, openShortcuts } from "./features/layout.js";
+import { bindStageSplit } from "./features/stage-split.js"; // Stage split (src/features/stage-split.js)
 import { beatsAction, bindBeats, isBeatMenuOpen, snapForDrag, toggleBeatClick } from "./features/beats.js";
 import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
@@ -653,6 +656,7 @@ function start() {
   bindBeats();
   bindLayout();
   bindBigVideo(); // Big video (src/features/big-video.js)
+  bindStageSplit(); // Stage split (src/features/stage-split.js)
   bindFocus();
   const keysBlocked = () =>
     isLoading() ||
