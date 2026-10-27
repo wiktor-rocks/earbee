@@ -156,6 +156,77 @@ module.exports = async function (h) {
     key("V");
     await sleep(800);
     check("(and out again, for what follows)", videoWin() !== null);
+
+    // The picture brought back during a drag in the video window: no drag
+    // is left over, and the zoom comes back with it.
+    const there = videoWin().webContents;
+    const { width: w, height: hh } = await inWindow(`({ width: innerWidth, height: innerHeight })`);
+    const middle = { x: Math.round(w / 2), y: Math.round(hh / 2) };
+    for (let i = 0; i < 5; i++) {
+      there.sendInputEvent({ type: "mouseWheel", ...middle, deltaX: 0, deltaY: 120 });
+      await sleep(60);
+    }
+    await until(async () => Number.parseFloat(await zoomThere()) > 1.1);
+    // Its controls, kept from the main window, to see whether they're
+    // still updated once the window is closed.
+    await inWindow(`window.opener.__closedZoomBar = document.querySelector(".video-zoom-bar")`);
+    there.sendInputEvent({ type: "mouseDown", ...middle, button: "left", clickCount: 1 });
+    for (let i = 1; i <= 4; i++) {
+      there.sendInputEvent({
+        type: "mouseMove",
+        x: middle.x + 15 * i,
+        y: middle.y,
+        button: "left",
+        modifiers: ["leftButtonDown"],
+      });
+      await sleep(40);
+    }
+    await sleep(500);
+    const midDrag = await zoomThere();
+    key("V");
+    await sleep(800);
+    const main = () =>
+      js(`(() => {
+        const pane = document.getElementById("videoPane");
+        return {
+          zoom: document.getElementById("videoCanvas").dataset.zoom ?? "",
+          panning: pane.classList.contains("panning"),
+          level: pane.querySelector(".video-zoom-level").textContent,
+          bars: pane.querySelectorAll(".video-zoom-bar").length,
+        };
+      })()`);
+    let m = await main();
+    check(
+      "brought back during a drag: no drag left over, and the zoom comes back with the picture",
+      midDrag !== "" && m.zoom === midDrag && !m.panning,
+      `${midDrag} → ${JSON.stringify(m)}`,
+    );
+
+    // Out and back a few times while zoomed in: the main window's controls
+    // still follow the zoom, and the closed windows' controls don't.
+    for (let i = 0; i < 6; i++) {
+      key("V");
+      await sleep(700);
+    }
+    key("=", ["control"]);
+    await sleep(300);
+    m = await main();
+    const closedLevel = await js(`__closedZoomBar.querySelector(".video-zoom-level").textContent`);
+    check(
+      "out and back six times: the controls still say the zoom",
+      videoWin() === null && m.bars === 1 && m.level === `${Number.parseFloat(m.zoom).toFixed(1)}×`,
+      JSON.stringify(m),
+    );
+    check(
+      "…and a closed video window's controls are let go (not updated any more)",
+      closedLevel !== m.level,
+      `closed window's controls say ${closedLevel}, the main window's ${m.level}`,
+    );
+    await js(`delete window.__closedZoomBar`);
+    key("0", ["control"]);
+    key("V");
+    await sleep(800);
+    check("(and out again, for what follows, at 1×)", videoWin() !== null && (await zoomThere()) === "");
   }
 
   await inWindow(`document.querySelector('[aria-label="Keep on top"]').click()`);

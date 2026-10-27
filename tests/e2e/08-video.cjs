@@ -263,7 +263,13 @@ module.exports = async function (h) {
   const [, x0] = (await zoomNow()).split(" ").map(Number);
   wc.sendInputEvent({ type: "mouseDown", ...centre, button: "left", clickCount: 1 });
   for (let i = 1; i <= 5; i++) {
-    wc.sendInputEvent({ type: "mouseMove", x: centre.x + 20 * i, y: centre.y, button: "left" });
+    wc.sendInputEvent({
+      type: "mouseMove",
+      x: centre.x + 20 * i,
+      y: centre.y,
+      button: "left",
+      modifiers: ["leftButtonDown"],
+    });
     await sleep(30);
   }
   wc.sendInputEvent({ type: "mouseUp", x: centre.x + 100, y: centre.y, button: "left", clickCount: 1 });
@@ -346,7 +352,13 @@ module.exports = async function (h) {
   const [, slowX0] = (await zoomNow()).split(" ").map(Number);
   wc.sendInputEvent({ type: "mouseDown", ...centre, button: "left", clickCount: 1 });
   for (let i = 1; i <= 5; i++) {
-    wc.sendInputEvent({ type: "mouseMove", x: centre.x - 20 * i, y: centre.y, button: "left" });
+    wc.sendInputEvent({
+      type: "mouseMove",
+      x: centre.x - 20 * i,
+      y: centre.y,
+      button: "left",
+      modifiers: ["leftButtonDown"],
+    });
     await sleep(30);
   }
   wc.sendInputEvent({ type: "mouseUp", x: centre.x - 100, y: centre.y, button: "left", clickCount: 1 });
@@ -384,6 +396,260 @@ module.exports = async function (h) {
   await shot("video-zoom-rotated.png");
   check(
     "…and nothing said the zoom failed",
+    !(await stopped()),
+    await js(`document.getElementById("message").textContent`),
+  );
+
+  // The zoom's edge cases: another file chosen while zoomed in, an audio
+  // file, a jump where the proxy isn't built yet, resizing while zoomed
+  // (big video, the stage split, a tiny pane), and input that isn't a
+  // plain notch of the wheel.
+  const loaded = async () => {
+    for (let i = 0; i < 200; i++) {
+      await sleep(50);
+      if (await js(`document.getElementById("loadingOverlay").hidden && !document.getElementById("play").disabled`))
+        break;
+    }
+    await sleep(300);
+  };
+  const zoomParts = async () => (await zoomNow()).split(" ").map(Number); // [zoom, x, y], or [0]
+  const panes = () => js(`videoPane.classList.contains("panning")`);
+  const dragPicture = async (from, dx, dy, { release = true, steps = 5 } = {}) => {
+    wc.sendInputEvent({ type: "mouseDown", ...from, button: "left", clickCount: 1 });
+    for (let i = 1; i <= steps; i++) {
+      wc.sendInputEvent({
+        type: "mouseMove",
+        x: Math.round(from.x + (dx * i) / steps),
+        y: Math.round(from.y + (dy * i) / steps),
+        button: "left",
+        modifiers: ["leftButtonDown"],
+      });
+      await sleep(30);
+    }
+    if (release) wc.sendInputEvent({ type: "mouseUp", x: from.x + dx, y: from.y + dy, button: "left", clickCount: 1 });
+    await sleep(200);
+  };
+
+  // Another file chosen while zoomed in, and wheeled over while it loads:
+  // it opens with all of its picture.
+  await openFile(path.join(FIXTURES, "counter.webm"));
+  await wheelOver(at.x, at.y, 120, 5);
+  await h.setFiles(path.join(FIXTURES, "rotated.mp4"));
+  for (let i = 0; i < 8; i++) {
+    wc.sendInputEvent({ type: "mouseWheel", x: Math.round(at.x), y: Math.round(at.y), deltaX: 0, deltaY: 120 });
+    await sleep(25);
+  }
+  await loaded();
+  check(
+    "a file chosen while zoomed in (and wheeled over while it loads) opens with all of its picture",
+    (await zoomNow()) === "" && (await zoomBar()).level === "1.0×" && !(await stopped()),
+    `${await zoomNow()} ${JSON.stringify(await zoomBar())}`,
+  );
+  // Zoomed in on it straight away: it's portrait, so the view is kept
+  // within its own shape, not the last file's.
+  await wheelOver(centre.x, centre.y, 120, 12);
+  const [portraitZoom, portraitX] = await zoomParts();
+  check(
+    "…and zoomed in straight away, the view keeps to its (portrait) shape",
+    portraitZoom > 4 && Math.abs(portraitX - 0.5) < 0.02,
+    await zoomNow(),
+  );
+
+  // An audio file: the zoom's keys and the wheel do nothing there.
+  await openFile(path.join(FIXTURES, "tone.wav"));
+  key("=", ["control"]);
+  key("-", ["control"]);
+  key("0", ["control"]);
+  await wheelOver(centre.x, centre.y, 120, 3);
+  check(
+    "with an audio file, the zoom's keys and the wheel do nothing (and break nothing)",
+    (await js(`videoPane.hidden`)) && (await zoomNow()) === "" && !(await stopped()),
+    `${await js(`videoPane.hidden`)} "${await zoomNow()}" "${await js(`document.getElementById("message").textContent`)}"`,
+  );
+
+  // A jump far into a long video right after opening, zoomed in: its proxy
+  // isn't built there, so the overview's frame shows first (zoomed), then
+  // the sharp one; the zoom stays.
+  await openFile(path.join(FIXTURES, "long-counter.webm"));
+  await wheelOver(centre.x, centre.y, 120, 6);
+  const zoomBeforeJump = await zoomNow();
+  await h.click((await h.duration()) * 0.8);
+  let sharp = false;
+  for (let i = 0; i < 60 && !sharp; i++) {
+    await sleep(100);
+    sharp = !(await js(`"proxy" in videoCanvas.dataset`)) && Number(await js(`videoCanvas.dataset.frameTime`)) > 10;
+  }
+  check(
+    "a far jump while zoomed in: the picture gets there, sharp, still zoomed",
+    sharp && (await zoomNow()) === zoomBeforeJump && !(await stopped()),
+    `sharp ${sharp}, frame ${await js(`videoCanvas.dataset.frameTime`)}, zoom ${zoomBeforeJump} → ${await zoomNow()}`,
+  );
+  // Scrubbing across it while zoomed in.
+  await drag(0, 0, [], await h.xAt((await h.duration()) * 0.8), await h.xAt((await h.duration()) * 0.3));
+  await sleep(800);
+  check(
+    "scrubbing while zoomed in: the picture follows, still zoomed",
+    Math.abs(Number(await js(`videoCanvas.dataset.frameTime`)) - (await h.pos())) < 0.5 &&
+      (await zoomNow()) === zoomBeforeJump &&
+      !(await stopped()),
+    `frame ${await js(`videoCanvas.dataset.frameTime`)} at ${await h.pos()}, zoom ${await zoomNow()}`,
+  );
+
+  // Big video on and off, zoomed in: the zoom stays, the picture fills the pane.
+  key("F");
+  await sleep(600);
+  const big = await paneBox();
+  const bigEdge = await pixel(big.left + 4, big.top + big.height / 2);
+  const bigZoom = await zoomNow();
+  key("F");
+  await sleep(600);
+  check(
+    "big video on and off while zoomed in: the zoom stays, the picture fills the pane",
+    bigZoom !== "" && (await zoomNow()) !== "" && bigEdge.some((c) => c > 60) && !(await stopped()),
+    `big ${JSON.stringify(big)} edge ${bigEdge}, zoom ${bigZoom} → ${await zoomNow()}`,
+  );
+
+  // A shorter pane while zoomed in (the stage split dragged): the view is
+  // kept within what the new shape allows, so the page and the picture
+  // agree, and the first drag moves the picture.
+  const splitAt = () =>
+    js(
+      `(() => { const r = document.querySelector(".stage-split").getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`,
+    );
+  const dragSplit = async (dy) => {
+    const { x, y } = await splitAt();
+    wc.sendInputEvent({ type: "mouseDown", x, y, button: "left", clickCount: 1 });
+    for (let i = 1; i <= 6; i++) {
+      wc.sendInputEvent({ type: "mouseMove", x, y: Math.round(y + (dy * i) / 6), button: "left" });
+      await sleep(30);
+    }
+    wc.sendInputEvent({ type: "mouseUp", x, y: y + dy, button: "left", clickCount: 1 });
+    await sleep(400);
+  };
+  key("0", ["control"]);
+  await sleep(200);
+  await wheelOver(centre.x, centre.y, 120, 6);
+  for (let i = 0; i < 4; i++) await dragPicture(centre, 300, 0); // to the frame's left edge
+  const [, leftmost] = await zoomParts();
+  await dragSplit(-100); // the picture 100 px shorter
+  const [, afterShrink] = await zoomParts();
+  const short = await paneBox();
+  const shortCentre = { x: Math.round(short.left + short.width / 2), y: Math.round(short.top + short.height / 2) };
+  await dragPicture(shortCentre, -6, 0, { steps: 1 });
+  const [, afterNudge] = await zoomParts();
+  check(
+    "a shorter pane while zoomed in: the view is kept within the picture",
+    afterShrink > leftmost + 0.005,
+    `x at the left edge ${leftmost}, after the split moved ${afterShrink}`,
+  );
+  check("…and the first small drag moves it", afterNudge > afterShrink, `${afterShrink} → ${afterNudge}`);
+
+  // As small as the split allows, at the 8× limit, playing: no trouble.
+  await dragSplit(-2000);
+  const tiny = await paneBox();
+  await wheelOver(tiny.left + tiny.width / 2, tiny.top + tiny.height / 2, 120, 30);
+  key("Space");
+  going = await playsOn(800);
+  await ensurePaused();
+  check(
+    "the smallest pane, zoomed in to 8×, playing: the picture goes on",
+    Number.parseFloat(await zoomNow()) === 8 && going.ok,
+    `pane ${Math.round(tiny.width)}×${Math.round(tiny.height)}, zoom ${await zoomNow()}, ${JSON.stringify(going)}`,
+  );
+  await dragSplit(2000);
+  key("0", ["control"]);
+  await sleep(200);
+
+  // Input: the wheel over the controls, a trackpad's many small steps,
+  // Ctrl+wheel, sideways scrolling.
+  const now = await paneBox();
+  const mid = { x: Math.round(now.left + now.width / 2), y: Math.round(now.top + now.height / 2) };
+  await wheelOver(mid.x, mid.y, 120, 3);
+  const beforeOverBar = await zoomNow();
+  const plus = await js(
+    `(() => { const r = videoPane.querySelectorAll(".video-zoom-step")[1].getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`,
+  );
+  await wheelOver(plus.x, plus.y, 120, 3);
+  check("the wheel over the zoom controls doesn't zoom", (await zoomNow()) === beforeOverBar, await zoomNow());
+  key("0", ["control"]);
+  await sleep(200);
+  for (let i = 0; i < 40; i++) {
+    wc.sendInputEvent({ type: "mouseWheel", ...mid, deltaX: 0, deltaY: 3 });
+    await sleep(10);
+  }
+  await sleep(300);
+  const trackpad = Number.parseFloat(await zoomNow());
+  check(
+    "a trackpad's 40 small steps zoom as far as one notch of the same size",
+    Math.abs(trackpad - Math.exp(120 * 0.0015)) < 0.02,
+    `${trackpad} (one notch: ${Math.exp(120 * 0.0015).toFixed(3)})`,
+  );
+  key("0", ["control"]);
+  await sleep(200);
+  for (let i = 0; i < 3; i++) {
+    wc.sendInputEvent({ type: "mouseWheel", ...mid, deltaX: 0, deltaY: 120, modifiers: ["control"] });
+    await sleep(50);
+  }
+  await sleep(300);
+  check(
+    "Ctrl+wheel zooms the picture, not the whole page",
+    Number.parseFloat(await zoomNow()) > 1.3 && wc.getZoomFactor() === 1,
+    `${await zoomNow()}, page ${wc.getZoomFactor()}`,
+  );
+  key("0", ["control"]);
+  await sleep(200);
+  for (let i = 0; i < 3; i++) {
+    wc.sendInputEvent({ type: "mouseWheel", ...mid, deltaX: 120, deltaY: 0 });
+    await sleep(50);
+  }
+  await sleep(300);
+  check("sideways scrolling doesn't zoom", (await zoomNow()) === "", await zoomNow());
+
+  // Dragging: released over the waveform, the drag ends there; and a drag
+  // whose release never came (the window lost the pointer) doesn't go on
+  // moving the picture with the button up.
+  await wheelOver(mid.x, mid.y, 120, 6);
+  const waveformY = Math.round((await rect()).y);
+  await dragPicture(mid, 0, waveformY - mid.y, { release: false });
+  wc.sendInputEvent({ type: "mouseUp", x: mid.x, y: waveformY, button: "left", clickCount: 1 });
+  await sleep(200);
+  check("a drag released outside the picture ends", !(await panes()));
+  await dragPicture(mid, 40, 0, { release: false });
+  const [, heldX] = await zoomParts();
+  for (let i = 1; i <= 5; i++) {
+    wc.sendInputEvent({ type: "mouseMove", x: mid.x + 40 + 20 * i, y: mid.y });
+    await sleep(30);
+  }
+  await sleep(200);
+  const [, afterLostX] = await zoomParts();
+  check(
+    "a drag whose release was missed: moving with the button up doesn't move the picture",
+    afterLostX === heldX && !(await panes()),
+    `x ${heldX} → ${afterLostX}, panning ${await panes()}`,
+  );
+  wc.sendInputEvent({ type: "mouseUp", x: mid.x + 140, y: mid.y, button: "left", clickCount: 1 });
+
+  // Ctrl+= / Ctrl+- / Ctrl+0 with a text field focused (a knob's typed
+  // value): as other Ctrl shortcuts they still work, and the field keeps
+  // its text and its focus.
+  await js(`document.getElementById("speedValue").dispatchEvent(new MouseEvent("dblclick", { bubbles: true }))`);
+  await sleep(100);
+  const fieldBefore = await js(`document.activeElement.className + " " + document.activeElement.value`);
+  key("=", ["control"]);
+  key("-", ["control"]);
+  await sleep(150);
+  const fieldAfter = await js(`document.activeElement.className + " " + document.activeElement.value`);
+  key("Escape");
+  await sleep(100);
+  check(
+    "Ctrl+= / Ctrl+- while typing a knob's value leave the field's text and focus alone",
+    fieldBefore.startsWith("knob-value-field") && fieldAfter === fieldBefore,
+    `${fieldBefore} → ${fieldAfter}`,
+  );
+  key("0", ["control"]);
+  await sleep(200);
+  check(
+    "…and nothing in all of this said the zoom failed",
     !(await stopped()),
     await js(`document.getElementById("message").textContent`),
   );

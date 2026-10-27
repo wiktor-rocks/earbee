@@ -44,13 +44,7 @@ export const resetVideoZoom = () => player.videoView.resetZoom();
  */
 export function videoZoomChanged(view) {
   const zoomed = view.zoom > 1;
-  for (const entry of controls) {
-    const { bar, level } = entry;
-    // A closed video window's controls go.
-    if (!bar.isConnected) {
-      controls.delete(entry);
-      continue;
-    }
+  for (const { bar, level } of controls) {
     bar.classList.toggle("zoomed", zoomed);
     level.textContent = `${view.zoom < 10 ? view.zoom.toFixed(1) : Math.round(view.zoom)}×`;
     level.disabled = !zoomed;
@@ -94,6 +88,9 @@ export function bindVideoZoom(pane) {
   let last = null; // the pointer's place, while dragging
   const onMove = (event) => {
     if (!last) return;
+    // The button is up, but its release never came (the window lost the
+    // pointer, e.g. Alt+Tab mid-drag): the drag is over.
+    if (!(event.buttons & 1)) return endDrag();
     player.videoView.panZoomBy(event.clientX - last.x, event.clientY - last.y);
     last = { x: event.clientX, y: event.clientY };
   };
@@ -131,6 +128,10 @@ export function bindVideoZoom(pane) {
     stepButton("+", "Zoom in: or scroll over the picture (Ctrl+=)", zoomVideoIn),
   );
   pane.append(bar);
-  controls.add({ bar, level });
+  const entry = { bar, level };
+  controls.add(entry);
+  // A closed video window's page stays whole (its elements still on it),
+  // so it's let go when the window goes, not when the bar leaves the page.
+  win.addEventListener("pagehide", () => controls.delete(entry));
   videoZoomChanged(player.videoView.getZoom());
 }

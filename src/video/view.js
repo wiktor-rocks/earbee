@@ -267,6 +267,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
     pane.hidden = false;
     onVisibilityChange(true);
     resizeCanvas();
+    aspect = 0; // its own shape comes with its first frame; no zooming till then
     setZoom(WHOLE); // each video starts with all of its picture
     send({ type: "show", id: video.id }); // at 0, with what was built while it loaded
   }
@@ -356,6 +357,15 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
     if (canZoom() && zoomView.zoom > 1) setZoom(panBy(zoomBox(), zoomView, dx, dy));
   }
 
+  // The pane resized: a shape that shows more of the frame may push the
+  // view's middle back inside it. The worker draws it so already; kept
+  // here too, so the page says what's drawn and a drag starts from there.
+  function keepZoomInPane() {
+    if (zoomView.zoom <= 1 || !canZoom()) return;
+    const kept = clampView(zoomBox(), zoomView);
+    if (kept.x !== zoomView.x || kept.y !== zoomView.y) setZoom(kept);
+  }
+
   /* ---------- Canvases ---------- */
 
   // The worker's surface for `target`, handing it over the first time.
@@ -391,7 +401,9 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
   function observePane() {
     resizeObserver?.disconnect();
     resizeObserver = new (paneWindow().ResizeObserver)(() => {
-      if (!pane.hidden) resizeCanvas();
+      if (pane.hidden) return;
+      resizeCanvas();
+      keepZoomInPane();
     });
     resizeObserver.observe(pane);
   }
