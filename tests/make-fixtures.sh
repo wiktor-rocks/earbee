@@ -28,6 +28,9 @@
 #                 1 of each bar, every 2 s), over a chord that changes every
 #                 bar (e2e/20-beats.cjs; the same recipe as the model's test
 #                 clip, scripts/export-beat-model.py)
+#   rotated.mp4   4 s, 640x360 VP9 + Opus in MP4, marked rotated by 90°
+#                 (as phones record): it shows 360x640, portrait; zooming
+#                 into it (e2e/08-video.cjs)
 # Needs ffmpeg (with libvpx and libopus).
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -50,6 +53,12 @@ ffmpeg -v error -y -f lavfi -i "sine=frequency=523:duration=6" -ac 2 -c:a aac -b
   -movflags +frag_keyframe+empty_moov+default_base_moof dl-audio.m4a
 ffmpeg -v error -y -f lavfi -i "testsrc2=size=640x360:rate=30:duration=6" \
   -c:v libvpx-vp9 -deadline realtime -an dl-video.webm
+
+# Made upright, then marked rotated (a copy, with a display matrix).
+ffmpeg -v error -y -f lavfi -i "testsrc2=size=640x360:rate=30:duration=4" -f lavfi -i "sine=frequency=330:duration=4" \
+  -c:v libvpx-vp9 -deadline realtime -c:a libopus -shortest rotated-upright.mp4
+ffmpeg -v error -y -display_rotation 90 -i rotated-upright.mp4 -c copy rotated.mp4
+rm rotated-upright.mp4
 
 chirp="aevalsrc=0.4*sin(2*PI*(200*t+8*t*t)):s=48000:d=90"
 ffmpeg -v error -y -f lavfi -i "$chirp" -ar 44100 -c:a libmp3lame -b:a 32k long-chirp.mp3

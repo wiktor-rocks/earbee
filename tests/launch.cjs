@@ -34,6 +34,7 @@ const needed = [
   "long-counter.webm",
   "clicks.wav",
   "bars.wav",
+  "rotated.mp4",
 ];
 
 if (!needed.every((name) => fs.existsSync(path.join(fixtures, name)))) {

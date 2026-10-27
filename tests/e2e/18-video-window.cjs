@@ -106,6 +106,58 @@ module.exports = async function (h) {
     await ensurePaused();
   }
 
+  {
+    // Video zoom (src/features/video-zoom.js) in the video window: the
+    // wheel over its picture, its own controls, Ctrl+0 there; and the
+    // zoom goes back to the main window with the picture.
+    const contents = videoWin().webContents;
+    const zoomThere = () => inWindow(`document.querySelector("canvas").dataset.zoom ?? ""`);
+    const until = async (test) => {
+      for (let waited = 0; waited < 3000; waited += 100) {
+        if (await test()) return true;
+        await sleep(100);
+      }
+      return false;
+    };
+    const { width, height } = await inWindow(`({ width: innerWidth, height: innerHeight })`);
+    const wheel = async () => {
+      for (let i = 0; i < 5; i++) {
+        contents.sendInputEvent({
+          type: "mouseWheel",
+          x: Math.round(width / 2),
+          y: Math.round(height / 2),
+          deltaX: 0,
+          deltaY: 120,
+        });
+        await sleep(60);
+      }
+    };
+    await wheel();
+    await until(async () => Number.parseFloat(await zoomThere()) > 1.1);
+    const zoom = Number.parseFloat(await zoomThere());
+    // (Not every notch may arrive: input reaches an offscreen window late.)
+    check("scrolling over the video window's picture zooms it in", zoom > 1.1, await zoomThere());
+    check(
+      "…and its controls say how far",
+      (await inWindow(`document.querySelector(".video-zoom-level").textContent`)) === `${zoom.toFixed(1)}×`,
+    );
+    contents.focus();
+    contents.sendInputEvent({ type: "keyDown", keyCode: "0", modifiers: ["control"] });
+    contents.sendInputEvent({ type: "keyUp", keyCode: "0", modifiers: ["control"] });
+    check("Ctrl+0 there shows all of the picture", await until(async () => (await zoomThere()) === ""));
+    await wheel();
+    await until(async () => Number.parseFloat(await zoomThere()) > 1.1);
+    const out = await zoomThere();
+    key("V");
+    await sleep(800);
+    const back = await js(`document.getElementById("videoCanvas").dataset.zoom ?? ""`);
+    check("bringing the picture back keeps its zoom", out !== "" && back === out, `${out} → ${back}`);
+    key("0", ["control"]);
+    key("V");
+    await sleep(800);
+    check("(and out again, for what follows)", videoWin() !== null);
+  }
+
   await inWindow(`document.querySelector('[aria-label="Keep on top"]').click()`);
   await sleep(300);
   check(

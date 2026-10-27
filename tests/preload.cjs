@@ -39,7 +39,8 @@ webFrame.executeJavaScript(`
   window.Worker = class extends NativeWorker {
     constructor(...args) {
       super(...args);
-      if (String(args[0]).includes("video-worker")) return;
+      // The video worker (kept, so tests can send it messages of their own).
+      if (String(args[0]).includes("video-worker")) return void (window.__videoWorker = this);
       __workers.created++;
       this.__live = true;
     }

@@ -316,6 +316,78 @@ module.exports = async function (h) {
   await openFile(path.join(FIXTURES, "long-counter.webm"));
   check("a new file shows all of its picture", (await zoomNow()) === "" && (await zoomBar()).level === "1.0×");
 
+  // Whatever goes wrong with the zoom costs the zoom, never the picture.
+  // Broken views sent straight to the worker (as a bug could) are taken
+  // as safe ones (video/zoom.js safeView), and the picture plays on.
+  const stopped = async () => /stopped|failed/.test(await js(`document.getElementById("message").textContent`));
+  const playsOn = async (ms) => {
+    const from = Number(await js(`videoCanvas.dataset.frameTime`));
+    await sleep(ms);
+    const to = Number(await js(`videoCanvas.dataset.frameTime`));
+    const middle = await pixel(box.left + box.width / 2, box.top + box.height / 2);
+    return { ok: to > from && !(await stopped()) && middle.some((c) => c > 60), from, to, middle };
+  };
+  await js(
+    `[{ zoom: NaN, x: 0.5, y: 0.5 }, { zoom: 1e9, x: -5, y: "a" }, null, { zoom: Infinity, x: Infinity, y: -Infinity }, "zoom"].forEach((view) => __videoWorker.postMessage({ type: "view", view }))`,
+  );
+  key("Space");
+  let going = await playsOn(800);
+  await ensurePaused();
+  check("broken views sent to the worker: the picture plays on", going.ok, JSON.stringify(going));
+  key("0", ["control"]);
+  await sleep(200);
+
+  // Zoomed in while playing slowly (each frame is copied then), and
+  // dragged while it plays.
+  await h.slide("speed", 0.25);
+  key("Space");
+  await sleep(300);
+  await wheelOver(at.x, at.y, 120, 6);
+  const [, slowX0] = (await zoomNow()).split(" ").map(Number);
+  wc.sendInputEvent({ type: "mouseDown", ...centre, button: "left", clickCount: 1 });
+  for (let i = 1; i <= 5; i++) {
+    wc.sendInputEvent({ type: "mouseMove", x: centre.x - 20 * i, y: centre.y, button: "left" });
+    await sleep(30);
+  }
+  wc.sendInputEvent({ type: "mouseUp", x: centre.x - 100, y: centre.y, button: "left", clickCount: 1 });
+  going = await playsOn(1500);
+  const [slowZoom, slowX1] = (await zoomNow()).split(" ").map(Number);
+  await ensurePaused();
+  check(
+    "zoomed in and dragged while playing at 0.25×: the picture goes on, zoomed",
+    going.ok && slowZoom > 2 && slowX1 > slowX0,
+    `${JSON.stringify(going)} zoom ${await zoomNow()} (x from ${slowX0})`,
+  );
+  await h.slide("speed", 1);
+  key("0", ["control"]);
+  await sleep(200);
+
+  // A video marked rotated (as phones record): shown upright, portrait,
+  // letterboxed left and right; zoomed in, it fills the pane.
+  await openFile(path.join(FIXTURES, "rotated.mp4"));
+  await sleep(500);
+  const side = { x: box.left + box.width * 0.25, y: box.top + box.height / 2 };
+  const sideBefore = await pixel(side.x, side.y);
+  await wheelOver(box.left + box.width / 2, box.top + box.height / 2, 120, 10);
+  const sideAfter = await pixel(side.x, side.y);
+  key("Space");
+  going = await playsOn(800);
+  await ensurePaused();
+  check(
+    "a rotated (portrait) video zooms in and fills the pane, and plays on",
+    sideBefore.every((c) => c < 20) &&
+      sideAfter.some((c) => c > 60) &&
+      going.ok &&
+      Number.parseFloat(await zoomNow()) > 4,
+    `side ${sideBefore} → ${sideAfter}, ${JSON.stringify(going)}, zoom ${await zoomNow()}`,
+  );
+  await shot("video-zoom-rotated.png");
+  check(
+    "…and nothing said the zoom failed",
+    !(await stopped()),
+    await js(`document.getElementById("message").textContent`),
+  );
+
   // Opening another video while one plays: the old one's decoding is cut
   // off as it's put away. That's no problem with the new file, which used
   // to be told "Part of the video couldn't be decoded". Ends on
