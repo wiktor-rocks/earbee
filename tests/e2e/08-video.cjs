@@ -1,5 +1,5 @@
 // Video: the picture follows playback, loop wraps and drags (the proxy,
-// its overview and its builders).
+// its overview and its builders); zooming into the picture.
 // Part of the end-to-end run (see run.cjs); `h` is the harness.
 const path = require("path");
 
@@ -200,6 +200,100 @@ module.exports = async function (h) {
     `allowed ${await allowedNow()}, ready: ${ready}`,
   );
   await js(`${app}.then(([, { setLoopRegion }]) => setLoopRegion(null))`);
+
+  // Zooming in (src/features/video-zoom.js): the wheel over the picture
+  // zooms in where the pointer is and the picture fills its pane; a drag
+  // moves it; the keys and the controls; paused, it's drawn again from the
+  // frame on screen, without decoding; a new file shows all of it.
+  const paneBox = () =>
+    js(
+      `(() => { const r = videoPane.getBoundingClientRect(); return { left: r.left, top: r.top, width: r.width, height: r.height }; })()`,
+    );
+  const zoomNow = () => js(`videoCanvas.dataset.zoom ?? ""`);
+  const zoomBar = () =>
+    js(
+      `(() => { const b = videoPane.querySelector(".video-zoom-bar"); return { level: b.querySelector(".video-zoom-level").textContent, zoomed: b.classList.contains("zoomed") }; })()`,
+    );
+  const pixel = async (x, y) => {
+    wc.invalidate();
+    await sleep(120);
+    const [b, g, r] = (await wc.capturePage({ x: Math.round(x), y: Math.round(y), width: 1, height: 1 })).toBitmap();
+    return [r, g, b];
+  };
+  const wheelOver = async (x, y, deltaY, times) => {
+    for (let i = 0; i < times; i++) {
+      wc.sendInputEvent({ type: "mouseWheel", x: Math.round(x), y: Math.round(y), deltaX: 0, deltaY });
+      await sleep(50);
+    }
+    await sleep(300);
+  };
+  const box = await paneBox();
+  const edge = { x: box.left + 4, y: box.top + box.height / 2 }; // in the letterbox at 1×
+  const at = { x: box.left + box.width * 0.4, y: box.top + box.height * 0.5 };
+  check(
+    "the zoom controls are on the picture, at 1×",
+    (await zoomBar()).level === "1.0×" && (await zoomNow()) === "",
+    JSON.stringify(await zoomBar()),
+  );
+  const edgeBefore = await pixel(edge.x, edge.y);
+  const colourBefore = await pixel(at.x, at.y);
+  const frameBefore = await js(`videoCanvas.dataset.frameTime`);
+  await wheelOver(at.x, at.y, 120, 5); // up (Electron's deltaY is the DOM's, inverted)
+  const zoomed = await zoomNow();
+  const level = Number.parseFloat(zoomed);
+  check(
+    "scrolling up over the picture zooms in, and the controls say how far",
+    level > 2 && level < 3 && (await zoomBar()).zoomed && (await zoomBar()).level === `${level.toFixed(1)}×`,
+    `${zoomed} ${JSON.stringify(await zoomBar())}`,
+  );
+  const colourAfter = await pixel(at.x, at.y);
+  check(
+    "…where the pointer is: what was under it still is",
+    colourAfter.every((c, i) => Math.abs(c - colourBefore[i]) < 60),
+    `${colourBefore} → ${colourAfter}`,
+  );
+  const edgeAfter = await pixel(edge.x, edge.y);
+  check(
+    "…and the picture fills its pane (no letterbox)",
+    edgeBefore.every((c) => c < 20) && edgeAfter.some((c) => c > 60),
+    `${edgeBefore} → ${edgeAfter}`,
+  );
+  check("…drawn again without decoding (the same frame)", (await js(`videoCanvas.dataset.frameTime`)) === frameBefore);
+  const centre = { x: Math.round(box.left + box.width / 2), y: Math.round(box.top + box.height / 2) };
+  const [, x0] = (await zoomNow()).split(" ").map(Number);
+  wc.sendInputEvent({ type: "mouseDown", ...centre, button: "left", clickCount: 1 });
+  for (let i = 1; i <= 5; i++) {
+    wc.sendInputEvent({ type: "mouseMove", x: centre.x + 20 * i, y: centre.y, button: "left" });
+    await sleep(30);
+  }
+  wc.sendInputEvent({ type: "mouseUp", x: centre.x + 100, y: centre.y, button: "left", clickCount: 1 });
+  await sleep(200);
+  const [, x1] = (await zoomNow()).split(" ").map(Number);
+  check("dragging the picture right shows more of its left", x1 < x0 - 0.01, `x ${x0} → ${x1}`);
+  key("=", ["control"]);
+  await sleep(200);
+  const keyed = Number.parseFloat(await zoomNow());
+  check("Ctrl+= zooms in further", Math.abs(keyed - level * 1.25) < 0.01, `${level} → ${keyed}`);
+  key("0", ["control"]);
+  await sleep(300);
+  check(
+    "Ctrl+0 shows all of the picture again",
+    (await zoomNow()) === "" &&
+      (await zoomBar()).level === "1.0×" &&
+      (await pixel(edge.x, edge.y)).every((c) => c < 20),
+  );
+  await wheelOver(at.x, at.y, 120, 30);
+  check("it goes no further than 8×", Number.parseFloat(await zoomNow()) === 8, await zoomNow());
+  await js(`videoPane.querySelector(".video-zoom-step").click()`); // −
+  await sleep(150);
+  check("the controls' − zooms out", Math.abs(Number.parseFloat(await zoomNow()) - 8 / 1.25) < 0.01, await zoomNow());
+  await js(`videoPane.querySelector(".video-zoom-level").click()`);
+  await sleep(150);
+  check("…and a click on the level shows all of it", (await zoomNow()) === "");
+  await wheelOver(at.x, at.y, 120, 3);
+  await shot("video-zoom.png");
+  await openFile(path.join(FIXTURES, "long-counter.webm"));
+  check("a new file shows all of its picture", (await zoomNow()) === "" && (await zoomBar()).level === "1.0×");
 
   // Opening another video while one plays: the old one's decoding is cut
   // off as it's put away. That's no problem with the new file, which used

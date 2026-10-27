@@ -3271,6 +3271,67 @@ button.mark-remove {
   color: #fff;
 }
 
+/* ---------- Video zoom (src/features/video-zoom.js) ----------
+   Zoomed in, the picture can be dragged (the hand cursor). The controls
+   sit in its bottom-left corner while the pointer is on it, and stay
+   while zoomed in; white on dark glass, like the buttons in the top
+   corner, whatever the theme. */
+
+.video-pane.zoomed {
+  cursor: grab;
+}
+
+.video-pane.panning {
+  cursor: grabbing;
+}
+
+.video-zoom-bar {
+  position: absolute;
+  bottom: 8px;
+  left: 8px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #000 55%, transparent);
+  color: #fff;
+  opacity: 0;
+  cursor: default;
+}
+
+.video-pane:hover .video-zoom-bar,
+.video-zoom-bar.zoomed,
+.video-zoom-bar:focus-within {
+  opacity: 1;
+}
+
+.video-zoom-bar button {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: 700 12px var(--num);
+  font-variant-numeric: tabular-nums;
+}
+
+.video-zoom-bar button:hover:not(:disabled) {
+  background: color-mix(in srgb, #fff 18%, transparent);
+}
+
+.video-zoom-step {
+  font-size: 16px;
+  line-height: 1;
+}
+
+/* At 1×, the level is only a readout. */
+.video-zoom-level:disabled {
+  opacity: 0.75;
+}
+
 /* ---------- Smaller windows ----------
    The marks sidebar always stays in view, so half a screen (about 960 px
    wide) still shows everything: under 1100 px it gets narrower, its

@@ -35,8 +35,9 @@
 //   page → { type: "points", times }  the ready points, in seconds
 //   page → { type: "memory", available }  bytes free (or null), for their budget
 //   page → { type: "level", limits }  { maxBytes, maxMemoryShare }: how big it is
+//   page → { type: "view", view }  the zoom: { zoom, x, y } (zoom.js)
 //   ←      { type: "ready" }  once Mediabunny is loaded
-//   ←      { type: "shown", time, proxy }  each frame drawn
+//   ←      { type: "shown", time, proxy, aspect }  each frame drawn (aspect: its width / height)
 //   ←      { type: "built", built, overview }  the proxy's progress (text or null)
 //   ←      { type: "problem", message }  once per file
 //   ←      { type: "ready-points", times, allowed }  the points with a decoder
@@ -53,6 +54,7 @@ import { CONFIG } from "../config.js";
 import { mediaSource } from "../core/media.js";
 import { createVideoProxy } from "./proxy.js";
 import { readyPointsFor } from "./ready-budget.js";
+import { WHOLE, zoomedView } from "./zoom.js";
 
 const scope = /** @type {any} */ (self);
 const post = (message) => scope.postMessage(message);
@@ -87,6 +89,13 @@ let lastSkipCheckAt = 0;
 let shownTime = null; // timestamp of the frame on screen
 let shownIsProxy = false;
 let shownAspect = 0; // the frame on screen's width / height
+let view = WHOLE; // the zoom (zoom.js): the part of the frame drawn
+// A copy of the whole frame on screen, so a zoom, a move or a resize
+// redraws it at once without decoding it again: kept while paused, and
+// while playing zoomed in (each frame then). Its time is the frame's.
+let still = null;
+let stillTime = null;
+let stillIsProxy = false;
 let sharpRedraw; // timer: the frame drawn again, sharp, once resizing stops
 let proxyRequest = null; // time wanted from the proxy (latest wins)
 let proxyBusy = false;
@@ -237,6 +246,8 @@ function clear() {
   discard(current);
   current = null;
   surface?.context.clearRect(0, 0, surface.canvas.width, surface.canvas.height);
+  still = null; // (its memory)
+  stillTime = null;
   markBuilt(null);
 }
 
@@ -275,28 +286,21 @@ function useSurface(id) {
   if (mode !== "playing") showFrameAt(time);
 }
 
-// Where a frame of `aspect` (width / height) goes, letterboxed, in a
-// canvas of `width` × `height`.
-function fitRect(width, height, aspect) {
-  const drawWidth = Math.min(width, height * aspect);
-  const drawHeight = drawWidth / aspect;
-  return { x: (width - drawWidth) / 2, y: (height - drawHeight) / 2, width: drawWidth, height: drawHeight };
-}
-
-// Resizing clears the canvas. What was on screen is drawn straight back,
-// scaled to the new size, so the picture never goes black (the stage
-// split handle resizes it every frame while dragged). Paused, the frame
-// is then drawn again, sharp, once the resizing stops; playing, the next
-// frame does it within a few milliseconds.
+// Resizing clears the canvas. The picture is drawn straight back at the
+// new size, so it never goes black (the stage split handle resizes it
+// every frame while dragged): from the copy of the frame when there is
+// one, else from what was on the canvas, scaled. Paused, a scaled one (or
+// a proxy's copy) is drawn again, sharp, once the resizing stops;
+// playing, the next frame does it within a few milliseconds.
 function resizeSurface(id, width, height) {
   const resized = surfaces.get(id);
   if (!resized) return;
   const { canvas, context } = resized;
-  const onScreen = resized === surface && current && shownTime !== null && shownAspect > 0 && canvas.width > 1;
-  const from = onScreen ? fitRect(canvas.width, canvas.height, shownAspect) : null;
-  // The picture, copied out before the resize clears it.
+  const isShown = resized === surface && current && shownTime !== null && shownAspect > 0;
+  // The picture, copied out before the resize clears it (no copy kept).
   let picture = null;
-  if (from) {
+  if (isShown && !hasStill() && canvas.width > 1) {
+    const from = zoomedView({ aspect: shownAspect, width: canvas.width, height: canvas.height }, view).rect;
     picture = new OffscreenCanvas(Math.max(1, Math.round(from.width)), Math.max(1, Math.round(from.height)));
     picture
       .getContext("2d")
@@ -304,46 +308,131 @@ function resizeSurface(id, width, height) {
   }
   canvas.width = width;
   canvas.height = height;
-  if (picture) {
-    const to = fitRect(width, height, shownAspect);
+  if (isShown && hasStill()) drawStill();
+  else if (picture) {
+    const to = zoomedView({ aspect: shownAspect, width, height }, view).rect;
     context.fillStyle = "#000";
     context.fillRect(0, 0, width, height);
     context.drawImage(picture, to.x, to.y, to.width, to.height);
   }
-  if (resized !== surface || !current || mode === "playing") return;
+  if (resized !== surface || !current || mode === "playing" || (hasStill() && !stillIsProxy)) return;
   clearTimeout(sharpRedraw);
   sharpRedraw = setTimeout(() => {
     if (current && mode !== "playing") showFrameAt(shownTime ?? target);
   }, CONFIG.video.resizeRedrawMs);
 }
 
+// A new zoom: drawn at once from the copy of the frame; without one,
+// paused, the frame is shown again (decoded); playing, the next frame
+// draws it.
+function setView(next) {
+  view = next;
+  if (!surface || !current) return;
+  if (hasStill()) drawStill();
+  else if (mode !== "playing" && shownTime !== null) showFrameAt(shownTime);
+}
+
 /* ---------- Drawing ---------- */
 
-// Letterboxes the frame into the canvas (honouring rotation metadata).
+// What part of a frame of `aspect` shows on the canvas, and where (the
+// whole frame letterboxed, unless zoomed in; zoom.js).
+const placed = (canvas, aspect) => zoomedView({ aspect, width: canvas.width, height: canvas.height }, view);
+
+// A crop rectangle in a frame `width` × `height` pixels, from fractions.
+const cropIn = (crop, width, height) => ({
+  left: crop.left * width,
+  top: crop.top * height,
+  width: crop.width * width,
+  height: crop.height * height,
+});
+
+// Draws the frame's part in view into the canvas, letterboxed (honouring
+// rotation metadata).
 function draw(frame) {
   if (!surface) return;
   const { canvas, context } = surface;
+  const aspect = frame.displayWidth / frame.displayHeight;
   context.fillStyle = "#000";
   context.fillRect(0, 0, canvas.width, canvas.height);
-  frame.drawWithFit(context, { fit: "contain" });
-  shownAspect = frame.displayWidth / frame.displayHeight;
+  if (view.zoom > 1) {
+    const { crop } = placed(canvas, aspect);
+    frame.drawWithFit(context, { fit: "contain", crop: cropIn(crop, frame.displayWidth, frame.displayHeight) });
+  } else frame.drawWithFit(context, { fit: "contain" });
+  shownAspect = aspect;
+  keepStill(frame.timestamp, false, frame.displayWidth, frame.displayHeight, (stillContext) =>
+    frame.drawWithFit(stillContext, { fit: "fill" }),
+  );
   markShown(frame.timestamp, false);
 }
 
-// Letterboxes a (low-resolution) proxy frame into the canvas.
+// The same for a (low-resolution) proxy frame.
 function drawProxy(frame) {
   if (!surface) return;
   const { canvas, context } = surface;
-  const { width, height } = canvas;
-  const scale = Math.min(width / frame.displayWidth, height / frame.displayHeight);
-  const drawWidth = frame.displayWidth * scale;
-  const drawHeight = frame.displayHeight * scale;
+  const aspect = frame.displayWidth / frame.displayHeight;
+  const { crop, rect } = placed(canvas, aspect);
+  const source = cropIn(crop, frame.displayWidth, frame.displayHeight);
 
   context.fillStyle = "#000";
-  context.fillRect(0, 0, width, height);
-  context.drawImage(frame, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
-  shownAspect = frame.displayWidth / frame.displayHeight;
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(
+    frame,
+    source.left,
+    source.top,
+    source.width,
+    source.height,
+    rect.x,
+    rect.y,
+    rect.width,
+    rect.height,
+  );
+  shownAspect = aspect;
+  keepStill(frame.timestamp / 1e6, true, frame.displayWidth, frame.displayHeight, (stillContext, width, height) =>
+    stillContext.drawImage(frame, 0, 0, width, height),
+  );
   markShown(frame.timestamp / 1e6, true);
+}
+
+/* ---------- The copy of the frame on screen ---------- */
+
+const hasStill = () => still !== null && stillTime === shownTime && shownTime !== null;
+
+// Copies the frame just drawn, `frameWidth` × `frameHeight` (display
+// pixels), at its own size or smaller, within
+// CONFIG.video.zoom.stillMaxPixels (a 4K frame fits); `drawWhole` draws
+// all of it into a context of the size given.
+function keepStill(time, isProxy, frameWidth, frameHeight, drawWhole) {
+  if (mode === "playing" && view.zoom === 1) {
+    stillTime = null; // not kept: playing frames replace each other anyway
+    return;
+  }
+  const shrink = Math.min(1, Math.sqrt(CONFIG.video.zoom.stillMaxPixels / (frameWidth * frameHeight)));
+  const width = Math.max(1, Math.round(frameWidth * shrink));
+  const height = Math.max(1, Math.round(frameHeight * shrink));
+  if (!still || still.width !== width || still.height !== height) still = new OffscreenCanvas(width, height);
+  drawWhole(still.getContext("2d"), width, height);
+  stillTime = time;
+  stillIsProxy = isProxy;
+}
+
+// Draws the copy's part in view into the canvas.
+function drawStill() {
+  const { canvas, context } = surface;
+  const { crop, rect } = placed(canvas, shownAspect);
+  const source = cropIn(crop, still.width, still.height);
+  context.fillStyle = "#000";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+  context.drawImage(
+    still,
+    source.left,
+    source.top,
+    source.width,
+    source.height,
+    rect.x,
+    rect.y,
+    rect.width,
+    rect.height,
+  );
 }
 
 // The page puts what's on screen on the canvas (data-frame-time, and
@@ -351,7 +440,7 @@ function drawProxy(frame) {
 function markShown(time, isProxy) {
   shownTime = time;
   shownIsProxy = isProxy;
-  post({ type: "shown", time, proxy: isProxy });
+  post({ type: "shown", time, proxy: isProxy, aspect: shownAspect });
 }
 
 // And the parts of `proxy` built so far, as "start–end" in seconds, and
@@ -816,6 +905,8 @@ scope.onmessage = ({ data }) => {
       return useSurface(data.id);
     case "size":
       return resizeSurface(data.id, data.width, data.height);
+    case "view":
+      return setView(data.view);
     case "show": {
       const video = videos.get(data.id);
       return video && show(video);
