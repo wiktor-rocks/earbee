@@ -1,11 +1,25 @@
-// Static UI and offline: generated scales, bundled fonts, the shortcuts list.
+// Static UI and offline: the dock's knobs, bundled fonts, the shortcuts list.
 // Part of the end-to-end run (see run.cjs); `h` is the harness.
 
 module.exports = async function (h) {
   const { js, check } = h;
 
-  check("speed scale generated", (await js(`document.getElementById("speedScale").textContent`)) === "0.05×3×");
-  check("volume scale generated", (await js(`document.getElementById("volumeScale").textContent`)) === "0%100%200%");
+  // The dock: a knob over every setting's slider (the EQ bands' in a popover),
+  // and the speed presets (a few next to the knob, all behind "…").
+  check(
+    "every slider has a knob",
+    await js(
+      `["speed", "volume", "semitoneShift", "centShift", "eqLow", "eqLowMid", "eqMid", "eqHighMid", "eqHigh"].every((id) => document.getElementById(id).parentElement.matches(".knob"))`,
+    ),
+  );
+  check(
+    "the EQ bands are knobs in their popover",
+    (await js(`eqPopover.querySelectorAll("#eqKnobs .knob").length`)) === 5,
+  );
+  check(
+    "speed presets: 3 in the dock, 12 behind …",
+    (await js(`[speedChips.children.length, speedChipsAll.children.length].join()`)) === "3,12",
+  );
   await js(`document.fonts.ready`);
   check(
     "Nunito loaded offline",

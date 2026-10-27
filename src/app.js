@@ -111,7 +111,8 @@
  *   context.js     `settings`, `marks` and `beats` (the open track's), and `player`: the
  *                  components above, once created
  *   ui/            dom.js (elements, messages, rendering, loading screens),
- *                  controls.js (sliders, chips, EQ), shortcuts.js (key
+ *                  controls.js (settings' knobs, chips, EQ), knob.js (a
+ *                  knob over a slider: drag, wheel), shortcuts.js (key
  *                  handling, giving focus back), theme.js (applying a
  *                  theme), prefs.js (the settings: values, changes,
  *                  listeners), pref-fields.js (one Settings control per
@@ -142,12 +143,12 @@
  *   Speed preset or EQ band   Edit CONFIG.speed.presets / CONFIG.eq.bands.
  *                             The buttons and faders are generated.
  *   Step sizes (← / →)        Edit CONFIG.step.sizes (↑ / ↓ cycle through them).
- *   Slider range or default   Edit CONFIG. Sliders get min/max/step from it,
- *                             and the scale labels under them are generated.
+ *   Slider range or default   Edit CONFIG. Sliders and their knobs get
+ *                             min/max/step from it.
  *   New slider setting        Add a range to CONFIG, a value to `settings`
  *                             (context.js), an entry to SLIDERS
- *                             (ui/controls.js), an <input type="range">
- *                             plus readout to index.html, and its key to
+ *                             (ui/controls.js), a .knob-cell (an <input
+ *                             type="range"> plus readout) to index.html, and its key to
  *                             SOUND_SLIDERS (features/project/sections.js)
  *                             so project files save it.
  *   New keyboard shortcut     Add an entry to SHORTCUTS (below), with its
@@ -288,8 +289,7 @@ import {
 } from "./features/playback.js";
 import {
   bindSettingControls,
-  buildEqFaders,
-  buildScales,
+  buildEqKnobs,
   buildSpeedChips,
   changeStepSize,
   initSliders,
@@ -629,8 +629,7 @@ function start() {
   videoView.preload().catch((error) => console.warn("Video warm-up failed:", error));
 
   buildSpeedChips();
-  buildScales();
-  buildEqFaders();
+  buildEqKnobs();
   renderShortcutLegend(SHORTCUTS);
 
   initSliders();

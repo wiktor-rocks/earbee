@@ -8,15 +8,24 @@ export const CONFIG = {
     initial: 1,
     nudge: 0.01, // Shift+, / Shift+. slow down / speed up by this much
     presets: [0.1, 0.25, 0.35, 0.4, 0.45, 0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1],
+    // The presets next to the speed knob; the rest are behind its "…".
+    dockPresets: [0.5, 0.75, 1],
   },
   volume: { min: 0, max: 200, step: 1, initial: 100 }, // percent
   semitones: { min: -12, max: 12, step: 1, initial: 0 },
   cents: { min: -50, max: 50, step: 1, initial: 0 },
 
+  // The knobs in the dock (ui/knob.js), for every setting above and the
+  // EQ bands. `travel`: pixels of drag from one end of the range to the
+  // other (speed: about 0.015× a pixel); `fine`: how many times slower
+  // with Shift; `wheelPixels`: how far one wheel notch turns it, as
+  // pixels of drag (with Shift, a notch is one step).
+  knob: { travel: 200, fine: 5, wheelPixels: 10 },
+
   eq: {
     gain: { min: -24, max: 24, step: 0.1, initial: 0 }, // dB, per band
     enabledInitially: false,
-    // `id` is also the fader's element id; its readout is `${id}Value`.
+    // `id` is also the knob's element id; its readout is `${id}Value`.
     bands: [
       { id: "eqLow", label: "Low", type: "lowshelf", frequency: 120 },
       { id: "eqLowMid", label: "Lo-mid", type: "peaking", frequency: 400, Q: 1 },

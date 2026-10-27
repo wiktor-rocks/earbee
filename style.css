@@ -2647,86 +2647,61 @@ button.mark-remove {
   color: var(--danger);
 }
 
-/* ---------- Sound dock: speed, pitch, volume, EQ ---------- */
+/* ---------- Sound dock: speed, pitch, volume, EQ ----------
+   One row: each group's knobs side by side, a hairline between groups.
+   It wraps if a window is too narrow for it. */
 
 .dock {
-  display: grid;
-  grid-template-columns: minmax(0, 1.8fr) minmax(0, 1.15fr) minmax(0, 0.8fr) auto;
-  padding: 12px 0 18px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 10px;
+  padding: 10px 0;
 }
 
-/* Each group starts at the top, so the titles and the first row of
-   controls line up across the dock. */
 .dock-group {
   display: flex;
-  flex-direction: column;
-  justify-content: flex-start;
-  gap: 6px;
+  align-items: center;
+  gap: 12px;
   min-width: 0;
-  padding: 0 16px;
+  padding: 0 14px;
 }
 
 .dock-group + .dock-group {
   border-left: 1px solid var(--hairline);
 }
 
-/* One height for every title row, whatever buttons it holds (Pitch's
-   reset, EQ's on/off). */
-.dock-head {
+/* A group's name over its total or buttons (Pitch, EQ), before its
+   knobs. */
+.dock-title {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  height: 26px;
+  flex-direction: column;
+  gap: 3px;
 }
 
-.dock-head h2 {
+.dock-title-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.dock h2 {
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.pitch-total {
   font-size: 12px;
 }
 
-.readout {
-  font-size: 16px;
-  font-weight: 800;
-}
-
-/* Speed in two columns: the title and slider on the left, the presets on
-   the right, their first row level with the title. (`.dock` so the short
-   window's `.dock-group` gap doesn't close up the columns.) */
-.dock .speed-group {
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 14px;
-}
-
-.speed-main {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 90px;
-}
-
-.dock-slider {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  gap: 3px;
-  min-width: 90px;
-}
-
-.scale {
-  display: flex;
-  justify-content: space-between;
-  color: var(--muted);
-  font: 600 10px var(--num);
-  font-variant-numeric: tabular-nums;
-}
-
-/* The speed presets: two rows of six, or three of four on a narrow
-   window. */
+/* The speed presets next to its knob, and "…" for the rest. */
 .chips {
-  display: grid;
-  grid-template-columns: repeat(6, auto);
+  display: flex;
   gap: 4px;
+}
+
+.speed-group .chips + .speed-more {
+  margin-left: -8px;
 }
 
 .chip {
@@ -2743,27 +2718,38 @@ button.mark-remove {
   color: var(--accent);
 }
 
-.slider-row {
+.speed-more {
+  min-width: 28px;
+  font-size: 14px;
+  line-height: 1;
+  anchor-name: --speed-more;
+}
+
+/* All the presets: opened by "…" (popovertarget), above it, anchored by
+   CSS. */
+.dock-popover {
+  position: fixed;
+  inset: auto;
+  position-anchor: --speed-more;
+  position-area: top center;
+  position-try-fallbacks: flip-block;
+  margin: 0 0 8px;
+  padding: 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-lifted);
+}
+
+.all-chips {
   display: grid;
-  grid-template-columns: 62px minmax(0, 1fr) 42px;
-  align-items: center;
-  gap: 8px;
+  grid-template-columns: repeat(6, auto);
 }
 
-.slider-row label {
-  color: var(--muted);
-  font-size: 11.5px;
-}
-
-.slider-row output {
-  font-size: 11.5px;
-  text-align: right;
-}
-
-/* ---------- EQ: on/off in the dock, the bands in a popover ---------- */
+/* ---------- EQ: on/off in the dock, the band knobs in a popover ---------- */
 
 .eq-open {
-  align-self: flex-start;
   anchor-name: --eq-open;
 }
 
@@ -2792,51 +2778,169 @@ button.mark-remove {
   align-items: center;
   justify-content: space-between;
   gap: 24px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
-.eq-faders {
+/* A column per band: the knob, bigger than the dock's, over its name,
+   frequency and value. */
+.eq-knobs {
+  --knob-size: 42px;
+
   display: grid;
-  grid-template-columns: repeat(5, 56px);
-  gap: 4px;
-}
-
-.eq-group.bypassed .eq-faders {
-  opacity: 0.45;
-}
-
-.fader {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
+  grid-template-columns: repeat(5, 58px);
   gap: 6px;
+}
+
+.eq-knobs .knob-cell {
+  flex-direction: column;
+  gap: 6px;
+}
+
+.eq-knobs .knob-text {
+  align-items: center;
   min-width: 0;
-}
-
-.fader output {
-  font-size: 11px;
-  white-space: nowrap;
-}
-
-.fader input[type="range"] {
-  width: 22px;
-  height: 120px;
-  writing-mode: vertical-lr;
-  direction: rtl;
-}
-
-.fader label {
-  color: var(--muted);
-  font-size: 10.5px;
-  font-weight: 700;
   text-align: center;
+}
+
+.eq-knobs .knob-text label {
+  font-size: 10.5px;
   text-transform: uppercase;
 }
 
-.fader label small {
+.eq-knobs .knob-text small {
   display: block;
   font-weight: 500;
   text-transform: none;
+}
+
+.eq-knobs .knob-value {
+  font-size: 12px;
+}
+
+.eq-group.bypassed .eq-knobs {
+  opacity: 0.45;
+}
+
+/* ---------- Knobs (ui/knob.js) ----------
+   A knob, then its name over its value. The range input inside the
+   knob holds the value, out of sight; the dial is an SVG: the track, the
+   value's arc over it, the face and the pointer. */
+
+:root {
+  --knob-size: 34px;
+}
+
+.knob-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.knob {
+  position: relative;
+  flex: none;
+  width: var(--knob-size);
+  height: var(--knob-size);
+  border-radius: 50%;
+  cursor: ns-resize;
+  touch-action: none;
+  user-select: none;
+}
+
+.knob:has(input:focus-visible) {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Out of sight but still there for Tab, the arrow keys and screen
+   readers. */
+.knob input[type="range"] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.knob-dial {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+
+.knob-track,
+.knob-arc {
+  fill: none;
+  stroke-width: 4;
+}
+
+.knob-track {
+  stroke: color-mix(in srgb, var(--text) 14%, transparent);
+}
+
+.knob-arc {
+  stroke: var(--accent);
+}
+
+.knob-face {
+  fill: var(--surface-2);
+  stroke: var(--hairline);
+}
+
+.knob:hover .knob-face,
+.knob.dragging .knob-face {
+  fill: var(--surface-hover);
+}
+
+.knob-pointer {
+  stroke: var(--text);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+.knob-text {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 40px;
+}
+
+.knob-text label,
+.knob-text h2 {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+/* The display font's capitals for the groups that are one knob (Speed,
+   Volume); the bands and pitch knobs' names are lighter. */
+.knob-text h2 {
+  font-family: var(--display);
+  font-weight: 400;
+}
+
+.knob-value {
+  font-size: 13.5px;
+  line-height: 1.3;
+  white-space: nowrap;
+  cursor: text;
+}
+
+/* Typing a value: the field takes the value's place, the same size. */
+.knob-value-field {
+  width: 56px;
+  margin: 0;
+  padding: 0 3px;
+  border: 1px solid var(--accent);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--text);
+  font: 700 13.5px/1.3 var(--num);
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- Notifications (ui/toast.js) ----------
@@ -3098,17 +3202,19 @@ button.mark-remove {
 /* ---------- Smaller windows ----------
    The marks sidebar always stays in view, so half a screen (about 960 px
    wide) still shows everything: under 1100 px it gets narrower, its
-   buttons show only their icons, and the speed presets take three rows;
-   the transport stays one row, its chips cut off when they don't fit.
+   buttons show only their icons, and the dock's knobs get smaller; the
+   transport stays one row, its chips cut off when they don't fit.
    Short windows: the dock and the minimap get more compact. */
 
 @media (max-width: 1099px) {
   :root {
     --sidebar-width: 240px;
+    --knob-size: 30px;
   }
 
-  .chips {
-    grid-template-columns: repeat(4, auto);
+  .dock-group {
+    gap: 10px;
+    padding: 0 12px;
   }
 
   .sidebar-actions .label {
@@ -3127,15 +3233,6 @@ button.mark-remove {
   }
 
   .dock {
-    padding: 8px 0 12px;
-  }
-
-  .dock .scale {
-    display: none;
-  }
-
-  .dock-group,
-  .speed-main {
-    gap: 3px;
+    padding: 6px 0;
   }
 }

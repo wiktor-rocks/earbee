@@ -72,7 +72,7 @@ module.exports = async function (h) {
   );
   // Clicked slider: arrows still step the cursor
   const sl = await js(
-    `(() => { const r = document.getElementById("speed").getBoundingClientRect(); return { x: Math.round(r.left + r.width * 0.27), y: Math.round(r.top + r.height / 2) }; })()`,
+    `(() => { const r = document.getElementById("speed").closest(".knob").getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`,
   );
   wc.sendInputEvent({ type: "mouseDown", x: sl.x, y: sl.y, button: "left", clickCount: 1 });
   wc.sendInputEvent({ type: "mouseUp", x: sl.x, y: sl.y, button: "left", clickCount: 1 });
@@ -100,6 +100,50 @@ module.exports = async function (h) {
   await sleep(100);
   const v1 = await js(`document.getElementById("speed").value`);
   check("Tab-focused slider keeps arrows", v1 !== v0 && (await pos()) === p0, `focus-visible=${fv} ${v0}→${v1}`);
+  await js(`document.querySelector('#speedChips [data-speed="1"]').click(); document.activeElement.blur()`);
+
+  // The speed knob: a drag up turns it up (200 px for the whole range,
+  // CONFIG.knob), with Shift 5× less; the wheel with Shift by one step;
+  // a double-clicked value can be typed.
+  await h.shot("dock-knobs.png");
+  await js(`eqToggle.click(); eqPopover.showPopover()`);
+  await h.shot("dock-eq-knobs.png");
+  await js(`eqPopover.hidePopover(); eqToggle.click()`);
+  const speedNow = async () => Number(await js(`document.getElementById("speed").value`));
+  const dragKnob = async (dy, modifiers = []) => {
+    wc.sendInputEvent({ type: "mouseDown", x: sl.x, y: sl.y, button: "left", clickCount: 1, modifiers });
+    for (let i = 1; i <= 10; i++) {
+      wc.sendInputEvent({ type: "mouseMove", x: sl.x, y: sl.y - (dy * i) / 10, button: "left", modifiers });
+      await sleep(15);
+    }
+    wc.sendInputEvent({ type: "mouseUp", x: sl.x, y: sl.y - dy, button: "left", clickCount: 1, modifiers });
+    await sleep(100);
+  };
+  let k0 = await speedNow();
+  await dragKnob(50);
+  const coarse = (await speedNow()) - k0;
+  check("dragging the knob up turns it up", Math.abs(coarse - 0.74) < 0.03, `${k0}→${await speedNow()}`);
+  k0 = await speedNow();
+  await dragKnob(-50, ["shift"]);
+  const fine = k0 - (await speedNow());
+  check("Shift turns it 5× finer", Math.abs(fine - 0.15) < 0.02, `${k0}→${await speedNow()}`);
+  k0 = await speedNow();
+  wc.sendInputEvent({ type: "mouseWheel", x: sl.x, y: sl.y, deltaX: 0, deltaY: 100, modifiers: ["shift"] });
+  await sleep(100);
+  check("Shift+wheel up: one step", Math.abs((await speedNow()) - k0 - 0.01) < 1e-6, `${k0}→${await speedNow()}`);
+  await js(`speedValue.dispatchEvent(new MouseEvent("dblclick", { bubbles: true }))`);
+  await sleep(50);
+  check("double-clicking the value gives a field", await js(`document.activeElement.matches(".knob-value-field")`));
+  await js(`document.activeElement.value = "0.63"`);
+  key("Return");
+  await sleep(100);
+  check(
+    "a typed value sets the speed",
+    (await speedNow()) === 0.63 &&
+      (await js(`speedValue.textContent`)) === "0.63×" &&
+      (await js(`!document.querySelector(".knob-value-field")`)),
+    `${await speedNow()} ${await js(`speedValue.textContent`)}`,
+  );
   await js(`document.querySelector('#speedChips [data-speed="1"]').click(); document.activeElement.blur()`);
   // Loop interplay and Space after stepping
   await click(5);
