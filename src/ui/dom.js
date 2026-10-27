@@ -60,8 +60,6 @@ export const dom = {
   message: $("message"),
   trackTime: $("trackTime"),
   loopInfo: $("loopInfo"),
-  speedScale: $("speedScale"),
-  volumeScale: $("volumeScale"),
   playButton: /** @type {HTMLButtonElement} */ ($("play")),
   playLabel: $("playLabel"),
   stopButton: /** @type {HTMLButtonElement} */ ($("stop")),
@@ -73,10 +71,11 @@ export const dom = {
   startPointButton: $("startPoint"),
   stopPointButton: $("stopPoint"),
   speedChips: $("speedChips"),
+  speedChipsAll: $("speedChipsAll"),
   pitchValue: $("pitchValue"),
   resetPitchButton: $("resetPitch"),
   eqSection: $("eqSection"),
-  eqFaders: $("eqFaders"),
+  eqKnobs: $("eqKnobs"),
   eqToggle: $("eqToggle"),
   resetEqButton: $("resetEq"),
   shortcutList: $("shortcutList"),
@@ -93,7 +92,9 @@ export const dom = {
   addRegionButton: $("addRegion"),
 };
 
-export const speedChips = () => /** @type {HTMLButtonElement[]} */ ([...dom.speedChips.children]);
+// The few next to the speed knob, and all of them in its "…" popover.
+export const speedChips = () =>
+  /** @type {HTMLButtonElement[]} */ ([...dom.speedChips.children, ...dom.speedChipsAll.children]);
 const transportButtons = () => [dom.playButton, dom.stopButton, dom.stepBackButton, dom.stepForwardButton];
 
 /* ---------- Errors and notices ---------- */
