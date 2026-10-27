@@ -2027,6 +2027,17 @@ body.stage-split-dragging * {
   cursor: crosshair;
 }
 
+/* WaveSurfer's own box (its host, scroll area and wrapper) fills the
+   waveform's height, whatever height it was last drawn at. Otherwise it is
+   as tall as its drawing, and when the timeline grows (the stage split
+   handle) an empty band shows below it until the redraw; meanwhile the
+   drawing is stretched to fill it (waveform.js, bindResizeClamp). */
+.waveform > div,
+.waveform ::part(scroll),
+.waveform ::part(wrapper) {
+  height: 100%;
+}
+
 .waveform.near-loop-edge {
   cursor: ew-resize;
 }

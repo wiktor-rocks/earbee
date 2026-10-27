@@ -142,7 +142,7 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
 
       waveSurfer = WaveSurfer.create({
         container,
-        height: "auto",
+        height: "auto", // until a track loads, then in pixels (see load)
         ...waveColors(),
         cursorWidth: 1, // thin, for precision (WaveSurfer shifts it by up to this)
         // Drawn and scaled here (see the top of the file).
@@ -564,11 +564,13 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
 
   // A wider window raises the fit-to-width zoom; never stay zoomed out past it.
   // A taller or shorter one (or the stage giving the timeline more room)
-  // redraws: WaveSurfer only notices width changes, and would keep the
-  // old height. Redrawing takes a while on a long track, so it waits for
-  // the height to settle (a drag of the stage split handle changes it every
+  // redraws at the new height, here only: WaveSurfer is given the height
+  // in pixels (see `load`), so it doesn't redraw by itself on a height
+  // change. Redrawing takes a while on a long track, so it waits for the
+  // height to settle (a drag of the stage split handle changes it every
   // frame); meanwhile the drawing there is stretched to the new height
-  // (only the drawn layers: the cursor and the loop follow it already).
+  // (only the drawn layers: the cursor and the loop follow it already),
+  // and the stretch comes off once the new drawing is all there.
   function bindResizeClamp() {
     let height = container.clientHeight;
     /** @type {ReturnType<typeof setTimeout> | undefined} */
@@ -590,10 +592,9 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
         if (duration) stretch(height);
         clearTimeout(heightTimer);
         heightTimer = setTimeout(() => {
-          if (!duration) return;
-          // The stretch comes off once the new drawing is all there.
+          if (!duration || height === 0) return;
           waveSurfer.once("redrawcomplete", () => stretch(null));
-          waveSurfer.setOptions({ height: "auto" });
+          waveSurfer.setOptions({ height });
         }, 100);
       }
       emitView();
@@ -699,6 +700,11 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     loudnessWindow = slicesPerWindow(levels[0].peak.length, trackDuration);
     shaped = shapeLevels(levels, appearance, { window: loudnessWindow });
     overview = shapeOverview(levels, { window: loudnessWindow });
+    // The height in pixels, not "auto" (see bindResizeClamp); set only when
+    // it changed, as setting it redraws the track on screen.
+    // (A hidden container has none: its next resize sets it.)
+    const shownHeight = container.clientHeight;
+    if (shownHeight > 0 && waveSurfer.options.height !== shownHeight) waveSurfer.setOptions({ height: shownHeight });
     await waveSurfer.load("", [indexChannel(levels[0].peak.length)], trackDuration);
     waveSurfer.setTime(0);
     duration = trackDuration;

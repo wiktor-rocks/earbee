@@ -148,6 +148,36 @@ module.exports = async function (h) {
     );
   }
 
+  // A slow drag, pausing long enough for a redraw now and then: after each
+  // move and each pause, the drawing fills the waveform's height exactly
+  // (it once came out stretched twice over after a redraw mid-drag).
+  {
+    const fills = () =>
+      js(`(() => {
+        const drawn = ${waveLayers}.getBoundingClientRect().height;
+        const height = document.querySelector("#waveform > div").shadowRoot.querySelector(".scroll").clientHeight;
+        return { drawn: Math.round(drawn), height };
+      })()`);
+    const { x, y } = await split();
+    const seen = [];
+    h.wc.sendInputEvent({ type: "mouseDown", x, y, button: "left", clickCount: 1 });
+    for (let i = 1; i <= 4; i++) {
+      h.wc.sendInputEvent({ type: "mouseMove", x, y: y - 15 * i, button: "left" });
+      await sleep(30);
+      seen.push(await fills());
+      await sleep(250);
+      seen.push(await fills());
+    }
+    h.wc.sendInputEvent({ type: "mouseUp", x, y: y - 60, button: "left", clickCount: 1 });
+    await sleep(400);
+    seen.push(await fills());
+    check(
+      "a slow drag: the drawing fills the waveform's height all along",
+      seen.every(({ drawn, height }) => Math.abs(drawn - height) <= 2),
+      JSON.stringify(seen),
+    );
+  }
+
   key("F");
   await sleep(500);
   let l = await layout();
