@@ -32,6 +32,7 @@ import { formatTrackTime } from "../../core/format.js";
 import { $, dom, element, onClick, showNotice } from "../../ui/dom.js";
 import { readStored, store } from "../../ui/storage.js";
 import { onThemeChange } from "../../ui/theme.js";
+import { bindVideoZoom } from "../video-zoom.js"; // Video zoom (src/features/video-zoom.js)
 
 /* ---------- The video window's page ----------
  * Fills the empty window that this feature opens: this page's stylesheets
@@ -123,6 +124,7 @@ function buildVideoWindow(win, { onBringBack }) {
 
   doc.body.className = "video-window";
   doc.body.append(pane, controls);
+  bindVideoZoom(pane); // Video zoom (src/features/video-zoom.js)
 
   // The controls (and the pointer) show while it moves, and stay while it
   // is over them.

@@ -135,7 +135,9 @@
  *                  big-video.js (the picture large, the rest put away;
  *                  its wiring marked "Big video ("), stage-split.js (the
  *                  handle between the picture and the timeline; its
- *                  wiring marked "Stage split (")
+ *                  wiring marked "Stage split ("), video-zoom.js
+ *                  (zooming into the picture: the wheel, dragging, its
+ *                  controls; wiring marked "Video zoom (")
  *   app.js         This file: creates and wires the components, the
  *                  SHORTCUTS table, start()
  *   vendor/        Signalsmith Stretch, patched to read across several
@@ -262,6 +264,7 @@ import {
 import { bigVideoPictureChanged, bindBigVideo, leaveBigVideo, toggleBigVideo } from "./features/big-video.js"; // Big video (src/features/big-video.js)
 import { bindLayout, openShortcuts } from "./features/layout.js";
 import { bindStageSplit } from "./features/stage-split.js"; // Stage split (src/features/stage-split.js)
+import { bindVideoZoom, resetVideoZoom, videoZoomChanged, zoomVideoIn, zoomVideoOut } from "./features/video-zoom.js"; // Video zoom (src/features/video-zoom.js)
 import { beatsAction, bindBeats, isBeatMenuOpen, snapForDrag, toggleBeatClick } from "./features/beats.js";
 import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
@@ -359,6 +362,7 @@ const videoView = createVideoView({
     bigVideoPictureChanged(visible); // Big video (src/features/big-video.js)
   },
   onProblem: (message) => showNotice(message),
+  onZoomChange: videoZoomChanged, // Video zoom (src/features/video-zoom.js)
 });
 
 Object.assign(player, { engine, transport, waveform, timeline, videoView });
@@ -609,6 +613,33 @@ const SHORTCUTS = [
   },
   // Big video (src/features/big-video.js)
   { group: "Video", codes: ["KeyF"], keys: ["F"], description: "Big video on / off", down: toggleBigVideo },
+  // Video zoom (src/features/video-zoom.js); also the wheel over the picture
+  {
+    group: "Video",
+    codes: ["Equal", "NumpadAdd"],
+    ctrl: true,
+    keys: ["="],
+    description: "Zoom into the picture (or scroll over it; drag to move)",
+    repeat: true,
+    down: zoomVideoIn,
+  },
+  {
+    group: "Video",
+    codes: ["Minus", "NumpadSubtract"],
+    ctrl: true,
+    keys: ["−"],
+    description: "Zoom out of the picture",
+    repeat: true,
+    down: zoomVideoOut,
+  },
+  {
+    group: "Video",
+    codes: ["Digit0", "Numpad0"],
+    ctrl: true,
+    keys: ["0"],
+    description: "All of the picture",
+    down: resetVideoZoom,
+  },
   {
     group: "Help",
     codes: ["Slash"],
@@ -657,6 +688,7 @@ function start() {
   bindLayout();
   bindBigVideo(); // Big video (src/features/big-video.js)
   bindStageSplit(); // Stage split (src/features/stage-split.js)
+  bindVideoZoom($("videoPane")); // Video zoom (src/features/video-zoom.js)
   bindFocus();
   const keysBlocked = () =>
     isLoading() ||

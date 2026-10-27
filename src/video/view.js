@@ -59,6 +59,13 @@
  * data-ready-points lists the ones ready, data-ready-allowed how many the
  * video may have.
  *
+ * Zooming in (features/video-zoom.js): a part of the picture, larger;
+ * which part is a view { zoom, x, y } (video/zoom.js), kept here and sent
+ * to the worker, which crops each frame to it. The worker keeps a copy
+ * of the frame on screen (while paused, or zoomed in), so a zoom, a move
+ * or a resize redraws at once without decoding again. Each video starts
+ * with all of its picture.
+ *
  * Frames are decoded as lightweight VideoSamples; only the ones actually
  * drawn are painted, and every sample is closed as soon as it isn't
  * needed (they hold decoder memory).
@@ -72,7 +79,8 @@
  *
  * Exposes: preload, prepare, overviewReady, show, clear, discard,
  *          start, advance, showFrameAt, attach, setReadyPoints,
- *          setAvailableMemory, setReadyLevel
+ *          setAvailableMemory, setReadyLevel, getZoom, zoomTo,
+ *          panZoomBy, resetZoom
  *   prepare(media) → { video, reason }: opens a file (a File, or a
  *   download's { name, url }; core/media.js) without touching the
  *   video on screen; `video` is null (with a reason) if it has no
@@ -84,12 +92,17 @@
  *   setAvailableMemory(bytes) the memory free (or null), for their budget.
  *   setReadyLevel(level) "off" | "low" | "normal" | "high": how big that
  *   budget is (CONFIG.video.readyPoints.levels).
+ *   zoomTo(zoom, clientX?, clientY?) zooms (1 … CONFIG.video.zoom.max)
+ *   keeping the picture's point under the pointer (or the middle) put;
+ *   panZoomBy(dx, dy) moves the view with a drag; resetZoom() all of it.
  *   attach({ pane, canvas }) moves the picture to another pane and
  *   canvas, which may be in another same-origin window; the frame on
  *   screen is redrawn there and the old pane is hidden.
  * ===================================================================== */
 
 import { CONFIG } from "../config.js";
+import { clamp } from "../core/format.js";
+import { WHOLE, clampView, panBy, zoomAround } from "./zoom.js";
 
 /**
  * @param {object} options
@@ -97,8 +110,9 @@ import { CONFIG } from "../config.js";
  * @param {HTMLCanvasElement} options.canvas
  * @param {(visible: boolean) => void} options.onVisibilityChange Switch the page layout.
  * @param {(message: string) => void} options.onProblem Tell the user the picture is in trouble.
+ * @param {(view: import("./zoom.js").ZoomView) => void} [options.onZoomChange] The zoom changed (the controls).
  */
-export function createVideoView({ pane, canvas, onVisibilityChange, onProblem }) {
+export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, onZoomChange = () => {} }) {
   /** @type {Worker | null} */
   let worker = null;
   /** @type {Promise<void> | null} */
@@ -116,6 +130,9 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
   let showing = false; // a video is on screen
   /** @type {ResizeObserver | undefined} */
   let resizeObserver;
+  /** @type {import("./zoom.js").ZoomView} */
+  let zoomView = WHOLE; // the zoom (see "Zooming in" below)
+  let aspect = 0; // the frame on screen's width / height, from the worker
 
   const now = () => performance.timeOrigin + performance.now();
   const send = (message, transfer = []) => worker && !stopped && worker.postMessage(message, transfer);
@@ -141,6 +158,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     send({ type: "use", id: surfaceId });
     send({ type: "points", times: sentPoints }); // set before the worker started
     send({ type: "level", limits: levelLimits });
+    send({ type: "view", view: zoomView });
   }
 
   // The worker failed: whatever waits for it gives up, and the user
@@ -169,6 +187,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
         return;
       }
       case "shown":
+        if (data.aspect > 0) aspect = data.aspect;
         return showing && markShown(data.time, data.proxy);
       case "built":
         builtText = data.built;
@@ -176,6 +195,10 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
         return showBuilt();
       case "problem":
         return onProblem(data.message);
+      case "zoom-failed":
+        // The worker draws the whole picture again; so do the controls.
+        setZoom(WHOLE);
+        return onProblem("Zooming into the picture failed, so it shows all of it again.");
       case "ready-points":
         readyText = data.times.length ? data.times.map((time) => time.toFixed(3)).join(" ") : null;
         allowedText = showing ? String(data.allowed) : null;
@@ -244,10 +267,13 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     pane.hidden = false;
     onVisibilityChange(true);
     resizeCanvas();
+    aspect = 0; // its own shape comes with its first frame; no zooming till then
+    setZoom(WHOLE); // each video starts with all of its picture
     send({ type: "show", id: video.id }); // at 0, with what was built while it loaded
   }
 
   function clear() {
+    setZoom(WHOLE);
     showing = false;
     send({ type: "clear" });
     pane.hidden = true;
@@ -290,6 +316,56 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     else canvas.dataset.readyAllowed = allowedText;
   }
 
+  /* ---------- Zooming in ----------
+   * The part of the picture that shows (zoom.js): the worker draws it, from
+   * the view sent here; the pointer's places are the pane's (in its own
+   * window, for the video window). onZoomChange tells the controls.
+   */
+
+  // The pane as the zoom sees it: the frame's shape and the pane's size.
+  const zoomBox = () => ({ aspect, width: pane.clientWidth, height: pane.clientHeight });
+  const canZoom = () => showing && aspect > 0 && pane.clientWidth > 0 && pane.clientHeight > 0;
+
+  /** @param {import("./zoom.js").ZoomView} next */
+  function setZoom(next) {
+    // (A pane not laid out yet, in a video window just opened, keeps it.)
+    zoomView = canZoom() ? clampView(zoomBox(), next) : showing ? next : WHOLE;
+    send({ type: "view", view: zoomView });
+    // data-zoom: "zoom x y" while zoomed in (for tests, as data-frame-time).
+    if (zoomView.zoom > 1)
+      canvas.dataset.zoom = [zoomView.zoom.toFixed(3), zoomView.x.toFixed(4), zoomView.y.toFixed(4)].join(" ");
+    else delete canvas.dataset.zoom;
+    pane.classList.toggle("zoomed", zoomView.zoom > 1);
+    onZoomChange(zoomView);
+  }
+
+  // Zoomed to `zoom` (within 1 … CONFIG.video.zoom.max), keeping the
+  // picture's point under (clientX, clientY) where it is; without a
+  // point, the middle of the pane.
+  /** @param {number} zoom @param {number} [clientX] @param {number} [clientY] */
+  function zoomTo(zoom, clientX, clientY) {
+    if (!canZoom()) return;
+    const box = pane.getBoundingClientRect();
+    const x = clientX === undefined ? box.width / 2 : clientX - box.left;
+    const y = clientY === undefined ? box.height / 2 : clientY - box.top;
+    setZoom(zoomAround(zoomBox(), zoomView, clamp(zoom, 1, CONFIG.video.zoom.max), x, y));
+  }
+
+  // The view dragged by (dx, dy) pixels: the picture follows the pointer.
+  /** @param {number} dx @param {number} dy */
+  function panZoomBy(dx, dy) {
+    if (canZoom() && zoomView.zoom > 1) setZoom(panBy(zoomBox(), zoomView, dx, dy));
+  }
+
+  // The pane resized: a shape that shows more of the frame may push the
+  // view's middle back inside it. The worker draws it so already; kept
+  // here too, so the page says what's drawn and a drag starts from there.
+  function keepZoomInPane() {
+    if (zoomView.zoom <= 1 || !canZoom()) return;
+    const kept = clampView(zoomBox(), zoomView);
+    if (kept.x !== zoomView.x || kept.y !== zoomView.y) setZoom(kept);
+  }
+
   /* ---------- Canvases ---------- */
 
   // The worker's surface for `target`, handing it over the first time.
@@ -325,7 +401,9 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
   function observePane() {
     resizeObserver?.disconnect();
     resizeObserver = new (paneWindow().ResizeObserver)(() => {
-      if (!pane.hidden) resizeCanvas();
+      if (pane.hidden) return;
+      resizeCanvas();
+      keepZoomInPane();
     });
     resizeObserver.observe(pane);
   }
@@ -345,7 +423,10 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     delete canvas.dataset.readyPoints;
     delete canvas.dataset.readyAllowed;
 
+    pane.classList.remove("zoomed");
+    delete canvas.dataset.zoom;
     ({ pane, canvas } = surface);
+    setZoom(zoomView); // (its classes and data-zoom, on the new pane)
     surfaceId = surfaceFor(canvas);
     observePane();
     if (showing) {
@@ -439,6 +520,10 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     setReadyPoints,
     setAvailableMemory,
     setReadyLevel,
+    getZoom: () => zoomView,
+    zoomTo,
+    panZoomBy,
+    resetZoom: () => setZoom(WHOLE),
   };
 }
 
