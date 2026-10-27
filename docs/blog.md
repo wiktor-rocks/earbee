@@ -266,6 +266,8 @@ Afterwards:
 - **How a post looks,** and the EarBee box under it: `site/_includes/post.njk`, and the "Blog" section of `site/style.css`.
 - **The blog's title and description,** the site's address and the author: `site/_data/site.json`.
 - **The screenshot and the demo clips:** recorded from the app; see [site/README.md](../site/README.md).
+- **The questions on the home page** (its "Questions" section): `site/_data/faq.json`. The page, its FAQ structured data (for search engines) and `llms.txt` all read it, so they always agree. Keep each answer short, general (no exact numbers or keys a release could change) and true for what's on `main`.
+- **`llms.txt`** (earbee.org/llms.txt, the site in plain text for AI assistants): built from `site/llms.njk`. It lists the published posts and the questions by itself; edit the template only to change its description or links.
 
 Check every change with `npm start` (both themes, phone width), then `npm run check` at the top of the project (formatting and lint).
 

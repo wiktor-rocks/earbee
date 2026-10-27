@@ -320,6 +320,21 @@ description: "A free desktop app for transcribing music: slow it down without ch
   </ul>
 </section>
 
+<!-- Questions people ask, and assistants quote: from _data/faq.json, which
+     the page's FAQPage structured data (_includes/base.njk) and llms.txt
+     (llms.njk) read too, so all three say the same. -->
+<section id="faq" class="faq">
+  <h2>Questions</h2>
+  <div class="faq-list">
+    {%- for item in faq %}
+    <details>
+      <summary>{{ item.q }}</summary>
+      <p>{{ item.a }}{% if item.link %} <a href="{{ item.link.href }}">{{ item.link.text }}</a>.{% endif %}</p>
+    </details>
+    {%- endfor %}
+  </div>
+</section>
+
 <section id="download" class="download">
   <h2>Download</h2>
   <p class="section-intro" data-release-long>For Windows, macOS and Linux. Free and open source.</p>

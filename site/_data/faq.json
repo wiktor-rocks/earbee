@@ -1,0 +1,43 @@
+[
+  {
+    "q": "Is EarBee free?",
+    "a": "Yes, all of it. There is no trial, no subscription, no paid version, no account and no ads. EarBee is open source under the MIT licence, and its code is on GitHub."
+  },
+  {
+    "q": "Does slowing a song down change its pitch?",
+    "a": "No. Speed and pitch are separate: slow a song down or speed it up and it keeps its pitch, or shift the pitch in semitones and cents at the same speed, to match a band that tuned down."
+  },
+  {
+    "q": "Which computers does it run on?",
+    "a": "Windows, macOS (Apple Silicon and Intel) and Linux."
+  },
+  {
+    "q": "Can I learn from a YouTube video with it?",
+    "a": "Yes. Paste a link or search by name, and EarBee opens the video, or only its sound. A video's chapters become marked sections, and the picture stays in sync at any speed."
+  },
+  {
+    "q": "What files does it open?",
+    "a": "Audio and video files: MP3, WAV, FLAC, M4A, MP4, MOV, WebM and MKV, among others."
+  },
+  {
+    "q": "Does it need the internet?",
+    "a": "No. Everything runs on your computer; the internet is only needed to download from YouTube."
+  },
+  {
+    "q": "Can it find the tempo and the bars?",
+    "a": "Yes. A beat tracker that runs on your computer marks every beat and bar and shows the tempo, so you can loop one bar or step through it beat by beat. On Intel Macs, a simpler finder marks the beats, without the bars."
+  },
+  {
+    "q": "Does it write out the notes for me?",
+    "a": "No. EarBee is made for working music out by ear: it slows it down, loops it and lets you hear it clearly, and the writing down is yours to do."
+  },
+  {
+    "q": "Is it an alternative to Transcribe!?",
+    "a": "A free one, made for the same work: slowing down, loops, EQ, markers and video.",
+    "link": { "href": "/blog/free-alternative-to-transcribe/", "text": "How the free options compare" }
+  },
+  {
+    "q": "Can I save my work?",
+    "a": "Yes. A project file keeps your marks, loop, speed and EQ, with or without the song in it."
+  }
+]
