@@ -43,6 +43,20 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-27: The ready points have a memory budget: fewer of them for big videos
+
+- **What:** how many decoders wait at the video's ready points now depends on the video's size and the memory free: up to 4 at 1080p, 1 at 4K (none when memory is tight), none at 8K. When only some fit, the loop start comes first, then the start point, then the marks. Points closer than 50 ms (the start point just after a loop wrap) share one decoder.
+- **Why:** the owner asked to make sure a 4K video can't use up the memory. Measured (`BENCH=points` in `local/bench/app-bench.cjs`, memory per process from `app.getAppMetrics()`), each waiting decoder held far more than its one frame: about 155 MB at 1080p and 380 MB at 4K (Mediabunny decodes up to 8 frames ahead, and H.264 keeps its reference frames), so four at 4K took about **+1.5 GB**. No leak: over 40 loop wraps and 20 mark jumps it went up and down with the number of points, and back to the baseline once they were let go. Also, after each wrap the start point (a few ms after the loop start) got a decoder of its own.
+- **How:**
+  - `readyPointsFor()` (new, pure, `src/video/ready-budget.js`): a decoder counts as `heldFrames` (48) frames of 1.5 bytes a pixel; together they get at most `maxBytes` (640 MB) and at most `maxMemoryShare` (15 %) of the memory free when the video opens (the main process's `availableMemory`, sent with `setAvailableMemory`). The worker gives decoders to the first that many points only.
+  - `setReadyPoints` merges its groups in a fixed order (loop, start, marks) and treats points within `sameSeconds` (50 ms) as one; `takeStandby` takes a decoder for a jump up to that far past its frame, shows its frame and decodes on to the exact one.
+  - The canvas's `data-ready-allowed` says how many the video may have.
+- **Where:** `src/video/ready-budget.js` (new), `src/video/video-worker.js` (`allowedPoints`, `wantedPoints`, `takeStandby`, the `memory` message), `src/video/view.js` (`GROUPS`, `setAvailableMemory`, the header), `src/features/open-file.js`, `src/config.js` (`video.readyPoints`); `tests/unit/ready-budget.test.mjs` (new), `tests/e2e/08-video.cjs`.
+- **Verified by:**
+  - `BENCH=points` on `video-5min.mp4` (1080p) and `video-4k-3min.mp4` (4K), page process (Tab) memory: before, 1080p +620 MB with four points and 4K +1,540 MB with four. After: 1080p the same four (three after wraps, the start point sharing the loop start's), +500 MB; 4K one point (the loop start) when 4.8 GB were free, +360 MB, and none in a run with less free. Released, it came back to the baseline each time.
+  - `npm run check`; `npm run test:unit` (300, 6 new); `TB_TOPICS=08,12,19 npm test` (45 e2e, 28 smoke), and topic 08's new check that a 360p video may have all four.
+  - Not tried in a real window by a person yet.
+
 ## 2026-10-27: The video is sharp at once after jumps to the loop start, the start point and the marks (experiment `exp/sharp-jump-points`)
 
 - **What:** up to four "ready points" each have a decoder waiting, already decoded up to their frame: the loop start, the start point (green ▶), and the marks Shift+← / Shift+→ would go to from where playback is. A loop going round, Space, a mark jump, or a jump there while paused, shows the sharp frame at once, with no proxy, and plays on from it.

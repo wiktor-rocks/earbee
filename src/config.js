@@ -86,7 +86,21 @@ export const CONFIG = {
     // sharp at once. At most `max` of them; one gets ready while the sharp
     // decoding is idle and playback isn't behind by `pauseWhenBehindSeconds`,
     // looking again every `waitMs` meanwhile.
-    readyPoints: { max: 4, pauseWhenBehindSeconds: 0.1, waitMs: 20 },
+    // Points closer than `sameSeconds` share a decoder (a jump that far past
+    // its frame shows it, then decodes on to the exact one).
+    // Each waiting decoder holds about `heldFrames` decoded frames (measured
+    // 2026-10-27: ~50 at 1080p, ~31 at 4K, H.264), so together they get at
+    // most `maxBytes`, and at most `maxMemoryShare` of the memory free when
+    // the video opens: 4 at 1080p, 1 at 4K, none at 8K (video/ready-budget.js).
+    readyPoints: {
+      max: 4,
+      heldFrames: 48,
+      maxBytes: 640e6,
+      maxMemoryShare: 0.15,
+      sameSeconds: 0.05,
+      pauseWhenBehindSeconds: 0.1,
+      waitMs: 20,
+    },
     // The video worker's clock (video/video-worker.js): between the page's
     // positions it moves on by itself, at the rate measured over at least
     // rateWindowMs, for at most maxAheadMs past the latest (if the page

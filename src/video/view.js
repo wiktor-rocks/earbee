@@ -51,7 +51,12 @@
  * up to its frame (CONFIG.video.readyPoints), so a jump there shows the
  * sharp frame at once, with no proxy, and plays on from it; then the
  * point gets a new one. They get ready only while the sharp decoding is
- * idle. The canvas's data-ready-points lists the ones ready.
+ * idle. Each waiting decoder holds dozens of frames, so a big video gets
+ * fewer of them (none at 8K), within a share of the memory free
+ * (setAvailableMemory; video/ready-budget.js); the most wanted first: the
+ * loop start, then the start point, then the marks. The canvas's
+ * data-ready-points lists the ones ready, data-ready-allowed how many the
+ * video may have.
  *
  * Frames are decoded as lightweight VideoSamples; only the ones actually
  * drawn are painted, and every sample is closed as soon as it isn't
@@ -65,7 +70,8 @@
  * one onProblem message.
  *
  * Exposes: preload, prepare, overviewReady, show, clear, discard,
- *          start, advance, showFrameAt, attach, setReadyPoints
+ *          start, advance, showFrameAt, attach, setReadyPoints,
+ *          setAvailableMemory
  *   prepare(media) → { video, reason }: opens a file (a File, or a
  *   download's { name, url }; core/media.js) without touching the
  *   video on screen; `video` is null (with a reason) if it has no
@@ -73,7 +79,8 @@
  *   overviewReady(video, ms, signal, onProgress) waits (at most `ms`)
  *   for a prepared video's proxy overview, reporting the share done.
  *   setReadyPoints(group, times) sets one caller's ready points
- *   ("start", "loop", "marks"); all groups together are the points.
+ *   ("loop", "start", "marks"); all groups together are the points.
+ *   setAvailableMemory(bytes) the memory free (or null), for their budget.
  *   attach({ pane, canvas }) moves the picture to another pane and
  *   canvas, which may be in another same-origin window; the frame on
  *   screen is redrawn there and the old pane is hidden.
@@ -167,6 +174,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
         return onProblem(data.message);
       case "ready-points":
         readyText = data.times.length ? data.times.map((time) => time.toFixed(3)).join(" ") : null;
+        allowedText = showing ? String(data.allowed) : null;
         return showBuilt();
     }
   }
@@ -245,6 +253,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     builtText = null;
     overviewText = null;
     readyText = null;
+    allowedText = null;
     showBuilt();
   }
 
@@ -260,10 +269,12 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
 
   // And data-proxy-built: the parts of the proxy built so far, as
   // "start–end" in seconds; data-proxy-overview: its overview's frames;
-  // data-ready-points: the ready points with a decoder ready.
+  // data-ready-points: the ready points with a decoder ready, and
+  // data-ready-allowed: how many this video may have.
   let builtText = null;
   let overviewText = null;
   let readyText = null;
+  let allowedText = null;
   function showBuilt() {
     if (builtText === null) delete canvas.dataset.proxyBuilt;
     else canvas.dataset.proxyBuilt = builtText;
@@ -271,6 +282,8 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     else canvas.dataset.proxyOverview = overviewText;
     if (readyText === null) delete canvas.dataset.readyPoints;
     else canvas.dataset.readyPoints = readyText;
+    if (allowedText === null) delete canvas.dataset.readyAllowed;
+    else canvas.dataset.readyAllowed = allowedText;
   }
 
   /* ---------- Canvases ---------- */
@@ -326,6 +339,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     delete canvas.dataset.proxyBuilt;
     delete canvas.dataset.proxyOverview;
     delete canvas.dataset.readyPoints;
+    delete canvas.dataset.readyAllowed;
 
     ({ pane, canvas } = surface);
     surfaceId = surfaceFor(canvas);
@@ -366,20 +380,36 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
   /** @type {number[]} */
   let sentPoints = [];
 
-  // One caller's points (see the header). All groups' points, in group
-  // order, without near-duplicates (within 1 ms), at most CONFIG's max;
+  // Most wanted first: the worker gives decoders to the first ones only
+  // when a big video can't have them all.
+  const GROUPS = ["loop", "start", "marks"];
+
+  // One caller's points (see the header). All groups' points, in GROUPS'
+  // order, without near-duplicates (within sameSeconds: one decoder serves
+  // both, video-worker.js takeStandby), at most CONFIG's max;
   // sent only when they change (this is called on every frame).
-  /** @param {string} group @param {(number | null | undefined)[]} times */
+  /** @param {"loop" | "start" | "marks"} group @param {(number | null | undefined)[]} times */
   function setReadyPoints(group, times) {
     pointGroups[group] = times.filter((time) => typeof time === "number" && Number.isFinite(time));
     const points = [];
-    for (const time of Object.values(pointGroups).flat()) {
-      if (points.length < CONFIG.video.readyPoints.max && points.every((point) => Math.abs(point - time) >= 0.001))
+    for (const time of GROUPS.flatMap((name) => pointGroups[name] ?? [])) {
+      if (
+        points.length < CONFIG.video.readyPoints.max &&
+        points.every((point) => Math.abs(point - time) >= CONFIG.video.readyPoints.sameSeconds)
+      )
         points.push(time);
     }
     if (points.length === sentPoints.length && points.every((point, i) => point === sentPoints[i])) return;
     sentPoints = points;
     send({ type: "points", times: points });
+  }
+
+  // The memory free (bytes, or null if unknown), when a video opens: the
+  // ready points' budget is a share of it.
+  /** @param {number | null} bytes */
+  function setAvailableMemory(bytes) {
+    startWorker();
+    send({ type: "memory", available: bytes });
   }
 
   return {
@@ -394,6 +424,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     showFrameAt,
     attach,
     setReadyPoints,
+    setAvailableMemory,
   };
 }
 

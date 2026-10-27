@@ -152,6 +152,8 @@ module.exports = async function (h) {
   );
   let ready = await waitReady(15);
   check("a decoder gets ready at the loop start", isReady(ready, 15), `ready: ${ready}`);
+  const allowed = await js(`document.getElementById("videoCanvas").dataset.readyAllowed`);
+  check("a small video may have all four (the memory budget)", allowed === "4", `allowed: ${allowed}`);
   key("Space");
   s = await js(`__sampleCanvas(3500)`);
   await ensurePaused();

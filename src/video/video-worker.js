@@ -33,11 +33,13 @@
 //   page → { type: "start", time, at } / { type: "frame", time }
 //   page → { type: "position", position, at }  while playing
 //   page → { type: "points", times }  the ready points, in seconds
+//   page → { type: "memory", available }  bytes free (or null), for their budget
 //   ←      { type: "ready" }  once Mediabunny is loaded
 //   ←      { type: "shown", time, proxy }  each frame drawn
 //   ←      { type: "built", built, overview }  the proxy's progress (text or null)
 //   ←      { type: "problem", message }  once per file
-//   ←      { type: "ready-points", times }  the points with a decoder ready
+//   ←      { type: "ready-points", times, allowed }  the points with a decoder
+//          ready, and how many this video may have (video/ready-budget.js)
 import {
   ALL_FORMATS,
   BlobSource,
@@ -49,6 +51,7 @@ import {
 import { CONFIG } from "../config.js";
 import { mediaSource } from "../core/media.js";
 import { createVideoProxy } from "./proxy.js";
+import { readyPointsFor } from "./ready-budget.js";
 
 const scope = /** @type {any} */ (self);
 const post = (message) => scope.postMessage(message);
@@ -144,6 +147,8 @@ async function prepare(id, media) {
     first.close();
 
     const video = { input, track, sink, packets, firstTimestamp, proxy: null, discarded: false };
+    // Its frames' size, for the ready points' memory budget.
+    Object.assign(video, { width: track.codedWidth, height: track.codedHeight });
     videos.set(id, video);
     startProxy(video, await track.computeDuration());
     post({ type: "prepared", id, ok: true, reason: null });
@@ -219,6 +224,7 @@ function show(video) {
   current = video;
   showFrameAt(0);
   markBuilt(video.proxy); // what was built while it loaded
+  postReadyPoints(); // and how many it may have
   prerollNext();
 }
 
@@ -568,14 +574,27 @@ async function run() {
 // only while the sharp decoding is idle ("playback is king").
 /** @type {Map<number, { time: number, video: any, iterator: any, last: any, end: number, ready: boolean, closed: boolean }>} */
 const standbys = new Map(); // by point, for the video on screen
-let points = []; // the page's ready points, in seconds
+let points = []; // the page's ready points, in seconds, most wanted first
 const failedPoints = new Set(); // points whose decoder failed, for this video
 let prerolling = false;
+let availableMemory = null; // bytes free, from the page (null: unknown)
+
+// How many decoders may wait for the video on screen: fewer for bigger
+// frames, as each holds dozens of them (video/ready-budget.js).
+function allowedPoints() {
+  if (!current) return 0;
+  const { width, height } = current;
+  return readyPointsFor({ width, height, available: availableMemory }, CONFIG.video.readyPoints);
+}
+
+// The points that get a decoder: the first ones, as many as allowed.
+const wantedPoints = () => points.slice(0, allowedPoints());
 
 /** @param {number[]} times */
 function setPoints(times) {
   points = times;
-  for (const standby of [...standbys.values()]) if (!points.includes(standby.time)) closeStandby(standby);
+  const wanted = wantedPoints();
+  for (const standby of [...standbys.values()]) if (!wanted.includes(standby.time)) closeStandby(standby);
   postReadyPoints();
   prerollNext();
 }
@@ -596,7 +615,7 @@ function closeStandbys() {
 
 function postReadyPoints() {
   const times = [...standbys.values()].filter((standby) => standby.ready).map((standby) => standby.time);
-  post({ type: "ready-points", times: times.sort((a, b) => a - b) });
+  post({ type: "ready-points", times: times.sort((a, b) => a - b), allowed: allowedPoints() });
 }
 
 // Busy: the sharp decoding is working, or playback is behind (a proxy
@@ -613,7 +632,7 @@ async function prerollNext() {
   try {
     for (;;) {
       const video = current;
-      const time = points.find((point) => !standbys.has(point) && !failedPoints.has(point));
+      const time = wantedPoints().find((point) => !standbys.has(point) && !failedPoints.has(point));
       if (!video || time === undefined) break;
       await preroll(video, time);
     }
@@ -662,12 +681,14 @@ async function preroll(video, time) {
 
 // A jump to `time`: if a decoder is ready there, it becomes the cursor
 // and its frame is returned (to draw at once); the point gets a new one.
+// Up to sameSeconds past its frame (a start point a few ms after the loop
+// start) takes it too: its frame shows, and the cursor decodes on from it.
 function takeStandby(time) {
   if (!current) return null;
   const t = Math.max(time, current.firstTimestamp);
   for (const standby of standbys.values()) {
     if (!standby.ready || standby.video !== current) continue;
-    if (t < standby.last.timestamp - 0.001 || t >= standby.end) continue;
+    if (t < standby.last.timestamp - 0.001 || t >= standby.end + CONFIG.video.readyPoints.sameSeconds) continue;
     standbys.delete(standby.time);
     closeCursor();
     cursor = { iterator: standby.iterator, last: standby.last, end: standby.end };
@@ -687,9 +708,14 @@ function showFrameAt(time) {
   target = time;
   targetVersion++;
   dropNextFrame();
-  // A ready point: its sharp frame now, and nothing left to decode.
+  // A ready point: its sharp frame now; then the exact one, if `time` is a
+  // frame or two past it.
   const ready = takeStandby(time);
-  if (ready) return draw(ready);
+  if (ready) {
+    draw(ready);
+    if (time >= cursor.end) run();
+    return;
+  }
   if (!(cursor?.last && cursor.last.timestamp <= time && time < cursor.end)) requestProxyWithHeadStart(time);
   run();
 }
@@ -766,6 +792,9 @@ scope.onmessage = ({ data }) => {
       return mode === "playing" && setClock(data.position, data.at);
     case "points":
       return setPoints(Array.isArray(data.times) ? data.times.filter(Number.isFinite) : []);
+    case "memory":
+      availableMemory = Number.isFinite(data.available) ? data.available : null;
+      return setPoints(points);
   }
 };
 

@@ -183,8 +183,11 @@ export async function loadMediaFile(media, signal) {
   // before drawing the waveform: WaveSurfer measures its container when it
   // draws, so it must be visible and at its final size.
   showPlayer();
-  if (prepared?.video) player.videoView.show(prepared.video);
-  else player.videoView.clear();
+  if (prepared?.video) {
+    player.videoView.show(prepared.video);
+    // The ready points' memory budget (video/ready-budget.js).
+    availableMemory().then((bytes) => player.videoView.setAvailableMemory(bytes));
+  } else player.videoView.clear();
   // The samples move to the audio thread (no copy) while the waveform draws.
   await Promise.all([
     timer.time("transfer", () => player.engine.loadPieces(decoded.pieces)),
