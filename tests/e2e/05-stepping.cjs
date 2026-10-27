@@ -102,7 +102,7 @@ module.exports = async function (h) {
   check("Tab-focused slider keeps arrows", v1 !== v0 && (await pos()) === p0, `focus-visible=${fv} ${v0}→${v1}`);
   await js(`document.querySelector('#speedChips [data-speed="1"]').click(); document.activeElement.blur()`);
 
-  // The speed knob: a drag up turns it up (400 px for the whole range,
+  // The speed knob: a drag up turns it up (800 px for the whole range,
   // CONFIG.knob), with Shift 5× less; the wheel with Shift by one step;
   // a double-clicked value can be typed.
   await h.shot("dock-knobs.png");
@@ -122,11 +122,11 @@ module.exports = async function (h) {
   let k0 = await speedNow();
   await dragKnob(50);
   const coarse = (await speedNow()) - k0;
-  check("dragging the knob up turns it up", Math.abs(coarse - 0.37) < 0.02, `${k0}→${await speedNow()}`);
+  check("dragging the knob up turns it up", Math.abs(coarse - 0.18) < 0.015, `${k0}→${await speedNow()}`);
   k0 = await speedNow();
   await dragKnob(-50, ["shift"]);
   const fine = k0 - (await speedNow());
-  check("Shift turns it 5× finer", Math.abs(fine - 0.07) < 0.015, `${k0}→${await speedNow()}`);
+  check("Shift turns it 5× finer", Math.abs(fine - 0.04) < 0.015, `${k0}→${await speedNow()}`);
   k0 = await speedNow();
   wc.sendInputEvent({ type: "mouseWheel", x: sl.x, y: sl.y, deltaX: 0, deltaY: 100, modifiers: ["shift"] });
   await sleep(100);
