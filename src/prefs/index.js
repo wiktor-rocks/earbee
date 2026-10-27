@@ -209,8 +209,34 @@ const downloadsSection = defineSection({
   ],
 });
 
+// Settings › Advanced: choices most people never need. `sharpJumps` is how
+// much memory the video's ready points may use (decoders waiting at the
+// loop start, the start point and the nearest marks, so a jump there is
+// sharp at once); the levels' numbers are CONFIG.video.readyPoints.levels,
+// and app.js hands the choice to the video view's setReadyLevel().
+const advancedSection = defineSection({
+  id: "advanced",
+  title: "Advanced",
+  icon: "gear",
+  fields: [
+    {
+      key: "sharpJumps",
+      type: "choice",
+      label: "Memory for sharp video jumps",
+      help: "Decoders wait at the loop start, the start point and the nearest marks, so a jump there is sharp at once. Each takes about 150 MB in HD, 400 MB in 4K, and more for bigger videos.",
+      default: "normal",
+      options: [
+        { value: "off", label: "Off", detail: "a jump shows a blurry picture for a moment" },
+        { value: "low", label: "Low", detail: "the least memory" },
+        { value: "normal", label: "Normal", detail: "4K too, when memory allows" },
+        { value: "high", label: "High", detail: "the most memory: more for 4K" },
+      ],
+    },
+  ],
+});
+
 /** @type {import("./fields.js").Section[]} */
-export const SECTIONS = [generalSection, themeSection, waveformSection, downloadsSection];
+export const SECTIONS = [generalSection, themeSection, waveformSection, downloadsSection, advancedSection];
 
 /** @param {string} id */
 export const getSection = (id) => SECTIONS.find((section) => section.id === id);

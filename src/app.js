@@ -365,6 +365,9 @@ onThemeChange(() => waveform.refreshColors());
 // Its look follows Settings › Waveform.
 waveform.setAppearance(getPrefs("waveform"));
 onPrefsChange("waveform", (values) => waveform.setAppearance(values));
+// How much memory sharp video jumps may use: Settings › Advanced.
+videoView.setReadyLevel(getPrefs("advanced").sharpJumps);
+onPrefsChange("advanced", (values) => videoView.setReadyLevel(values.sharpJumps));
 
 // Everything that follows playback subscribes here.
 transport.on("position", (time) => {

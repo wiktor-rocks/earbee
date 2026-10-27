@@ -53,7 +53,8 @@
  * point gets a new one. They get ready only while the sharp decoding is
  * idle. Each waiting decoder holds dozens of frames, so a big video gets
  * fewer of them (none at 8K), within a share of the memory free
- * (setAvailableMemory; video/ready-budget.js); the most wanted first: the
+ * (setAvailableMemory; video/ready-budget.js) that the level chosen in
+ * Settings › Advanced sets (setReadyLevel); the most wanted first: the
  * loop start, then the start point, then the marks. The canvas's
  * data-ready-points lists the ones ready, data-ready-allowed how many the
  * video may have.
@@ -71,7 +72,7 @@
  *
  * Exposes: preload, prepare, overviewReady, show, clear, discard,
  *          start, advance, showFrameAt, attach, setReadyPoints,
- *          setAvailableMemory
+ *          setAvailableMemory, setReadyLevel
  *   prepare(media) → { video, reason }: opens a file (a File, or a
  *   download's { name, url }; core/media.js) without touching the
  *   video on screen; `video` is null (with a reason) if it has no
@@ -81,6 +82,8 @@
  *   setReadyPoints(group, times) sets one caller's ready points
  *   ("loop", "start", "marks"); all groups together are the points.
  *   setAvailableMemory(bytes) the memory free (or null), for their budget.
+ *   setReadyLevel(level) "off" | "low" | "normal" | "high": how big that
+ *   budget is (CONFIG.video.readyPoints.levels).
  *   attach({ pane, canvas }) moves the picture to another pane and
  *   canvas, which may be in another same-origin window; the frame on
  *   screen is redrawn there and the old pane is hidden.
@@ -137,6 +140,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     surfaceId = surfaceFor(canvas);
     send({ type: "use", id: surfaceId });
     send({ type: "points", times: sentPoints }); // set before the worker started
+    send({ type: "level", limits: levelLimits });
   }
 
   // The worker failed: whatever waits for it gives up, and the user
@@ -404,6 +408,15 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     send({ type: "points", times: points });
   }
 
+  // How big the ready points' budget is: a level of
+  // CONFIG.video.readyPoints.levels (Normal's for anything else).
+  let levelLimits = CONFIG.video.readyPoints.levels.normal;
+  /** @param {string} level */
+  function setReadyLevel(level) {
+    levelLimits = CONFIG.video.readyPoints.levels[level] ?? CONFIG.video.readyPoints.levels.normal;
+    send({ type: "level", limits: levelLimits });
+  }
+
   // The memory free (bytes, or null if unknown), when a video opens: the
   // ready points' budget is a share of it.
   /** @param {number | null} bytes */
@@ -425,6 +438,7 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem })
     attach,
     setReadyPoints,
     setAvailableMemory,
+    setReadyLevel,
   };
 }
 

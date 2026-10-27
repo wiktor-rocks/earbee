@@ -63,11 +63,12 @@ The words the app and its docs use, and what they are in the code. Each entry: w
 
 ## Video
 
-| Word             | What it is                                                                                | In the code                                                              |
-| ---------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| **Proxy**        | A low-resolution copy of a video, built in memory, so seeking and odd speeds stay smooth. | `src/video/proxy.js`; `CONFIG.video.proxy`                               |
-| **Big video**    | The picture as large as the window allows (F; Esc leaves it).                             | `src/features/big-video.js`                                              |
-| **Video window** | The picture in its own window, e.g. on a second screen (V).                               | `src/features/video-window/`; `electron/windows.js` (`allowVideoWindow`) |
+| Word             | What it is                                                                                                                                                                                             | In the code                                                                                                  |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------ |
+| **Proxy**        | A low-resolution copy of a video, built in memory, so seeking and odd speeds stay smooth.                                                                                                              | `src/video/proxy.js`; `CONFIG.video.proxy`                                                                   |
+| **Ready points** | Where a video's jumps are expected (the loop start, the start point, the nearest marks): a decoder waits at each, so a jump there is sharp at once. How much memory they may use: Settings › Advanced. | `setReadyPoints` in `src/video/view.js`; `CONFIG.video.readyPoints`; the budget: `src/video/ready-budget.js` |
+| **Big video**    | The picture as large as the window allows (F; Esc leaves it).                                                                                                                                          | `src/features/big-video.js`                                                                                  |
+| **Video window** | The picture in its own window, e.g. on a second screen (V).                                                                                                                                            | `src/features/video-window/`; `electron/windows.js` (`allowVideoWindow`)                                     |
 
 ## Files, settings, downloads
 

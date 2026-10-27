@@ -43,6 +43,17 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-27: Settings › Advanced: how much memory sharp video jumps may use
+
+- **What:** a new Settings section, **Advanced**, with **Memory for sharp video jumps**: Off, Low, Normal (the default, as before) or High. Off lets no decoder wait (a jump shows the blurry picture for a moment, as before the ready points); High gives more of them to big videos (two at 4K, with enough memory free). A change applies at once, to the open video too.
+- **Why:** the owner asked for the ready points' memory budget as an advanced setting, after it turned out a 4K video often gets none at Normal.
+- **How:**
+  - `CONFIG.video.readyPoints.levels` holds each level's `maxBytes` and `maxMemoryShare` (Off 0; Low 320 MB, 5 %; Normal 640 MB, 15 %; High 1.28 GB, 30 %); both rise together, or High couldn't give 4K more.
+  - `app.js` hands the setting to `videoView.setReadyLevel()`, which sends the level's limits to the worker (again when the worker starts); the worker's `allowedPoints()` uses them, and `setPoints` closes or readies decoders for the new allowance.
+  - The setting's options carry no numbers (those are in CONFIG); a unit test checks that its choices are the levels.
+- **Where:** `src/prefs/index.js` (`advancedSection`), `src/config.js` (`video.readyPoints.levels`), `src/video/view.js` (`setReadyLevel`), `src/video/video-worker.js` (the `level` message), `src/app.js`; `docs/glossary.md` (a "Ready points" row); `tests/unit/ready-budget.test.mjs`, `tests/e2e/08-video.cjs`, `tests/e2e/13-settings.cjs`.
+- **Verified by:** `npm run check`; `npm run test:unit` (305: the budget at each level, and that the setting's choices are the levels); `TB_TOPICS=08,13 npm test` (49 e2e, 28 smoke): Off leaves no decoder waiting (`data-ready-allowed` 0), Normal again readies the loop start's, and Settings has an Advanced tab. Not looked at in a real window yet.
+
 ## 2026-10-27: The ready points have a memory budget: fewer of them for big videos
 
 - **What:** how many decoders wait at the video's ready points now depends on the video's size and the memory free: up to 4 at 1080p, 1 at 4K (none when memory is tight), none at 8K. When only some fit, the loop start comes first, then the start point, then the marks. Points closer than 50 ms (the start point just after a loop wrap) share one decoder.

@@ -91,12 +91,18 @@ export const CONFIG = {
     // Each waiting decoder holds about `heldFrames` decoded frames (measured
     // 2026-10-27: ~50 at 1080p, ~31 at 4K, H.264), so together they get at
     // most `maxBytes`, and at most `maxMemoryShare` of the memory free when
-    // the video opens: 4 at 1080p, 1 at 4K, none at 8K (video/ready-budget.js).
+    // the video opens (video/ready-budget.js). Both come from the level
+    // chosen in Settings › Advanced ("Memory for sharp video jumps"); at
+    // Normal: 4 at 1080p, 1 at 4K when memory allows, none at 8K.
     readyPoints: {
       max: 4,
       heldFrames: 48,
-      maxBytes: 640e6,
-      maxMemoryShare: 0.15,
+      levels: {
+        off: { maxBytes: 0, maxMemoryShare: 0 }, // none
+        low: { maxBytes: 320e6, maxMemoryShare: 0.05 }, // HD only, one or two
+        normal: { maxBytes: 640e6, maxMemoryShare: 0.15 }, // 4K gets one when memory allows
+        high: { maxBytes: 1280e6, maxMemoryShare: 0.3 }, // 4K gets two
+      },
       sameSeconds: 0.05,
       pauseWhenBehindSeconds: 0.1,
       waitMs: 20,

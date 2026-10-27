@@ -34,6 +34,7 @@
 //   page → { type: "position", position, at }  while playing
 //   page → { type: "points", times }  the ready points, in seconds
 //   page → { type: "memory", available }  bytes free (or null), for their budget
+//   page → { type: "level", limits }  { maxBytes, maxMemoryShare }: how big it is
 //   ←      { type: "ready" }  once Mediabunny is loaded
 //   ←      { type: "shown", time, proxy }  each frame drawn
 //   ←      { type: "built", built, overview }  the proxy's progress (text or null)
@@ -578,13 +579,14 @@ let points = []; // the page's ready points, in seconds, most wanted first
 const failedPoints = new Set(); // points whose decoder failed, for this video
 let prerolling = false;
 let availableMemory = null; // bytes free, from the page (null: unknown)
+let levelLimits = CONFIG.video.readyPoints.levels.normal; // Settings › Advanced
 
 // How many decoders may wait for the video on screen: fewer for bigger
 // frames, as each holds dozens of them (video/ready-budget.js).
 function allowedPoints() {
   if (!current) return 0;
   const { width, height } = current;
-  return readyPointsFor({ width, height, available: availableMemory }, CONFIG.video.readyPoints);
+  return readyPointsFor({ width, height, available: availableMemory }, { ...CONFIG.video.readyPoints, ...levelLimits });
 }
 
 // The points that get a decoder: the first ones, as many as allowed.
@@ -794,6 +796,9 @@ scope.onmessage = ({ data }) => {
       return setPoints(Array.isArray(data.times) ? data.times.filter(Number.isFinite) : []);
     case "memory":
       availableMemory = Number.isFinite(data.available) ? data.available : null;
+      return setPoints(points);
+    case "level":
+      levelLimits = data.limits;
       return setPoints(points);
   }
 };

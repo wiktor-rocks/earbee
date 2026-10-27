@@ -181,6 +181,24 @@ module.exports = async function (h) {
     isReady(ready, 15) && from >= 0 && s.slice(from).every((q) => !q.proxy && Math.abs(q.frame - 15) < 0.05),
     `ready: ${ready}; ${JSON.stringify(s.slice(0, 4))}`,
   );
+  // Settings › Advanced › Off: no decoder waits; back at Normal, they do.
+  const prefs = `import("./src/ui/prefs.js")`;
+  const allowedNow = () => js(`document.getElementById("videoCanvas").dataset.readyAllowed`);
+  await js(`${prefs}.then(({ setPref }) => setPref("advanced", "sharpJumps", "off"))`);
+  await sleep(300);
+  const [offAllowed, offReady] = [await allowedNow(), await readyPoints()];
+  check(
+    "Settings › Advanced › Off: no decoder waits",
+    offAllowed === "0" && offReady === "",
+    `allowed ${offAllowed}, ready "${offReady}"`,
+  );
+  await js(`${prefs}.then(({ resetPref }) => resetPref("advanced", "sharpJumps"))`);
+  ready = await waitReady(15);
+  check(
+    "…and back at Normal, the loop start's is ready again",
+    (await allowedNow()) === "4" && isReady(ready, 15),
+    `allowed ${await allowedNow()}, ready: ${ready}`,
+  );
   await js(`${app}.then(([, { setLoopRegion }]) => setLoopRegion(null))`);
 
   // Opening another video while one plays: the old one's decoding is cut
