@@ -170,6 +170,8 @@ A conflict means both branches changed the same lines, and git asks which to kee
 
 ## Putting out a new version
 
+What goes into the next release, and only that, is kept in `local/NEXT-RELEASE-<version>.md` (on your computer only): the few things to finish, what's already in, and these steps with its number filled in. New ideas go to the scratchpad instead, so the release stays small enough to ship. Once it's out, start the next release's file and delete the old one.
+
 1. **Choose the number.**
    - `0.1.1` for fixes.
    - `0.2.0` for new features.

@@ -451,6 +451,7 @@ section h2 {
 .what h2::before,
 .keys h2::before,
 .themes h2::before,
+.faq h2::before,
 .download h2::before {
   content: "";
   display: block;
@@ -809,6 +810,52 @@ footer p {
   margin-left: auto;
   font-weight: 700;
   white-space: nowrap;
+}
+
+/* ---------- Questions ----------
+   The home page's FAQ (_data/faq.json): each question opens to its
+   answer, under a rule like the Free list's; "+" turns to "−" when open. */
+
+.faq-list {
+  max-width: 50em;
+}
+.faq details {
+  border-top: 1px solid var(--border);
+}
+.faq details:last-child {
+  border-bottom: 1px solid var(--border);
+}
+.faq summary {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+  list-style: none;
+}
+.faq summary::-webkit-details-marker {
+  display: none;
+}
+.faq summary::after {
+  content: "+";
+  flex: none;
+  color: var(--accent-text);
+  font-size: 1.3em;
+  line-height: 1;
+}
+.faq details[open] summary::after {
+  content: "−";
+}
+.faq summary:hover {
+  color: var(--accent-text);
+}
+.faq details p {
+  max-width: 44em;
+  margin: -4px 0 18px;
+  color: var(--muted);
 }
 
 /* ---------- Blog ----------

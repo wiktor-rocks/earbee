@@ -1,0 +1,33 @@
+---
+permalink: /llms.txt
+eleventyExcludeFromCollections: true
+---
+{#- /llms.txt: the site in plain text for AI assistants and tools (the
+    llmstxt.org proposal): what EarBee is, where things are, the posts and
+    the questions. Built, so the posts and the questions (_data/faq.json,
+    as on the home page) stay current by themselves. Plain text, so
+    nothing is escaped (| safe). -#}
+# {{ site.name }}
+
+> {{ site.name }} is a free, open-source desktop app for transcribing music and learning songs by ear: it slows audio and video down without changing the pitch, shifts the pitch, loops the hard part, marks sections and finds the beats and bars. For Windows, macOS and Linux.
+
+{{ site.name }} is free in full: no trial, no subscription, no paid version, no account, no ads. It is open source under the MIT licence. It runs on your computer and needs the internet only to download from YouTube. It helps a musician work music out by ear; it doesn't transcribe automatically or write out the notes.
+
+## Links
+
+- [Home page]({{ site.url }}/): what it does, with screenshots and clips
+- [Download]({{ site.url }}/#download): the latest release for Windows, macOS and Linux
+- [Source code](https://github.com/wiktor-rocks/earbee): on GitHub, MIT licence
+- [Questions]({{ site.url }}/#faq): the answers below, on the home page
+
+## Blog
+
+{% for post in collections.posts | reverse -%}
+- [{{ post.data.title | safe }}]({{ post.url | absolute }}): {{ post.data.description | safe }}
+{% endfor %}
+## Questions
+{% for item in faq %}
+### {{ item.q | safe }}
+
+{{ item.a | safe }}{% if item.link %} [{{ item.link.text | safe }}]({{ item.link.href | absolute }}).{% endif %}
+{% endfor %}
