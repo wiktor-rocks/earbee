@@ -99,8 +99,9 @@ export const CONFIG = {
     // the whole frame; the wheel zooms by e^(`wheelSpeed` × its pixels), a
     // notch (100 px) about 16 %; Ctrl+= / Ctrl+- by `keyFactor`. The worker
     // keeps a copy of the frame on screen, at most `stillMaxPixels` (4K),
-    // to redraw it at once when the view moves.
-    zoom: { max: 8, wheelSpeed: 0.0015, keyFactor: 1.25, stillMaxPixels: 3840 * 2160 },
+    // to redraw it at once when the view moves: paused, and playing zoomed
+    // in while frames come more than `copyApartSeconds` apart.
+    zoom: { max: 8, wheelSpeed: 0.0015, keyFactor: 1.25, stillMaxPixels: 3840 * 2160, copyApartSeconds: 0.08 },
     // Ready points (video/view.js): the loop start, the start point and the
     // nearest marks each get a decoder waiting there, so a jump there is
     // sharp at once. At most `max` of them; one gets ready while the sharp

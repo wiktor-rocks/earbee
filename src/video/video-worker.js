@@ -392,8 +392,13 @@ function draw(frame, keep = true) {
   else plain();
   shownAspect = aspect;
   if (keep)
-    keepStill(frame.timestamp, false, frame.displayWidth, frame.displayHeight, (stillContext) =>
-      frame.drawWithFit(stillContext, { fit: "fill" }),
+    keepStill(
+      frame.timestamp,
+      false,
+      frame.displayWidth,
+      frame.displayHeight,
+      (stillContext) => frame.drawWithFit(stillContext, { fit: "fill" }),
+      frame.duration,
     );
   else stillTime = null;
   markShown(frame.timestamp, false);
@@ -443,15 +448,20 @@ function drawProxy(frame) {
 
 const hasStill = () => still !== null && stillTime === shownTime && shownTime !== null;
 
-// Copies the frame just drawn, while paused (only the frame the decoder
-// was sent for: dragging draws many on the way, and copying each would
-// slow the drag) or playing zoomed in, `frameWidth` × `frameHeight` (display
+// Copies the frame just drawn, `frameWidth` × `frameHeight` (display
 // pixels), at its own size or smaller, within
 // CONFIG.video.zoom.stillMaxPixels (a 4K frame fits); `drawWhole` draws
-// all of it into a context of the size given.
-function keepStill(time, isProxy, frameWidth, frameHeight, drawWhole) {
-  if (mode === "playing" && view.zoom === 1) {
-    stillTime = null; // not kept: playing frames replace each other anyway
+// all of it into a context of the size given. Paused: only the frame the
+// decoder was sent for (dragging draws many on the way, and copying each
+// would slow the drag). Playing: only zoomed in, and only while frames
+// come more than CONFIG.video.zoom.copyApartSeconds apart (slow speeds):
+// otherwise the next frame redraws a move soon enough, and copying each
+// 4K frame costs the page's process about a sixth more CPU (measured).
+// `duration`: the frame's, in seconds.
+function keepStill(time, isProxy, frameWidth, frameHeight, drawWhole, duration = 0) {
+  const apart = duration / Math.max(rate, 1e-3) > CONFIG.video.zoom.copyApartSeconds;
+  if (mode === "playing" && !(view.zoom > 1 && apart && !isProxy)) {
+    stillTime = null; // not kept: playing frames replace each other
     return;
   }
   zoomSafely(() => {
