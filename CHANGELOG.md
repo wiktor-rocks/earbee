@@ -43,6 +43,24 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-27: Blog post "How to slow down a song without changing the pitch" (the website)
+
+- **What:** a fifth post, "How to slow down a song without changing the pitch", at `/blog/slow-down-a-song-without-changing-pitch/`.
+  - Why slowing a record or tape lowers the pitch, what time-stretching does instead, five steps that work in any player, how slow to go, and why very slow speeds sound strange.
+  - Shifting the pitch at the same speed (tuning down, cents, a bass line up an octave), and the free ways to do it: YouTube, VLC and Audacity.
+  - EarBee comes up in the first paragraph, and the post names its time-stretcher, Signalsmith Stretch.
+  - "Why transcribing music by ear makes you a better musician" now links to it, in step 5 of "How to start".
+- **Why:** post idea 1 in `docs/blog.md`. An assistant wrote the post in the owner's style, at the owner's request; the owner asked for EarBee earlier in the post and the time-stretcher's mention.
+- **How:**
+  - `keyword: "how to slow down a song without changing the pitch"`, in the title, the address and the first sentence.
+  - The claims about YouTube, VLC and Audacity are the ones already checked for the Transcribe! post (2026-10-25).
+  - EarBee is described without keys or numbers (the blog's rule); its percentages are practice advice, not the app's range.
+- **Where:** `site/blog/slow-down-a-song-without-changing-pitch.md`, `site/blog/why-transcribe-music-by-ear.md`.
+- **Verified by:**
+  - `node scripts/seo/check.cjs`: no errors or warnings for the post.
+  - `npm --prefix site run build`: the post is built.
+  - `npm run check`.
+
 ## 2026-10-27: Zooming into the video
 
 - **What:** the wheel over the picture zooms in where the pointer is, up to 8×: the picture first grows to fill its pane (the black bars go), then shows a smaller part of the frame, sharp. Once zoomed in, dragging the picture moves it. Ctrl+= / Ctrl+- zoom around the middle, Ctrl+0 shows all of it. Small "− 1.0× +" controls sit in the picture's bottom-left corner: on hover, and always while zoomed in; a click on the level shows all of it. It works in the main window, in big video and in the video window, and the zoom goes with the picture between them. Each file starts with all of its picture; the zoom isn't saved in projects. If zooming ever fails, the picture goes back to all of it and a message says so: the zoom never costs the picture.

@@ -43,7 +43,7 @@ There are apps that listen to a recording and write out the notes. If all you ne
 2. **Listen until you can sing it** along with the recording, before you pick up your instrument.
 3. **Loop one phrase,** a few bars at most, and stay on it until you have it.
 4. **Find the first note.** The rest of the phrase is much easier once you have it.
-5. **Slow it down when notes blur together.** At 70 % or even 50 % you can hear each note, and as long as the pitch stays put, you can play along.
+5. **Slow it down when notes blur together.** At 70 % or even 50 % you can hear each note, and as long as the pitch stays put, you can play along. Here's [how to slow down a song without changing the pitch](/blog/slow-down-a-song-without-changing-pitch/).
 6. **Play along at full speed** to check. If something sounds off, go back to that phrase.
 
 Writing it down is optional. It helps you remember and study a part, but plenty of players never write a note.
