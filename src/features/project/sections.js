@@ -27,6 +27,7 @@ import { setEqEnabled, setSetting, setStepSize } from "../../ui/controls.js";
 import { restoreBeats, savedBeats } from "../beats.js";
 import { resetMarks } from "../marks.js";
 import { getLoopRegion, getStartPoint, setLoopRegion, setStartPoint } from "../playback.js";
+import { getTimelineShare, setTimelineShare } from "../stage-split.js"; // Stage split (src/features/stage-split.js)
 
 /**
  * @typedef {object} Section
@@ -167,5 +168,18 @@ export const SECTIONS = [
     dirties: false,
     capture: () => player.waveform.getView() ?? {},
     restore: (data) => player.waveform.setView({ seconds: data.seconds ?? null, start: data.start ?? 0 }),
+  },
+  // Stage split (src/features/stage-split.js): how much of the stage the
+  // timeline takes beside a video. Like the zoom, saved, but dragging it
+  // isn't an unsaved change.
+  {
+    id: "stage",
+    label: "the video's size",
+    version: 1,
+    dirties: false,
+    capture: () => ({ timelineShare: getTimelineShare() }),
+    restore(data) {
+      if (finite(data.timelineShare)) setTimelineShare(data.timelineShare);
+    },
   },
 ];

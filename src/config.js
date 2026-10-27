@@ -171,6 +171,14 @@ export const CONFIG = {
     maxPeaksPerSecond: 8000,
   },
 
+  // With a video, the handle between the picture and the timeline
+  // (features/stage-split.js). `timelineShare`: the timeline's part of the
+  // stage's height at first (and for each new file). A drag keeps the
+  // timeline at least `minTimeline` px (style.css's --timeline-min is the
+  // same) and the picture at least `minVideo` px; a share read from a
+  // project file is kept within `minShare`–`maxShare`.
+  stage: { timelineShare: 0.4, minTimeline: 110, minVideo: 120, minShare: 0.1, maxShare: 0.9 },
+
   beats: {
     // The beat lines over the waveform (B; features/beats.js) are hidden
     // when zoomed out so far that beats are closer than this.

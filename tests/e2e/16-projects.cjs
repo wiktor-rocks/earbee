@@ -56,6 +56,7 @@ module.exports = async function (h) {
           row.querySelector(".mark-name").value + " @ " + row.querySelector(".mark-time").textContent),
         time: trackTime.textContent.split(" / ")[0], start: startPoint.textContent,
         zoom: Math.round(view.scrollWidth), scroll: Math.round(view.scrollLeft),
+        split: document.getElementById("stage").style.getPropertyValue("--timeline-share"),
       };
     })()`);
   const title = () => js(`document.title`);
@@ -143,6 +144,9 @@ module.exports = async function (h) {
   await js(`document.querySelector("#marksList .mark-name").dispatchEvent(new Event("change"))`);
   await click(12.25);
   for (let i = 0; i < 4; i++) await wheel(600); // zoomed in (Electron's deltaY is the DOM's, inverted), scrolled into the track
+  // The video's size (the stage split handle, src/features/stage-split.js),
+  // as a drag would leave it; saved even for a song.
+  await js(`document.getElementById("stage").style.setProperty("--timeline-share", "0.62")`);
   await sleep(200);
   const before = await session();
   check(
@@ -170,7 +174,7 @@ module.exports = async function (h) {
     "…as readable JSON linking to the media, with every section",
     saved.media.path === tone &&
       !saved.media.embedded &&
-      ["sound", "marks", "loop", "playback", "view"].every((id) => saved.sections[id]?.version >= 1),
+      ["sound", "marks", "loop", "playback", "view", "stage"].every((id) => saved.sections[id]?.version >= 1),
     JSON.stringify(saved.media),
   );
   check(
@@ -191,11 +195,12 @@ module.exports = async function (h) {
 
   // Another file starts afresh; the project brings it all back.
   await open(tone);
-  check("another file starts afresh", (await session()).marks.length === 0);
+  const fresh = await session();
+  check("another file starts afresh", fresh.marks.length === 0 && fresh.split === "", JSON.stringify(fresh));
   await open(linked);
   const back = await session();
   check(
-    "opening the project brings back marks, sound, loop, step, place and zoom",
+    "opening the project brings back marks, sound, loop, step, place, zoom and the video's size",
     JSON.stringify(back) === JSON.stringify(before),
     `${JSON.stringify(before)}\n     ${JSON.stringify(back)}`,
   );

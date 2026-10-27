@@ -26,6 +26,7 @@ import {
 } from "../core/media.js";
 import { formatDuration, formatMemory } from "../core/format.js";
 import { resetSoundSettings } from "../ui/controls.js";
+import { resetTimelineShare } from "./stage-split.js"; // Stage split (src/features/stage-split.js)
 import {
   clearMessage,
   dom,
@@ -195,11 +196,12 @@ export async function loadMediaFile(media, signal) {
   ]);
   player.transport.load(decoded.duration);
   // A new file starts fresh: no loop, marks or beats, and default speed,
-  // pitch, volume and EQ.
+  // pitch, volume and EQ, and the video's size.
   setLoopRegion(null);
   resetMarks(decoded.duration);
   resetBeats(media);
   resetSoundSettings();
+  resetTimelineShare(); // Stage split (src/features/stage-split.js)
   dom.fileName.textContent = media.name;
   dom.fileName.title = media.name;
   // Its length and kind, and an icon for audio or video.
