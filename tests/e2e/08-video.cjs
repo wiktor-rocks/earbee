@@ -282,6 +282,27 @@ module.exports = async function (h) {
       (await zoomBar()).level === "1.0×" &&
       (await pixel(edge.x, edge.y)).every((c) => c < 20),
   );
+  // Zoomed in while playing: each frame is cropped as it's drawn (a crop
+  // in fractions of a pixel once stopped the worker).
+  key("Space");
+  await sleep(500);
+  await wheelOver(at.x, at.y, 120, 5);
+  const playingFrom = Number(await js(`videoCanvas.dataset.frameTime`));
+  await sleep(800);
+  const playingTo = Number(await js(`videoCanvas.dataset.frameTime`));
+  const playingMessage = await js(`document.getElementById("message").textContent`);
+  const playingCentre = await pixel(box.left + box.width / 2, box.top + box.height / 2);
+  await ensurePaused();
+  check(
+    "zooming in while playing: the picture goes on, zoomed",
+    playingTo > playingFrom + 0.3 &&
+      !/stopped/.test(playingMessage) &&
+      playingCentre.some((c) => c > 60) &&
+      Number.parseFloat(await zoomNow()) > 2,
+    `frames ${playingFrom} → ${playingTo}, "${playingMessage}", centre ${playingCentre}, zoom ${await zoomNow()}`,
+  );
+  key("0", ["control"]);
+  await sleep(300);
   await wheelOver(at.x, at.y, 120, 30);
   check("it goes no further than 8×", Number.parseFloat(await zoomNow()) === 8, await zoomNow());
   await js(`videoPane.querySelector(".video-zoom-step").click()`); // −

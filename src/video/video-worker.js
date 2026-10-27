@@ -51,6 +51,7 @@ import {
   VideoSampleSink,
 } from "../../node_modules/mediabunny/dist/bundles/mediabunny.mjs";
 import { CONFIG } from "../config.js";
+import { clamp } from "../core/format.js";
 import { mediaSource } from "../core/media.js";
 import { createVideoProxy } from "./proxy.js";
 import { readyPointsFor } from "./ready-budget.js";
@@ -346,6 +347,19 @@ const cropIn = (crop, width, height) => ({
   height: crop.height * height,
 });
 
+// The same in whole pixels, inside the frame: Mediabunny's crop takes
+// nothing else (a fraction stops the worker).
+function wholePixels(crop, frame) {
+  const left = clamp(Math.floor(crop.left), 0, frame.displayWidth - 1);
+  const top = clamp(Math.floor(crop.top), 0, frame.displayHeight - 1);
+  return {
+    left,
+    top,
+    width: clamp(Math.round(crop.left + crop.width) - left, 1, frame.displayWidth - left),
+    height: clamp(Math.round(crop.top + crop.height) - top, 1, frame.displayHeight - top),
+  };
+}
+
 // Draws the frame's part in view into the canvas, letterboxed (honouring
 // rotation metadata).
 function draw(frame) {
@@ -356,7 +370,10 @@ function draw(frame) {
   context.fillRect(0, 0, canvas.width, canvas.height);
   if (view.zoom > 1) {
     const { crop } = placed(canvas, aspect);
-    frame.drawWithFit(context, { fit: "contain", crop: cropIn(crop, frame.displayWidth, frame.displayHeight) });
+    frame.drawWithFit(context, {
+      fit: "contain",
+      crop: wholePixels(cropIn(crop, frame.displayWidth, frame.displayHeight), frame),
+    });
   } else frame.drawWithFit(context, { fit: "contain" });
   shownAspect = aspect;
   keepStill(frame.timestamp, false, frame.displayWidth, frame.displayHeight, (stillContext) =>
