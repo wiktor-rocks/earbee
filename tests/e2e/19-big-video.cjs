@@ -113,6 +113,41 @@ module.exports = async function (h) {
   s1 = await split();
   check("…and back up", Math.abs(s1.timeline - s0.timeline - 80) < 4 && s1.share !== "", JSON.stringify(s1));
 
+  // While dragging, the picture stays on screen (drawn back at once,
+  // scaled; video-worker.js resizeSurface) and the waveform's drawing is
+  // stretched; once the drag stops, it's drawn again at its new height.
+  const waveLayers = `document.querySelector("#waveform > div").shadowRoot.querySelector(".canvases")`;
+  {
+    const { x, y } = await split();
+    h.wc.sendInputEvent({ type: "mouseDown", x, y, button: "left", clickCount: 1 });
+    for (let i = 1; i <= 3; i++) {
+      h.wc.sendInputEvent({ type: "mouseMove", x, y: y - 20 * i, button: "left" });
+      await sleep(30);
+    }
+    const mid = await js(`(() => {
+      const r = document.getElementById("videoPane").getBoundingClientRect();
+      return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2), stretched: ${waveLayers}.style.transform };
+    })()`);
+    const [blue, green, red] = (await h.wc.capturePage({ x: mid.x, y: mid.y, width: 1, height: 1 })).toBitmap();
+    h.wc.sendInputEvent({ type: "mouseUp", x, y: y - 60, button: "left", clickCount: 1 });
+    check("while dragging, the picture stays on screen", red + green + blue > 60, `rgb ${red} ${green} ${blue}`);
+    check(
+      "…and the waveform's drawing is stretched to the new height",
+      mid.stretched.startsWith("scaleY("),
+      mid.stretched,
+    );
+    await sleep(600);
+    const settled = await js(`(() => {
+      const layers = ${waveLayers};
+      return { stretched: layers.style.transform, drawn: parseFloat(layers.style.minHeight), height: document.querySelector("#waveform > div").shadowRoot.querySelector(".scroll").clientHeight };
+    })()`);
+    check(
+      "once the drag stops, the waveform is drawn at its new height, unstretched",
+      settled.stretched === "" && Math.abs(settled.drawn - settled.height) < 2,
+      JSON.stringify(settled),
+    );
+  }
+
   key("F");
   await sleep(500);
   let l = await layout();

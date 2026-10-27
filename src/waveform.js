@@ -565,16 +565,36 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   // A wider window raises the fit-to-width zoom; never stay zoomed out past it.
   // A taller or shorter one (or the stage giving the timeline more room)
   // redraws: WaveSurfer only notices width changes, and would keep the
-  // old height.
+  // old height. Redrawing takes a while on a long track, so it waits for
+  // the height to settle (a drag of the stage split handle changes it every
+  // frame); meanwhile the drawing there is stretched to the new height
+  // (only the drawn layers: the cursor and the loop follow it already).
   function bindResizeClamp() {
     let height = container.clientHeight;
     /** @type {ReturnType<typeof setTimeout> | undefined} */
     let heightTimer;
+    const drawnLayers = () =>
+      /** @type {HTMLElement[]} */ ([...(waveSurfer?.getWrapper().querySelectorAll(".canvases, .progress") ?? [])]);
+    // The height it was drawn at is the canvases' (WaveSurfer sets it).
+    const stretch = (to) => {
+      const layers = drawnLayers();
+      const drawn = Number.parseFloat(layers[0]?.style.minHeight ?? "");
+      for (const layer of layers) {
+        layer.style.transformOrigin = "0 0";
+        layer.style.transform = to && drawn > 0 ? `scaleY(${to / drawn})` : "";
+      }
+    };
     new ResizeObserver(() => {
       if (container.clientHeight !== height) {
         height = container.clientHeight;
+        if (duration) stretch(height);
         clearTimeout(heightTimer);
-        heightTimer = setTimeout(() => duration && waveSurfer.setOptions({ height: "auto" }), 100);
+        heightTimer = setTimeout(() => {
+          if (!duration) return;
+          // The stretch comes off once the new drawing is all there.
+          waveSurfer.once("redrawcomplete", () => stretch(null));
+          waveSurfer.setOptions({ height: "auto" });
+        }, 100);
       }
       emitView();
       if (!duration || zoomLevel === null || zoomLevel >= fitZoom()) return;

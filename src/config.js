@@ -91,6 +91,10 @@ export const CONFIG = {
     // If decoding falls this far behind playback (heavy file at high
     // speed), restart decoding at the current position instead of lagging.
     maxLagSeconds: 0.5,
+    // A paused picture whose canvas was resized is shown scaled at once,
+    // then drawn again, sharp, this long after the last resize (the stage
+    // split handle resizes it every frame while dragged).
+    resizeRedrawMs: 150,
     // Ready points (video/view.js): the loop start, the start point and the
     // nearest marks each get a decoder waiting there, so a jump there is
     // sharp at once. At most `max` of them; one gets ready while the sharp
