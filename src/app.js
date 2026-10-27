@@ -141,7 +141,7 @@
  *
  * COMMON CHANGES
  *   Speed preset or EQ band   Edit CONFIG.speed.presets / CONFIG.eq.bands.
- *                             The buttons and faders are generated.
+ *                             The buttons and knobs are generated.
  *   Step sizes (← / →)        Edit CONFIG.step.sizes (↑ / ↓ cycle through them).
  *   Slider range or default   Edit CONFIG. Sliders and their knobs get
  *                             min/max/step from it.

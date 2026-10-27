@@ -127,6 +127,15 @@ module.exports = async function (h) {
   await dragKnob(-50, ["shift"]);
   const fine = k0 - (await speedNow());
   check("Shift turns it 5× finer", Math.abs(fine - 0.04) < 0.015, `${k0}→${await speedNow()}`);
+  // Settings › General › Knob sensitivity: at 200 % the same drag turns it twice as far.
+  await js(`earbee.prefs.set("general", "knobSensitivity", 200)`);
+  await sleep(100);
+  k0 = await speedNow();
+  await dragKnob(50);
+  const doubled = (await speedNow()) - k0;
+  check("Knob sensitivity 200 %: twice as far", Math.abs(doubled - 0.37) < 0.02, `${k0}→${await speedNow()}`);
+  await js(`earbee.prefs.set("general", "knobSensitivity", 100)`);
+  await sleep(100);
   k0 = await speedNow();
   wc.sendInputEvent({ type: "mouseWheel", x: sl.x, y: sl.y, deltaX: 0, deltaY: 100, modifiers: ["shift"] });
   await sleep(100);
