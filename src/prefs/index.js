@@ -212,8 +212,10 @@ const downloadsSection = defineSection({
 // Settings › Advanced: choices most people never need. `sharpJumps` is how
 // much memory the video's ready points may use (decoders waiting at the
 // loop start, the start point and the nearest marks, so a jump there is
-// sharp at once); the levels' numbers are CONFIG.video.readyPoints.levels,
-// and app.js hands the choice to the video view's setReadyLevel().
+// sharp at once); app.js hands the choice to the video view's
+// setReadyLevel(). The numbers in its options are those of
+// CONFIG.video.readyPoints.levels (which this layer can't import): change
+// them together; tests/unit/ready-budget.test.mjs checks they agree.
 const advancedSection = defineSection({
   id: "advanced",
   title: "Advanced",
@@ -223,13 +225,13 @@ const advancedSection = defineSection({
       key: "sharpJumps",
       type: "choice",
       label: "Memory for sharp video jumps",
-      help: "Decoders wait at the loop start, the start point and the nearest marks, so a jump there is sharp at once. Each takes about 150 MB in HD, 400 MB in 4K, and more for bigger videos.",
+      help: "Right after a jump in a video (a loop going round, Space, a jump to a mark), the picture can be blurry for a moment while the full-quality one is decoded. This keeps memory set aside to have it ready at the loop start, the start point and the nearest marks, so those jumps are sharp at once. More memory covers more of them; 4K videos need the most.",
       default: "normal",
       options: [
-        { value: "off", label: "Off", detail: "a jump shows a blurry picture for a moment" },
-        { value: "low", label: "Low", detail: "the least memory" },
-        { value: "normal", label: "Normal", detail: "4K too, when memory allows" },
-        { value: "high", label: "High", detail: "the most memory: more for 4K" },
+        { value: "off", label: "Off", detail: "no decoders wait" },
+        { value: "low", label: "Low", detail: "up to 320 MB, 5 % of free" },
+        { value: "normal", label: "Normal", detail: "up to 640 MB, 15 % of free" },
+        { value: "high", label: "High", detail: "up to 1.28 GB, 30 % of free" },
       ],
     },
   ],

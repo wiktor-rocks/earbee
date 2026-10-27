@@ -93,4 +93,15 @@ describe("ready points' levels", () => {
     );
     assert.ok(field.default in levels);
   });
+
+  test("the setting's options give CONFIG's numbers", async () => {
+    const { getSection } = await import("../../src/prefs/index.js");
+    const field = getSection("advanced").fields.find((candidate) => candidate.key === "sharpJumps");
+    const bytes = (value) => (value >= 1e9 ? `${value / 1e9} GB` : `${value / 1e6} MB`);
+    for (const option of field.options) {
+      const { maxBytes, maxMemoryShare } = levels[option.value];
+      if (maxBytes === 0) continue; // Off
+      assert.ok(option.detail.includes(`up to ${bytes(maxBytes)}, ${maxMemoryShare * 100} %`), option.detail);
+    }
+  });
 });
