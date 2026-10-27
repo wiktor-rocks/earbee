@@ -195,6 +195,10 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
         return showBuilt();
       case "problem":
         return onProblem(data.message);
+      case "zoom-failed":
+        // The worker draws the whole picture again; so do the controls.
+        setZoom(WHOLE);
+        return onProblem("Zooming into the picture failed, so it shows all of it again.");
       case "ready-points":
         readyText = data.times.length ? data.times.map((time) => time.toFixed(3)).join(" ") : null;
         allowedText = showing ? String(data.allowed) : null;

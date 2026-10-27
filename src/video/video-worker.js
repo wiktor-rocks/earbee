@@ -38,6 +38,7 @@
 //   page → { type: "view", view }  the zoom: { zoom, x, y } (zoom.js)
 //   ←      { type: "ready" }  once Mediabunny is loaded
 //   ←      { type: "shown", time, proxy, aspect }  each frame drawn (aspect: its width / height)
+//   ←      { type: "zoom-failed" }  drawing zoomed in failed: back to the whole picture
 //   ←      { type: "built", built, overview }  the proxy's progress (text or null)
 //   ←      { type: "problem", message }  once per file
 //   ←      { type: "ready-points", times, allowed }  the points with a decoder
@@ -51,11 +52,10 @@ import {
   VideoSampleSink,
 } from "../../node_modules/mediabunny/dist/bundles/mediabunny.mjs";
 import { CONFIG } from "../config.js";
-import { clamp } from "../core/format.js";
 import { mediaSource } from "../core/media.js";
 import { createVideoProxy } from "./proxy.js";
 import { readyPointsFor } from "./ready-budget.js";
-import { WHOLE, zoomedView } from "./zoom.js";
+import { WHOLE, cropPixels, safeView, wholeCrop, zoomedView } from "./zoom.js";
 
 const scope = /** @type {any} */ (self);
 const post = (message) => scope.postMessage(message);
@@ -90,6 +90,7 @@ let lastSkipCheckAt = 0;
 let shownTime = null; // timestamp of the frame on screen
 let shownIsProxy = false;
 let shownAspect = 0; // the frame on screen's width / height
+/** @type {import("./zoom.js").ZoomView} */
 let view = WHOLE; // the zoom (zoom.js): the part of the frame drawn
 // A copy of the whole frame on screen, so a zoom, a move or a resize
 // redraws it at once without decoding it again: kept while paused, and
@@ -323,14 +324,43 @@ function resizeSurface(id, width, height) {
   }, CONFIG.video.resizeRedrawMs);
 }
 
-// A new zoom: drawn at once from the copy of the frame; without one,
-// paused, the frame is shown again (decoded); playing, the next frame
-// draws it.
+// A new zoom (checked: it comes from outside): drawn at once from the
+// copy of the frame; without one, paused, the frame is shown again
+// (decoded); playing, the next frame draws it.
 function setView(next) {
-  view = next;
+  view = safeView(next, CONFIG.video.zoom.max);
   if (!surface || !current) return;
   if (hasStill()) drawStill();
   else if (mode !== "playing" && shownTime !== null) showFrameAt(shownTime);
+}
+
+/* ---------- If zooming in fails ----------
+ * The zoom must never cost the picture: an error escaping the drawing
+ * stops this worker, and the picture with it, for the session. So every
+ * part that only exists for the zoom runs through zoomSafely: if it
+ * throws, the zoom goes (the page hears "zoom-failed" and says so), the
+ * copy of the frame goes, and the frame is drawn as it was before there
+ * was a zoom.
+ */
+
+let zoomFailed = false; // reported once a session
+
+/**
+ * @param {() => void} zoomed The zoom's own drawing.
+ * @param {() => void} [plain] The drawing without it, if it fails.
+ */
+function zoomSafely(zoomed, plain) {
+  try {
+    zoomed();
+  } catch (error) {
+    if (!zoomFailed) console.warn("Video zoom failed; showing all of the picture:", error);
+    zoomFailed = true;
+    view = WHOLE;
+    still = null;
+    stillTime = null;
+    post({ type: "zoom-failed" });
+    plain?.();
+  }
 }
 
 /* ---------- Drawing ---------- */
@@ -339,46 +369,33 @@ function setView(next) {
 // whole frame letterboxed, unless zoomed in; zoom.js).
 const placed = (canvas, aspect) => zoomedView({ aspect, width: canvas.width, height: canvas.height }, view);
 
-// A crop rectangle in a frame `width` × `height` pixels, from fractions.
-const cropIn = (crop, width, height) => ({
-  left: crop.left * width,
-  top: crop.top * height,
-  width: crop.width * width,
-  height: crop.height * height,
-});
-
-// The same in whole pixels, inside the frame: Mediabunny's crop takes
-// nothing else (a fraction stops the worker).
-function wholePixels(crop, frame) {
-  const left = clamp(Math.floor(crop.left), 0, frame.displayWidth - 1);
-  const top = clamp(Math.floor(crop.top), 0, frame.displayHeight - 1);
-  return {
-    left,
-    top,
-    width: clamp(Math.round(crop.left + crop.width) - left, 1, frame.displayWidth - left),
-    height: clamp(Math.round(crop.top + crop.height) - top, 1, frame.displayHeight - top),
-  };
-}
-
 // Draws the frame's part in view into the canvas, letterboxed (honouring
-// rotation metadata).
-function draw(frame) {
+// rotation metadata). At 1×, as before there was a zoom. `keep`: whether
+// it may be copied (not the frames on the way while dragging; see
+// keepStill).
+function draw(frame, keep = true) {
   if (!surface) return;
   const { canvas, context } = surface;
   const aspect = frame.displayWidth / frame.displayHeight;
-  context.fillStyle = "#000";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  if (view.zoom > 1) {
-    const { crop } = placed(canvas, aspect);
-    frame.drawWithFit(context, {
-      fit: "contain",
-      crop: wholePixels(cropIn(crop, frame.displayWidth, frame.displayHeight), frame),
-    });
-  } else frame.drawWithFit(context, { fit: "contain" });
+  const plain = () => {
+    context.fillStyle = "#000";
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    frame.drawWithFit(context, { fit: "contain" });
+  };
+  if (view.zoom > 1)
+    zoomSafely(() => {
+      const { crop } = placed(canvas, aspect);
+      context.fillStyle = "#000";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      frame.drawWithFit(context, { fit: "contain", crop: wholeCrop(crop, frame.displayWidth, frame.displayHeight) });
+    }, plain);
+  else plain();
   shownAspect = aspect;
-  keepStill(frame.timestamp, false, frame.displayWidth, frame.displayHeight, (stillContext) =>
-    frame.drawWithFit(stillContext, { fit: "fill" }),
-  );
+  if (keep)
+    keepStill(frame.timestamp, false, frame.displayWidth, frame.displayHeight, (stillContext) =>
+      frame.drawWithFit(stillContext, { fit: "fill" }),
+    );
+  else stillTime = null;
   markShown(frame.timestamp, false);
 }
 
@@ -386,23 +403,35 @@ function draw(frame) {
 function drawProxy(frame) {
   if (!surface) return;
   const { canvas, context } = surface;
+  const { width, height } = canvas;
   const aspect = frame.displayWidth / frame.displayHeight;
-  const { crop, rect } = placed(canvas, aspect);
-  const source = cropIn(crop, frame.displayWidth, frame.displayHeight);
-
-  context.fillStyle = "#000";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(
-    frame,
-    source.left,
-    source.top,
-    source.width,
-    source.height,
-    rect.x,
-    rect.y,
-    rect.width,
-    rect.height,
-  );
+  const plain = () => {
+    const scale = Math.min(width / frame.displayWidth, height / frame.displayHeight);
+    const drawWidth = frame.displayWidth * scale;
+    const drawHeight = frame.displayHeight * scale;
+    context.fillStyle = "#000";
+    context.fillRect(0, 0, width, height);
+    context.drawImage(frame, (width - drawWidth) / 2, (height - drawHeight) / 2, drawWidth, drawHeight);
+  };
+  if (view.zoom > 1)
+    zoomSafely(() => {
+      const { crop, rect } = placed(canvas, aspect);
+      const source = cropPixels(crop, frame.displayWidth, frame.displayHeight);
+      context.fillStyle = "#000";
+      context.fillRect(0, 0, width, height);
+      context.drawImage(
+        frame,
+        source.left,
+        source.top,
+        source.width,
+        source.height,
+        rect.x,
+        rect.y,
+        rect.width,
+        rect.height,
+      );
+    }, plain);
+  else plain();
   shownAspect = aspect;
   keepStill(frame.timestamp / 1e6, true, frame.displayWidth, frame.displayHeight, (stillContext, width, height) =>
     stillContext.drawImage(frame, 0, 0, width, height),
@@ -414,7 +443,9 @@ function drawProxy(frame) {
 
 const hasStill = () => still !== null && stillTime === shownTime && shownTime !== null;
 
-// Copies the frame just drawn, `frameWidth` × `frameHeight` (display
+// Copies the frame just drawn, while paused (only the frame the decoder
+// was sent for: dragging draws many on the way, and copying each would
+// slow the drag) or playing zoomed in, `frameWidth` × `frameHeight` (display
 // pixels), at its own size or smaller, within
 // CONFIG.video.zoom.stillMaxPixels (a 4K frame fits); `drawWhole` draws
 // all of it into a context of the size given.
@@ -423,32 +454,44 @@ function keepStill(time, isProxy, frameWidth, frameHeight, drawWhole) {
     stillTime = null; // not kept: playing frames replace each other anyway
     return;
   }
-  const shrink = Math.min(1, Math.sqrt(CONFIG.video.zoom.stillMaxPixels / (frameWidth * frameHeight)));
-  const width = Math.max(1, Math.round(frameWidth * shrink));
-  const height = Math.max(1, Math.round(frameHeight * shrink));
-  if (!still || still.width !== width || still.height !== height) still = new OffscreenCanvas(width, height);
-  drawWhole(still.getContext("2d"), width, height);
-  stillTime = time;
-  stillIsProxy = isProxy;
+  zoomSafely(() => {
+    stillTime = null; // until it's copied
+    const shrink = Math.min(1, Math.sqrt(CONFIG.video.zoom.stillMaxPixels / (frameWidth * frameHeight)));
+    const width = Math.max(1, Math.round(frameWidth * shrink));
+    const height = Math.max(1, Math.round(frameHeight * shrink));
+    if (!still || still.width !== width || still.height !== height) still = new OffscreenCanvas(width, height);
+    drawWhole(still.getContext("2d"), width, height);
+    stillTime = time;
+    stillIsProxy = isProxy;
+  });
 }
 
-// Draws the copy's part in view into the canvas.
+// Draws the copy's part in view into the canvas. If that fails, the
+// frame on screen is shown again (decoded) while paused; playing, the
+// next frame draws it.
 function drawStill() {
-  const { canvas, context } = surface;
-  const { crop, rect } = placed(canvas, shownAspect);
-  const source = cropIn(crop, still.width, still.height);
-  context.fillStyle = "#000";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  context.drawImage(
-    still,
-    source.left,
-    source.top,
-    source.width,
-    source.height,
-    rect.x,
-    rect.y,
-    rect.width,
-    rect.height,
+  zoomSafely(
+    () => {
+      const { canvas, context } = surface;
+      const { crop, rect } = placed(canvas, shownAspect);
+      const source = cropPixels(crop, still.width, still.height);
+      context.fillStyle = "#000";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(
+        still,
+        source.left,
+        source.top,
+        source.width,
+        source.height,
+        rect.x,
+        rect.y,
+        rect.width,
+        rect.height,
+      );
+    },
+    () => {
+      if (mode !== "playing" && shownTime !== null) showFrameAt(shownTime);
+    },
   );
 }
 
@@ -665,7 +708,7 @@ async function run() {
           // (while dragging) only if it is closer than what's shown.
           if (frame && mode === "frame") {
             const closer = Math.abs(target - frame.timestamp) < Math.abs(target - (shownTime ?? Infinity));
-            if (reached || closer) draw(frame);
+            if (reached || closer) draw(frame, reached); // copied only once there
           }
           if (reached) break;
         } else if (mode === "playing") {
