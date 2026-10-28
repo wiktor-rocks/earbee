@@ -21,13 +21,13 @@
  * ============================================================ */
 
 :root {
-  --bg: #0e1014;
-  --surface: #161920;
-  --surface-2: #1d212a;
-  --surface-hover: #262b36;
-  --border: #2a2f3a;
-  --text: #e6e8ee;
-  --muted: #8b93a7;
+  --bg: #0f0c0a;
+  --surface: #17120e;
+  --surface-2: #261f19;
+  --surface-hover: #30281f;
+  --border: #3b3129;
+  --text: #f1e9de;
+  --muted: #aa9b8a;
   --accent: #f5b301;
   --accent-hover: #ffc52e;
   --accent-ink: #1a1400;
@@ -42,10 +42,10 @@
 
   /* The waveform and minimap colours (the first five are read by
      src/waveform.js for its drawing; the rest are used here) */
-  --wave: #3b4252;
+  --wave: #4b3f34;
   --wave-progress: var(--accent);
-  --minimap-wave: #343a48;
-  --minimap-progress: #8a6a12;
+  --minimap-wave: #3a3129;
+  --minimap-progress: #8f6d14;
   /* The minimap's view box: the text colour, which contrasts with the
      background on every theme (the accent didn't, over the amber played part) */
   --minimap-overlay: color-mix(in srgb, var(--text) 16%, transparent);
@@ -78,12 +78,15 @@
   --num: var(--sans);
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
-  /* Shape and depth: cards (the timeline, transport, sidebar, dock) are
-     set apart by their surface and a soft shadow rather than strong
-     borders; a hairline keeps their edge on light themes. */
+  /* Shape and depth. The player's parts (the top bar, the stage, the
+     transport, the side panel) aren't cards: they meet edge to edge, flat,
+     set apart by hairlines, the waveform and minimap sunk into a darker
+     well (--inset). Dialogs and popovers still float, rounded, with a
+     shadow. Derived from the theme's colours, so every theme gets them. */
   --radius: 12px;
   --radius-sm: 8px;
-  --hairline: color-mix(in srgb, var(--border) 60%, transparent);
+  --hairline: color-mix(in srgb, var(--border) 62%, transparent);
+  --inset: color-mix(in srgb, var(--bg) 93%, #000);
   --shadow: 0 1px 2px rgb(0 0 0 / 0.18), 0 8px 24px rgb(0 0 0 / 0.14);
   --shadow-lifted: 0 2px 6px rgb(0 0 0 / 0.25), 0 18px 48px rgb(0 0 0 / 0.3);
   --sidebar-width: 300px;
@@ -1548,6 +1551,8 @@ body.dragging .welcome-hint {
    ticked, like the colour-theme menu's choice. */
 .beat-menu {
   position-anchor: --beat-menu;
+  position-area: left span-bottom;
+  margin: 0 10px 0 0;
   min-width: 220px;
 }
 
@@ -1720,11 +1725,15 @@ body.dragging .welcome-hint {
 
 .app {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 10px;
+  grid-template-rows: auto minmax(0, 1fr);
   height: 100vh;
-  padding: 10px 14px 12px;
   overflow: hidden;
+  /* A soft light from the top, over the window's colour. */
+  background: radial-gradient(
+    ellipse 110% 70% at 35% 0%,
+    color-mix(in srgb, var(--bg) 93%, var(--text)),
+    var(--bg) 65%
+  );
 }
 
 /* A file over the player: the page dims and a card says what a drop
@@ -1774,34 +1783,27 @@ body.dragging .drop-card {
   height: 22px;
 }
 
-/* A card: the timeline, the transport, the sidebar, the dock, the video
-   pane and the minimap (some set their own radius or background). */
-.timeline,
+/* No cards: the top bar, the transport and the side panel are flat bars
+   that meet edge to edge, hairlines between them. */
+.topbar,
 .transport,
-.sidebar,
-.dock,
-.video-pane,
-.waveform-minimap {
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius);
+.panel {
   background: var(--surface);
-  box-shadow: var(--shadow);
 }
 
-/* The stage beside the marks sidebar, and the transport under both, the
-   whole width, so its chips have room. */
+/* The stage, and the transport under it, as wide as the waveform; beside
+   both, the side panel (the sound, then the marks), the whole height. */
 .workspace {
   display: grid;
   grid-template:
-    "stage sidebar" minmax(0, 1fr)
-    "transport transport" auto
+    "stage panel" minmax(0, 1fr)
+    "transport panel" auto
     / minmax(0, 1fr) var(--sidebar-width);
-  gap: 10px 12px;
   min-height: 0;
 }
 
-/* The marks sidebar put away (its button in the top bar): the stage
-   takes the whole width too. */
+/* The side panel put away (its button in the top bar): the stage and the
+   transport take the whole width. */
 .workspace.sidebar-hidden {
   grid-template:
     "stage" minmax(0, 1fr)
@@ -1818,8 +1820,13 @@ body.dragging .drop-card {
   grid-area: transport;
 }
 
-.sidebar {
-  grid-area: sidebar;
+.panel {
+  grid-area: panel;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+  border-left: 1px solid var(--hairline);
 }
 
 /* ---------- Top bar ---------- */
@@ -1829,7 +1836,8 @@ body.dragging .drop-card {
   align-items: center;
   gap: 14px;
   min-width: 0;
-  height: 40px;
+  height: 42px;
+  padding: 0 14px;
 }
 
 /* Its sections (the name, the File menu, the open file, the tools)
@@ -1925,20 +1933,20 @@ body.dragging .drop-card {
 .stage {
   position: relative;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) 44px;
-  gap: 8px;
+  grid-template-rows: minmax(0, 1fr) 32px;
   min-height: 0;
 }
 
 /* Video files: the picture on top, then a shorter timeline (its lanes
-   take 48 px), then the minimap. The timeline's part is 40 % and at least
-   170 px, until the handle between them is dragged
-   (features/stage-split.js): then #stage has its own --timeline-share
-   and a lower --timeline-min (CONFIG.stage.minTimeline). */
+   take 48 px), then the minimap, just above the transport. The
+   timeline's part is 23 % and at least 140 px (CONFIG.stage.timelineShare),
+   so most of the height goes to the picture, until the handle between
+   them is dragged (features/stage-split.js): then #stage has its own
+   --timeline-share and a lower --timeline-min (CONFIG.stage.minTimeline). */
 .stage.has-video {
   grid-template-rows:
-    minmax(0, 1fr) minmax(var(--timeline-min, 170px), calc(var(--timeline-share, 0.4) * 100%))
-    44px;
+    minmax(0, 1fr) minmax(var(--timeline-min, 140px), calc(var(--timeline-share, 0.23) * 100%))
+    32px;
 }
 
 /* A short window's smaller minimap (as for songs, at the end of the
@@ -1946,21 +1954,21 @@ body.dragging .drop-card {
 @media (max-height: 719px) {
   .stage.has-video {
     grid-template-rows:
-      minmax(0, 1fr) minmax(var(--timeline-min, 170px), calc(var(--timeline-share, 0.4) * 100%))
-      34px;
+      minmax(0, 1fr) minmax(var(--timeline-min, 140px), calc(var(--timeline-share, 0.23) * 100%))
+      26px;
   }
 }
 
 /* ---------- Stage split handle (features/stage-split.js) ----------
-   In the gap between the picture and the timeline, only while a video
-   is on the stage (not in big video, nor with the video in its own
-   window). Placed in the timeline's grid area, so it takes no room of
-   its own, and moved 8 px up, into the gap. */
+   On the edge between the picture and the timeline under it, only while a
+   video is on the stage (not in big video, nor with the video in its own
+   window). Placed in the timeline's grid area, so it takes no room of its
+   own, and moved 4 px up, onto the edge. */
 
 .stage-split {
   display: none;
   position: absolute;
-  top: -8px;
+  top: -4px;
   right: 0;
   left: 0;
   grid-row: 2;
@@ -2008,6 +2016,12 @@ body.stage-split-dragging * {
   min-height: 0;
   overflow: hidden;
   background: #000;
+}
+
+/* The minimap and the waveform sit in a well, darker than the bars. */
+.waveform-minimap {
+  border-top: 1px solid var(--hairline);
+  background: var(--inset);
 }
 
 .video-pane canvas {
@@ -2081,9 +2095,6 @@ body.stage-split-dragging * {
   display: grid;
   grid-template-rows: 22px 26px minmax(0, 1fr);
   min-height: 0;
-  /* The lanes and the waveform reach the border, with no gap; small
-     corners, so little at their edges hides behind them. */
-  border-radius: 4px;
   overflow: hidden;
   isolation: isolate;
 }
@@ -2092,6 +2103,8 @@ body.stage-split-dragging * {
   position: relative;
   display: grid;
   min-height: 0;
+  background: var(--inset);
+  box-shadow: inset 0 6px 10px -6px rgb(0 0 0 / 0.35);
 }
 
 .timeline-track {
@@ -2105,8 +2118,8 @@ body.stage-split-dragging * {
 .marks-lane {
   position: relative;
   overflow: hidden;
-  border-bottom: 1px solid var(--border);
-  background: var(--surface-2);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface);
   touch-action: none;
   user-select: none;
 }
@@ -2316,11 +2329,10 @@ body.stage-split-dragging * {
 /* The minimap fills its card, inside a little padding (the stage's grid
    row sets the card's height; the minimap is drawn at height "auto"). */
 .waveform-minimap {
-  --minimap-pad: 4px;
+  --minimap-pad: 3px;
   position: relative;
   box-sizing: border-box;
-  padding: var(--minimap-pad);
-  border-radius: var(--radius-sm);
+  padding: var(--minimap-pad) 0;
   cursor: grab;
   touch-action: none;
 }
@@ -2333,7 +2345,7 @@ body.stage-split-dragging * {
    dragging (they don't take it). Over the drawn minimap, inside the padding. */
 .minimap-marks {
   position: absolute;
-  inset: var(--minimap-pad);
+  inset: var(--minimap-pad) 0;
   z-index: 3;
   pointer-events: none;
 }
@@ -2385,109 +2397,111 @@ body.stage-split-dragging * {
 .waveform-minimap [part~="minimap-overlay"] {
   z-index: 6 !important;
   box-sizing: border-box;
-  border: 2px solid var(--minimap-overlay-edge);
-  border-radius: 4px;
+  border: 1.5px solid var(--minimap-overlay-edge);
+  border-radius: 3px;
 }
 
 /* ---------- Transport bar ---------- */
 
-/* The buttons, the step size, the time (large), any message, then the
-   chips: where Space plays from, where playback stopped, the loop. Always
-   one row: wrapping would
-   make the bar taller and take that height from the waveform. When room
-   runs out the message gives way first, then the chips (cut off with an
-   ellipsis; their tooltips have them in full). */
+/* Three parts: the time and any message on the left; the step arrows,
+   Play and Stop in the middle (centred, the sides being equal), as rings;
+   the step size on the right. Always one row: wrapping would make the bar
+   taller and take that height from the waveform. When room runs out the
+   message gives way. */
 .transport {
-  display: flex;
-  flex-wrap: nowrap;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  gap: 6px 16px;
+  column-gap: 16px;
   min-width: 0;
-  padding: 7px 10px;
+  height: 64px;
+  padding: 0 20px;
+  border-top: 1px solid var(--hairline);
 }
 
-.transport-buttons {
+.transport-time {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 12px;
+  min-width: 0;
 }
 
-.transport-buttons .icon-button {
+.transport-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.transport-step {
+  justify-self: end;
+}
+
+/* The step arrows and Stop: hollow rings. (button. to outweigh
+   .icon-button.) */
+button.ring-button {
+  width: 31px;
+  height: 31px;
+  border: 1.5px solid var(--border);
+  border-radius: 50%;
+  background: transparent;
   color: var(--text);
 }
 
-/* Just the icon (the label is for screen readers), round. (button.
-   to outweigh button.primary's minimum width.) */
+button.ring-button:hover {
+  border-color: var(--muted);
+  background: var(--surface-hover);
+}
+
+button.ring-button .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* Play is green and Stop red on every theme (fixed, not theme colours).
+   Play: a large green ring, filled while playing. (button. to outweigh
+   button.primary.) */
 button.play-button {
   width: 40px;
   min-width: 0;
   height: 40px;
   padding: 0;
+  border: 2px solid #2fbf71;
   border-radius: 50%;
+  background: transparent;
+  color: #5fd38d;
 }
 
-/* Play is green and Stop red on every theme (fixed, not theme colours). */
-button.play-button,
 button.play-button:hover {
+  border-color: #45d486;
+  background: rgb(47 191 113 / 0.14);
+  color: #7be6aa;
+}
+
+button.play-button.playing,
+button.play-button.playing:hover {
   border-color: #2fbf71;
   background: #2fbf71;
   color: #06210f;
 }
 
-button.play-button:hover {
+button.play-button.playing:hover {
   border-color: #45d486;
   background: #45d486;
 }
 
-.transport-buttons #stop {
+button.ring-button#stop {
+  border-color: rgb(229 72 77 / 0.6);
   color: #e5484d;
 }
 
-.transport-buttons #stop:hover {
+button.ring-button#stop:hover {
+  border-color: #ff6369;
   color: #ff6369;
 }
 
 .play-button .icon {
-  width: 18px;
-  height: 18px;
-}
-
-/* The step arrows with the step size between them, as one control. Kept
-   snug (the size only as wide as its text) to leave the chips room. */
-.step-group {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 2px;
-  border-radius: 999px;
-  background: var(--surface-2);
-}
-
-.step-group .icon-button {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  color: var(--text);
-}
-
-/* The step size reads as plain text, and a click picks the next one (a
-   soft pill on hover says it's a button). (button. to outweigh button.) */
-button.step-size {
-  height: 28px;
-  padding: 0 5px;
-  border-color: transparent;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted);
-  font: 700 12px var(--num);
-  font-variant-numeric: tabular-nums;
-  text-align: center;
-  white-space: nowrap;
-}
-
-button.step-size:hover {
-  background: var(--surface-hover);
-  color: var(--text);
+  width: 16px;
+  height: 16px;
 }
 
 .play-button .icon-pause,
@@ -2499,42 +2513,71 @@ button.step-size:hover {
   display: block;
 }
 
+/* The step size: a dashed link (a click picks the next one). (button. to
+   outweigh button.) */
+button.step-size {
+  height: auto;
+  padding: 2px 0;
+  border: 0;
+  border-bottom: 1px dashed var(--border);
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  font: 700 12px var(--num);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+button.step-size:hover {
+  border-bottom-color: var(--muted);
+  background: transparent;
+  color: var(--text);
+}
+
+/* The time: large and light, the milliseconds lighter and dimmer, the
+   duration small. */
 .track-time {
+  display: flex;
+  align-items: baseline;
   font-size: 22px;
-  font-weight: 800;
+  font-weight: 400;
   letter-spacing: -0.01em;
   white-space: nowrap;
 }
 
-.time-total {
+.time-fraction {
   color: var(--muted);
-  font-size: 14px;
+  font-size: 0.7em;
+  font-weight: 300;
+}
+
+.time-total {
+  margin-left: 8px;
+  color: color-mix(in srgb, var(--muted) 75%, transparent);
+  font-size: 12px;
   font-weight: 600;
 }
 
-.transport-chips {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-width: 0;
-  margin-left: auto;
-}
-
-/* Small rounded readouts; the start and stop points' are buttons. They shrink,
-   cut off, rather than wrap the transport (see .transport). */
+/* Small readouts, flat, in the side panel's Points and Loop sections; the
+   start and stop points' are buttons. Cut off with an ellipsis if the
+   panel is narrow (their tooltips have them in full). */
 .chip-button {
   display: block; /* not a button's inline-flex: an ellipsis needs a block */
   min-width: 0;
   overflow: hidden;
-  padding: 4px 10px;
-  border: 1px solid var(--hairline);
-  border-radius: 999px;
-  background: var(--surface-2);
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
   color: var(--muted);
-  font: 700 12px/1.3 var(--num);
+  font: 800 12.5px/1.3 var(--num);
   font-variant-numeric: tabular-nums;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+button.chip-button:hover {
+  background: var(--surface-hover);
 }
 
 /* Where Space plays from: green, like its ▶ on the ruler. */
@@ -2547,30 +2590,32 @@ button.step-size:hover {
   color: var(--stop);
 }
 
+/* The loop: flat like the other chips, in its colour. */
 .loop-info {
-  border-color: color-mix(in srgb, var(--loop) 35%, transparent);
   color: var(--loop);
 }
 
 .loop-info.disabled {
-  border-color: var(--hairline);
   color: var(--muted);
 }
 
-/* ---------- Marks sidebar ---------- */
+/* ---------- Marks sidebar ----------
+   In the side panel, under the sound: it takes the rest of the height. */
 
 .sidebar {
   display: flex;
+  flex: 1;
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  border-top: 1px solid var(--hairline);
 }
 
 .sidebar-head {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px 12px 10px 14px;
+  padding: 10px 12px 10px 14px;
   border-bottom: 1px solid var(--hairline);
 }
 
@@ -2609,17 +2654,24 @@ button.step-size:hover {
   opacity: 0.5;
 }
 
-/* Fills the sidebar and scrolls; the page never grows with it. */
+/* Fills the sidebar and scrolls; the page never grows with it. A little
+   sunk, its rows edge to edge with hairlines between them. */
 .marks-list {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 2px;
   min-height: 0;
   margin: 0;
-  padding: 6px;
+  padding: 0;
   overflow-y: auto;
   list-style: none;
+  background: color-mix(in srgb, var(--inset) 45%, transparent);
+}
+
+/* No marks yet: the list takes no colour (the message beside it says how
+   to make one). */
+.marks-list:empty {
+  background: none;
 }
 
 /* A mark: its colour, its name (editable) and × on the first line, its
@@ -2632,8 +2684,8 @@ button.step-size:hover {
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   column-gap: 8px;
-  padding: 5px 6px 5px 8px;
-  border-radius: var(--radius-sm);
+  padding: 6px 8px 6px 14px;
+  border-bottom: 1px solid var(--hairline);
 }
 
 .mark-row:hover {
@@ -2720,35 +2772,95 @@ button.mark-remove {
 }
 
 /* ---------- Sound dock: speed, pitch, volume, EQ ----------
-   One row: each group's knobs side by side, a hairline between groups.
-   It wraps if a window is too narrow for it. */
+   At the top of the side panel: a section per group, one under the
+   other, a hairline between them. */
 
 .dock {
+  --knob-size: 40px;
+
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  row-gap: 10px;
-  padding: 10px 0;
+  flex: none;
+  flex-direction: column;
 }
 
 .dock-group {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 12px;
+  gap: 10px 12px;
   min-width: 0;
-  padding: 0 14px;
+  padding: 12px 14px;
 }
 
 .dock-group + .dock-group {
-  border-left: 1px solid var(--hairline);
+  border-top: 1px solid var(--hairline);
 }
 
-/* A group's name over its total or buttons (Pitch, EQ), before its
-   knobs. */
+/* Speed: its knob on a line of its own, the presets under it. */
+.speed-group .knob-cell {
+  flex: 1 1 100%;
+}
+
+/* Points: the start and stop points side by side, the first chip's text
+   in line with the section's title. */
+.points-chips {
+  display: flex;
+  flex: 1 1 100%;
+  gap: 6px;
+  min-width: 0;
+  margin-left: -9px;
+}
+
+/* Loop: its span across the section, in line with the title; with no
+   loop, how to make one. */
+.loop-group .loop-info {
+  flex: 1 1 100%;
+  margin-left: -9px;
+}
+
+.loop-hint {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.loop-group:has(#loopInfo:not([hidden])) .loop-hint {
+  display: none;
+}
+
+/* Beats: the ♩ button across the section (it finds the beats, then shows
+   the tempo and opens their menu, beside the panel). */
+button.beat-info {
+  flex: 1 1 100%;
+  justify-content: flex-start;
+  overflow: hidden;
+  font: 800 13px var(--num);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The beat lines hidden (B): the button says so by fading. */
+button.beat-info.disabled {
+  color: var(--muted);
+}
+
+/* Pitch: its title across, the two knobs side by side under it. */
+.pitch-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+/* A group's title (Pitch, EQ) across its section: the name on the left,
+   its total or buttons on the right. */
 .dock-title {
   display: flex;
-  flex-direction: column;
-  gap: 3px;
+  flex: 1 1 100%;
+  grid-column: 1 / -1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .dock-title-row {
@@ -2762,8 +2874,17 @@ button.mark-remove {
   line-height: 1.2;
 }
 
+.dock-title h2 {
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
 .pitch-total {
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 /* The speed presets next to its knob, and "…" for the rest. */
@@ -2829,14 +2950,15 @@ button.mark-remove {
   color: var(--muted);
 }
 
-/* Opened by its button (popovertarget), above it, anchored by CSS. */
+/* Opened by its button (popovertarget), left of the side panel, anchored
+   by CSS. */
 .eq-popover {
   position: fixed;
   inset: auto;
   position-anchor: --eq-open;
-  position-area: top span-left;
+  position-area: left span-bottom;
   position-try-fallbacks: flip-block;
-  margin: 0 0 8px;
+  margin: 0 10px 0 0;
   padding: 12px 14px 14px;
   border: 1px solid var(--hairline);
   border-radius: var(--radius);
@@ -3017,11 +3139,12 @@ button.mark-remove {
 
 /* ---------- Notifications (ui/toast.js) ----------
    Small confirmations at the bottom centre, above everything but modal
-   dialogs; only the toasts themselves take clicks (one dismisses it). */
+   dialogs; only the toasts themselves take clicks (one dismisses it).
+   Raised above the transport, so they never cover Play. */
 
 .toasts {
   position: fixed;
-  bottom: 16px;
+  bottom: 76px;
   left: 50%;
   z-index: 30;
   display: flex;
@@ -3163,12 +3286,12 @@ button.mark-remove {
 }
 
 .app.big-video > .topbar,
-.app.big-video > .dock,
-.app.big-video .sidebar,
+.app.big-video .panel,
 .app.big-video .waveform-minimap {
   display: none;
 }
 
+/* The transport under the picture, like a video player's. */
 .app.big-video .workspace {
   grid-template:
     "stage" minmax(0, 1fr)
@@ -3196,37 +3319,37 @@ button.mark-remove {
    them still (the picture's edges are the window's, so the bar's padding
    is all that keeps Play and the chips off them). */
 .app.big-video .transport {
+  height: auto;
   gap: 6px 14px;
   padding: 6px 16px;
+  border-bottom: 0;
+}
+
+.app.big-video .transport-controls {
+  gap: 8px;
 }
 
 .app.big-video .transport .icon {
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
 }
 
 .app.big-video button.play-button {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
 }
 
-.app.big-video .transport-buttons .icon-button {
+.app.big-video button.ring-button {
   width: 26px;
   height: 26px;
 }
 
-.app.big-video .step-group .icon-button {
-  width: 22px;
-  height: 22px;
-}
-
 .app.big-video button.step-size {
-  height: 22px;
   font-size: 11px;
 }
 
 .app.big-video .track-time {
-  font-size: 16px;
+  font-size: 17px;
 }
 
 .app.big-video .time-total {
@@ -3341,13 +3464,16 @@ button.mark-remove {
 
 @media (max-width: 1099px) {
   :root {
-    --sidebar-width: 240px;
-    --knob-size: 30px;
+    --sidebar-width: 250px;
+  }
+
+  .dock {
+    --knob-size: 34px;
   }
 
   .dock-group {
-    gap: 10px;
-    padding: 0 12px;
+    gap: 8px 10px;
+    padding: 10px 12px;
   }
 
   .sidebar-actions .label {
@@ -3356,16 +3482,19 @@ button.mark-remove {
 }
 
 @media (max-height: 719px) {
-  .app {
-    gap: 8px;
-    padding-block: 8px 10px;
-  }
-
   .stage {
-    grid-template-rows: minmax(0, 1fr) 34px;
+    grid-template-rows: minmax(0, 1fr) 26px;
   }
 
-  .dock {
-    padding: 6px 0;
+  .transport {
+    height: 56px;
+  }
+
+  .track-time {
+    font-size: 20px;
+  }
+
+  .dock-group {
+    padding-block: 8px;
   }
 }

@@ -33,16 +33,15 @@
 
 /* The strip, then the timeline and minimap as for an audio file. */
 .stage.video-popped {
-  grid-template-rows: auto minmax(0, 1fr) 44px;
+  grid-template-rows: auto minmax(0, 1fr) 32px;
 }
 
 .video-away {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 4px 4px 4px 12px;
-  border: 1px solid var(--hairline);
-  border-radius: var(--radius-sm);
+  padding: 4px 4px 4px 14px;
+  border-bottom: 1px solid var(--hairline);
   background: var(--surface);
   color: var(--muted);
   font-size: 12.5px;
@@ -58,7 +57,7 @@
 
 @media (max-height: 719px) {
   .stage.video-popped {
-    grid-template-rows: auto minmax(0, 1fr) 34px;
+    grid-template-rows: auto minmax(0, 1fr) 26px;
   }
 }
 

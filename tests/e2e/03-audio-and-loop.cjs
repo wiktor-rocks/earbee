@@ -254,13 +254,13 @@ module.exports = async function (h) {
   );
   check("region removed from waveform", regionHidden);
 
-  // A loop doesn't change the waveform's size: its chip keeps the
-  // transport bar one row (so the waveform keeps its height), and a loop
+  // A loop doesn't change the waveform's size: its chip shows in the side
+  // panel (so the waveform keeps its height), and a loop
   // reaching the end stays inside the track (whose scrollWidth the ruler,
   // the lanes and zooming go by).
   const sizes = () =>
     js(
-      `(() => { const wrapper = document.querySelector("#waveform > div").shadowRoot.querySelector(".wrapper"); return { wave: waveform.clientHeight, track: wrapper.scrollWidth, transport: document.querySelector(".transport").offsetHeight, chips: [...document.querySelectorAll(".transport-chips > :not([hidden])")].map((e) => e.id) }; })()`,
+      `(() => { const wrapper = document.querySelector("#waveform > div").shadowRoot.querySelector(".wrapper"); return { wave: waveform.clientHeight, track: wrapper.scrollWidth, transport: document.querySelector(".transport").offsetHeight, chips: [...document.querySelectorAll(".dock :is(#startPoint, #stopPoint, #loopInfo):not([hidden])")].map((e) => e.id) }; })()`,
     );
   const sameSize = (a, b) => a.wave === b.wave && a.track === b.track && a.transport === b.transport;
   const noLoop = await sizes();

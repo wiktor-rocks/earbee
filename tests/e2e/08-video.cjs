@@ -227,6 +227,10 @@ module.exports = async function (h) {
     }
     await sleep(300);
   };
+  // A pane wider than the 16:9 picture, so its sides are letterbox at 1×
+  // (the default split makes the pane about 16:9 itself).
+  await js(`import("./src/features/stage-split.js").then(({ setTimelineShare }) => setTimelineShare(0.4))`);
+  await sleep(400);
   const box = await paneBox();
   const edge = { x: box.left + 4, y: box.top + box.height / 2 }; // in the letterbox at 1×
   const at = { x: box.left + box.width * 0.4, y: box.top + box.height * 0.5 };
@@ -330,7 +334,9 @@ module.exports = async function (h) {
     const from = Number(await js(`videoCanvas.dataset.frameTime`));
     await sleep(ms);
     const to = Number(await js(`videoCanvas.dataset.frameTime`));
-    const middle = await pixel(box.left + box.width / 2, box.top + box.height / 2);
+    // The pane as it is now (the stage split may have made it smaller).
+    const now = await paneBox();
+    const middle = await pixel(now.left + now.width / 2, now.top + now.height / 2);
     return { ok: to > from && !(await stopped()) && middle.some((c) => c > 60), from, to, middle };
   };
   await js(

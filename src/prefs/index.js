@@ -113,7 +113,7 @@ export const waveformSection = defineSection({
       key: "style",
       type: "choice",
       label: "Shape",
-      default: "bars",
+      default: "continuous",
       options: [
         { value: "bars", label: "Bars" },
         { value: "continuous", label: "Continuous", detail: "one filled shape" },

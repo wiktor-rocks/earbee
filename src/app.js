@@ -159,8 +159,9 @@
  *                             group; the shortcuts dialog (?) lists it.
  *   Layout and look           style.css: the tokens at the top (colours,
  *                             radii, shadows, --sidebar-width) and section 5
- *                             (the page's grid, the cards, the dock, and the
- *                             media queries for narrow and short windows);
+ *                             (the page's grid, the bars and the side panel,
+ *                             the dock, and the media queries for narrow
+ *                             and short windows);
  *                             icons are <symbol>s in index.html's sprite.
  *   Colours and fonts         Tokens at the top of style.css (the waveform
  *                             reads its colours from there too). Colours

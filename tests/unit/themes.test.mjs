@@ -94,7 +94,7 @@ describe("cssVariables", () => {
   });
 
   test("a theme's own value wins over the derived one", () => {
-    assert.equal(cssVariables(getTheme("earbee"))["--surface-hover"], "#262b36");
+    assert.equal(cssVariables(getTheme("earbee"))["--surface-hover"], "#30281f");
   });
 });
 
