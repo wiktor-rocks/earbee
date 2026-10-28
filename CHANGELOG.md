@@ -43,6 +43,22 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-28: Blog post "Free Amazing Slow Downer alternative for Mac and Windows" (the website)
+
+- **What:** a sixth post, "Free Amazing Slow Downer alternative for Mac and Windows", at `/blog/free-alternative-to-amazing-slow-downer/`.
+  - What Amazing Slow Downer does and costs, a table comparing it with EarBee, what EarBee adds and why each part helps learning, what Amazing Slow Downer does better, the same routine in EarBee in seven steps, Macs, and Spotify.
+- **Why:** the next "alternative to" post on the owner's SEO list (local/NEXT-RELEASE-0.3.0.md). The owner asked for EarBee only, without the other free tools ("otherwise it's just a repeat" of the Transcribe! post), and in their own style; an assistant wrote it, the owner approved it.
+- **How:**
+  - `keyword: "amazing slow downer alternative"`, the most frequent of Google's suggestions (`scripts/seo/keywords.cjs`); "mac", "free" and "spotify", the next ones, have a place in the title, a heading and a section.
+  - Prices and features from Roni Music's own pages and store (2026-10-28): $39.95 for Windows or Mac, $9.95 for Android, about $15 for iPhone and iPad, free Lite versions on phones; no Spotify or Apple Music on computers, and none on phones since September 2022.
+  - The table's "No" for Amazing Slow Downer's waveform loops, marks, beats, video and YouTube links wasn't confirmed from its pages; the owner accepted the post as it is.
+  - EarBee is described without keys or numbers (the blog's rule).
+- **Where:** `site/blog/free-alternative-to-amazing-slow-downer.md`.
+- **Verified by:**
+  - `node scripts/seo/check.cjs`: no errors or warnings for the post.
+  - `npm --prefix site run build`: the post is built.
+  - `npm run format:check`.
+
 ## 2026-10-27: Blog post "How to slow down a song without changing the pitch" (the website)
 
 - **What:** a fifth post, "How to slow down a song without changing the pitch", at `/blog/slow-down-a-song-without-changing-pitch/`.
