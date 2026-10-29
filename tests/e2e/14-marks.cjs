@@ -279,13 +279,13 @@ module.exports = async function (h) {
   check("the sidebar's Point button marks a point", (await listed()).length === countBefore + 1);
 
   // The transport: Play shows only its icon (its label is for screen
-  // readers); the step size sits between the step arrows.
+  // readers); the step size sits on the right, after the step arrows.
   check(
-    "Play is just an icon; the step size is between its arrows",
+    "Play is just an icon; the step size is after its arrows",
     await js(`(() => {
       const box = (id) => document.getElementById(id).getBoundingClientRect();
       return play.offsetWidth <= 44 && playLabel.getBoundingClientRect().width <= 1 &&
-        box("stepBack").right <= box("stepSize").left && box("stepSize").right <= box("stepForward").left;
+        box("stepBack").right <= box("stepForward").left && box("stepForward").right <= box("stepSize").left;
     })()`),
     await js(
       `[play.offsetWidth, playLabel.getBoundingClientRect().width, ...["stepBack", "stepSize", "stepForward"].map((id) => { const r = document.getElementById(id).getBoundingClientRect(); return [r.left, r.right]; })]`,

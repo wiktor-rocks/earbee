@@ -24,11 +24,20 @@ import { columnLevels, combineFor, rangeLevel } from "./core/waveshape.js";
  * track, so they run on into the next canvas; the bars are laid out on
  * the whole track instead (see fillBars), so their gaps stay even where
  * two canvases meet.
+ *
+ * The canvases only just meet, and under display scaling (90 %) the screen
+ * rounds each one's start and width to its pixels separately, which can
+ * leave a pixel of background between two. So every canvas but the last
+ * reaches a little past its seam (overlapSeam), drawing the track's next
+ * values there: the same as the next canvas draws, whichever is on top.
  * ===================================================================== */
 
 const BAR_WIDTH = 2; // CSS px
 const BAR_GAP = 1;
 const PEAK_ALPHA = 0.4; // the two-tone outline
+// How far a canvas reaches over the next one, in CSS px: at 90 %, one is
+// 0.9 screen px, which after rounding doesn't always cover the missing one.
+const SEAM_OVERLAP = 2;
 
 /**
  * @param {CanvasRenderingContext2D} ctx
@@ -45,6 +54,7 @@ export function drawWaveform(ctx, shaped, start, count, appearance, track = {}) 
   if (!canvas.width || !canvas.height || count <= 0) return;
   const ratio = track.pixelRatio ?? (canvas.width / (parseFloat(canvas.style.width) || canvas.width) || 1);
   const kind = appearance.measure === "peaks" ? "peak" : "rms";
+  if (track.trackWidth) count *= overlapSeam(ctx, ratio, track.trackWidth);
 
   if (appearance.style === "bars") {
     fillBars(ctx, shaped, kind, ratio, track.trackWidth);
@@ -65,6 +75,25 @@ export function drawWaveform(ctx, shaped, start, count, appearance, track = {}) 
   } else {
     fillShape(ctx, columnsOf("top", kind), columnsOf("bottom", kind), ratio);
   }
+}
+
+// Widens a canvas by SEAM_OVERLAP CSS px, over the start of the next one,
+// unless it is the track's last (which would stick out of WaveSurfer's
+// wrapper and make it scroll further). Returns how many times wider it
+// got in CSS px (WaveSurfer slices the values by CSS px), for the count of
+// values it now shows. Resizing a canvas resets its context, so the fill
+// colour is set again.
+function overlapSeam(ctx, ratio, trackWidth) {
+  const { canvas } = ctx;
+  const left = parseFloat(canvas.style.left) || 0;
+  const width = parseFloat(canvas.style.width);
+  const extra = Math.min(SEAM_OVERLAP, Math.floor(trackWidth - left - width));
+  if (!width || extra <= 0) return 1;
+  const { fillStyle } = ctx;
+  canvas.style.width = `${width + extra}px`;
+  canvas.width = Math.round((width + extra) * ratio);
+  ctx.fillStyle = fillStyle;
+  return (width + extra) / width;
 }
 
 // Rounded bars, at least a pixel tall so silence still shows a line.
