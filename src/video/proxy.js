@@ -4,11 +4,7 @@ import { EPSILON, covers, keepsFrame, nextRange, reachedSoon } from "./proxy-pla
 // Low-resolution proxy of one video (see CONFIG.video.proxy). Built from
 // the source with WebCodecs, kept in memory as encoded chunks, and read
 // back with its own small decoder.
-//   build(isBusy)    builds the overview, then the whole proxy; pauses
-//                    while isBusy() is true
-//   overviewReady    a promise, settled once the overview is done (or has
-//                    failed, or can't be built, or the proxy is disposed)
-//   overviewProgress() → 0…1, how much of the overview is done
+//   build(isBusy)    builds the whole proxy; pauses while isBusy() is true
 //   frameAt(time)    → VideoFrame for `time` (caller closes it), or null if
 //                    nothing is built there (a builder goes there next) or
 //                    it is the frame last returned
@@ -17,24 +13,16 @@ import { EPSILON, covers, keepsFrame, nextRange, reachedSoon } from "./proxy-pla
 //   progress()       the same as shares of the video, 0…1, and whether all
 //                    of it is built: { parts, complete }, or null if its
 //                    length isn't known
-//   overviewCount()  frames in the overview
 //   dispose()        stops building and frees everything
 // `makeSourceSink()` makes a VideoSampleSink of the video (each reader
-// decodes on its own); `packets` is its EncodedPacketSink; `duration` its
-// length in seconds. `onProgress` (optional) is called whenever built()
-// or the overview has grown.
+// decodes on its own); `duration` is its length in seconds. `onProgress`
+// (optional) is called whenever built() has grown.
 //
-// The overview comes first: one frame per keyframe of the video (at most
-// one per overview.spacingSeconds, and overview.maxFrames in all), each
-// encoded on its own. Keyframes decode without the frames before them, so
-// this is quick even for a long video, and it is done coarse to fine
-// (every 32nd first, then the ones halfway between, ...), so even a part
-// of it is spread over the whole video. It isn't read back: a keyframe
-// standing in for a frame seconds after it looked like a wrong frame, so
-// where nothing else is built frameAt answers null and the page waits for
-// the exact frame (marked as loading).
+// Where nothing is built yet, frameAt answers null and the page waits for
+// the exact frame (marked as loading): nothing from elsewhere stands in,
+// as a frame from seconds before would look like a wrong one.
 //
-// Then the proxy itself: up to `builders` at once, each re-encoding a
+// The proxy is built by up to `builders` at once, each re-encoding a
 // stretch of the video (see proxy-plan.js for which). A second builder
 // takes the second half of the first one's part, and so on. A frame asked
 // for where nothing is built yet moves a builder there (starting a little
@@ -43,8 +31,8 @@ import { EPSILON, covers, keepsFrame, nextRange, reachedSoon } from "./proxy-pla
 // The chunks are kept in runs: stretches built in one go, each starting
 // with a keyframe, so decoding never crosses from one run into another.
 // Runs that come to touch are joined.
-export function createVideoProxy({ track, makeSourceSink, packets, duration, onProgress = () => {} }) {
-  const { width, maxFps, keyframeInterval, bitrate, leadSeconds, overview: overviewOptions } = CONFIG.video.proxy;
+export function createVideoProxy({ track, makeSourceSink, duration, onProgress = () => {} }) {
+  const { width, maxFps, keyframeInterval, bitrate, leadSeconds } = CONFIG.video.proxy;
   // Even dimensions keep every encoder happy.
   const height = 2 * Math.max(1, Math.round((width * track.displayHeight) / track.displayWidth / 2));
   const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -140,89 +128,6 @@ export function createVideoProxy({ track, makeSourceSink, packets, duration, onP
       timestamp: Math.round(sample.timestamp * 1e6),
       duration: Math.round(Math.max(sample.duration, 1 / maxFps) * 1e6),
     });
-  }
-
-  /* ---------- The overview ---------- */
-
-  /** @type {Run} */
-  const overview = { chunks: [], first: false, last: false, from: 0 }; // read like a run; all keyframes
-  let overviewShare = 0; // 0…1 done
-  /** @type {(value?: unknown) => void} */
-  let settleOverview = () => {};
-  const overviewReady = new Promise((resolve) => (settleOverview = resolve));
-
-  async function buildOverview(codec) {
-    const { spacingSeconds, maxFrames, bitrate: frameBits } = overviewOptions;
-    const firstTimestamp = await track.getFirstTimestamp();
-    const spacing = Math.max(spacingSeconds, duration / maxFrames);
-    const count = Math.max(1, Math.ceil(duration / spacing));
-    // Coarse to fine: every `stride`th spot first, then the ones halfway
-    // between, ...
-    let stride = 1;
-    while (count / stride > 32) stride *= 2;
-    const passes = [[]];
-    for (let i = 0; i < count; i += stride) passes[0].push(i);
-    for (let step = stride / 2; step >= 1; step /= 2) {
-      const pass = [];
-      for (let i = step; i < count; i += 2 * step) pass.push(i);
-      passes.push(pass);
-    }
-
-    const sink = makeSourceSink();
-    const seen = new Set(); // keyframe timestamps already in the overview
-    let spotsDone = 0;
-    for (const pass of passes) {
-      // The keyframe at or before each spot (only its timestamp: cheap).
-      const times = [];
-      for (const i of pass) {
-        const key = await packets.getKeyPacket(firstTimestamp + i * spacing, { metadataOnly: true });
-        if (disposed) return;
-        if (key && !seen.has(key.timestamp)) {
-          seen.add(key.timestamp);
-          times.push(key.timestamp);
-        }
-      }
-
-      // Each frame encoded on its own, at about frameBits / 8 bytes.
-      const encoder = openEncoder(
-        (chunk) => {
-          if (disposed) return;
-          const time = chunk.timestamp / 1e6;
-          const index = overview.chunks.findIndex((other) => other.time > time);
-          overview.chunks.splice(index < 0 ? overview.chunks.length : index, 0, { time, end: time, key: true, chunk });
-          if (readRun === overview) readRun = null; // its indices moved
-        },
-        { codec, bitrate: frameBits, framerate: 1 },
-      );
-      const reader = sink.samplesAtTimestamps(times);
-      readers.add(reader);
-      try {
-        let read = 0;
-        for await (const sample of reader) {
-          if (disposed) return;
-          if (sample) {
-            try {
-              const frame = scale(sample);
-              encoder.encode(frame, { keyFrame: true });
-              frame.close();
-            } finally {
-              sample.close();
-            }
-          }
-          read++;
-          overviewShare = (spotsDone + (pass.length * read) / times.length) / count;
-          await giveWay(encoder, read);
-        }
-        if (disposed) return;
-        await encoder.flush();
-      } finally {
-        readers.delete(reader);
-        closeEncoder(encoder);
-      }
-      spotsDone += pass.length;
-      overviewShare = spotsDone / count;
-      onProgress();
-    }
   }
 
   /* ---------- Building the proxy ---------- */
@@ -381,37 +286,22 @@ export function createVideoProxy({ track, makeSourceSink, packets, duration, onP
 
   async function build(busy) {
     isBusy = busy;
-    try {
-      const codec = await pickCodec();
-      if (!codec) throw new Error("No video encoder available for the proxy.");
+    const codec = await pickCodec();
+    if (!codec) throw new Error("No video encoder available for the proxy.");
+    const startedAt = performance.now();
 
-      const startedAt = performance.now();
-      try {
-        if (known) await buildOverview(codec);
-      } catch (error) {
-        if (!disposed) console.warn("Video proxy overview failed:", error); // the proxy can still be built
-      } finally {
-        settleOverview();
-      }
-      if (disposed) return;
-      const overviewMs = performance.now() - startedAt;
+    // Splitting needs the length; without it, one builder front to back.
+    const most = known ? CONFIG.video.proxy.builders : 1;
+    const count = Math.max(1, Math.min(most, Math.floor(navigator.hardwareConcurrency / 2)));
+    await Promise.all(Array.from({ length: count }, () => builder(codec)));
+    if (disposed) return;
 
-      // Splitting needs the length; without it, one builder front to back.
-      const most = known ? CONFIG.video.proxy.builders : 1;
-      const count = Math.max(1, Math.min(most, Math.floor(navigator.hardwareConcurrency / 2)));
-      await Promise.all(Array.from({ length: count }, () => builder(codec)));
-      if (disposed) return;
-
-      const chunks = runs.flatMap((run) => run.chunks);
-      const megabytes = chunks.reduce((sum, { chunk }) => sum + chunk.byteLength, 0) / 1024 ** 2;
-      console.debug(
-        `Video proxy: ${overview.chunks.length} overview frames in ${Math.round(overviewMs)} ms, then ` +
-          `${chunks.length} frames (${codec}, ${width}×${height}, ${megabytes.toFixed(1)} MB) ` +
-          `in ${Math.round(performance.now() - startedAt - overviewMs)} ms by ${count} builders`,
-      );
-    } finally {
-      settleOverview();
-    }
+    const chunks = runs.flatMap((run) => run.chunks);
+    const megabytes = chunks.reduce((sum, { chunk }) => sum + chunk.byteLength, 0) / 1024 ** 2;
+    console.debug(
+      `Video proxy: ${chunks.length} frames (${codec}, ${width}×${height}, ${megabytes.toFixed(1)} MB) ` +
+        `in ${Math.round(performance.now() - startedAt)} ms by ${count} builders`,
+    );
   }
 
   /* ---------- Reading ---------- */
@@ -519,19 +409,14 @@ export function createVideoProxy({ track, makeSourceSink, packets, duration, onP
     for (const encoder of encoders) closeEncoder(encoder);
     readRun = null;
     runs.length = 0;
-    overview.chunks.length = 0;
-    settleOverview();
   }
 
   return {
     build,
-    overviewReady,
-    overviewProgress: () => overviewShare,
     frameAt,
     builtAt: (time) => runAt(time) !== undefined,
     built,
     progress,
-    overviewCount: () => overview.chunks.length,
     dispose,
   };
 }

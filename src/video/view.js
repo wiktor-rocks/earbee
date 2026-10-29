@@ -34,20 +34,19 @@
  *
  * Proxy: from the moment a file is prepared (while it still loads), and
  * then only while the main decoder is idle, the video is re-encoded at
- * low resolution with a keyframe every few frames (createVideoProxy).
- * First a coarse overview, one frame per keyframe, which loading waits
- * for (overviewReady, at most a few seconds), then the whole video, by
- * several builders at once; a position asked for that isn't built yet
- * moves a builder there. When the sharp frame for a position isn't
- * ready, the proxy frame for exactly that time is drawn instead, at full
- * frame rate, and the sharp frames take over once decoded. Where the proxy
- * isn't built yet, nothing else stands in (the overview's keyframes would
- * be seconds off: a wrong frame): what is on screen stays, dimmed and
- * marked "Loading the frame" (the pane's "loading-frame" class), until
- * the frame is decoded. While the proxy is being built, the pane says how
- * far ("Loading low-resolution preview 43%", in a .video-loading label
- * placed just left of the video's controls; style.css "Video loading"). The canvas's data-proxy-built shows what is built,
- * data-proxy-overview the overview's frames.
+ * low resolution with a keyframe every few frames (createVideoProxy), by
+ * several builders at once; loading doesn't wait for it, and a position
+ * asked for that isn't built yet moves a builder there. When the sharp
+ * frame for a position isn't ready, the proxy frame for exactly that time
+ * is drawn instead, at full frame rate, and the sharp frames take over
+ * once decoded. Where the proxy isn't built yet, nothing else stands in
+ * (a frame from elsewhere would be a wrong frame): what is on screen
+ * stays, dimmed and marked "Loading the frame" (the pane's
+ * "loading-frame" class), until the frame is decoded. While the proxy is
+ * being built, the pane says how far ("Loading low-resolution preview
+ * 43%", in a .video-loading label placed just left of the video's
+ * controls; style.css "Video loading"). The canvas's data-proxy-built
+ * shows what is built.
  *
  * Ready points: where jumps are expected (the loop start, the start
  * point, the marks Shift+← / Shift+→ go to), set by those features with
@@ -81,7 +80,7 @@
  * of the session (a canvas can be handed to a worker only once), with
  * one onProblem message.
  *
- * Exposes: preload, prepare, overviewReady, show, clear, discard,
+ * Exposes: preload, prepare, show, clear, discard,
  *          start, advance, showFrameAt, attach, setReadyPoints,
  *          setAvailableMemory, setReadyLevel, getZoom, zoomTo,
  *          panZoomBy, resetZoom
@@ -89,8 +88,6 @@
  *   download's { name, url }; core/media.js) without touching the
  *   video on screen; `video` is null (with a reason) if it has no
  *   picture this app can decode. Never throws.
- *   overviewReady(video, ms, signal, onProgress) waits (at most `ms`)
- *   for a prepared video's proxy overview, reporting the share done.
  *   setReadyPoints(group, times) sets one caller's ready points
  *   ("loop", "start", "marks"); all groups together are the points.
  *   setAvailableMemory(bytes) the memory free (or null), for their budget.
@@ -125,8 +122,6 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
   let nextId = 1;
   /** @type {Map<number, (prepared: { video: { id: number } | null, reason: string | null }) => void>} */
   const preparing = new Map();
-  /** @type {Map<number, { onProgress: (share: number) => void, done: () => void }>} */
-  const overviews = new Map();
   // Each canvas's surface in the worker (a canvas is transferred once).
   /** @type {WeakMap<HTMLCanvasElement, number>} */
   const surfaces = new WeakMap();
@@ -173,7 +168,6 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
     console.warn("Video worker failed:", reason);
     for (const resolve of preparing.values()) resolve({ video: null, reason: "its video couldn't be read" });
     preparing.clear();
-    for (const { done } of overviews.values()) done();
     if (showing) onProblem("The video's picture stopped. The audio is unaffected.");
   }
 
@@ -184,12 +178,6 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
         preparing.delete(data.id);
         return resolve?.({ video: data.ok ? { id: data.id } : null, reason: data.reason });
       }
-      case "overview": {
-        const watch = overviews.get(data.id);
-        watch?.onProgress(data.share);
-        if (data.done) watch?.done();
-        return;
-      }
       case "shown":
         if (data.aspect > 0) aspect = data.aspect;
         return showing && markShown(data.time, data.proxy);
@@ -197,7 +185,6 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
         return showing && pane.classList.add("loading-frame");
       case "built":
         builtText = data.built;
-        overviewText = data.overview;
         progress = data.progress ?? null;
         return showBuilt();
       case "problem":
@@ -233,35 +220,6 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
     });
   }
 
-  // Waits (at most `ms`, or until `signal` aborts) until the proxy's
-  // overview of a prepared video is done, so dragging anywhere shows a
-  // picture at once; reports the share done meanwhile.
-  /**
-   * @param {{ id: number } | null | undefined} video
-   * @param {number} ms
-   * @param {AbortSignal | undefined} signal
-   * @param {(share: number) => void} onProgress
-   */
-  async function overviewReady(video, ms, signal, onProgress) {
-    if (!video || stopped || signal?.aborted) return;
-    let timeout;
-    let onAbort;
-    try {
-      await new Promise((resolve) => {
-        overviews.set(video.id, { onProgress, done: () => resolve(undefined) });
-        send({ type: "watch-overview", id: video.id });
-        timeout = setTimeout(resolve, ms);
-        onAbort = resolve;
-        signal?.addEventListener("abort", onAbort, { once: true });
-      });
-    } finally {
-      clearTimeout(timeout);
-      signal?.removeEventListener("abort", onAbort);
-      overviews.delete(video.id);
-      send({ type: "unwatch-overview", id: video.id });
-    }
-  }
-
   /** @param {{ id: number } | null | undefined} video */
   function discard(video) {
     if (video) send({ type: "discard", id: video.id });
@@ -289,7 +247,6 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
     delete canvas.dataset.proxy;
     pane.classList.remove("loading-frame");
     builtText = null;
-    overviewText = null;
     progress = null;
     readyText = null;
     allowedText = null;
@@ -309,11 +266,9 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
   }
 
   // And data-proxy-built: the parts of the proxy built so far, as
-  // "start–end" in seconds; data-proxy-overview: its overview's frames;
-  // data-ready-points: the ready points with a decoder ready, and
-  // data-ready-allowed: how many this video may have.
+  // "start–end" in seconds; data-ready-points: the ready points with a
+  // decoder ready, and data-ready-allowed: how many this video may have.
   let builtText = null;
-  let overviewText = null;
   let readyText = null;
   let allowedText = null;
   /** @type {{ parts: number[][], complete: boolean } | null} */
@@ -327,8 +282,6 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
     }
     if (builtText === null) delete canvas.dataset.proxyBuilt;
     else canvas.dataset.proxyBuilt = builtText;
-    if (overviewText === null) delete canvas.dataset.proxyOverview;
-    else canvas.dataset.proxyOverview = overviewText;
     if (readyText === null) delete canvas.dataset.readyPoints;
     else canvas.dataset.readyPoints = readyText;
     if (allowedText === null) delete canvas.dataset.readyAllowed;
@@ -457,7 +410,6 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
     delete canvas.dataset.frameTime;
     delete canvas.dataset.proxy;
     delete canvas.dataset.proxyBuilt;
-    delete canvas.dataset.proxyOverview;
     delete canvas.dataset.readyPoints;
     delete canvas.dataset.readyAllowed;
 
@@ -551,7 +503,6 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
   return {
     preload,
     prepare,
-    overviewReady,
     show,
     clear,
     discard,

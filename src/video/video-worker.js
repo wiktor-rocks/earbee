@@ -23,8 +23,6 @@
 //   page → { type: "prepare", id, media }  (a File, or { name, url }: core/media.js)
 //   ←      { type: "prepared", id, ok, reason }
 //   page → { type: "discard", id }
-//   page → { type: "watch-overview", id } / { type: "unwatch-overview", id }
-//   ←      { type: "overview", id, share, done }  every 100 ms while watched
 //   page → { type: "surface", id, canvas }  an OffscreenCanvas
 //   page → { type: "use", id }  draw there from now on
 //   page → { type: "size", id, width, height }  pixels
@@ -42,7 +40,7 @@
 //          built there: what's on screen stays (marked as loading, view.js) until a frame
 //          there is drawn
 //   ←      { type: "zoom-failed" }  drawing zoomed in failed: back to the whole picture
-//   ←      { type: "built", built, overview, progress }  the proxy's progress (text or null;
+//   ←      { type: "built", built, progress }  the proxy's progress (text or null;
 //          progress: proxy.progress(), for "Loading low-resolution preview …%")
 //   ←      { type: "problem", message }  once per file
 //   ←      { type: "ready-points", times, allowed }  the points with a decoder
@@ -181,13 +179,11 @@ function failed(id, input, reason) {
   post({ type: "prepared", id, ok: false, reason });
 }
 
-// The proxy starts building at once, while the file still loads (its
-// overview is what loading waits for: see view.js overviewReady).
+// The proxy starts building at once, while the file still loads.
 function startProxy(video, duration) {
   const proxy = createVideoProxy({
     track: video.track,
     makeSourceSink: () => new VideoSampleSink(video.track), // each with its own decoder
-    packets: video.packets,
     duration,
     onProgress: () => video === current && markBuilt(proxy),
   });
@@ -198,31 +194,6 @@ function startProxy(video, duration) {
     .catch((error) => {
       if (!video.discarded) console.warn("Video proxy failed:", error);
     });
-}
-
-// The overview's progress while the page waits for it (view.js overviewReady).
-/** @type {Map<number, ReturnType<typeof setInterval>>} */
-const watching = new Map();
-function watchOverview(id) {
-  const video = videos.get(id);
-  if (!video?.proxy) return post({ type: "overview", id, share: 1, done: true });
-  let done = false;
-  video.proxy.overviewReady.then(
-    () => (done = true),
-    () => (done = true),
-  );
-  const report = () => post({ type: "overview", id, share: video.proxy.overviewProgress(), done });
-  watching.set(
-    id,
-    setInterval(() => {
-      report();
-      if (done) unwatchOverview(id);
-    }, 100),
-  );
-}
-function unwatchOverview(id) {
-  clearInterval(watching.get(id));
-  watching.delete(id);
 }
 
 function discard(video) {
@@ -517,8 +488,8 @@ function markShown(time, isProxy) {
   post({ type: "shown", time, proxy: isProxy, aspect: shownAspect });
 }
 
-// And the parts of `proxy` built so far, as "start–end" in seconds, and
-// its overview's frames (data-proxy-built, data-proxy-overview).
+// And the parts of `proxy` built so far, as "start–end" in seconds
+// (data-proxy-built), and as shares of the video (the loading label).
 function markBuilt(proxy) {
   const built =
     proxy &&
@@ -526,7 +497,7 @@ function markBuilt(proxy) {
       .built()
       .map(([from, to]) => `${from.toFixed(1)}–${to.toFixed(1)}`)
       .join(" ");
-  post({ type: "built", built, overview: proxy && String(proxy.overviewCount()), progress: proxy && proxy.progress() });
+  post({ type: "built", built, progress: proxy && proxy.progress() });
 }
 
 /* ---------- Proxy fill-in ---------- */
@@ -977,10 +948,6 @@ scope.onmessage = ({ data }) => {
       return prepare(data.id, data.media);
     case "discard":
       return discard(videos.get(data.id));
-    case "watch-overview":
-      return watchOverview(data.id);
-    case "unwatch-overview":
-      return unwatchOverview(data.id);
     case "surface":
       return addSurface(data.id, data.canvas);
     case "use":

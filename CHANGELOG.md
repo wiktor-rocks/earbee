@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-30: Videos open without waiting for a preview nobody sees
+
+- **What:** opening a video no longer waits (up to 3 s) for the low-res copy's "overview", and "Preparing the picture X %" is gone from the loading screen. The low-res copy itself is built as before, in the background, with its progress beside the video's buttons.
+- **Why:** since the previous entry, the overview (one frame per keyframe, built first while loading) was never shown: a keyframe stands in for a frame seconds after it, which the owner saw as a wrong frame. It still cost the wait, the CPU and its memory. The owner asked for it to go.
+- **How:** the proxy builds only the copy itself (its builders start as soon as the file is prepared, as before); `frameAt` answers `null` where nothing is built, and the page waits for the exact frame. Loading no longer asks the worker about the overview (`overviewReady`, the `watch-overview` / `overview` messages), and the memory check counts only the copy. Measured on the same machine, three openings each, before → after: a 5-minute 1080p MP4 4.7–5.9 s → 5.2–5.4 s, a 3-minute 4K MP4 4.9–7.7 s → 4.7–4.8 s, `long-counter.webm` 1.7–2.7 s → 1.6–1.8 s: as fast or faster, and steadier (for these files most of the time is decoding the sound).
+- **Where:** `src/video/proxy.js` (the overview's building and its API gone; `build`), `src/video/video-worker.js` (`startProxy`, `markBuilt`; `watchOverview` gone), `src/video/view.js` (`overviewReady` and `data-proxy-overview` gone), `src/features/open-file.js` (`loadMediaFile`, `checkMemory`), `src/config.js` (`video.proxy.overview` gone); `tests/e2e/08-video.cjs` (the overview's check gone; "several places at once" waits up to 3 s for the builders, as loading no longer gives them that time).
+- **Verified by:** `npm run check`; `npm run test:unit`; topics 08, 18, 19, 11, 12, 16 and 03–07 pass (07's "bad file keeps loop of previous song" needs 04–06 before it, as known). The opening times above (`local/bench/media/`).
+
 ## 2026-10-30: A new look, a side panel in any order, and no wrong frames after a jump
 
 - **What:**

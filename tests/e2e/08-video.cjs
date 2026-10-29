@@ -1,5 +1,5 @@
-// Video: the picture follows playback, loop wraps and drags (the proxy,
-// its overview and its builders); zooming into the picture.
+// Video: the picture follows playback, loop wraps and drags (the proxy
+// and its builders); zooming into the picture.
 // Part of the end-to-end run (see run.cjs); `h` is the harness.
 const path = require("path");
 
@@ -72,8 +72,8 @@ module.exports = async function (h) {
 
   // A long video, dragged far in right after opening: its proxy isn't
   // built there yet (its builders start at the start, a half and a
-  // quarter), so the overview answers, and a builder moves there (and a
-  // little before). Dragging back then shows the proxy, while the
+  // quarter), so the picture waits for the exact frame, and a builder
+  // moves there (and a little before). Dragging back then shows the proxy, while the
   // sharp decoder has to start again at the keyframe before (one every 20 s
   // in long-counter.webm, at 180 s here).
   const openedAt = Date.now();
@@ -106,12 +106,18 @@ module.exports = async function (h) {
       return start <= from && end >= to;
     });
 
-  // Loading waited for the overview (one frame per keyframe: 12 here), and
-  // several builders have started, spread over the video.
-  const overviewFrames = Number(await js(`document.getElementById("videoCanvas").dataset.proxyOverview ?? 0`));
-  check("loading builds the proxy's overview", overviewFrames >= 10, `${overviewFrames} frames, load ${loadMs} ms`);
-  const early = await builtParts();
-  check("the proxy is built in several places at once", early.split(" ").length >= 2, `built: ${early}`);
+  // Loading doesn't wait for the proxy; soon after, several builders have
+  // started, spread over the video.
+  let early = await builtParts();
+  for (let i = 0; i < 30 && early.split(" ").length < 2; i++) {
+    await sleep(100);
+    early = await builtParts();
+  }
+  check(
+    "the proxy is built in several places at once",
+    early.split(" ").length >= 2,
+    `built: ${early}, load ${loadMs} ms`,
+  );
   const building = await label();
   check(
     "meanwhile, the picture says how much of the low-res preview is loaded",
@@ -120,8 +126,8 @@ module.exports = async function (h) {
   );
 
   // Far in, beyond the proxy: no wrong frames. Only frames near where
-  // the drag is are drawn (not the overview's keyframes, nor the decoder's
-  // on the way from the keyframe before, seconds off); meanwhile what is
+  // the drag is are drawn (not the decoder's on the way from the keyframe
+  // before, seconds off); meanwhile what is
   // on screen stays, marked as loading, and the exact frame follows.
   s = await scrub(150, 200, 1600, 2500);
   const wrong = s.filter((q, i) => {
@@ -519,8 +525,8 @@ module.exports = async function (h) {
   );
 
   // A jump far into a long video right after opening, zoomed in: its proxy
-  // isn't built there, so the overview's frame shows first (zoomed), then
-  // the sharp one; the zoom stays.
+  // isn't built there, so the picture waits for the sharp frame; the
+  // zoom stays.
   await openFile(path.join(FIXTURES, "long-counter.webm"));
   await wheelOver(centre.x, centre.y, 120, 6);
   const zoomBeforeJump = await zoomNow();
