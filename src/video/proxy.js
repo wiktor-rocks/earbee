@@ -1,5 +1,5 @@
 import { CONFIG } from "../config.js";
-import { EPSILON, covers, nextRange, reachedSoon } from "./proxy-plan.js";
+import { EPSILON, covers, keepsFrame, nextRange, reachedSoon } from "./proxy-plan.js";
 
 // Low-resolution proxy of one video (see CONFIG.video.proxy). Built from
 // the source with WebCodecs, kept in memory as encoded chunks, and read
@@ -10,8 +10,13 @@ import { EPSILON, covers, nextRange, reachedSoon } from "./proxy-plan.js";
 //                    failed, or can't be built, or the proxy is disposed)
 //   overviewProgress() → 0…1, how much of the overview is done
 //   frameAt(time)    → VideoFrame for `time` (caller closes it), or null if
-//                    nothing is built there or it is the frame last returned
+//                    nothing is built there (a builder goes there next) or
+//                    it is the frame last returned
+//   builtAt(time)    whether the proxy has the frame for `time`
 //   built()          what is built so far: [start, end] pairs, in seconds
+//   progress()       the same as shares of the video, 0…1, and whether all
+//                    of it is built: { parts, complete }, or null if its
+//                    length isn't known
 //   overviewCount()  frames in the overview
 //   dispose()        stops building and frees everything
 // `makeSourceSink()` makes a VideoSampleSink of the video (each reader
@@ -24,9 +29,10 @@ import { EPSILON, covers, nextRange, reachedSoon } from "./proxy-plan.js";
 // encoded on its own. Keyframes decode without the frames before them, so
 // this is quick even for a long video, and it is done coarse to fine
 // (every 32nd first, then the ones halfway between, ...), so even a part
-// of it is spread over the whole video. Where nothing else is built,
-// frameAt answers with the overview's frame at or before `time`: off by up
-// to one keyframe gap, but at once.
+// of it is spread over the whole video. It isn't read back: a keyframe
+// standing in for a frame seconds after it looked like a wrong frame, so
+// where nothing else is built frameAt answers null and the page waits for
+// the exact frame (marked as loading).
 //
 // Then the proxy itself: up to `builders` at once, each re-encoding a
 // stretch of the video (see proxy-plan.js for which). A second builder
@@ -77,6 +83,17 @@ export function createVideoProxy({ track, makeSourceSink, packets, duration, onP
     runs.find((run) => covers({ start: runStart(run), end: runEnd(run), first: run.first, last: run.last }, time));
 
   const built = () => runs.map((run) => [runStart(run), runEnd(run)]);
+
+  const progress = () =>
+    known
+      ? {
+          parts: runs.map((run) => [
+            run.first ? 0 : Math.min(1, runStart(run) / duration),
+            run.last ? 1 : Math.min(1, runEnd(run) / duration),
+          ]),
+          complete: runs.length === 1 && runs[0].first && runs[0].last,
+        }
+      : null;
 
   async function pickCodec() {
     for (const codec of ["vp8", "vp09.00.10.08", "avc1.42001f"]) {
@@ -129,7 +146,6 @@ export function createVideoProxy({ track, makeSourceSink, packets, duration, onP
 
   /** @type {Run} */
   const overview = { chunks: [], first: false, last: false, from: 0 }; // read like a run; all keyframes
-  let overviewConfig = null;
   let overviewShare = 0; // 0…1 done
   /** @type {(value?: unknown) => void} */
   let settleOverview = () => {};
@@ -169,9 +185,8 @@ export function createVideoProxy({ track, makeSourceSink, packets, duration, onP
 
       // Each frame encoded on its own, at about frameBits / 8 bytes.
       const encoder = openEncoder(
-        (chunk, metadata) => {
+        (chunk) => {
           if (disposed) return;
-          if (metadata?.decoderConfig) overviewConfig = metadata.decoderConfig;
           const time = chunk.timestamp / 1e6;
           const index = overview.chunks.findIndex((other) => other.time > time);
           overview.chunks.splice(index < 0 ? overview.chunks.length : index, 0, { time, end: time, key: true, chunk });
@@ -303,7 +318,7 @@ export function createVideoProxy({ track, makeSourceSink, packets, duration, onP
         try {
           if (disposed) return false;
           if (sample.timestamp >= job.to - EPSILON) break; // `to` may have moved closer meanwhile
-          if (sample.timestamp >= nextTime - EPSILON) {
+          if (keepsFrame(sample.timestamp, nextTime, sample.duration)) {
             const frame = scale(sample);
             // Every range starts with a keyframe, so runs decode on their own.
             encoder.encode(frame, { keyFrame: count % keyframeInterval === 0 });
@@ -403,7 +418,7 @@ export function createVideoProxy({ track, makeSourceSink, packets, duration, onP
 
   let decoder = null;
   /** @type {Run | null} */
-  let readRun = null; // the run the decoder is in (or the overview)
+  let readRun = null; // the run the decoder is in
   let nextIndex = -1; // next chunk of readRun the decoder expects, when decoding in order
   const waiting = new Map(); // chunk timestamp (µs) → resolve(frame)
 
@@ -430,7 +445,7 @@ export function createVideoProxy({ track, makeSourceSink, packets, duration, onP
     } else {
       decoder.reset();
     }
-    decoder.configure(run === overview ? overviewConfig : decoderConfig);
+    decoder.configure(decoderConfig);
     for (const resolve of waiting.values()) resolve(null);
     waiting.clear();
     readRun = run;
@@ -458,25 +473,22 @@ export function createVideoProxy({ track, makeSourceSink, packets, duration, onP
 
   async function frameAt(time) {
     if (disposed) return null;
-    let run = runAt(time);
+    const run = runAt(time);
     if (!run) {
       wanted = time; // build here next
       wantedAt = performance.now();
-      run = overview; // meanwhile, the nearest keyframe
+      return null;
     }
-    if (run === overview ? !overviewConfig || !overview.chunks.length : !decoderConfig) return null;
+    if (!decoderConfig) return null;
     const { chunks } = run;
     const index = indexAt(chunks, time);
     const inOrder = decoder && run === readRun;
     if (inOrder && index === nextIndex - 1) return null; // already the latest frame
 
-    // Continue in order when possible (any overview chunk follows any
-    // other: all are keyframes); otherwise start at the keyframe.
-    const continuing =
-      inOrder &&
-      (run === overview || (nextIndex >= 0 && nextIndex <= index && keyIndexBefore(chunks, index) < nextIndex));
+    // Continue in order when possible; otherwise start at the keyframe.
+    const continuing = inOrder && nextIndex >= 0 && nextIndex <= index && keyIndexBefore(chunks, index) < nextIndex;
     if (!continuing) restartDecoder(run);
-    const first = run === overview ? index : continuing ? nextIndex : keyIndexBefore(chunks, index);
+    const first = continuing ? nextIndex : keyIndexBefore(chunks, index);
 
     for (let i = first; i < index; i++) decoder.decode(chunks[i].chunk);
     const wantedChunk = chunks[index].chunk;
@@ -516,7 +528,9 @@ export function createVideoProxy({ track, makeSourceSink, packets, duration, onP
     overviewReady,
     overviewProgress: () => overviewShare,
     frameAt,
+    builtAt: (time) => runAt(time) !== undefined,
     built,
+    progress,
     overviewCount: () => overview.chunks.length,
     dispose,
   };

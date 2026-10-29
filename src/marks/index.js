@@ -43,6 +43,9 @@ const COLORS = new Set(MARK_COLORS.map((color) => color.id));
 
 const clampTime = (time, duration) => clamp(time, 0, duration > 0 ? duration : Infinity);
 
+// The n of an "m<n>" id (the order marks were made in); 0 for other ids.
+const idNumber = (mark) => Number(/^m(\d+)$/.exec(mark.id)?.[1] ?? 0);
+
 /**
  * A complete, valid mark from `raw`, or null if it can't be one. Times are
  * kept inside the track, the ends of a region put in order, and a region
@@ -144,10 +147,22 @@ export function createMarks({ minSeconds = 0.05 } = {}) {
     return `${prefix} ${Math.max(0, ...numbers.map((match) => Number(match[1]))) + 1}`;
   }
 
+  // The colour after the newest mark's, in MARK_COLORS' order (the first
+  // once there are none), so marks made one after another differ.
+  function nextColor() {
+    const newest = marks.reduce((a, b) => (idNumber(b) > idNumber(a) ? b : a), marks[0]);
+    if (!newest) return DEFAULT_MARK_COLOR;
+    const index = MARK_COLORS.findIndex((color) => color.id === newest.color);
+    return MARK_COLORS[(index + 1) % MARK_COLORS.length].id;
+  }
+
   /** @param {{ start: number, end: number | null, label?: string, color?: string }} fields */
   function add(fields) {
     const shape = fields.end === null ? "point" : "region";
-    const mark = normalizeMark({ label: nextLabel(shape), ...fields, id: `m${lastId + 1}` }, limits());
+    const mark = normalizeMark(
+      { label: nextLabel(shape), color: nextColor(), ...fields, id: `m${lastId + 1}` },
+      limits(),
+    );
     if (!mark || isRegion(mark) !== (shape === "region")) return null; // a region too short
     lastId++;
     commit([...marks, mark]);
@@ -163,7 +178,7 @@ export function createMarks({ minSeconds = 0.05 } = {}) {
     reset(trackDuration, saved) {
       duration = trackDuration;
       const restored = saved === undefined ? [] : parseMarks(saved, limits());
-      lastId = Math.max(0, ...restored.map((mark) => Number(/^m(\d+)$/.exec(mark.id)?.[1] ?? 0)));
+      lastId = Math.max(0, ...restored.map(idNumber));
       commit(restored);
     },
 

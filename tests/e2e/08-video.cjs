@@ -53,6 +53,23 @@ module.exports = async function (h) {
   check("video stays synced in loop (≥90% within 100 ms)", syncedShare >= 0.9, `${(syncedShare * 100).toFixed(1)}%`);
   await shot("video-loop.png");
 
+  // The loading label in the picture's bottom-right corner (video/view.js,
+  // style.css "Video loading") goes once all of the proxy is built.
+  const label = () =>
+    js(
+      `(() => { const l = document.querySelector("#videoPane > .video-loading"); return l && !l.hidden ? l.textContent : null; })()`,
+    );
+  let shownLabel = await label();
+  for (let i = 0; i < 150 && shownLabel !== null; i++) {
+    await sleep(100);
+    shownLabel = await label();
+  }
+  check(
+    "the loading label goes once the whole proxy is built",
+    shownLabel === null,
+    `${shownLabel}, built: ${await js(`document.getElementById("videoCanvas").dataset.proxyBuilt ?? ""`)}`,
+  );
+
   // A long video, dragged far in right after opening: its proxy isn't
   // built there yet (its builders start at the start, a half and a
   // quarter), so the overview answers, and a builder moves there (and a
@@ -95,16 +112,28 @@ module.exports = async function (h) {
   check("loading builds the proxy's overview", overviewFrames >= 10, `${overviewFrames} frames, load ${loadMs} ms`);
   const early = await builtParts();
   check("the proxy is built in several places at once", early.split(" ").length >= 2, `built: ${early}`);
-
-  // Far in, beyond the proxy: the overview answers at once, within one
-  // keyframe gap (20 s) of where the drag is.
-  s = await scrub(150, 200, 1600, 0);
-  const far = s.filter((q) => q.t > 200);
-  const near = far.filter((q) => Math.abs(q.frame - q.pos) <= 20).length / far.length;
+  const building = await label();
   check(
-    "a far drag shows a picture at once (≥90% within a keyframe gap)",
-    s.some((q) => q.proxy) && near >= 0.9,
-    `${(near * 100).toFixed(0)}%, built then: ${early}`,
+    "meanwhile, the picture says how much of the low-res preview is loaded",
+    /^Loading low-resolution preview \d+%$/.test(building ?? ""),
+    building,
+  );
+
+  // Far in, beyond the proxy: no wrong frames. Only frames near where
+  // the drag is are drawn (not the overview's keyframes, nor the decoder's
+  // on the way from the keyframe before, seconds off); meanwhile what is
+  // on screen stays, marked as loading, and the exact frame follows.
+  s = await scrub(150, 200, 1600, 2500);
+  const wrong = s.filter((q, i) => {
+    if (i === 0 || q.frame === s[i - 1].frame) return false;
+    const recent = s.filter((r) => r.t >= q.t - 600 && r.t <= q.t);
+    return !recent.some((r) => Math.abs(r.frame - r.pos) < 0.5 || Math.abs(q.frame - r.pos) < 0.5);
+  });
+  const farEnd = s.at(-1);
+  check(
+    "a far drag shows no wrong frames, says it's loading, then the exact frame",
+    wrong.length === 0 && s.some((q) => q.loading) && !farEnd.loading && Math.abs(farEnd.frame - farEnd.pos) < 0.05,
+    JSON.stringify({ wrong: wrong.slice(0, 3), end: farEnd, built: early }),
   );
   let parts = "";
   for (let i = 0; i < 60 && !covers(parts, 196, 205); i++) {
@@ -129,7 +158,7 @@ module.exports = async function (h) {
   const end = s.at(-1);
   check(
     "the sharp frame takes over after the drag",
-    !end.proxy && Math.abs(end.frame - end.pos) < 0.05,
+    !end.proxy && !end.loading && Math.abs(end.frame - end.pos) < 0.05,
     JSON.stringify(end),
   );
 
@@ -227,6 +256,10 @@ module.exports = async function (h) {
     }
     await sleep(300);
   };
+  // A pane wider than the 16:9 picture, so its sides are letterbox at 1×
+  // (the default split makes the pane about 16:9 itself).
+  await js(`import("./src/features/stage-split.js").then(({ setTimelineShare }) => setTimelineShare(0.4))`);
+  await sleep(400);
   const box = await paneBox();
   const edge = { x: box.left + 4, y: box.top + box.height / 2 }; // in the letterbox at 1×
   const at = { x: box.left + box.width * 0.4, y: box.top + box.height * 0.5 };
@@ -319,6 +352,22 @@ module.exports = async function (h) {
   check("…and a click on the level shows all of it", (await zoomNow()) === "");
   await wheelOver(at.x, at.y, 120, 3);
   await shot("video-zoom.png");
+  // The video's buttons together, bottom right (style.css, "Video controls"):
+  // the zoom, then its own window, then big video.
+  const videoButtons = await js(`(() => {
+    const bar = videoPane.querySelector(".video-controls"), b = bar.getBoundingClientRect(), p = videoPane.getBoundingClientRect();
+    const order = [...bar.children].map((c) => [c.className, Number(getComputedStyle(c).order)])
+      .sort((x, y) => x[1] - y[1]).map(([name]) => name.split(" ").find((n) => ["video-zoom-bar", "video-popout-button", "big-video-button"].includes(n)));
+    return { order, right: Math.round(p.right - b.right), bottom: Math.round(p.bottom - b.bottom), shown: getComputedStyle(bar).opacity === "1" };
+  })()`);
+  check(
+    "the video's buttons sit together in the bottom-right corner: zoom, own window, big video",
+    videoButtons.order.join() === "video-zoom-bar,video-popout-button,big-video-button" &&
+      videoButtons.right === 8 &&
+      videoButtons.bottom === 8 &&
+      videoButtons.shown,
+    JSON.stringify(videoButtons),
+  );
   await openFile(path.join(FIXTURES, "long-counter.webm"));
   check("a new file shows all of its picture", (await zoomNow()) === "" && (await zoomBar()).level === "1.0×");
 
@@ -330,7 +379,9 @@ module.exports = async function (h) {
     const from = Number(await js(`videoCanvas.dataset.frameTime`));
     await sleep(ms);
     const to = Number(await js(`videoCanvas.dataset.frameTime`));
-    const middle = await pixel(box.left + box.width / 2, box.top + box.height / 2);
+    // The pane as it is now (the stage split may have made it smaller).
+    const now = await paneBox();
+    const middle = await pixel(now.left + now.width / 2, now.top + now.height / 2);
     return { ok: to > from && !(await stopped()) && middle.some((c) => c > 60), from, to, middle };
   };
   await js(

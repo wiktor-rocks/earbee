@@ -141,6 +141,15 @@ module.exports = async function (h) {
       "…and its controls say how far",
       (await inWindow(`document.querySelector(".video-zoom-level").textContent`)) === `${zoom.toFixed(1)}×`,
     );
+    const corner = await inWindow(`(() => {
+      const bar = document.querySelector(".video-controls"), b = bar.getBoundingClientRect(), p = document.querySelector(".video-pane").getBoundingClientRect();
+      return { holdsZoom: bar.contains(document.querySelector(".video-zoom-bar")), right: Math.round(p.right - b.right), bottom: Math.round(p.bottom - b.bottom) };
+    })()`);
+    check(
+      "…in the bottom-right corner, as in the main window",
+      corner.holdsZoom && corner.right === 8 && corner.bottom === 8,
+      JSON.stringify(corner),
+    );
     contents.focus();
     contents.sendInputEvent({ type: "keyDown", keyCode: "0", modifiers: ["control"] });
     contents.sendInputEvent({ type: "keyUp", keyCode: "0", modifiers: ["control"] });

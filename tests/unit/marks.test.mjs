@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
 import { MARKS_VERSION, MarksFormatError, createMarks, parseMarks } from "../../src/marks/index.js";
-import { DEFAULT_MARK_COLOR } from "../../src/themes/index.js";
+import { DEFAULT_MARK_COLOR, MARK_COLORS } from "../../src/themes/index.js";
 
 const track = (duration = 60) => {
   const marks = createMarks({ minSeconds: 0.05 });
@@ -19,6 +19,11 @@ describe("the marks store", () => {
     assert.deepEqual(a, { id: "m1", start: 10, end: null, label: "Mark 1", color: DEFAULT_MARK_COLOR });
     assert.deepEqual([b.start, b.end, b.label], [4, 8, "Region 1"]);
     assert.equal(c.label, "Mark 2");
+    // Each new mark takes the colour after the newest one's.
+    assert.deepEqual(
+      [a, b, c].map((mark) => mark.color),
+      MARK_COLORS.slice(0, 3).map((color) => color.id),
+    );
     assert.deepEqual(
       marks.list().map((mark) => mark.id),
       ["m3", "m2", "m1"],

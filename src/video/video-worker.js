@@ -38,8 +38,12 @@
 //   page → { type: "view", view }  the zoom: { zoom, x, y } (zoom.js)
 //   ←      { type: "ready" }  once Mediabunny is loaded
 //   ←      { type: "shown", time, proxy, aspect }  each frame drawn (aspect: its width / height)
+//   ←      { type: "waiting" }  the frame asked for isn't decoded yet and the proxy isn't
+//          built there: what's on screen stays (marked as loading, view.js) until a frame
+//          there is drawn
 //   ←      { type: "zoom-failed" }  drawing zoomed in failed: back to the whole picture
-//   ←      { type: "built", built, overview }  the proxy's progress (text or null)
+//   ←      { type: "built", built, overview, progress }  the proxy's progress (text or null;
+//          progress: proxy.progress(), for "Loading low-resolution preview …%")
 //   ←      { type: "problem", message }  once per file
 //   ←      { type: "ready-points", times, allowed }  the points with a decoder
 //          ready, and how many this video may have (video/ready-budget.js)
@@ -522,7 +526,7 @@ function markBuilt(proxy) {
       .built()
       .map(([from, to]) => `${from.toFixed(1)}–${to.toFixed(1)}`)
       .join(" ");
-  post({ type: "built", built, overview: proxy && String(proxy.overviewCount()) });
+  post({ type: "built", built, overview: proxy && String(proxy.overviewCount()), progress: proxy && proxy.progress() });
 }
 
 /* ---------- Proxy fill-in ---------- */
@@ -559,12 +563,17 @@ async function serveProxy() {
       proxyRequest = null;
 
       const frame = await video.proxy.frameAt(time);
-      if (!frame) continue;
+      const wanted = mode === "playing" ? target : time; // the target may have moved meanwhile
+      if (!frame) {
+        // Not built there (asking moved a builder there): what is on screen
+        // stays, marked as loading, until the frame is decoded; never a
+        // frame from somewhere else.
+        if (video === current && !video.proxy.builtAt(time) && wantsProxy(wanted)) post({ type: "waiting" });
+        continue;
+      }
       try {
         // Draw only if still useful: the sharp picture may have caught up,
-        // or be nearer than this frame (one from the overview can be off
-        // by a keyframe gap).
-        const wanted = mode === "playing" ? target : time;
+        // or be nearer than this frame.
         const nearer = shownTime === null || Math.abs(frame.timestamp / 1e6 - wanted) < Math.abs(shownTime - wanted);
         if (video === current && wantsProxy(wanted) && nearer) drawProxy(frame);
       } finally {
@@ -715,10 +724,13 @@ async function run() {
           if (video !== current) continue;
           const reached = targetVersion === version;
           // The exact frame always replaces what's shown; a frame on the way
-          // (while dragging) only if it is closer than what's shown.
+          // (while dragging) only if it is closer than what's shown and
+          // near where the drag is: one from the keyframe before, seconds
+          // off, would be a wrong frame.
           if (frame && mode === "frame") {
-            const closer = Math.abs(target - frame.timestamp) < Math.abs(target - (shownTime ?? Infinity));
-            if (reached || closer) draw(frame, reached); // copied only once there
+            const off = Math.abs(target - frame.timestamp);
+            const closer = off < Math.abs(target - (shownTime ?? Infinity));
+            if (reached || (closer && off < CONFIG.video.proxy.useWhenOffBySeconds)) draw(frame, reached); // copied only once there
           }
           if (reached) break;
         } else if (mode === "playing") {

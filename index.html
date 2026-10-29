@@ -375,9 +375,9 @@
             id="sidebarToggle"
             class="icon-button"
             type="button"
-            title="Hide the marks"
-            aria-label="Show the marks"
-            aria-controls="sidebar"
+            title="Hide the side panel"
+            aria-label="Show the side panel"
+            aria-controls="panel"
             aria-pressed="true"
           >
             <svg class="icon" aria-hidden="true"><use href="#i-sidebar" /></svg>
@@ -420,6 +420,10 @@
         <div id="stage" class="stage">
           <div id="videoPane" class="video-pane" hidden>
             <canvas id="videoCanvas" aria-label="Video"></canvas>
+            <!-- The video's buttons (zoom, its own window, big video), bottom
+                 right, while the pointer is on the picture; each added by its
+                 feature. -->
+            <div class="video-controls"></div>
           </div>
 
           <div class="timeline">
@@ -434,8 +438,27 @@
           <div id="waveform-minimap" class="waveform-minimap" aria-label="Full track overview"></div>
         </div>
 
+        <!-- The transport, under the waveform: the time (and any message) on
+             the left; the step arrows, Play and Stop as rings in the middle;
+             the step size on the right. -->
         <section class="transport" aria-label="Transport">
-          <div class="transport-buttons">
+          <div class="transport-time">
+            <output id="trackTime" class="track-time" aria-label="Playback position and track duration"
+              >0:00.000 / 0:00.000</output
+            >
+            <div id="message" class="message" role="status"></div>
+          </div>
+
+          <div class="transport-controls">
+            <button
+              id="stepBack"
+              class="icon-button ring-button"
+              type="button"
+              title="Step back (←)"
+              aria-label="Step back"
+            >
+              <svg class="icon" aria-hidden="true"><use href="#i-step-back" /></svg>
+            </button>
             <button
               id="play"
               class="primary play-button"
@@ -446,27 +469,12 @@
               <svg class="icon icon-pause" aria-hidden="true"><use href="#i-pause" /></svg>
               <span id="playLabel" class="visually-hidden">Play</span>
             </button>
-            <button id="stop" class="icon-button" type="button" title="Stop (.)" aria-label="Stop">
+            <button id="stop" class="icon-button ring-button" type="button" title="Stop (.)" aria-label="Stop">
               <svg class="icon" aria-hidden="true"><use href="#i-stop" /></svg>
-            </button>
-          </div>
-
-          <!-- Stepping: the arrows with the step size between them. -->
-          <div class="step-group">
-            <button id="stepBack" class="icon-button" type="button" title="Step back (←)" aria-label="Step back">
-              <svg class="icon" aria-hidden="true"><use href="#i-step-back" /></svg>
-            </button>
-            <button
-              id="stepSize"
-              class="step-size"
-              type="button"
-              title="Step size: click for the next one (Shift+click: the one before), or ↑ / ↓"
-            >
-              Step 1 s
             </button>
             <button
               id="stepForward"
-              class="icon-button"
+              class="icon-button ring-button"
               type="button"
               title="Step forward (→)"
               aria-label="Step forward"
@@ -475,165 +483,199 @@
             </button>
           </div>
 
-          <output id="trackTime" class="track-time" aria-label="Playback position and track duration"
-            >0:00.000 / 0:00.000</output
-          >
-
-          <div id="message" class="message" role="status"></div>
-
-          <div class="transport-chips">
-            <button id="beatInfo" type="button" class="chip-button beat-info" hidden>♩ Find the beats</button>
+          <div class="transport-step">
             <button
-              id="startPoint"
+              id="stepSize"
+              class="step-size"
               type="button"
-              class="chip-button start-point"
-              title="Space plays from here (S sets it; click to go there)"
-              hidden
+              title="Step size: click for the next one (Shift+click: the one before), or ↑ / ↓"
             >
-              ▶ 0:00.000
+              Step 1 s
             </button>
-            <button
-              id="stopPoint"
-              type="button"
-              class="chip-button stop-point"
-              title="Playback last stopped here (Enter plays from here; click to go there)"
-              hidden
-            >
-              ■ 0:00.000
-            </button>
-            <output id="loopInfo" class="chip-button loop-info" aria-label="Loop" hidden></output>
           </div>
         </section>
 
-        <aside id="sidebar" class="sidebar" aria-labelledby="marksTitle">
-          <header class="sidebar-head">
-            <h2 id="marksTitle">Marks</h2>
-            <output id="marksCount" class="badge" aria-label="Number of marks"></output>
-            <div class="sidebar-actions">
+        <!-- The side panel: the sound, then the marks (the top bar's
+             button hides it all, and the stage takes its width). -->
+        <div id="panel" class="panel">
+          <!-- The sound dock: a column of knobs (ui/knob.js, over the range
+               inputs), each with its name and value beside it; double-click a
+               value to type one. The EQ bands' knobs are in a popover. -->
+          <section class="dock" aria-label="Sound">
+            <div class="dock-group speed-group">
+              <div class="knob-cell">
+                <input id="speed" type="range" aria-labelledby="speedTitle" />
+                <div class="knob-text">
+                  <h2 id="speedTitle">Speed</h2>
+                  <output id="speedValue" class="knob-value">1.00×</output>
+                </div>
+              </div>
+              <div id="speedChips" class="chips" aria-label="Speed presets"></div>
               <button
-                id="addPoint"
-                class="small"
+                id="speedMore"
+                class="chip speed-more"
                 type="button"
-                title="Mark a point where you are (M)"
-                aria-label="Mark a point"
+                popovertarget="speedPopover"
+                title="All speed presets"
+                aria-label="All speed presets"
               >
-                <svg class="icon" aria-hidden="true"><use href="#i-point" /></svg>
-                <span class="label">Point</span>
+                …
               </button>
-              <button
-                id="addRegion"
-                class="small"
-                type="button"
-                title="Start, then end, a region where you are (R)"
-                aria-label="Mark a region"
-              >
-                <svg class="icon" aria-hidden="true"><use href="#i-region" /></svg>
-                <span class="label">Region</span>
-              </button>
+              <div id="speedPopover" class="dock-popover" popover aria-label="Speed presets">
+                <div id="speedChipsAll" class="chips all-chips"></div>
+              </div>
             </div>
-          </header>
 
-          <div id="marksEmpty" class="marks-empty">
-            <svg class="icon marks-empty-icon" aria-hidden="true"><use href="#i-point" /></svg>
-            <p>No marks yet.</p>
-            <p>Press <kbd>M</kbd> to mark a point, <kbd>R</kbd> to start and end a region.</p>
-          </div>
-          <ol id="marksList" class="marks-list" aria-labelledby="marksTitle"></ol>
-        </aside>
+            <div class="dock-group pitch-group">
+              <div class="dock-title">
+                <h2>Pitch</h2>
+                <div class="dock-title-row">
+                  <output id="pitchValue" class="pitch-total">+0.00 st</output>
+                  <button
+                    id="resetPitch"
+                    class="icon-button small"
+                    type="button"
+                    title="Reset pitch"
+                    aria-label="Reset pitch"
+                  >
+                    <svg class="icon" aria-hidden="true"><use href="#i-reset" /></svg>
+                  </button>
+                </div>
+              </div>
+              <div class="knob-cell">
+                <input id="semitoneShift" type="range" />
+                <div class="knob-text">
+                  <label for="semitoneShift">Semitones</label>
+                  <output id="semitoneValue" class="knob-value">+0 st</output>
+                </div>
+              </div>
+              <div class="knob-cell">
+                <input id="centShift" type="range" />
+                <div class="knob-text">
+                  <label for="centShift">Fine</label>
+                  <output id="centValue" class="knob-value">+0 ct</output>
+                </div>
+              </div>
+            </div>
+
+            <div class="dock-group volume-group">
+              <div class="knob-cell">
+                <input id="volume" type="range" aria-labelledby="volumeTitle" />
+                <div class="knob-text">
+                  <h2 id="volumeTitle">Volume</h2>
+                  <output id="volumeValue" class="knob-value">100%</output>
+                </div>
+              </div>
+            </div>
+
+            <div id="eqSection" class="dock-group eq-group bypassed">
+              <div class="dock-title">
+                <h2>EQ</h2>
+                <div class="dock-title-row">
+                  <button id="eqToggle" class="small toggle" type="button" aria-pressed="false" aria-label="EQ on/off">
+                    Off
+                  </button>
+                  <button id="eqOpen" class="small eq-open" type="button" popovertarget="eqPopover">
+                    <svg class="icon" aria-hidden="true"><use href="#i-sliders" /></svg>
+                    Bands
+                  </button>
+                </div>
+              </div>
+              <div id="eqPopover" class="eq-popover" popover aria-label="EQ bands">
+                <div class="eq-popover-head">
+                  <h2>EQ bands</h2>
+                  <button id="resetEq" class="small" type="button">Reset</button>
+                </div>
+                <div id="eqKnobs" class="eq-knobs"></div>
+              </div>
+            </div>
+
+            <!-- The beats: the ♩ button finds them, then shows the tempo and
+                 opens the beats menu (features/beats.js), beside the panel. -->
+            <div class="dock-group beats-group">
+              <div class="dock-title">
+                <h2>Beats</h2>
+              </div>
+              <button id="beatInfo" type="button" class="beat-info" hidden>♩ Find the beats</button>
+            </div>
+
+            <!-- The points: where Space plays from (▶, S sets it) and where
+                 playback last stopped (■); a click goes there
+                 (features/playback.js). -->
+            <div class="dock-group points-group">
+              <div class="dock-title">
+                <h2>Points</h2>
+              </div>
+              <div class="points-chips">
+                <button
+                  id="startPoint"
+                  type="button"
+                  class="chip-button start-point"
+                  title="Space plays from here (S sets it; click to go there)"
+                  hidden
+                >
+                  ▶ 0:00.000
+                </button>
+                <button
+                  id="stopPoint"
+                  type="button"
+                  class="chip-button stop-point"
+                  title="Playback last stopped here (Enter plays from here; click to go there)"
+                  hidden
+                >
+                  ■ 0:00.000
+                </button>
+              </div>
+            </div>
+
+            <!-- The A–B loop: its span (renderLoopInfo in ui/dom.js), dimmed while
+                 it's off; with none, how to make one. -->
+            <div class="dock-group loop-group">
+              <div class="dock-title">
+                <h2>Loop</h2>
+              </div>
+              <output id="loopInfo" class="chip-button loop-info" aria-label="Loop" hidden></output>
+              <p class="loop-hint">Shift+drag on the waveform, or <kbd>[</kbd> and <kbd>]</kbd></p>
+            </div>
+          </section>
+
+          <aside id="sidebar" class="sidebar" aria-labelledby="marksTitle">
+            <header class="sidebar-head">
+              <h2 id="marksTitle">Marks</h2>
+              <output id="marksCount" class="badge" aria-label="Number of marks"></output>
+              <div class="sidebar-actions">
+                <button
+                  id="addPoint"
+                  class="small"
+                  type="button"
+                  title="Mark a point where you are (M)"
+                  aria-label="Mark a point"
+                >
+                  <svg class="icon" aria-hidden="true"><use href="#i-point" /></svg>
+                  <span class="label">Point</span>
+                </button>
+                <button
+                  id="addRegion"
+                  class="small"
+                  type="button"
+                  title="Start, then end, a region where you are (R)"
+                  aria-label="Mark a region"
+                >
+                  <svg class="icon" aria-hidden="true"><use href="#i-region" /></svg>
+                  <span class="label">Region</span>
+                </button>
+              </div>
+            </header>
+
+            <div id="marksEmpty" class="marks-empty">
+              <svg class="icon marks-empty-icon" aria-hidden="true"><use href="#i-point" /></svg>
+              <p>No marks yet.</p>
+              <p>Press <kbd>M</kbd> to mark a point, <kbd>R</kbd> to start and end a region.</p>
+            </div>
+            <ol id="marksList" class="marks-list" aria-labelledby="marksTitle"></ol>
+          </aside>
+        </div>
       </div>
-
-      <!-- The sound dock: one row of knobs (ui/knob.js, over the range
-           inputs), each with its name and value beside it; double-click a
-           value to type one. The EQ bands' knobs are in a popover. -->
-      <section class="dock" aria-label="Sound">
-        <div class="dock-group speed-group">
-          <div class="knob-cell">
-            <input id="speed" type="range" aria-labelledby="speedTitle" />
-            <div class="knob-text">
-              <h2 id="speedTitle">Speed</h2>
-              <output id="speedValue" class="knob-value">1.00×</output>
-            </div>
-          </div>
-          <div id="speedChips" class="chips" aria-label="Speed presets"></div>
-          <button
-            id="speedMore"
-            class="chip speed-more"
-            type="button"
-            popovertarget="speedPopover"
-            title="All speed presets"
-            aria-label="All speed presets"
-          >
-            …
-          </button>
-          <div id="speedPopover" class="dock-popover" popover aria-label="Speed presets">
-            <div id="speedChipsAll" class="chips all-chips"></div>
-          </div>
-        </div>
-
-        <div class="dock-group pitch-group">
-          <div class="dock-title">
-            <h2>Pitch</h2>
-            <div class="dock-title-row">
-              <output id="pitchValue" class="pitch-total">+0.00 st</output>
-              <button
-                id="resetPitch"
-                class="icon-button small"
-                type="button"
-                title="Reset pitch"
-                aria-label="Reset pitch"
-              >
-                <svg class="icon" aria-hidden="true"><use href="#i-reset" /></svg>
-              </button>
-            </div>
-          </div>
-          <div class="knob-cell">
-            <input id="semitoneShift" type="range" />
-            <div class="knob-text">
-              <label for="semitoneShift">Semitones</label>
-              <output id="semitoneValue" class="knob-value">+0 st</output>
-            </div>
-          </div>
-          <div class="knob-cell">
-            <input id="centShift" type="range" />
-            <div class="knob-text">
-              <label for="centShift">Fine</label>
-              <output id="centValue" class="knob-value">+0 ct</output>
-            </div>
-          </div>
-        </div>
-
-        <div class="dock-group volume-group">
-          <div class="knob-cell">
-            <input id="volume" type="range" aria-labelledby="volumeTitle" />
-            <div class="knob-text">
-              <h2 id="volumeTitle">Volume</h2>
-              <output id="volumeValue" class="knob-value">100%</output>
-            </div>
-          </div>
-        </div>
-
-        <div id="eqSection" class="dock-group eq-group bypassed">
-          <div class="dock-title">
-            <h2>EQ</h2>
-            <div class="dock-title-row">
-              <button id="eqToggle" class="small toggle" type="button" aria-pressed="false" aria-label="EQ on/off">
-                Off
-              </button>
-              <button id="eqOpen" class="small eq-open" type="button" popovertarget="eqPopover">
-                <svg class="icon" aria-hidden="true"><use href="#i-sliders" /></svg>
-                Bands
-              </button>
-            </div>
-          </div>
-          <div id="eqPopover" class="eq-popover" popover aria-label="EQ bands">
-            <div class="eq-popover-head">
-              <h2>EQ bands</h2>
-              <button id="resetEq" class="small" type="button">Reset</button>
-            </div>
-            <div id="eqKnobs" class="eq-knobs"></div>
-          </div>
-        </div>
-      </section>
     </div>
 
     <!-- The keyboard shortcuts, grouped (rendered from SHORTCUTS in app.js);

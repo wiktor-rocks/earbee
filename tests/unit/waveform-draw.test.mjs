@@ -31,8 +31,9 @@ function drawTrack(ratio) {
     // The slice of values the canvas is given, as WaveSurfer slices it.
     const start = Math.floor((left / TRACK_CSS) * VALUES);
     const end = Math.floor(((left + width) / TRACK_CSS) * VALUES);
-    const scale = (width * ratio) / canvas.width; // this canvas's px → the track's
-    const record = (x, y, w, h) => bars.push({ x: left * ratio + x * scale, height: h });
+    // This canvas's px → the track's, read once drawn (it may have widened).
+    const scale = () => (parseFloat(canvas.style.width) * ratio) / canvas.width;
+    const record = (x, y, w, h) => bars.push({ x: left * ratio + x * scale(), height: h });
     const ctx = {
       canvas,
       beginPath() {},
@@ -135,4 +136,73 @@ describe("the continuous shape across canvases", () => {
       "one point per column, left to right",
     );
   });
+});
+
+// Every canvas but the last reaches past its seam, over the next one, so
+// the screen's rounding under display scaling never leaves a pixel of
+// background between them; the shape there matches the next canvas's.
+describe("canvases overlap at the seams", () => {
+  const values = 5000;
+  const levels = Float32Array.from({ length: values }, (_, i) => 0.2 + 0.7 * Math.abs(Math.sin(i / 37)));
+  const both = { top: { peak: levels, rms: levels }, bottom: { peak: levels, rms: levels } };
+  for (const dpr of [0.9, 1.25]) {
+    const ratio = Math.max(1, dpr);
+    const canvases = [];
+    for (let left = 0; left < TRACK_CSS; left += CANVAS_CSS) {
+      const width = Math.min(CANVAS_CSS, TRACK_CSS - left);
+      const canvas = {
+        width: Math.round(width * ratio),
+        height: Math.round(HEIGHT_CSS * ratio),
+        style: { left: `${left}px`, width: `${width}px` },
+      };
+      const points = [];
+      const ctx = {
+        canvas,
+        fillStyle: "#abc",
+        beginPath() {},
+        moveTo: (x, y) => points.push([x, y]),
+        lineTo: (x, y) => points.push([x, y]),
+        closePath() {},
+        fill() {},
+      };
+      const start = Math.floor((left / TRACK_CSS) * values);
+      const end = Math.floor(((left + width) / TRACK_CSS) * values);
+      drawWaveform(
+        /** @type {any} */ (ctx),
+        both,
+        start,
+        end - start,
+        { ...LOOK, style: "continuous" },
+        {
+          trackWidth: TRACK_CSS,
+          pixelRatio: ratio,
+        },
+      );
+      const turn = points.findIndex((point, i) => i > 0 && point[0] <= points[i - 1][0]);
+      canvases.push({ left, width, canvas, fillStyle: ctx.fillStyle, top: points.slice(0, turn) });
+    }
+
+    test(`at ${dpr * 100} %: each canvas but the last reaches 2 px past its seam`, () => {
+      const last = canvases.length - 1;
+      canvases.forEach(({ width, canvas, fillStyle }, k) => {
+        const wide = k < last ? width + 2 : width;
+        assert.equal(canvas.style.width, `${wide}px`, `canvas ${k}`);
+        assert.equal(canvas.width, Math.round(wide * ratio), `canvas ${k}`);
+        assert.equal(fillStyle, "#abc", `canvas ${k} keeps its fill colour`);
+      });
+    });
+
+    test(`at ${dpr * 100} %: over the seam, the shape matches the next canvas's`, () => {
+      for (let k = 1; k < canvases.length; k++) {
+        const before = canvases[k - 1];
+        const after = canvases[k];
+        // The overlap, in the earlier canvas's px and in the next one's.
+        for (const css of [0, 1, 2]) {
+          const mine = heightAt(before.top, (after.left - before.left + css) * ratio);
+          const next = heightAt(after.top, css * ratio);
+          assert.ok(Math.abs(mine - next) <= 1, `seam ${k}, +${css} px: ${mine} vs ${next}`);
+        }
+      }
+    });
+  }
 });

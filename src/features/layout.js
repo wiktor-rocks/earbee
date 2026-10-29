@@ -1,9 +1,9 @@
 /* =====================================================================
  * LAYOUT
  * The keyboard shortcuts dialog: opened by the ? button and the ? key,
- * closed by its Close button, Esc, or a click on the backdrop. The marks
- * sidebar: hidden and shown again by its button in the top bar (the
- * choice is remembered on this computer).
+ * closed by its Close button, Esc, or a click on the backdrop. The side
+ * panel (the sound, then the marks): hidden and shown again by its button
+ * in the top bar (the choice is remembered on this computer).
  * ===================================================================== */
 
 import { dom, onClick } from "../ui/dom.js";
@@ -16,19 +16,20 @@ export function openShortcuts() {
 const SIDEBAR_KEY = "earbee.sidebarHidden";
 const OLD_SIDEBAR_KEY = "scribee.sidebarHidden"; // the app's old name (ScriBee, until 0.1.1)
 
-// Hides or shows the marks sidebar; the timeline takes its width.
+// Hides or shows the side panel; the stage takes its width. (Its key
+// keeps the name from when it held only the marks.)
 function showSidebar(shown) {
-  dom.sidebar.hidden = !shown;
+  dom.panel.hidden = !shown;
   dom.workspace.classList.toggle("sidebar-hidden", !shown);
   dom.sidebarToggle.setAttribute("aria-pressed", String(shown));
-  dom.sidebarToggle.title = shown ? "Hide the marks" : "Show the marks";
+  dom.sidebarToggle.title = shown ? "Hide the side panel" : "Show the side panel";
 }
 
 function bindSidebarToggle() {
-  // Without browser storage the sidebar just shows.
+  // Without browser storage the panel just shows.
   showSidebar((readStored(SIDEBAR_KEY) ?? readStored(OLD_SIDEBAR_KEY)) !== "true");
   onClick(dom.sidebarToggle, () => {
-    const shown = dom.sidebar.hidden;
+    const shown = dom.panel.hidden;
     showSidebar(shown);
     store(SIDEBAR_KEY, String(!shown));
   });

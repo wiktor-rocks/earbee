@@ -95,6 +95,7 @@ webFrame.executeJavaScript(`
         pos: __parseTime(document.getElementById("trackTime").textContent),
         frame: Number(frameTime),
         proxy: proxy !== undefined,
+        loading: document.getElementById("videoPane").classList.contains("loading-frame"), // waiting for the frame
       });
       if (performance.now() - t0 < ms) requestAnimationFrame(tick); else resolve(out);
     })();

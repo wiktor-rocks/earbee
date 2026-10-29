@@ -246,12 +246,18 @@ module.exports = async function (h) {
     JSON.stringify(zoomed),
   );
 
-  const bars = await measure();
-  check("Bars (the default): bars with gaps between them", bars.empty >= 0.2, round(bars));
-  await shot("waveform-bars.png");
+  const initial = await measure();
+  check("Continuous (the default): one shape, no gaps", initial.empty <= 0.02 && initial.median >= 0.4, round(initial));
 
   const opened = await openSettings();
   check("Settings has a Waveform tab", opened && (await js(`!document.getElementById("settings-waveform")?.hidden`)));
+
+  const toBars = await choose("style", "bars");
+  const bars = await measure();
+  check("Bars: bars with gaps between them", toBars && bars.empty >= 0.2, round(bars));
+  await closeSettings();
+  await shot("waveform-bars.png");
+  await openSettings();
 
   const toContinuous = await choose("style", "continuous");
   const continuous = await measure();
@@ -357,7 +363,7 @@ module.exports = async function (h) {
 
   // Back to the defaults for whatever runs next.
   for (const [field, value] of Object.entries({
-    style: "bars",
+    style: "continuous",
     measure: "loudness",
     scale: "linear",
     stereo: "combined",

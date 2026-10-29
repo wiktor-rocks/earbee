@@ -39,7 +39,7 @@ export function setTimelineShare(share) {
   stage.style.setProperty("--timeline-min", `${minTimeline}px`);
 }
 
-// Back to the layout before any drag: 40 % and at least 170 px (style.css).
+// Back to the layout before any drag: 23 % and at least 140 px (style.css).
 export function resetTimelineShare() {
   stage.style.removeProperty("--timeline-share");
   stage.style.removeProperty("--timeline-min");
@@ -58,13 +58,14 @@ export function bindStageSplit() {
   const timeline = /** @type {HTMLElement} */ (stage.querySelector(".timeline"));
   const minimap = $("waveform-minimap");
 
-  // The timeline's height for the pointer at `y`: the handle's middle
-  // follows the pointer. Kept so the timeline and the picture both keep
-  // their least heights.
+  // The timeline's height for the pointer at `y`: the handle's middle sits
+  // on the timeline's top edge (style.css), so that edge follows the
+  // pointer. Kept so the timeline and the picture both keep their least
+  // heights.
   function timelineHeightAt(y) {
     const gap = Number.parseFloat(getComputedStyle(stage).rowGap) || 0;
     const room = stage.clientHeight - minimap.offsetHeight - 2 * gap;
-    const wanted = timeline.getBoundingClientRect().bottom - y - handle.offsetHeight / 2;
+    const wanted = timeline.getBoundingClientRect().bottom - y;
     return clamp(wanted, CONFIG.stage.minTimeline, Math.max(CONFIG.stage.minTimeline, room - CONFIG.stage.minVideo));
   }
 

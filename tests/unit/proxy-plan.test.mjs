@@ -2,7 +2,7 @@
 // a time asked for, splitting a busy builder's part, filling gaps.
 import assert from "node:assert/strict";
 import { describe, test } from "node:test";
-import { covers, nextRange, reachedSoon } from "../../src/video/proxy-plan.js";
+import { covers, keepsFrame, nextRange, reachedSoon } from "../../src/video/proxy-plan.js";
 
 const options = { duration: 600, leadSeconds: 5, minSplitSeconds: 20 };
 const run = (start, end, extra = {}) => ({ start, end, first: false, last: false, ...extra });
@@ -95,5 +95,36 @@ describe("nextRange", () => {
     const runs = [run(0, 100, { first: true })];
     const range = nextRange(runs, [job(300, Infinity, 350)], 200, options);
     assert.deepEqual(range, { from: 195, to: 300, lower: 100, after: -1, split: -1 });
+  });
+});
+
+describe("keepsFrame: thinning to at most 30 fps", () => {
+  // Keeps frames as the proxy's builder does: each kept one sets the next
+  // time a frame period on.
+  const kept = (times, duration, maxFps = 30) => {
+    const out = [];
+    let next = -Infinity;
+    for (const time of times) {
+      if (!keepsFrame(time, next, duration)) continue;
+      out.push(time);
+      next = time + 1 / maxFps;
+    }
+    return out;
+  };
+
+  test("a 30 fps file with times rounded to the millisecond keeps every frame", () => {
+    const times = [20, 20.033, 20.067, 20.1, 20.133, 20.167, 20.2];
+    assert.deepEqual(kept(times, 0.033), times);
+  });
+
+  test("60 fps is thinned to every other frame", () => {
+    const times = Array.from({ length: 7 }, (_, i) => i / 60);
+    assert.deepEqual(kept(times, 1 / 60), [0, 2 / 60, 4 / 60, 6 / 60]);
+  });
+
+  test("24 fps keeps every frame; with no duration, times must be a full period apart", () => {
+    const times = Array.from({ length: 5 }, (_, i) => i / 24);
+    assert.deepEqual(kept(times, 1 / 24), times);
+    assert.deepEqual(kept([0, 0.033, 0.067], 0), [0, 0.067]);
   });
 });

@@ -84,6 +84,7 @@ export const dom = {
   helpButton: $("helpButton"),
   sidebarToggle: $("sidebarToggle"),
   sidebar: $("sidebar"),
+  panel: $("panel"),
   workspace: $("workspace"),
   marksList: $("marksList"),
   marksEmpty: $("marksEmpty"),
@@ -135,15 +136,21 @@ export function renderTransportState(state) {
   for (const button of transportButtons()) button.disabled = state === "empty";
 }
 
-// The position large, the duration after it smaller ("1:05.250 / 3:41.000").
+// The position large, its milliseconds dimmer, the duration after it
+// smaller ("1:05" ".250" " / 3:41.000").
 const timeParts = {
   position: element("span", { className: "time-position" }),
+  fraction: element("span", { className: "time-fraction" }),
   total: element("span", { className: "time-total" }),
 };
 export function renderTrackTime(position) {
-  if (!timeParts.position.isConnected) dom.trackTime.replaceChildren(timeParts.position, timeParts.total);
+  if (!timeParts.position.isConnected)
+    dom.trackTime.replaceChildren(timeParts.position, timeParts.fraction, timeParts.total);
   const shown = formatTrackTime(position);
-  if (timeParts.position.textContent !== shown) timeParts.position.textContent = shown;
+  const dot = shown.lastIndexOf(".");
+  const [whole, fraction] = [shown.slice(0, dot), shown.slice(dot)];
+  if (timeParts.position.textContent !== whole) timeParts.position.textContent = whole;
+  if (timeParts.fraction.textContent !== fraction) timeParts.fraction.textContent = fraction;
   const total = ` / ${formatTrackTime(player.transport.duration)}`;
   if (timeParts.total.textContent !== total) timeParts.total.textContent = total;
 }
@@ -154,7 +161,7 @@ export function renderStepSize() {
   dom.stepSize.textContent = typeof stepSize === "string" ? `Step 1 ${stepSize}` : `Step ${formatStepSize(stepSize)} s`;
 }
 
-// The beats chip in the transport bar: a button that finds them, their
+// The beats button in the side panel: it finds them, then shows their
 // progress, then the tempo (and the tempo heard, at another speed, and
 // the progress while the model fills in the rest); dimmed while their
 // lines are hidden. Its tooltip says which finder found them.
@@ -187,9 +194,9 @@ export function renderBeatInfo() {
   }
 }
 
-// The loop readout next to the track time; dimmed while the loop is off.
-// Kept short (↻, like the ▶ and ■ chips) so the transport stays one row;
-// the tooltip has it in full in case the chip is cut off.
+// The loop readout, in the side panel's Loop section; dimmed while the
+// loop is off. Kept short (↻, like the ▶ and ■ chips); the tooltip has it
+// in full in case the chip is cut off.
 export function renderLoopInfo(region) {
   dom.loopInfo.hidden = !region;
   if (!region) return;

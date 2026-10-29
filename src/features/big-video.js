@@ -6,7 +6,7 @@
  * the whole track (like a video player's timeline: click or drag to seek,
  * no zooming) and the transport.
  *
- *   On / off   F, the button over the picture (on hover), or a
+ *   On / off   F, the button at the picture's bottom right, or a
  *              double-click on the picture; Esc leaves it. It lasts while videos follow
  *              one another; an audio file or a restart ends it. Leaving
  *              it gives the waveform its zoom back, on what is playing.
@@ -79,7 +79,7 @@ export function bindBigVideo() {
   button = element("button", { type: "button", className: "icon-button small big-video-button" });
   button.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#i-enlarge" /></svg>`;
   onClick(button, toggleBigVideo);
-  pane.append(button);
+  (pane.querySelector(".video-controls") ?? pane).append(button);
   // has-video comes and goes with the video window (and with a video).
   new MutationObserver(render).observe(stage, { attributes: true, attributeFilter: ["class"] });
   // A double-click on the picture, not on its buttons.

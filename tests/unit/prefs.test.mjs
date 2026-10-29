@@ -173,8 +173,14 @@ describe("the waveform section", () => {
   const waveform = getSection("waveform");
   const values = defaultsOf(waveform);
 
-  test("defaults: bars of loudness, linear, stereo combined, normal height", () => {
-    assert.deepEqual(values, { style: "bars", measure: "loudness", scale: "linear", stereo: "combined", height: 100 });
+  test("defaults: a continuous shape of loudness, linear, stereo combined, normal height", () => {
+    assert.deepEqual(values, {
+      style: "continuous",
+      measure: "loudness",
+      scale: "linear",
+      stereo: "combined",
+      height: 100,
+    });
     assert.ok(!waveform.electronOnly, "the waveform settings work in a plain browser too");
   });
 

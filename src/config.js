@@ -188,7 +188,7 @@ export const CONFIG = {
   // timeline at least `minTimeline` px (style.css's --timeline-min is the
   // same) and the picture at least `minVideo` px; a share read from a
   // project file is kept within `minShare`–`maxShare`.
-  stage: { timelineShare: 0.4, minTimeline: 110, minVideo: 120, minShare: 0.1, maxShare: 0.9 },
+  stage: { timelineShare: 0.23, minTimeline: 110, minVideo: 120, minShare: 0.1, maxShare: 0.9 },
 
   beats: {
     // The beat lines over the waveform (B; features/beats.js) are hidden

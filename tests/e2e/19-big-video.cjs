@@ -13,7 +13,8 @@ module.exports = async function (h) {
 
   const layout = () =>
     js(`(() => {
-      const shown = (selector) => getComputedStyle(document.querySelector(selector)).display !== "none";
+      // Shown on the page (the dock and the sidebar go with the side panel).
+      const shown = (selector) => document.querySelector(selector).checkVisibility();
       const host = document.querySelector("#waveform > div").shadowRoot;
       const pane = document.getElementById("videoPane");
       const box = pane.getBoundingClientRect();
@@ -36,7 +37,7 @@ module.exports = async function (h) {
         sidebarKey: localStorage.getItem("earbee.sidebarHidden"),
       };
     })()`);
-  const isNormal = (l) => !l.big && l.topbar && l.dock && l.minimap && l.timeline >= 170;
+  const isNormal = (l) => !l.big && l.topbar && l.dock && l.minimap && l.timeline >= 140;
   // The wheel over the waveform (zooms in, unless held at fit).
   const wheelIn = () =>
     js(`(() => {
@@ -92,8 +93,8 @@ module.exports = async function (h) {
   };
   const s0 = await split();
   check(
-    "the split handle shows with a video, in the gap above the timeline",
-    s0.shown && Math.abs(s0.top - s0.pane) < 1 && Math.abs(s0.bottom - s0.timelineTop) < 1,
+    "the split handle shows with a video, on the edge between the picture and the timeline",
+    s0.shown && Math.abs((s0.top + s0.bottom) / 2 - s0.pane) < 1 && Math.abs(s0.pane - s0.timelineTop) < 1,
     JSON.stringify(s0),
   );
   await dragSplit(-100);

@@ -25,7 +25,7 @@ module.exports = async function (h) {
     })()`);
 
   await ensurePaused();
-  check("starts with the default theme", (await themeId()) === "earbee" && (await variable("--bg")) === "#0e1014");
+  check("starts with the default theme", (await themeId()) === "earbee" && (await variable("--bg")) === "#0f0c0a");
 
   // The menu: opens on the current theme, keeps shortcuts away, arrows move.
   await js(`document.getElementById("themeButton").click()`);
@@ -45,7 +45,7 @@ module.exports = async function (h) {
   await ensurePaused();
   key("Down");
   await sleep(100);
-  check("↓ moves to the next theme", (await js(`document.activeElement.dataset.choice`)) === "monokai");
+  check("↓ moves to the next theme", (await js(`document.activeElement.dataset.choice`)) === "earbee-graphite");
 
   // Switching: variables, page, both waveform canvases, saved.
   const nordBg = "#2e3440";
@@ -179,5 +179,5 @@ module.exports = async function (h) {
   await pick("earbee");
   await sleep(300);
   wc.focus();
-  check("back to the default theme", (await variable("--bg")) === "#0e1014");
+  check("back to the default theme", (await variable("--bg")) === "#0f0c0a");
 };

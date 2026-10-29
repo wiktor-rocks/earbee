@@ -5,30 +5,82 @@
 
 /** @typedef {import("./index.js").Theme} Theme */
 
-// EarBee: the app's own dark theme, amber on graphite.
-// style.css :root holds the same values as the fallback (a unit test keeps
-// them equal).
+// EarBee: the app's own dark theme, amber on a warm brown-black (espresso),
+// no blue in its greys. style.css :root holds the same values as the
+// fallback (a unit test keeps them equal).
 /** @type {Theme} */
 const earbee = {
   id: "earbee",
   name: "EarBee",
   scheme: "dark",
   colors: {
-    bg: "#0e1014",
-    surface: "#161920",
-    surface2: "#1d212a",
-    surfaceHover: "#262b36",
-    border: "#2a2f3a",
-    text: "#e6e8ee",
-    muted: "#8b93a7",
+    bg: "#0f0c0a",
+    surface: "#17120e",
+    surface2: "#261f19",
+    surfaceHover: "#30281f",
+    border: "#3b3129",
+    text: "#f1e9de",
+    muted: "#aa9b8a",
     accent: "#f5b301",
     accentHover: "#ffc52e",
     accentInk: "#1a1400",
     danger: "#ff6b6b",
     loop: "#4cc9f0",
-    wave: "#3b4252",
-    minimapWave: "#343a48",
-    minimapProgress: "#8a6a12",
+    wave: "#4b3f34",
+    minimapWave: "#3a3129",
+    minimapProgress: "#8f6d14",
+    cursor: "#ffffff",
+  },
+};
+
+// EarBee Graphite: EarBee's amber on neutral greys, with no hue at all.
+/** @type {Theme} */
+const earbeeGraphite = {
+  id: "earbee-graphite",
+  name: "EarBee Graphite",
+  scheme: "dark",
+  colors: {
+    bg: "#0e0e0e",
+    surface: "#171717",
+    surface2: "#252525",
+    surfaceHover: "#2f2f2f",
+    border: "#393939",
+    text: "#eeeeee",
+    muted: "#a2a2a2",
+    accent: "#f5b301",
+    accentHover: "#ffc52e",
+    accentInk: "#1a1400",
+    danger: "#ff6b6b",
+    loop: "#4cc9f0",
+    wave: "#464646",
+    minimapWave: "#363636",
+    minimapProgress: "#8f6d14",
+    cursor: "#ffffff",
+  },
+};
+
+// EarBee Moss: EarBee's amber on smoky grey-greens, like old studio gear.
+/** @type {Theme} */
+const earbeeMoss = {
+  id: "earbee-moss",
+  name: "EarBee Moss",
+  scheme: "dark",
+  colors: {
+    bg: "#0d0f0c",
+    surface: "#161914",
+    surface2: "#232820",
+    surfaceHover: "#2c3228",
+    border: "#363d30",
+    text: "#e9ecdf",
+    muted: "#9ea592",
+    accent: "#f5b301",
+    accentHover: "#ffc52e",
+    accentInk: "#1a1400",
+    danger: "#ff6b6b",
+    loop: "#4cc9f0",
+    wave: "#434b3a",
+    minimapWave: "#343a2e",
+    minimapProgress: "#8f6d14",
     cursor: "#ffffff",
   },
 };
@@ -434,6 +486,8 @@ const everforestLight = {
 /** @type {Theme[]} */
 export const THEMES = [
   earbee,
+  earbeeGraphite,
+  earbeeMoss,
   monokai,
   dracula,
   nord,
