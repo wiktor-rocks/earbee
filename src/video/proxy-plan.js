@@ -22,6 +22,13 @@
 
 export const EPSILON = 1e-4; // s; times closer than this are the same
 
+// Whether a frame at `time` is kept when thinning to at most maxFps:
+// `nextTime` is a frame period after the last one kept, less half a frame
+// of the source (`duration`, s), as files round their times: a 30 fps
+// WebM's frames are 33 and 34 ms apart, never 33.3, and a strict check
+// would drop every other one.
+export const keepsFrame = (time, nextTime, duration) => time >= nextTime - Math.max(EPSILON, (duration || 0) / 2);
+
 export const covers = (run, time) =>
   (run.first || run.start <= time + EPSILON) && (run.last || time <= run.end + EPSILON);
 

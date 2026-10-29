@@ -39,11 +39,15 @@
  * for (overviewReady, at most a few seconds), then the whole video, by
  * several builders at once; a position asked for that isn't built yet
  * moves a builder there. When the sharp frame for a position isn't
- * ready, the proxy frame for exactly that time is drawn instead (or the
- * overview's nearest one, if that is nearer than what is on screen), at
- * full frame rate, and the sharp frames take over once decoded. The
- * canvas's data-proxy-built shows what is built, data-proxy-overview the
- * overview's frames.
+ * ready, the proxy frame for exactly that time is drawn instead, at full
+ * frame rate, and the sharp frames take over once decoded. Where the proxy
+ * isn't built yet, nothing else stands in (the overview's keyframes would
+ * be seconds off: a wrong frame): what is on screen stays, dimmed and
+ * marked "Loading the frame" (the pane's "loading-frame" class), until
+ * the frame is decoded. While the proxy is being built, the pane says how
+ * far ("Loading low-resolution preview 43%", in a .video-loading label
+ * placed just left of the video's controls; style.css "Video loading"). The canvas's data-proxy-built shows what is built,
+ * data-proxy-overview the overview's frames.
  *
  * Ready points: where jumps are expected (the loop start, the start
  * point, the marks Shift+← / Shift+→ go to), set by those features with
@@ -189,9 +193,12 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
       case "shown":
         if (data.aspect > 0) aspect = data.aspect;
         return showing && markShown(data.time, data.proxy);
+      case "waiting":
+        return showing && pane.classList.add("loading-frame");
       case "built":
         builtText = data.built;
         overviewText = data.overview;
+        progress = data.progress ?? null;
         return showBuilt();
       case "problem":
         return onProblem(data.message);
@@ -280,8 +287,10 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
     onVisibilityChange(false);
     delete canvas.dataset.frameTime;
     delete canvas.dataset.proxy;
+    pane.classList.remove("loading-frame");
     builtText = null;
     overviewText = null;
+    progress = null;
     readyText = null;
     allowedText = null;
     showBuilt();
@@ -291,10 +300,12 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
 
   // The canvas carries what's on screen (used by tests and handy in
   // DevTools): data-frame-time, plus data-proxy while a proxy frame shows.
+  // A frame drawn ends the wait for one.
   function markShown(time, isProxy) {
     canvas.dataset.frameTime = time.toFixed(3);
     if (isProxy) canvas.dataset.proxy = "";
     else delete canvas.dataset.proxy;
+    pane.classList.remove("loading-frame");
   }
 
   // And data-proxy-built: the parts of the proxy built so far, as
@@ -305,7 +316,15 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
   let overviewText = null;
   let readyText = null;
   let allowedText = null;
+  /** @type {{ parts: number[][], complete: boolean } | null} */
+  let progress = null; // the proxy's, for the pane's label
   function showBuilt() {
+    const label = loadingLabel();
+    label.hidden = progress === null || progress.complete;
+    if (!label.hidden) {
+      const built = progress.parts.reduce((sum, [from, to]) => sum + (to - from), 0);
+      label.textContent = `Loading low-resolution preview ${Math.floor(built * 100)}%`;
+    }
     if (builtText === null) delete canvas.dataset.proxyBuilt;
     else canvas.dataset.proxyBuilt = builtText;
     if (overviewText === null) delete canvas.dataset.proxyOverview;
@@ -398,14 +417,33 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
 
   // The observer comes from the pane's window, so it sees that window's
   // layout.
+  // The pane's loading label (made once per pane, which may be in the
+  // video window's page).
+  function loadingLabel() {
+    let label = /** @type {HTMLOutputElement | null} */ (pane.querySelector(":scope > .video-loading"));
+    if (!label) {
+      label = pane.ownerDocument.createElement("output");
+      label.className = "video-loading";
+      label.hidden = true;
+      pane.append(label);
+    }
+    return label;
+  }
+
+  // The pane's size, for the canvas; and the width of the video's
+  // controls (bottom right, if the pane has them), which the loading
+  // label keeps clear of (--video-controls-width).
   function observePane() {
     resizeObserver?.disconnect();
-    resizeObserver = new (paneWindow().ResizeObserver)(() => {
-      if (pane.hidden) return;
+    const controls = /** @type {HTMLElement | null} */ (pane.querySelector(".video-controls"));
+    resizeObserver = new (paneWindow().ResizeObserver)((entries) => {
+      if (controls) pane.style.setProperty("--video-controls-width", `${controls.offsetWidth}px`);
+      if (pane.hidden || !entries.some((entry) => entry.target === pane)) return;
       resizeCanvas();
       keepZoomInPane();
     });
     resizeObserver.observe(pane);
+    if (controls) resizeObserver.observe(controls);
   }
   observePane();
 
@@ -425,7 +463,11 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
 
     pane.classList.remove("zoomed");
     delete canvas.dataset.zoom;
+    const loading = pane.classList.contains("loading-frame");
+    pane.classList.remove("loading-frame");
+    loadingLabel().hidden = true;
     ({ pane, canvas } = surface);
+    pane.classList.toggle("loading-frame", loading);
     setZoom(zoomView); // (its classes and data-zoom, on the new pane)
     surfaceId = surfaceFor(canvas);
     observePane();

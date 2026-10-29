@@ -3354,6 +3354,66 @@ body.panel-order-dragging * {
   color: var(--muted);
 }
 
+/* ---------- Video loading (video/view.js) ----------
+   While the video's low-res copy is being built, its progress just left
+   of the video's controls, bottom right ("Loading low-resolution preview
+   43%", .video-loading; view.js measures the controls' width). Where it
+   isn't built yet, a jump keeps what is on screen, dimmed and marked
+   "Loading the frame" (.loading-frame), until the exact frame is
+   decoded; only after a moment, so a quick catch-up shows nothing. White
+   on dark glass, like the controls, and as tall. */
+
+.video-loading,
+.video-pane::before {
+  position: absolute;
+  z-index: 1;
+  border-radius: 999px;
+  background: color-mix(in srgb, #000 55%, transparent);
+  color: #fff;
+  font: 700 11px var(--sans);
+  letter-spacing: 0.02em;
+  pointer-events: none;
+}
+
+.video-loading {
+  display: flex;
+  right: calc(var(--video-controls-width, 0px) + 14px);
+  bottom: 8px;
+  align-items: center;
+  height: 30px;
+  padding: 0 11px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.video-loading[hidden] {
+  display: none;
+}
+
+.video-pane::before {
+  content: "Loading the frame…";
+  top: 50%;
+  left: 50%;
+  padding: 4px 9px;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+  transition: opacity 0.12s;
+}
+
+.video-pane canvas {
+  transition: filter 0.12s;
+}
+
+.video-pane.loading-frame::before {
+  opacity: 1;
+  transition-delay: 0.15s;
+}
+
+.video-pane.loading-frame canvas {
+  filter: brightness(0.5);
+  transition-delay: 0.15s;
+}
+
 /* ---------- Video controls ----------
    The video's buttons (the zoom, its own window, big video), each added
    by its feature into one bar in the picture's bottom-right corner, like
