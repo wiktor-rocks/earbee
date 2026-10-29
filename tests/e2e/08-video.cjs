@@ -323,6 +323,22 @@ module.exports = async function (h) {
   check("…and a click on the level shows all of it", (await zoomNow()) === "");
   await wheelOver(at.x, at.y, 120, 3);
   await shot("video-zoom.png");
+  // The video's buttons together, bottom right (style.css, "Video controls"):
+  // the zoom, then its own window, then big video.
+  const videoButtons = await js(`(() => {
+    const bar = videoPane.querySelector(".video-controls"), b = bar.getBoundingClientRect(), p = videoPane.getBoundingClientRect();
+    const order = [...bar.children].map((c) => [c.className, Number(getComputedStyle(c).order)])
+      .sort((x, y) => x[1] - y[1]).map(([name]) => name.split(" ").find((n) => ["video-zoom-bar", "video-popout-button", "big-video-button"].includes(n)));
+    return { order, right: Math.round(p.right - b.right), bottom: Math.round(p.bottom - b.bottom), shown: getComputedStyle(bar).opacity === "1" };
+  })()`);
+  check(
+    "the video's buttons sit together in the bottom-right corner: zoom, own window, big video",
+    videoButtons.order.join() === "video-zoom-bar,video-popout-button,big-video-button" &&
+      videoButtons.right === 8 &&
+      videoButtons.bottom === 8 &&
+      videoButtons.shown,
+    JSON.stringify(videoButtons),
+  );
   await openFile(path.join(FIXTURES, "long-counter.webm"));
   check("a new file shows all of its picture", (await zoomNow()) === "" && (await zoomBar()).level === "1.0×");
 

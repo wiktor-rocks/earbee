@@ -3027,8 +3027,7 @@ button.beat-info.disabled {
 
 /* ---------- Panel order (src/features/panel-order.js) ----------
    Each section of the side panel has a grip on its left edge, in its
-   padding: hidden until the pointer is over the section, then faint,
-   full while it's pointed at or focused. Dragging it dims the section and
+   padding, always shown: faint, full while it's pointed at or focused. Dragging it dims the section and
    shows a line where it would land. The sound sections below the marks
    are in a second dock (.dock-below); a dock with no sections takes no
    room. */
@@ -3067,7 +3066,7 @@ button.beat-info.disabled {
   background: none;
   color: var(--muted);
   cursor: grab;
-  opacity: 0;
+  opacity: 0.5;
   touch-action: none;
 }
 
@@ -3075,11 +3074,6 @@ button.beat-info.disabled {
   width: 8px;
   height: 14px;
   fill: currentColor;
-}
-
-.dock-group:hover > .panel-grip,
-.sidebar-head:hover > .panel-grip {
-  opacity: 0.6;
 }
 
 .panel-grip:hover,
@@ -3091,11 +3085,6 @@ button.beat-info.disabled {
 
 .panel-dragging {
   opacity: 0.4;
-}
-
-/* While dragging, the other sections' grips stay out of sight. */
-body.panel-order-dragging .panel-grip {
-  opacity: 0;
 }
 
 .panel-drop-line {
@@ -3365,6 +3354,57 @@ body.panel-order-dragging * {
   color: var(--muted);
 }
 
+/* ---------- Video controls ----------
+   The video's buttons (the zoom, its own window, big video), each added
+   by its feature into one bar in the picture's bottom-right corner, like
+   a video player's: shown while the pointer is on the picture, while one
+   of them has focus, and while zoomed in. White on dark glass, whatever
+   the theme. Their order is each feature's (CSS order). */
+
+.video-pane {
+  position: relative;
+}
+
+.video-controls {
+  display: flex;
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, #000 55%, transparent);
+  color: #fff;
+  opacity: 0;
+  cursor: default;
+}
+
+.video-controls:empty {
+  display: none;
+}
+
+.video-pane:hover .video-controls,
+.video-controls:focus-within,
+.video-controls:has(.video-zoom-bar.zoomed) {
+  opacity: 1;
+}
+
+.video-controls button {
+  min-width: 26px;
+  height: 26px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+}
+
+.video-controls button:hover:not(:disabled) {
+  background: color-mix(in srgb, #fff 18%, transparent);
+  color: inherit;
+}
+
 /* ---------- Big video (src/features/big-video.js) ----------
    The picture takes all the height but a thin waveform strip (the whole
    track, held at fit by waveform.lockFit, like a video player's timeline)
@@ -3469,36 +3509,16 @@ body.panel-order-dragging * {
   visibility: hidden;
 }
 
-/* Over the picture's top-right corner while the pointer is on it, left of
-   the video window's button. */
-.video-pane {
-  position: relative;
-}
-
+/* Its button: last in the video's controls, where a video player has
+   fullscreen. */
 .big-video-button {
-  position: absolute;
-  top: 8px;
-  right: 40px;
-  opacity: 0;
-  background: color-mix(in srgb, #000 55%, transparent);
-  color: #fff;
-}
-
-.video-pane:hover .big-video-button,
-.big-video-button:focus-visible {
-  opacity: 1;
-}
-
-.big-video-button:hover {
-  background: color-mix(in srgb, #000 75%, transparent);
-  color: #fff;
+  order: 2;
 }
 
 /* ---------- Video zoom (src/features/video-zoom.js) ----------
-   Zoomed in, the picture can be dragged (the hand cursor). The controls
-   sit in its bottom-left corner while the pointer is on it, and stay
-   while zoomed in; white on dark glass, like the buttons in the top
-   corner, whatever the theme. */
+   Zoomed in, the picture can be dragged (the hand cursor). Its buttons
+   come first in the video's controls (bottom right), set apart from the
+   others by a line; the controls stay while zoomed in. */
 
 .video-pane.zoomed {
   cursor: grab;
@@ -3509,40 +3529,22 @@ body.panel-order-dragging * {
 }
 
 .video-zoom-bar {
-  position: absolute;
-  bottom: 8px;
-  left: 8px;
   display: flex;
+  order: 0;
   align-items: center;
   gap: 2px;
-  padding: 2px;
-  border-radius: 999px;
-  background: color-mix(in srgb, #000 55%, transparent);
-  color: #fff;
-  opacity: 0;
-  cursor: default;
 }
 
-.video-pane:hover .video-zoom-bar,
-.video-zoom-bar.zoomed,
-.video-zoom-bar:focus-within {
-  opacity: 1;
+/* A line between the zoom and the video's other buttons. */
+.video-controls > .video-zoom-bar:not(:only-child) {
+  margin-right: 2px;
+  padding-right: 4px;
+  border-right: 1px solid color-mix(in srgb, #fff 25%, transparent);
 }
 
 .video-zoom-bar button {
-  min-width: 26px;
-  height: 26px;
-  padding: 0 6px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: inherit;
   font: 700 12px var(--num);
   font-variant-numeric: tabular-nums;
-}
-
-.video-zoom-bar button:hover:not(:disabled) {
-  background: color-mix(in srgb, #fff 18%, transparent);
 }
 
 .video-zoom-step {

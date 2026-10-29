@@ -94,7 +94,8 @@ function buildVideoWindow(win, { onBringBack }) {
   doc.documentElement.lang = document.documentElement.lang;
 
   const canvas = element("canvas", { ariaLabel: "Video" });
-  const pane = element("div", { className: "video-pane" }, canvas);
+  // The pane's buttons (the zoom) go in its controls, bottom right.
+  const pane = element("div", { className: "video-pane" }, canvas, element("div", { className: "video-controls" }));
 
   const time = element("span", { className: "video-window-time" });
   const back = element(
@@ -277,7 +278,7 @@ function buildMarkup() {
     icon(ICONS.popOut),
   );
   onClick(popButton, toggleVideoWindow);
-  docked.pane.append(popButton);
+  (docked.pane.querySelector(".video-controls") ?? docked.pane).append(popButton);
 
   const back = element("button", { type: "button", className: "small" }, icon(ICONS.bringBack), "Bring back");
   onClick(back, bringBack);

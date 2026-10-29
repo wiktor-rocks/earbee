@@ -1,34 +1,16 @@
 /* =====================================================================
  * VIDEO WINDOW (src/features/video-window/)
- * The button over the video, the main window's stage while the video is
- * in its own window (the strip, then the timeline as for an audio file),
- * and the video window's page. Loaded after style.css.
+ * The button in the video's controls, the main window's stage while the
+ * video is in its own window (the strip, then the timeline as for an
+ * audio file), and the video window's page. Loaded after style.css.
  * ===================================================================== */
 
 /* ---------- The main window ---------- */
 
-.video-pane {
-  position: relative;
-}
-
-/* Over the picture's top-right corner, while the pointer is on it. */
+/* Its button: in the video's controls (style.css, "Video controls"),
+   after the zoom, before big video. */
 .video-popout-button {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  opacity: 0;
-  background: color-mix(in srgb, #000 55%, transparent);
-  color: #fff;
-}
-
-.video-pane:hover .video-popout-button,
-.video-popout-button:focus-visible {
-  opacity: 1;
-}
-
-.video-popout-button:hover {
-  background: color-mix(in srgb, #000 75%, transparent);
-  color: #fff;
+  order: 1;
 }
 
 /* The strip, then the timeline and minimap as for an audio file. */

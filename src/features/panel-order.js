@@ -2,7 +2,7 @@
  * PANEL ORDER
  * The side panel's sections (Speed, Pitch, Volume, EQ, Beats, Points,
  * Loop and Marks) in the order the user likes: drag a section by its
- * grip (on its left edge, shown on hover) and drop it higher or lower;
+ * grip (on its left edge) and drop it higher or lower;
  * with the grip focused, ↑ and ↓ move it one place.
  *
  *   How        The sections are found in the page as they are: each

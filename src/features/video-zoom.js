@@ -8,9 +8,10 @@
  *
  *   Keys       Ctrl+= / Ctrl+- zoom in or out around the middle, Ctrl+0
  *              shows all of the picture (app.js's SHORTCUTS).
- *   Controls   In the picture's bottom-left corner, while the pointer is
- *              on it, and always while zoomed in: −, the zoom (a click
- *              shows all of the picture again) and +.
+ *   Controls   With the video's other buttons, in the picture's
+ *              bottom-right corner, while the pointer is on it, and always
+ *              while zoomed in: −, the zoom (a click shows all of the
+ *              picture again) and +.
  *   Where      The main window's pane (big video too) and the video
  *              window's (bindVideoZoom is called for each); the zoom is
  *              the picture's, so it goes with it from one to the other.
@@ -127,7 +128,7 @@ export function bindVideoZoom(pane) {
     level,
     stepButton("+", "Zoom in: or scroll over the picture (Ctrl+=)", zoomVideoIn),
   );
-  pane.append(bar);
+  (pane.querySelector(".video-controls") ?? pane).append(bar);
   const entry = { bar, level };
   controls.add(entry);
   // A closed video window's page stays whole (its elements still on it),
