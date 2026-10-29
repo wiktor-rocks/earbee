@@ -137,7 +137,9 @@
  *                  handle between the picture and the timeline; its
  *                  wiring marked "Stage split ("), video-zoom.js
  *                  (zooming into the picture: the wheel, dragging, its
- *                  controls; wiring marked "Video zoom (")
+ *                  controls; wiring marked "Video zoom ("),
+ *                  panel-order.js (the side panel's sections dragged
+ *                  into any order; wiring marked "Panel order (")
  *   app.js         This file: creates and wires the components, the
  *                  SHORTCUTS table, start()
  *   vendor/        Signalsmith Stretch, patched to read across several
@@ -265,6 +267,7 @@ import {
 import { bigVideoPictureChanged, bindBigVideo, leaveBigVideo, toggleBigVideo } from "./features/big-video.js"; // Big video (src/features/big-video.js)
 import { bindLayout, openShortcuts } from "./features/layout.js";
 import { bindStageSplit } from "./features/stage-split.js"; // Stage split (src/features/stage-split.js)
+import { bindPanelOrder } from "./features/panel-order.js"; // Panel order (src/features/panel-order.js)
 import { bindVideoZoom, resetVideoZoom, videoZoomChanged, zoomVideoIn, zoomVideoOut } from "./features/video-zoom.js"; // Video zoom (src/features/video-zoom.js)
 import { beatsAction, bindBeats, isBeatMenuOpen, snapForDrag, toggleBeatClick } from "./features/beats.js";
 import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
@@ -689,6 +692,7 @@ function start() {
   bindLayout();
   bindBigVideo(); // Big video (src/features/big-video.js)
   bindStageSplit(); // Stage split (src/features/stage-split.js)
+  bindPanelOrder(); // Panel order (src/features/panel-order.js)
   bindVideoZoom($("videoPane")); // Video zoom (src/features/video-zoom.js)
   bindFocus();
   const keysBlocked = () =>

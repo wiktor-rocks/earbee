@@ -3025,6 +3025,96 @@ button.beat-info.disabled {
   opacity: 0.45;
 }
 
+/* ---------- Panel order (src/features/panel-order.js) ----------
+   Each section of the side panel has a grip on its left edge, in its
+   padding: hidden until the pointer is over the section, then faint,
+   full while it's pointed at or focused. Dragging it dims the section and
+   shows a line where it would land. The sound sections below the marks
+   are in a second dock (.dock-below); a dock with no sections takes no
+   room. */
+
+.panel,
+.dock-group,
+.sidebar-head {
+  position: relative;
+}
+
+.dock-below {
+  border-top: 1px solid var(--hairline);
+}
+
+.dock:not(:has(> .dock-group)) {
+  display: none;
+}
+
+.dock:not(:has(> .dock-group)) + .sidebar {
+  border-top: 0;
+}
+
+.panel-grip {
+  display: grid;
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 1px;
+  place-items: center;
+  width: 11px;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--muted);
+  cursor: grab;
+  opacity: 0;
+  touch-action: none;
+}
+
+.panel-grip .icon {
+  width: 8px;
+  height: 14px;
+  fill: currentColor;
+}
+
+.dock-group:hover > .panel-grip,
+.sidebar-head:hover > .panel-grip {
+  opacity: 0.6;
+}
+
+.panel-grip:hover,
+.panel-grip:focus-visible {
+  background: var(--surface-2);
+  color: var(--text);
+  opacity: 1;
+}
+
+.panel-dragging {
+  opacity: 0.4;
+}
+
+/* While dragging, the other sections' grips stay out of sight. */
+body.panel-order-dragging .panel-grip {
+  opacity: 0;
+}
+
+.panel-drop-line {
+  position: absolute;
+  right: 6px;
+  left: 6px;
+  z-index: 3;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--accent);
+  pointer-events: none;
+}
+
+body.panel-order-dragging,
+body.panel-order-dragging * {
+  cursor: grabbing !important;
+  user-select: none;
+}
+
 /* ---------- Knobs (ui/knob.js) ----------
    A knob, then its name over its value. The range input inside the
    knob holds the value, out of sight; the dial is an SVG: the track, the

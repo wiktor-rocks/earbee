@@ -363,6 +363,76 @@ module.exports = async function (h) {
   h.win.setSize(width, height);
   await sleep(400);
 
+  // The side panel's sections in another order (src/features/panel-order.js):
+  // dragged by their grips, or moved with ↑ ↓ on a focused grip; remembered.
+  const panelOrder = () =>
+    js(`[...document.querySelectorAll("#panel > .dock > .dock-group, #sidebar")].map((part) =>
+      part.id === "sidebar" ? "marks" : [...part.classList].find((name) => name !== "dock-group" && name.endsWith("-group")).slice(0, -6))`);
+  const middle = (selector, part = "middle") =>
+    js(`(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect();
+      return { x: Math.round(r.left + r.width / 2), y: Math.round(${part === "top" ? "r.top + 6" : "r.top + r.height / 2"}) }; })()`);
+  // `during` runs before the release (a screenshot of the drop line).
+  async function dragGrip(grip, to, during = async () => {}) {
+    const from = await middle(grip);
+    wc.sendInputEvent({ type: "mouseDown", x: from.x, y: from.y, button: "left", clickCount: 1 });
+    for (let i = 1; i <= 8; i++) {
+      wc.sendInputEvent({
+        type: "mouseMove",
+        x: from.x,
+        y: Math.round(from.y + ((to.y - from.y) * i) / 8),
+        button: "left",
+      });
+      await sleep(30);
+    }
+    await during();
+    wc.sendInputEvent({ type: "mouseUp", x: from.x, y: to.y, button: "left", clickCount: 1 });
+    await sleep(150);
+  }
+  const defaultOrder = await panelOrder();
+  await dragGrip(".volume-group > .panel-grip", await middle(".speed-group", "top"));
+  const volumeFirst = await panelOrder();
+  check(
+    "panel order: Volume dragged above Speed",
+    volumeFirst.join() === ["volume", "speed", ...defaultOrder.filter((k) => !["volume", "speed"].includes(k))].join(),
+    JSON.stringify(volumeFirst),
+  );
+  await js(`document.querySelector(".dock").scrollTop = document.querySelector(".dock").scrollHeight`);
+  await dragGrip(".sidebar-head > .panel-grip", await middle(".loop-group", "top"), () => shot("panel-order.png"));
+  const marksUp = await js(`(() => {
+    const below = document.querySelector(".dock-below");
+    return { loopBelow: below.contains(document.querySelector(".loop-group")), belowShown: below.checkVisibility(),
+      between: sidebar.previousElementSibling === document.querySelector(".dock") && sidebar.nextElementSibling === below,
+      marksHeight: Math.round(sidebar.getBoundingClientRect().height) };
+  })()`);
+  check(
+    "panel order: Marks dragged above Loop, which goes into the dock below",
+    marksUp.loopBelow && marksUp.belowShown && marksUp.between && marksUp.marksHeight >= 180,
+    JSON.stringify(marksUp),
+  );
+  const stepBefore = await js(`stepSize.textContent.trim()`);
+  await js(`document.querySelector(".volume-group > .panel-grip").focus()`);
+  key("Down");
+  await sleep(100);
+  const keyed = await panelOrder();
+  const stored = await js(`localStorage.getItem("earbee.panelOrder")`);
+  check(
+    "panel order: ↓ on a focused grip moves its section, not the step size; the order is remembered",
+    keyed[0] === "speed" &&
+      keyed[1] === "volume" &&
+      keyed.at(-2) === "marks" &&
+      keyed.at(-1) === "loop" &&
+      (await js(`stepSize.textContent.trim()`)) === stepBefore &&
+      (await js(`document.activeElement?.closest(".volume-group") !== null`)) &&
+      stored === JSON.stringify(keyed),
+    JSON.stringify({ keyed, stored }),
+  );
+  await js(`import("./src/features/panel-order.js").then(({ resetPanelOrder }) => resetPanelOrder())`);
+  check(
+    "panel order: back to the default, with no dock below",
+    (await panelOrder()).join() === defaultOrder.join() &&
+      !(await js(`document.querySelector(".dock-below").checkVisibility()`)),
+  );
+
   // Another file: no marks.
   await openFile(path.join(FIXTURES, "long-chirp.m4a"));
   check(
