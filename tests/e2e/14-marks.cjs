@@ -335,6 +335,31 @@ module.exports = async function (h) {
     half.visible && half.beside && half.inside && half.noSpill,
     JSON.stringify(half),
   );
+
+  // A short window too: the sound scrolls on its own above the marks,
+  // which keep their height and their own scrolling; the page never grows.
+  h.win.setSize(960, 560);
+  await sleep(400);
+  const short = await js(`(() => {
+    const dock = document.querySelector(".dock"), d = dock.getBoundingClientRect(), side = sidebar.getBoundingClientRect();
+    const before = { dockScrolls: dock.scrollHeight > dock.clientHeight, marksHeight: Math.round(side.height),
+      below: side.top >= d.bottom - 1, listScrolls: marksList.scrollHeight > marksList.clientHeight,
+      noGrow: document.scrollingElement.scrollHeight <= innerHeight };
+    dock.scrollTop = dock.scrollHeight;
+    const loop = document.querySelector(".loop-group").getBoundingClientRect();
+    return { ...before, loopShown: loop.top >= d.top - 1 && loop.bottom <= d.bottom + 1 };
+  })()`);
+  check(
+    "a short window: the sound scrolls above the marks, which stay in view",
+    short.dockScrolls &&
+      short.marksHeight >= 180 &&
+      short.below &&
+      short.listScrolls &&
+      short.noGrow &&
+      short.loopShown,
+    JSON.stringify(short),
+  );
+  await js(`document.querySelector(".dock").scrollTop = 0`);
   h.win.setSize(width, height);
   await sleep(400);
 

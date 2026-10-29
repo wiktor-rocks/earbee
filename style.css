@@ -90,6 +90,7 @@
   --shadow: 0 1px 2px rgb(0 0 0 / 0.18), 0 8px 24px rgb(0 0 0 / 0.14);
   --shadow-lifted: 0 2px 6px rgb(0 0 0 / 0.25), 0 18px 48px rgb(0 0 0 / 0.3);
   --sidebar-width: 300px;
+  --marks-min-height: 180px; /* the marks under the sound, however short the window */
 
   color-scheme: dark;
   accent-color: var(--accent);
@@ -2600,13 +2601,15 @@ button.chip-button:hover {
 }
 
 /* ---------- Marks sidebar ----------
-   In the side panel, under the sound: it takes the rest of the height. */
+   In the side panel, under the sound: it takes the rest of the height,
+   never less than --marks-min-height (the sound scrolls instead), so the
+   marks stay in view in a short window. */
 
 .sidebar {
   display: flex;
   flex: 1;
   flex-direction: column;
-  min-height: 0;
+  min-height: var(--marks-min-height);
   overflow: hidden;
   border-top: 1px solid var(--hairline);
 }
@@ -2664,6 +2667,7 @@ button.chip-button:hover {
   margin: 0;
   padding: 0;
   overflow-y: auto;
+  scrollbar-width: thin;
   list-style: none;
   background: color-mix(in srgb, var(--inset) 45%, transparent);
 }
@@ -2773,14 +2777,20 @@ button.mark-remove {
 
 /* ---------- Sound dock: speed, pitch, volume, EQ ----------
    At the top of the side panel: a section per group, one under the
-   other, a hairline between them. */
+   other, a hairline between them. Its full height when there's room;
+   when the panel is short it scrolls on its own, above the marks, so
+   more groups can come without pushing anything else. (The wheel over a
+   knob still turns the knob.) */
 
 .dock {
   --knob-size: 40px;
 
   display: flex;
-  flex: none;
+  flex: 0 1 auto;
   flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
 }
 
 .dock-group {
@@ -3457,10 +3467,11 @@ button.beat-info.disabled {
 
 /* ---------- Smaller windows ----------
    The marks sidebar always stays in view, so half a screen (about 960 px
-   wide) still shows everything: under 1100 px it gets narrower, its
+   wide) still shows the whole player: under 1100 px it gets narrower, its
    buttons show only their icons, and the dock's knobs get smaller; the
    transport stays one row, its chips cut off when they don't fit.
-   Short windows: the dock and the minimap get more compact. */
+   Short windows: the dock and the minimap get more compact, and the dock
+   scrolls above the marks when it still doesn't fit. */
 
 @media (max-width: 1099px) {
   :root {
