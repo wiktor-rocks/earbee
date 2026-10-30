@@ -1,6 +1,8 @@
-/* earbee.org: the landing page and the blog. Colours and fonts are the app's own
-   (style.css and src/themes/palettes.js at the top of the repository):
-   the EarBee theme, or EarBee Light on a light system. */
+/* earbee.org: the landing page and the blog. Colours, fonts and shapes are
+   the app's own (style.css and src/themes/palettes.js at the top of the
+   repository): the EarBee theme, or EarBee Light on a light system. Like
+   the app, the page is flat: its parts are set apart by hairlines, not
+   floating cards, and the waveform sits in a darker well. */
 
 @font-face {
   font-family: "Righteous";
@@ -16,19 +18,29 @@
 }
 
 :root {
-  --bg: #0e1014;
-  --surface: #161920;
-  --surface-2: #1d212a;
-  --border: #2a2f3a;
-  --text: #e6e8ee;
-  --muted: #8b93a7;
+  --bg: #0f0c0a;
+  --surface: #17120e;
+  --surface-2: #261f19;
+  --surface-hover: #30281f;
+  --border: #3b3129;
+  --text: #f1e9de;
+  --muted: #aa9b8a;
   --accent: #f5b301;
   --accent-hover: #ffc52e;
   --accent-ink: #1a1400;
-  --wave: #3b4252;
+  --wave: #4b3f34;
   --start: #5fd38d;
   --accent-text: var(--accent); /* amber as small text: darker on light */
   --glow: color-mix(in srgb, var(--accent) 16%, transparent);
+
+  /* Shape and depth, as in the app: hairlines between the parts, the
+     waveform sunk into a darker well (--inset, with a soft shadow along
+     its top, --inset-shade), 12 and 8 px corners. */
+  --hairline: color-mix(in srgb, var(--border) 62%, transparent);
+  --inset: #0e0b09;
+  --inset-shade: #090706;
+  --radius: 12px;
+  --radius-sm: 8px;
 
   --display: "Righteous", system-ui, sans-serif;
   --sans: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -45,13 +57,16 @@
     --bg: #f5f1e8;
     --surface: #fffcf5;
     --surface-2: #efe9dc;
+    --surface-hover: #e7e0d1;
     --border: #ddd3bf;
     --text: #1f1b14;
     --muted: #6b6252;
-    --wave: #cfc5b0;
+    --wave: #a69d8a;
     --start: #1f9d55;
-    --accent-text: #8a5d00;
+    --accent-text: #8a5f00;
     --glow: color-mix(in srgb, var(--accent) 22%, transparent);
+    --inset: #ebe7de;
+    --inset-shade: #d3cfc6;
     color-scheme: light;
   }
 }
@@ -59,13 +74,16 @@
   --bg: #f5f1e8;
   --surface: #fffcf5;
   --surface-2: #efe9dc;
+  --surface-hover: #e7e0d1;
   --border: #ddd3bf;
   --text: #1f1b14;
   --muted: #6b6252;
-  --wave: #cfc5b0;
+  --wave: #a69d8a;
   --start: #1f9d55;
-  --accent-text: #8a5d00;
+  --accent-text: #8a5f00;
   --glow: color-mix(in srgb, var(--accent) 22%, transparent);
+  --inset: #ebe7de;
+  --inset-shade: #d3cfc6;
   color-scheme: light;
 }
 
@@ -77,6 +95,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 72px; /* a link to #download lands below the top bar */
 }
 
 body {
@@ -136,8 +155,8 @@ kbd {
   min-width: 26px;
   padding: 1px 7px;
   border: 1px solid var(--border);
-  border-bottom-width: 3px;
-  border-radius: 6px;
+  border-bottom-width: 2px;
+  border-radius: 5px;
   background: var(--surface-2);
   color: var(--text);
   font: 700 13px/1.6 var(--sans);
@@ -154,57 +173,93 @@ kbd {
   color: var(--accent);
 }
 
-/* ---------- Top bar ---------- */
+/* ---------- Top bar ----------
+   Like the app's: a bar across the whole window on the panels' colour,
+   a hairline under it, staying at the top. Its content keeps the page's
+   width. The links are quiet buttons, like the app's File button; Download
+   is a soft one; the theme switch, an icon button set apart by a hairline. */
 
 .top {
-  width: var(--page);
-  margin: 0 auto;
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px 0;
+  padding: 10px max(16px, (100% - 1120px) / 2);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface);
 }
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   text-decoration: none;
 }
 .brand:hover {
   color: inherit;
 }
+.brand img {
+  width: 38px;
+  height: auto;
+}
+.top .wordmark {
+  font-size: 25px;
+}
 .top nav {
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 4px;
   font-size: 15px;
   font-weight: 600;
 }
 .top nav a {
-  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
   color: var(--muted);
+  text-decoration: none;
 }
 .top nav a:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.top nav .nav-download {
+  margin-left: 4px;
+  border-color: var(--hairline);
+  background: var(--surface-2);
   color: var(--text);
 }
 
 /* Dark or light: shows the moon in the light theme, the sun in the dark. */
 .theme-switch {
+  position: relative;
   display: grid;
   place-items: center;
   width: 36px;
   height: 36px;
-  margin-left: -6px;
+  margin-left: 17px;
   padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--muted);
   cursor: pointer;
 }
+.theme-switch::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 6px;
+  bottom: 6px;
+  border-left: 1px solid var(--hairline);
+}
 .theme-switch:hover {
-  border-color: var(--muted);
+  background: var(--surface-hover);
   color: var(--text);
 }
 .theme-switch svg {
@@ -314,15 +369,18 @@ kbd {
   }
 }
 
+/* Buttons are soft, like the app's: a surface tint and a hairline; the
+   primary one is the accent. */
 .button {
   display: inline-flex;
   align-items: baseline;
   gap: 8px;
   padding: 12px 20px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--text);
+  font-family: inherit; /* a <button> doesn't take the page's font by itself */
   font-weight: 700;
   text-decoration: none;
   transition:
@@ -331,7 +389,7 @@ kbd {
 }
 .button:hover {
   color: var(--text);
-  border-color: var(--muted);
+  background: var(--surface-hover);
 }
 .button small {
   font-weight: 600;
@@ -352,6 +410,9 @@ kbd {
   background: none;
   align-self: center;
 }
+.button.quiet:hover {
+  background: var(--surface-hover);
+}
 
 /* On a phone or tablet ("phone" on <html>, set in the head, _includes/base.njk),
    which can't run EarBee, this note takes the download buttons' place. */
@@ -360,9 +421,9 @@ kbd {
   max-width: 30em;
   margin: 0;
   padding: 16px 18px;
-  border: 1px solid var(--border);
+  border: 1px solid var(--hairline);
   border-left: 4px solid var(--accent);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface);
   color: var(--muted);
   font-size: 16px;
@@ -390,12 +451,9 @@ kbd {
 }
 .shot-frame {
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   overflow: hidden;
   background: var(--surface);
-  box-shadow:
-    0 30px 80px -30px rgb(0 0 0 / 0.6),
-    0 0 0 6px color-mix(in srgb, var(--surface-2) 60%, transparent);
 }
 .shot picture,
 .shot img {
@@ -409,14 +467,21 @@ kbd {
   font-size: 14px;
 }
 
-/* A waveform drawn by download.js, played up to the green start point. */
+/* A waveform drawn by download.js, played up to the green start point,
+   sunk into a well like the app's waveform (--inset, a soft shadow along
+   its top). */
 .wave {
   width: var(--page);
-  height: 64px;
+  height: 88px;
   margin: 72px auto 0;
+  padding: 12px 14px;
   display: flex;
   align-items: center;
   gap: 2px;
+  border: 1px solid var(--hairline); /* on the page, not a panel: an edge */
+  border-radius: var(--radius-sm);
+  background: var(--inset);
+  box-shadow: inset 0 6px 10px -6px var(--inset-shade);
 }
 .wave i {
   flex: 1;
@@ -508,7 +573,7 @@ section h2 {
 .ticks li {
   position: relative;
   padding: 8px 0 8px 20px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--hairline);
   font-size: 16px;
 }
 .ticks li::before {
@@ -531,10 +596,9 @@ section h2 {
   position: relative;
   aspect-ratio: var(--ratio, 16 / 10);
   border: 1px solid var(--border);
-  border-radius: 14px;
+  border-radius: var(--radius);
   overflow: hidden;
   background: var(--surface);
-  box-shadow: 0 24px 60px -30px rgb(0 0 0 / 0.55);
 }
 .clip video,
 .clip img {
@@ -553,7 +617,7 @@ section h2 {
 .features > div {
   position: relative;
   padding: 18px 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--hairline);
   display: grid;
   grid-template-columns: 11em 1fr;
   gap: 16px;
@@ -595,8 +659,8 @@ section h2 {
   list-style: none;
   margin: 0;
   padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
   background: var(--surface);
 }
 .keylist li {
@@ -615,7 +679,7 @@ section h2 {
   padding: 1px 6px;
 }
 .keylist li + li {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--hairline);
 }
 .keylist .k + span {
   color: var(--muted);
@@ -640,7 +704,7 @@ section h2 {
   width: 100%;
   padding: 34px 12px 10px;
   border: 0;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--bg);
   color: var(--fg);
   font: inherit;
@@ -700,7 +764,7 @@ section h2 {
 }
 .free-list li {
   padding: 16px 0 16px 18px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--hairline);
   color: var(--muted);
   position: relative;
 }
@@ -719,16 +783,21 @@ section h2 {
   color: var(--text);
 }
 
+/* The three systems in one flat panel, set apart by hairlines, like the
+   app's side panel. */
 .platforms {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--surface);
 }
 .platform {
   padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--surface);
+}
+.platform + .platform {
+  border-left: 1px solid var(--hairline);
 }
 .platform h3 {
   font-size: 26px;
@@ -764,9 +833,10 @@ section h2 {
   display: inline-block;
   white-space: nowrap;
 }
-/* The visitor's own system (download.js marks it). */
+/* The visitor's own system (download.js marks it): an amber line along its
+   top, and its button amber. */
 .platform.mine {
-  border-color: var(--accent);
+  box-shadow: inset 0 3px 0 var(--accent);
 }
 .platform.mine .button {
   border-color: var(--accent);
@@ -793,7 +863,7 @@ footer {
   width: var(--page);
   margin: 96px auto 0;
   padding: 28px 0 40px;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--hairline);
   display: flex;
   align-items: center;
   gap: 14px;
@@ -820,10 +890,10 @@ footer p {
   max-width: 50em;
 }
 .faq details {
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--hairline);
 }
 .faq details:last-child {
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--hairline);
 }
 .faq summary {
   display: flex;
@@ -889,7 +959,7 @@ main > .post {
 }
 .post-list li {
   padding: 24px 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--hairline);
 }
 .post-list h2 {
   font-size: 26px;
@@ -969,7 +1039,7 @@ main > .post {
   max-width: 100%;
   height: auto;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
 }
 .post-body figcaption {
   margin-top: 8px;
@@ -984,7 +1054,7 @@ main > .post {
 .post-body pre {
   overflow-x: auto;
   padding: 14px 16px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface-2);
 }
 .post-body pre code {
@@ -994,7 +1064,7 @@ main > .post {
 .post-body hr {
   margin: 40px 0;
   border: 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--hairline);
 }
 .post-body table {
   width: 100%;
@@ -1005,7 +1075,7 @@ main > .post {
 .post-body th,
 .post-body td {
   padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--hairline);
   text-align: left;
 }
 
@@ -1016,8 +1086,8 @@ main > .post {
   align-items: flex-start;
   margin-top: 56px;
   padding: 24px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
   background: var(--surface);
 }
 .post-cta img {
@@ -1070,12 +1140,13 @@ main > .post {
   }
   .platform .alt {
     padding: 10px 20px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-sm);
     text-decoration: none;
   }
   .platform .alt:hover {
-    border-color: var(--muted);
+    background: var(--surface-hover);
+    color: var(--text);
   }
 }
 
@@ -1103,6 +1174,10 @@ main > .post {
   .spotlight.flip .clip {
     order: 0;
   }
+  .platform + .platform {
+    border-left: 0;
+    border-top: 1px solid var(--hairline);
+  }
   .keys {
     gap: 24px;
   }
@@ -1116,35 +1191,28 @@ main > .post {
     font-size: 16px;
   }
   .top {
-    padding: 12px 0;
+    padding-block: 6px;
   }
   .brand img {
-    width: 42px;
-    height: auto;
+    width: 34px;
   }
-  .wordmark {
-    font-size: 25px;
-  }
-  .top nav {
-    gap: 10px;
+  .top .wordmark {
+    font-size: 23px;
   }
   .top nav a[data-link="repo"] {
     display: none;
   }
-  /* A button-sized target for a thumb. */
-  .top nav .nav-download {
-    display: inline-flex;
-    align-items: center;
+  /* Button-sized targets for a thumb. */
+  .top nav a {
     min-height: 44px;
-    padding: 0 14px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    color: var(--text);
   }
   .theme-switch {
     width: 44px;
     height: 44px;
-    margin-left: 0;
+    margin-left: 13px;
+  }
+  .theme-switch::before {
+    left: -8px;
   }
   .hero h1 br {
     display: none;
@@ -1183,7 +1251,8 @@ main > .post {
   }
   .wave {
     margin-top: 48px;
-    height: 40px;
+    height: 60px;
+    padding: 8px 10px;
   }
   /* The logo beside the text, the links under the text. */
   footer {
@@ -1216,15 +1285,15 @@ main > .post {
     gap: 8px;
   }
   .brand img {
-    width: 34px;
+    width: 30px;
   }
-  .wordmark {
+  .top .wordmark {
     font-size: 21px;
   }
   .top nav {
-    gap: 8px;
+    gap: 0;
   }
-  .top nav .nav-download {
+  .top nav a {
     padding: 0 10px;
   }
 }
@@ -1240,6 +1309,9 @@ main > .post {
   .cta .button {
     flex: 1 1 100%;
     justify-content: center;
+    flex-wrap: wrap; /* if the size doesn't fit beside the label, it goes under it */
+    row-gap: 0;
+    padding-inline: 16px;
   }
 }
 
