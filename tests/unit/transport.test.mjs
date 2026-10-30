@@ -195,8 +195,10 @@ describe("A–B loop", () => {
     assert.deepEqual([scheduled.at(-1).loopStart, scheduled.at(-1).loopEnd], [1, 3]);
   });
 
-  test("the position wraps back to the start, and the wrap is a jump", () => {
+  test("the position wraps back to the start, and the wrap is a jump marked as one", () => {
     const { transport, events } = setup();
+    const marks = [];
+    transport.on("jump", (time, info) => marks.push(info));
     transport.setLoop({ start: 1, end: 3 });
     transport.play(); // starts inside the loop: at its start
     near(transport.position, 1);
@@ -207,6 +209,10 @@ describe("A–B loop", () => {
     frame();
     near(transport.position, 1.5);
     assert.equal(events.filter(([name]) => name === "jump").length, 1);
+    assert.deepEqual(marks, [{ wrapped: true }]);
+    // A seek is a jump of its own, not a wrap.
+    transport.seek(2);
+    assert.equal(marks.at(-1), undefined);
   });
 
   test("turning a loop on while playing outside it moves to its start", () => {

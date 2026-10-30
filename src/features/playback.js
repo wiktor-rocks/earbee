@@ -45,8 +45,8 @@ export const stepBack = () => step(-1);
 export const stepForward = () => step(1);
 
 // Where you last started listening: where playback last started, or where
-// it was last moved to (click, step, loop wrap) or set to (S, dragging the
-// green start point); 0 after Stop. Kept up to date by the transport
+// it was last moved to (click, step; not a loop wrap-around) or set to (S,
+// dragging the green start point); 0 after Stop. Kept up to date by the transport
 // listeners in bindPlayback().
 let returnPoint = null;
 
@@ -153,7 +153,10 @@ export function bindPlayback() {
     if (state === "paused" || state === "ended") setStopPoint(player.transport.position);
     else if (state === "ready") setStopPoint(null);
   });
-  player.transport.on("jump", (time) => {
+  // A loop wrap-around isn't a move of yours: the start point stays where
+  // you started (it used to creep by a few ms on every wrap).
+  player.transport.on("jump", (time, { wrapped = false } = {}) => {
+    if (wrapped) return;
     returnPoint = time;
     showStartPoint();
   });

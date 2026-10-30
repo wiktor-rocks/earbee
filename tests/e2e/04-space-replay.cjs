@@ -185,6 +185,37 @@ module.exports = async function (h) {
   s = await sample(300);
   await ensurePaused();
   check("…where Space starts", near(firstMoved(s, before), 14, 0.08), firstMoved(s, before));
+  // Started inside the loop, the start point holds still while it wraps:
+  // each wrap lands a few ms past the loop start, which used to move it.
+  await click(14.5);
+  const startShown = () =>
+    js(
+      `[document.getElementById("startPoint").textContent, document.querySelector("#timelineGuides .guide-start").style.left].join(" @ ")`,
+    );
+  const shownBefore = await startShown();
+  key("Space");
+  const shown = new Set();
+  let wraps = 0;
+  let last = await pos();
+  for (const until = Date.now() + 4500; Date.now() < until;) {
+    await sleep(60);
+    shown.add(await startShown());
+    const now = await pos();
+    if (now < last - 0.01) wraps++;
+    last = now;
+  }
+  key("Space");
+  await sleep(50);
+  check(
+    "while a loop wraps, the start point holds still (readout and line)",
+    wraps >= 2 && shown.size === 1 && shown.has(shownBefore),
+    `${wraps} wraps; ${shownBefore} → ${[...shown].join(", ")}`,
+  );
+  before = await pos();
+  key("Space");
+  s = await sample(300);
+  await ensurePaused();
+  check("…and Space replays from it", near(firstMoved(s, before), 14.5, 0.08), firstMoved(s, before));
   key("L", ["shift"]);
   await sleep(100);
 

@@ -43,6 +43,21 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-30: The start point holds still while a loop plays
+
+- **What:** while a loop plays, the start point (the green line and the ▶ readout) stays where you started playing. Space replays from there after a pause. Before, it moved on every wrap-around, by a few milliseconds each time. Outside an active loop it still shows the loop start, as before.
+- **Why:** the owner, in the 0.3.0 scope: "The start moves by itself while the loop is running, it's moving slightly, by a couple of milliseconds."
+- **How:**
+  - The transport sends a `"jump"` on each wrap-around. The wrapped position is whatever the first frame after the wrap reads: a few ms past the loop start, a little different each time. The start point followed every `"jump"`, so it crept on each pass. Each wrap also gave the video a new ready point to prepare.
+  - A wrap's `"jump"` now carries `{ wrapped: true }`, and the start point ignores it.
+  - The other `"jump"` listeners still treat a wrap as a jump: the waveform following, the video and the beat click.
+  - Drawing a loop while playing outside it still moves the start point to the loop start, because that isn't a wrap.
+- **Where:** `src/audio/transport.js` (`draw`, the Events doc); `src/features/playback.js` (`bindPlayback`, the `returnPoint` comment); `tests/e2e/04-space-replay.cjs`; `tests/unit/transport.test.mjs`.
+- **Verified by:**
+  - `npm run check`; `npm run test:unit` (331 pass).
+  - `TB_TOPICS=03,04 npm test` (76 pass, smoke 28). Its new check (the readout and the line stay exactly the same through two wraps, and Space replays from there) fails without the fix: the start point went from 0:14.511 to 0:14.005, then crept on.
+  - `TB_TOPICS=03,08 npm test`: 98 pass. One check fails, "a file chosen while zoomed in (and wheeled over while it loads)…", which also fails on 2 of 3 runs without this change (a race in the test).
+
 ## 2026-10-30: Light themes fit the new look
 
 - **What:** on every light theme:

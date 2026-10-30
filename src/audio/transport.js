@@ -44,8 +44,9 @@ import { timelinePositionAt } from "../core/timeline.js";
  *          | "stopped" | "ended"
  * Events:  on("position", t)  every frame while playing, and after changes
  *          on("state", s)     whenever the state changes
- *          on("jump", t)      after a seek or a loop wrap-around (position
- *                             moved discontinuously)
+ *          on("jump", t, w)   after a seek or a loop wrap-around (position
+ *                             moved discontinuously); w is { wrapped: true }
+ *                             for a wrap-around, undefined otherwise
  *          on("loop", loop)   after setLoop (the active loop, or null)
  * ===================================================================== */
 
@@ -167,14 +168,16 @@ export function createTransport({ engine, getRate, getSemitones }) {
   // The animation frame loop only draws; it never decides anything. The
   // next frame is requested first, so the loop survives any listener error.
   // A position smaller than the last one drawn means the loop wrapped
-  // around (seeks reset lastDrawn), which views see as a jump.
+  // around (seeks reset lastDrawn), which views see as a jump, marked as a
+  // wrap: it lands a few ms past the loop start, a little differently each
+  // time, so it mustn't move the start point.
   function draw() {
     rafId = requestAnimationFrame(draw);
     const position = currentPosition();
     const wrapped = lastDrawn !== null && position < lastDrawn - 0.001;
     lastDrawn = position;
     onPosition(position);
-    if (wrapped) events.emit("jump", position);
+    if (wrapped) events.emit("jump", position, { wrapped: true });
   }
 
   function stopDrawing() {
