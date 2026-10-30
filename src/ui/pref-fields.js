@@ -1,7 +1,7 @@
 // The Settings dialog's controls: one renderer per field type (see
 // src/prefs/fields.js). A renderer builds its control once and returns
 // { element, update(values) }; update() shows a section's current values,
-// so a change made anywhere (the palette menu, another window) shows here
+// so a change made anywhere (another window, the main process) shows here
 // without rebuilding anything, and focus stays put.
 //
 // A new field type: an entry in TYPES (src/prefs/fields.js) and one here.
@@ -19,7 +19,7 @@ import { element, guarded } from "./dom.js";
  * @typedef {{ element: HTMLElement, update: (values: Record<string, any>) => void }} Rendered
  */
 
-/** Colour squares previewing a theme (also used by the palette menu). @param {string[]} colors */
+/** Colour squares previewing a theme. @param {string[]} colors */
 export const swatch = (colors) =>
   element(
     "span",

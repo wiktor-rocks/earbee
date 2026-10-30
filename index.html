@@ -34,24 +34,13 @@
       <div class="welcome-corner">
         <button
           id="welcomeSettingsButton"
-          class="theme-button settings-button"
+          class="icon-button settings-button"
           type="button"
           title="Settings"
           aria-label="Settings"
           aria-haspopup="dialog"
         >
           <svg class="icon" aria-hidden="true"><use href="#i-gear" /></svg>
-        </button>
-        <button
-          id="welcomeThemeButton"
-          class="theme-button"
-          type="button"
-          title="Colour theme"
-          aria-label="Colour theme"
-          aria-haspopup="menu"
-          aria-expanded="false"
-        >
-          <svg class="icon" aria-hidden="true"><use href="#i-palette" /></svg>
         </button>
       </div>
       <div class="welcome-content">
@@ -402,17 +391,6 @@
           >
             <svg class="icon" aria-hidden="true"><use href="#i-gear" /></svg>
           </button>
-          <button
-            id="themeButton"
-            class="icon-button"
-            type="button"
-            title="Colour theme"
-            aria-label="Colour theme"
-            aria-haspopup="menu"
-            aria-expanded="false"
-          >
-            <svg class="icon" aria-hidden="true"><use href="#i-palette" /></svg>
-          </button>
         </div>
       </header>
 
@@ -719,10 +697,6 @@
         <div id="overlayTitle" class="loading-file"></div>
       </div>
     </div>
-
-    <!-- The colour-theme menu (see features/settings.js), opened by the
-         palette buttons; its items are generated. -->
-    <div id="themeMenu" class="menu theme-menu" role="menu" aria-label="Colour theme" popover></div>
 
     <!-- The File menu (see features/file-menu.js), opened by File in the
          top bar. Save and From YouTube are shown only in Electron. -->

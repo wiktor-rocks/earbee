@@ -127,7 +127,7 @@
  *                  beat click), marks.js (actions,
  *                  selection, the marks list), open-file.js, download.js
  *                  (and searching in the download dialog), settings.js
- *                  (the Settings dialog and the theme menu), file-menu.js
+ *                  (the Settings dialog, where the theme is chosen), file-menu.js
  *                  (the File menu), layout.js (the shortcuts dialog, the
  *                  sidebar toggle), project/ (saving and opening project
  *                  files: index.js; what they save: sections.js),
@@ -141,7 +141,12 @@
  *                  (zooming into the picture: the wheel, dragging, its
  *                  controls; wiring marked "Video zoom ("),
  *                  panel-order.js (the side panel's sections dragged
- *                  into any order; wiring marked "Panel order (")
+ *                  into any order; wiring marked "Panel order ("),
+ *                  video-buttons.js (Settings › Layout: the video's
+ *                  buttons always shown or on hover; wiring marked
+ *                  "Video buttons ("), topbar-autohide.js (Settings ›
+ *                  Layout: the top bar hides until the pointer reaches
+ *                  it; wiring marked "Top bar autohide (")
  *   app.js         This file: creates and wires the components, the
  *                  SHORTCUTS table, start()
  *   vendor/        Signalsmith Stretch, patched to read across several
@@ -272,12 +277,14 @@ import { bigVideoPictureChanged, bindBigVideo, leaveBigVideo, toggleBigVideo } f
 import { bindLayout, openShortcuts } from "./features/layout.js";
 import { bindStageSplit } from "./features/stage-split.js"; // Stage split (src/features/stage-split.js)
 import { bindPanelOrder } from "./features/panel-order.js"; // Panel order (src/features/panel-order.js)
+import { bindVideoButtons } from "./features/video-buttons.js"; // Video buttons (src/features/video-buttons.js)
+import { bindTopbarAutohide } from "./features/topbar-autohide.js"; // Top bar autohide (src/features/topbar-autohide.js)
 import { bindVideoZoom, resetVideoZoom, videoZoomChanged, zoomVideoIn, zoomVideoOut } from "./features/video-zoom.js"; // Video zoom (src/features/video-zoom.js)
 import { beatsAction, bindBeats, isBeatMenuOpen, snapForDrag, toggleBeatClick } from "./features/beats.js";
 import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
 import { bindProject, isSaveDialogOpen, openFile, saveProject, saveProjectAs } from "./features/project/index.js";
-import { bindSettings, bindThemePicker, isSettingsOpen, isThemeMenuOpen } from "./features/settings.js";
+import { bindSettings, isSettingsOpen } from "./features/settings.js";
 import { bindFileMenu, isFileMenuOpen } from "./features/file-menu.js";
 import {
   bindPlayback,
@@ -688,7 +695,6 @@ function start() {
   bindFileDrop(openFile);
   bindProject();
   bindDownloads();
-  bindThemePicker();
   bindFileMenu();
   bindSettings();
   bindMarks();
@@ -698,12 +704,13 @@ function start() {
   bindStageSplit(); // Stage split (src/features/stage-split.js)
   bindPanelOrder(); // Panel order (src/features/panel-order.js)
   bindVideoZoom($("videoPane")); // Video zoom (src/features/video-zoom.js)
+  bindVideoButtons(); // Video buttons (src/features/video-buttons.js)
+  bindTopbarAutohide(); // Top bar autohide (src/features/topbar-autohide.js)
   bindFocus();
   const keysBlocked = () =>
     isLoading() ||
     dom.downloadDialog.open ||
     isSaveDialogOpen() ||
-    isThemeMenuOpen() ||
     isFileMenuOpen() ||
     isBeatMenuOpen() ||
     isSettingsOpen() ||

@@ -31,7 +31,6 @@ import { player } from "../../context.js";
 import { formatTrackTime } from "../../core/format.js";
 import { $, dom, element, onClick, showNotice } from "../../ui/dom.js";
 import { readStored, store } from "../../ui/storage.js";
-import { onThemeChange } from "../../ui/theme.js";
 import { bindVideoZoom } from "../video-zoom.js"; // Video zoom (src/features/video-zoom.js)
 
 /* ---------- The video window's page ----------
@@ -81,16 +80,24 @@ function icon(path) {
 function buildVideoWindow(win, { onBringBack }) {
   const doc = win.document;
 
-  // The same stylesheets (absolute URLs) and theme colours as this page.
+  // The same stylesheets (absolute URLs) and look as this page: <html>'s
+  // style (the theme's colours) and its data-theme and data-video-buttons
+  // (Settings › Layout, features/video-buttons.js), copied whenever this
+  // page's change, whatever changes them.
   for (const link of document.querySelectorAll('link[rel="stylesheet"]')) {
     doc.head.append(element("link", { rel: "stylesheet", href: /** @type {HTMLLinkElement} */ (link).href }));
   }
-  const followTheme = () => {
-    doc.documentElement.style.cssText = document.documentElement.style.cssText;
-    doc.documentElement.dataset.theme = document.documentElement.dataset.theme ?? "";
+  const MIRRORED = ["style", "data-theme", "data-video-buttons"];
+  const followLook = () => {
+    for (const name of MIRRORED) {
+      const value = document.documentElement.getAttribute(name);
+      if (value === null) doc.documentElement.removeAttribute(name);
+      else doc.documentElement.setAttribute(name, value);
+    }
   };
-  followTheme();
-  const stopFollowingTheme = onThemeChange(followTheme);
+  followLook();
+  const lookObserver = new MutationObserver(followLook);
+  lookObserver.observe(document.documentElement, { attributes: true, attributeFilter: MIRRORED });
   doc.documentElement.lang = document.documentElement.lang;
 
   const canvas = element("canvas", { ariaLabel: "Video" });
@@ -154,7 +161,7 @@ function buildVideoWindow(win, { onBringBack }) {
       doc.title = title;
     },
     dispose() {
-      stopFollowingTheme();
+      lookObserver.disconnect();
       clearTimeout(idleTimer);
     },
   };

@@ -150,6 +150,27 @@ module.exports = async function (h) {
       corner.holdsZoom && corner.right === 8 && corner.bottom === 8,
       JSON.stringify(corner),
     );
+    // Settings › Layout › The video's buttons reaches the window too: it
+    // copies the main page's data-video-buttons (and its theme) as they change.
+    const buttonsThere = () =>
+      inWindow(
+        `[document.documentElement.dataset.videoButtons, getComputedStyle(document.querySelector(".video-controls")).opacity, document.documentElement.dataset.theme === ${JSON.stringify("")} ? "" : "themed"].join()`,
+      );
+    const buttonsBefore = await buttonsThere();
+    await js(`earbee.prefs.set("layout", "videoButtons", "hover")`);
+    const buttonsHover =
+      (await until(async () => (await buttonsThere()).startsWith("hover,"))) && (await buttonsThere());
+    await js(`earbee.prefs.set("layout", "videoButtons", "always")`);
+    const buttonsBack =
+      (await until(async () => (await buttonsThere()).startsWith("always,"))) && (await buttonsThere());
+    check(
+      "the window follows Settings › Layout › The video's buttons, and keeps the theme",
+      buttonsBefore === "always,1,themed" &&
+        typeof buttonsHover === "string" &&
+        buttonsHover.startsWith("hover,") &&
+        buttonsBack === "always,1,themed",
+      `${buttonsBefore} → ${buttonsHover} → ${buttonsBack}`,
+    );
     contents.focus();
     contents.sendInputEvent({ type: "keyDown", keyCode: "0", modifiers: ["control"] });
     contents.sendInputEvent({ type: "keyUp", keyCode: "0", modifiers: ["control"] });

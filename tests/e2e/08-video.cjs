@@ -374,6 +374,26 @@ module.exports = async function (h) {
       videoButtons.shown,
     JSON.stringify(videoButtons),
   );
+  // Always shown, the default; Settings › Layout › On hover shows them only
+  // while the pointer is on the picture (features/video-buttons.js).
+  const buttonsShown = () => js(`getComputedStyle(videoPane.querySelector(".video-controls")).opacity === "1"`);
+  const pointerTo = async (x, y) => {
+    wc.sendInputEvent({ type: "mouseMove", x: Math.round(x), y: Math.round(y) });
+    await sleep(150);
+  };
+  const pane = await paneBox();
+  await pointerTo(pane.left - 40, pane.top + pane.height / 2);
+  check("the video's buttons show without the pointer on the picture (the default)", await buttonsShown());
+  await js(`earbee.prefs.set("layout", "videoButtons", "hover")`);
+  await sleep(200);
+  check("…On hover: still shown while zoomed in", (await zoomBar()).zoomed && (await buttonsShown()));
+  await js(`videoPane.querySelector(".video-zoom-level").click()`);
+  await sleep(200);
+  check("…hidden once all of the picture shows, with the pointer elsewhere", !(await buttonsShown()));
+  await pointerTo(pane.left + pane.width / 2, pane.top + pane.height / 2);
+  check("…and shown with it on the picture", await buttonsShown());
+  await js(`earbee.prefs.set("layout", "videoButtons", "always")`);
+  await sleep(200);
   await openFile(path.join(FIXTURES, "long-counter.webm"));
   check("a new file shows all of its picture", (await zoomNow()) === "" && (await zoomBar()).level === "1.0×");
 

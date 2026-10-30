@@ -48,8 +48,8 @@ const generalSection = defineSection({
 
 // Settings › Theme: the colour theme, and for Automatic which theme each
 // system mode uses. The values are the themes' ThemePrefs
-// ({ choice, dark, light }); ui/theme.js applies them, the palette menu
-// (features/settings.js) is a shortcut to `choice`.
+// ({ choice, dark, light }); ui/theme.js applies them. They're chosen only
+// here (there's no other theme picker).
 /** @param {import("../themes/index.js").Theme} theme */
 const option = (theme) => ({
   value: theme.id,
@@ -167,6 +167,37 @@ export const waveformSection = defineSection({
   ],
 });
 
+// Settings › Layout: how the player's window is laid out. `autohideTopBar`:
+// the top bar slides away and comes back when the pointer reaches the top
+// edge (features/topbar-autohide.js). `videoButtons`: the video's buttons
+// (the zoom, its own window, big video) always shown, or only while the
+// pointer is on the picture (features/video-buttons.js).
+const layoutSection = defineSection({
+  id: "layout",
+  title: "Layout",
+  icon: "sidebar",
+  fields: [
+    {
+      key: "autohideTopBar",
+      type: "boolean",
+      label: "Hide the top bar",
+      help: "It slides back in when the pointer reaches the top of the window, and stays while you use it.",
+      default: false,
+    },
+    {
+      key: "videoButtons",
+      type: "choice",
+      label: "The video's buttons",
+      help: "The zoom, the video in its own window and big video, in the picture's corner.",
+      default: "always",
+      options: [
+        { value: "always", label: "Always" },
+        { value: "hover", label: "On hover", detail: "while the pointer is on the picture" },
+      ],
+    },
+  ],
+});
+
 // Settings › Downloads: where downloaded files go, and what the From
 // YouTube dialog downloads, and where it searches. electron/downloader.js reads them for each
 // download; features/download.js starts the dialog on `kind`.
@@ -251,7 +282,14 @@ const advancedSection = defineSection({
 });
 
 /** @type {import("./fields.js").Section[]} */
-export const SECTIONS = [generalSection, themeSection, waveformSection, downloadsSection, advancedSection];
+export const SECTIONS = [
+  generalSection,
+  themeSection,
+  waveformSection,
+  layoutSection,
+  downloadsSection,
+  advancedSection,
+];
 
 /** @param {string} id */
 export const getSection = (id) => SECTIONS.find((section) => section.id === id);

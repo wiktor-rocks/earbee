@@ -99,14 +99,67 @@ module.exports = async function (h) {
   check("↓ moves to Save", (await js(`document.activeElement.id`)) === "saveButton");
   key("Escape");
   await sleep(150);
-  // Not opened from the keyboard (Tab): no focus is left on File, as with
-  // the theme menu (see bindFocus in ui/shortcuts.js).
+  // Not opened from the keyboard (Tab): no focus is left on File (see
+  // bindFocus in ui/shortcuts.js).
   check(
     "Escape closes it, File no longer expanded",
     !(await fileMenuOpen()) &&
       (await js(`document.activeElement === document.body`)) &&
       (await js(`fileMenuButton.getAttribute("aria-expanded")`)) === "false",
   );
+  // How every popover menu behaves (ui/menu.js). While open, the
+  // shortcuts are held off. A real click (press and release) on its button
+  // again closes it: the press mustn't light-dismiss it and the click open
+  // it again.
+  // M (mark a point) rather than Space: the menu's first item, Open…, has
+  // focus, and Space would click it (its file chooser would then block
+  // the video window in topic 18).
+  await js(`fileMenuButton.click()`);
+  await sleep(150);
+  const marksBefore = await js(`document.querySelectorAll("#marksList .mark-row").length`);
+  key("M");
+  await sleep(300);
+  check(
+    "shortcuts don't fire while the File menu is open",
+    (await js(`document.querySelectorAll("#marksList .mark-row").length`)) === marksBefore,
+  );
+  await js(`fileMenu.matches(":popover-open") || fileMenuButton.click()`);
+  await sleep(150);
+  const fileButtonAt = await js(
+    `(() => { const r = fileMenuButton.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`,
+  );
+  const realClick = async () => {
+    wc.sendInputEvent({ type: "mouseDown", ...fileButtonAt, button: "left", clickCount: 1 });
+    wc.sendInputEvent({ type: "mouseUp", ...fileButtonAt, button: "left", clickCount: 1 });
+    await sleep(150);
+  };
+  await realClick();
+  check("clicking File again closes the menu", !(await fileMenuOpen()));
+  await realClick();
+  check("…and clicking it once more opens it", await fileMenuOpen());
+  key("Escape");
+  await sleep(150);
+  // Reached with the keyboard (Shift+Tab from the next button) and opened
+  // with Enter: focus goes back to the button.
+  await js(`sidebarToggle.focus()`);
+  key("Tab", ["shift"]);
+  await sleep(50);
+  const tabbedTo = await js(`document.activeElement.id`);
+  // Opened as Enter opens it: one click with no press (detail 0). Sending
+  // Enter's key events clicked twice, and the second click landed on the
+  // menu's first item, Open…, whose file chooser then stayed active and
+  // blocked the video window in topic 18.
+  await js(`fileMenuButton.click()`);
+  await sleep(150);
+  const openedByKey = await fileMenuOpen();
+  key("Escape");
+  await sleep(150);
+  check(
+    "with the keyboard (Shift+Tab, Enter, Esc), focus goes back to File",
+    tabbedTo === "fileMenuButton" && openedByKey && (await js(`document.activeElement.id`)) === "fileMenuButton",
+    `${tabbedTo} ${openedByKey} ${await js(`document.activeElement.id`)}`,
+  );
+  await js(`document.activeElement.blur()`);
   await js(`fileMenuButton.click()`);
   await sleep(150);
   await js(`downloadButton.click()`);

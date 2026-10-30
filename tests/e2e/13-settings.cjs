@@ -1,6 +1,6 @@
 // Settings: the dialog (generated from src/prefs), the General, Theme,
-// Downloads and Advanced sections, Reset, keeping the palette menu in step, what the main process
-// refuses, and keeping the values over a reload.
+// Layout, Downloads and Advanced sections, Reset, a change made elsewhere showing in the dialog,
+// the top bar hiding itself, what the main process refuses, and keeping the values over a reload.
 // Part of the end-to-end run (see run.cjs); `h` is the harness.
 const fs = require("fs");
 const path = require("path");
@@ -30,7 +30,7 @@ module.exports = async function (h) {
   check(
     "one tab per settings section",
     JSON.stringify(await js(`[...document.querySelectorAll(".settings-tab")].map((tab) => tab.textContent)`)) ===
-      JSON.stringify(["General", "Theme", "Waveform", "Downloads", "Advanced"]),
+      JSON.stringify(["General", "Theme", "Waveform", "Layout", "Downloads", "Advanced"]),
   );
   // The dialog has one size: switching tabs, or fields showing and hiding,
   // never moves it or its tabs.
@@ -40,7 +40,7 @@ module.exports = async function (h) {
         `(() => { const d = document.getElementById("settingsDialog").getBoundingClientRect(); const t = document.querySelector(".settings-tab").getBoundingClientRect(); const p = document.getElementById("settingsPanels"); return { dialog: [d.left, d.top, d.width, d.height].map(Math.round).join(), tab: [t.left, t.top].map(Math.round).join(), content: p.scrollHeight, shown: p.clientHeight }; })()`,
       );
     const seen = [];
-    for (const id of ["general", "theme", "waveform", "downloads", "advanced", "theme"]) {
+    for (const id of ["general", "theme", "waveform", "layout", "downloads", "advanced", "theme"]) {
       await js(`document.getElementById("settings-tab-${id}").click()`);
       await sleep(100);
       seen.push({ id, ...(await layout()) });
@@ -103,8 +103,8 @@ module.exports = async function (h) {
   await tab("theme");
   await sleep(100);
 
-  // A change made elsewhere (here the main process, as the palette menu or
-  // another window would) shows in the open dialog.
+  // A change made elsewhere (here the main process, as another window
+  // would) shows in the open dialog.
   prefsStore.set("theme", "choice", "nord");
   await sleep(300);
   check(
@@ -114,28 +114,21 @@ module.exports = async function (h) {
   );
 
   // Escape closes it (opened with a click, so no focus is left on the
-  // gear); the palette menu agrees.
+  // gear). The theme is chosen in its tab: the page follows at once.
   key("Escape");
   await sleep(200);
   check(
     "Escape closes Settings, no focus left on the gear",
     !(await isOpen()) && (await js(`document.activeElement === document.body`)),
   );
-  await js(`document.getElementById("themeButton").click()`);
-  await sleep(150);
-  check(
-    "the palette menu shows the theme chosen in Settings",
-    (await js(`document.querySelector('#themeMenu [aria-checked="true"]').dataset.choice`)) === "nord",
-  );
-  await js(`document.querySelector('#themeMenu [data-choice="one-dark"]').click()`);
-  await sleep(200);
-  key("Escape");
-  await sleep(150);
   await js(`document.getElementById("settingsButton").click()`);
   await sleep(200);
+  await tab("theme");
+  await choose("theme", "choice", "one-dark");
   check(
-    "…and Settings shows the theme chosen in the menu",
-    await js(`${radio("theme", "choice", "one-dark")}.checked`),
+    "choosing a theme in Settings shows it at once",
+    (await js(`${radio("theme", "choice", "one-dark")}.checked`)) &&
+      (await js(`document.documentElement.dataset.theme`)) === "one-dark",
   );
 
   // Downloads: the folder, the kind, the quality.
@@ -215,6 +208,71 @@ module.exports = async function (h) {
   );
   check("…and the folder picker only opens for folder settings", folderChoice.asked === 2);
 
+  // Settings › Layout › Hide the top bar (features/topbar-autohide.js): the
+  // stage takes the bar's room once; the bar slides back over it at the top
+  // edge (not during a drag), stays while its menu is open, goes once the
+  // pointer leaves.
+  const bars = () =>
+    js(`(() => {
+      const bar = document.querySelector(".topbar").getBoundingClientRect();
+      const stage = document.getElementById("stage").getBoundingClientRect();
+      return { bottom: Math.round(bar.bottom), stageTop: Math.round(stage.top), autohide: document.getElementById("app").classList.contains("topbar-autohide") };
+    })()`);
+  const pointerTo = async (y, modifiers = []) => {
+    h.wc.sendInputEvent({ type: "mouseMove", x: 300, y, modifiers });
+    await sleep(400); // the slide (150 ms) is over
+  };
+  const goneAfterLeaving = 1000; // CONFIG.layout.topbarHideMs (600) and the slide
+  const inLayout = await bars();
+  await js(`document.getElementById("settingsDialog").close()`);
+  await sleep(200);
+  await js(`document.getElementById("settingsButton").click()`);
+  await sleep(200);
+  await tab("layout");
+  await js(`${row("layout", "autohideTopBar")}.querySelector("input").click()`);
+  await sleep(300);
+  await js(`document.getElementById("settingsDialog").close()`);
+  await pointerTo(400);
+  const hidden = await bars();
+  check(
+    "Hide the top bar: saved; the bar out of sight, its room the stage's",
+    saved().layout?.autohideTopBar === true &&
+      hidden.autohide &&
+      hidden.bottom <= 0 &&
+      hidden.stageTop < inLayout.stageTop,
+    JSON.stringify({ inLayout, hidden }),
+  );
+  await pointerTo(1, ["leftButtonDown"]);
+  check("…a drag up to the top edge doesn't bring it", (await bars()).bottom <= 0);
+  await pointerTo(400);
+  await pointerTo(1);
+  const revealed = await bars();
+  check(
+    "…the pointer at the top edge brings it over the stage, which stays put",
+    revealed.bottom >= 40 && revealed.stageTop === hidden.stageTop,
+    JSON.stringify(revealed),
+  );
+  await shot("topbar-autohide.png");
+  await sleep(goneAfterLeaving);
+  check("…it stays while the pointer is on it, even at the very top", (await bars()).bottom >= 40);
+  await pointerTo(25);
+  await sleep(goneAfterLeaving);
+  check("…or lower down on it", (await bars()).bottom >= 40);
+  await pointerTo(400);
+  await sleep(goneAfterLeaving);
+  check("…and it goes a moment after the pointer leaves", (await bars()).bottom <= 0);
+  await pointerTo(1);
+  await js(`document.getElementById("fileMenuButton").click()`);
+  await pointerTo(400);
+  await sleep(goneAfterLeaving);
+  check("…it stays while its File menu is open", (await bars()).bottom >= 40);
+  await js(`document.getElementById("fileMenu").hidePopover()`);
+  await sleep(400);
+  check("…and goes once the menu closes", (await bars()).bottom <= 0);
+  await js(`earbee.prefs.set("layout", "autohideTopBar", false)`);
+  await sleep(300);
+  check("turned off, the bar is back in the layout", JSON.stringify(await bars()) === JSON.stringify(inLayout));
+
   // Kept over a reload (the preload reads them before the page starts).
   await h.wc.reload();
   await sleep(1500);
@@ -225,6 +283,7 @@ module.exports = async function (h) {
   );
 
   // Back to the defaults for anything after this.
+  prefsStore.reset("layout");
   prefsStore.reset("theme");
   prefsStore.reset("downloads");
   await sleep(300);
