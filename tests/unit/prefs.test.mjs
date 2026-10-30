@@ -157,6 +157,21 @@ describe("the general section", () => {
   });
 });
 
+describe("the layout section", () => {
+  const layout = getSection("layout");
+
+  test("defaults: the top bar stays, the video's buttons always show", () => {
+    assert.deepEqual(defaultsOf(layout), { autohideTopBar: false, videoButtons: "always" });
+  });
+
+  test("anything but its choices falls back to always; anything but true or false to a bar that stays", () => {
+    assert.equal(normalizePrefsFile({ layout: { videoButtons: "sideways" } }).layout.videoButtons, "always");
+    assert.equal(normalizePrefsFile({ layout: { videoButtons: "hover" } }).layout.videoButtons, "hover");
+    assert.equal(normalizePrefsFile({ layout: { autohideTopBar: "yes" } }).layout.autohideTopBar, false);
+    assert.equal(normalizePrefsFile({ layout: { autohideTopBar: true } }).layout.autohideTopBar, true);
+  });
+});
+
 describe("the downloads section", () => {
   test("defaults: the usual folder, audio, chapters as marks, searching YouTube, 1080p", () => {
     assert.deepEqual(defaultsOf(getSection("downloads")), {

@@ -30,7 +30,7 @@ module.exports = async function (h) {
   check(
     "one tab per settings section",
     JSON.stringify(await js(`[...document.querySelectorAll(".settings-tab")].map((tab) => tab.textContent)`)) ===
-      JSON.stringify(["General", "Theme", "Waveform", "Downloads", "Advanced"]),
+      JSON.stringify(["General", "Theme", "Waveform", "Layout", "Downloads", "Advanced"]),
   );
   // The dialog has one size: switching tabs, or fields showing and hiding,
   // never moves it or its tabs.
@@ -40,7 +40,7 @@ module.exports = async function (h) {
         `(() => { const d = document.getElementById("settingsDialog").getBoundingClientRect(); const t = document.querySelector(".settings-tab").getBoundingClientRect(); const p = document.getElementById("settingsPanels"); return { dialog: [d.left, d.top, d.width, d.height].map(Math.round).join(), tab: [t.left, t.top].map(Math.round).join(), content: p.scrollHeight, shown: p.clientHeight }; })()`,
       );
     const seen = [];
-    for (const id of ["general", "theme", "waveform", "downloads", "advanced", "theme"]) {
+    for (const id of ["general", "theme", "waveform", "layout", "downloads", "advanced", "theme"]) {
       await js(`document.getElementById("settings-tab-${id}").click()`);
       await sleep(100);
       seen.push({ id, ...(await layout()) });

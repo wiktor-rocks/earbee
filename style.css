@@ -3489,9 +3489,11 @@ body.panel-order-dragging * {
 /* ---------- Video controls ----------
    The video's buttons (the zoom, its own window, big video), each added
    by its feature into one bar in the picture's bottom-right corner, like
-   a video player's: shown while the pointer is on the picture, while one
-   of them has focus, and while zoomed in. White on dark glass, whatever
-   the theme. Their order is each feature's (CSS order). */
+   a video player's. Always shown; with Settings › Layout › On hover
+   (data-video-buttons on <html>, features/video-buttons.js), only while
+   the pointer is on the picture, while one of them has focus, and while
+   zoomed in. White on dark glass, whatever the theme. Their order is each
+   feature's (CSS order). */
 
 .video-pane {
   position: relative;
@@ -3508,7 +3510,6 @@ body.panel-order-dragging * {
   border-radius: 999px;
   background: color-mix(in srgb, #000 55%, transparent);
   color: #fff;
-  opacity: 0;
   cursor: default;
 }
 
@@ -3516,9 +3517,13 @@ body.panel-order-dragging * {
   display: none;
 }
 
-.video-pane:hover .video-controls,
-.video-controls:focus-within,
-.video-controls:has(.video-zoom-bar.zoomed) {
+:root[data-video-buttons="hover"] .video-controls {
+  opacity: 0;
+}
+
+:root[data-video-buttons="hover"] .video-pane:hover .video-controls,
+:root[data-video-buttons="hover"] .video-controls:focus-within,
+:root[data-video-buttons="hover"] .video-controls:has(.video-zoom-bar.zoomed) {
   opacity: 1;
 }
 
