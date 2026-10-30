@@ -289,6 +289,7 @@ const tokyoNight = {
 // paper, the light counterpart of EarBee. The amber is the dark
 // theme's own yellow, so the brand colour is the same in both (it's soft on
 // the pale panels; tests/unit/themes.test.mjs exempts it from the 3:1 check).
+// Text in the accent uses a deeper amber, which reads on them.
 /** @type {Theme} */
 const earbeeLight = {
   id: "earbee-light",
@@ -305,9 +306,10 @@ const earbeeLight = {
     accent: "#f5b301",
     accentHover: "#ffc52e",
     accentInk: "#1a1400",
+    accentText: "#8a5f00",
     danger: "#c0392b",
     loop: "#0b7fa8",
-    wave: "#d3c8b2",
+    wave: "#a69d8a",
     cursor: "#1f1b14",
   },
 };
@@ -331,7 +333,7 @@ const solarizedLight = {
     accentInk: "#fdf6e3",
     danger: "#c42b28",
     loop: "#6c71c4",
-    wave: "#cfc8b0",
+    wave: "#a5a999",
     cursor: "#073642",
   },
 };
@@ -355,7 +357,7 @@ const catppuccinLatte = {
     accentInk: "#eff1f5",
     danger: "#c80e36",
     loop: "#179299",
-    wave: "#bcc0cc",
+    wave: "#a6a9b8",
     cursor: "#4c4f69",
   },
 };
@@ -378,7 +380,7 @@ const githubLight = {
     accentInk: "#ffffff",
     danger: "#cf222e",
     loop: "#8250df",
-    wave: "#b7c0ca",
+    wave: "#abb3bd",
     cursor: "#1f2328",
   },
 };
@@ -401,7 +403,7 @@ const gruvboxLight = {
     accentInk: "#fbf1c7",
     danger: "#9d0006",
     loop: "#076678",
-    wave: "#bdae93",
+    wave: "#b1a38b",
     cursor: "#3c3836",
   },
 };
@@ -426,7 +428,7 @@ const oneLight = {
     accentInk: "#fafafa",
     danger: "#ca1243",
     loop: "#a626a4",
-    wave: "#c8c8cc",
+    wave: "#a8a9ae",
     cursor: "#383a42",
   },
 };
@@ -452,7 +454,7 @@ const tokyoNightDay = {
     danger: "#b01e49",
     loop: "#587539",
     start: "#118c74",
-    wave: "#a8b1d6",
+    wave: "#8b9bcd",
     cursor: "#3358b0",
   },
 };
@@ -477,7 +479,7 @@ const everforestLight = {
     accentInk: "#fdf6e3",
     danger: "#bc413e",
     loop: "#3a94c5",
-    wave: "#cfc9ab",
+    wave: "#b1b09b",
     cursor: "#56646b",
   },
 };

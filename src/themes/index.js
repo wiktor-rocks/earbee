@@ -32,6 +32,21 @@ export const DEFAULT_MARK_COLOR = MARK_COLORS[0].id;
 /** @param {string} id */
 const markColorVariable = (id) => `--mark-${id}`;
 
+// The transport's Play (green) and Stop (red) buttons: like the marks', the
+// same in every theme, with one shade for dark themes and one for light
+// ones (the dark shades are too pale to read on a light panel).
+// cssVariables() sets each as its variable.
+/** @type {Record<string, { dark: string, light: string }>} */
+export const TRANSPORT_COLORS = {
+  "--play": { dark: "#2fbf71", light: "#1b7f46" }, // Play's ring, and its fill while playing
+  "--play-hover": { dark: "#45d486", light: "#16733e" },
+  "--play-icon": { dark: "#5fd38d", light: "#1b7f46" }, // the triangle on the empty ring
+  "--play-icon-hover": { dark: "#7be6aa", light: "#16733e" },
+  "--play-ink": { dark: "#06210f", light: "#ffffff" }, // the triangle on the filled ring
+  "--stop-button": { dark: "#e5484d", light: "#c92a2f" },
+  "--stop-button-hover": { dark: "#ff6369", light: "#a81d22" },
+};
+
 /**
  * @typedef {object} Theme
  * @property {string} id
@@ -74,6 +89,9 @@ export const ROLES = {
   accentHover: "--accent-hover", // optional
   minimapWave: "--minimap-wave", // optional
   minimapProgress: "--minimap-progress", // optional
+  accentText: "--accent-text", // optional; the accent as text (where the accent itself is too pale to read)
+  inset: "--inset", // optional; the well the waveform and minimap sit in, a little darker than the panels
+  insetShade: "--inset-shade", // optional; the soft shadow along the well's top edge
 };
 
 /** @type {Record<string, (colors: Record<string, string>, scheme: string) => string>} */
@@ -86,6 +104,11 @@ const DERIVED = {
   start: (c, scheme) => MARK_COLORS.find((color) => color.id === "green")[scheme],
   // The error red.
   stop: (c) => c.danger,
+  accentText: (c) => c.accent,
+  // Dark themes sink the well toward black; light ones toward their own
+  // text colour, which keeps the theme's hue (black made a dull grey there).
+  inset: (c, scheme) => (scheme === "dark" ? mix(c.bg, "#000000", 0.07) : mix(c.bg, c.text, 0.045)),
+  insetShade: (c, scheme) => (scheme === "dark" ? mix(c.inset, "#000000", 0.35) : mix(c.inset, c.text, 0.12)),
 };
 
 export const REQUIRED_ROLES = Object.keys(ROLES).filter((role) => !(role in DERIVED));
@@ -120,6 +143,10 @@ export function cssVariables(theme) {
     ...Object.fromEntries(Object.entries(ROLES).map(([role, variable]) => [variable, colors[role]])),
     // The marks' colours, in the shade for the theme's scheme.
     ...Object.fromEntries(MARK_COLORS.map((color) => [markColorVariable(color.id), color[theme.scheme]])),
+    // Play and Stop, in the shade for the theme's scheme.
+    ...Object.fromEntries(
+      Object.entries(TRANSPORT_COLORS).map(([variable, shades]) => [variable, shades[theme.scheme]]),
+    ),
   };
 }
 

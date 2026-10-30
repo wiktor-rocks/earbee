@@ -31,6 +31,8 @@
   --accent: #f5b301;
   --accent-hover: #ffc52e;
   --accent-ink: #1a1400;
+  /* The accent as text (a theme with a pale accent gives it a deeper one) */
+  --accent-text: #f5b301;
   --danger: #ff6b6b;
   --overlay-bg: color-mix(in srgb, var(--bg) 78%, transparent);
 
@@ -72,6 +74,16 @@
   --mark-violet: #b88cff;
   --mark-grey: #aab2c0;
 
+  /* Play (green) and Stop (red) in the transport: the same in every theme,
+     with a deeper shade on light ones (the dark shades; src/themes/index.js) */
+  --play: #2fbf71;
+  --play-hover: #45d486;
+  --play-icon: #5fd38d;
+  --play-icon-hover: #7be6aa;
+  --play-ink: #06210f;
+  --stop-button: #e5484d;
+  --stop-button-hover: #ff6369;
+
   /* Righteous for the logo and titles, Nunito for everything else */
   --display: "Righteous", system-ui, sans-serif;
   --sans: "Nunito Variable", "Nunito", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -81,12 +93,16 @@
   /* Shape and depth. The player's parts (the top bar, the stage, the
      transport, the side panel) aren't cards: they meet edge to edge, flat,
      set apart by hairlines, the waveform and minimap sunk into a darker
-     well (--inset). Dialogs and popovers still float, rounded, with a
-     shadow. Derived from the theme's colours, so every theme gets them. */
+     well (--inset, with a soft shadow along its top, --inset-shade).
+     Dialogs and popovers still float, rounded, with a shadow. Derived from
+     the theme's colours, so every theme gets them: a dark theme's well is
+     sunk toward black, a light theme's toward its own text colour
+     (src/themes/index.js). */
   --radius: 12px;
   --radius-sm: 8px;
   --hairline: color-mix(in srgb, var(--border) 62%, transparent);
-  --inset: color-mix(in srgb, var(--bg) 93%, #000);
+  --inset: #0e0b09;
+  --inset-shade: #090706;
   --shadow: 0 1px 2px rgb(0 0 0 / 0.18), 0 8px 24px rgb(0 0 0 / 0.14);
   --shadow-lifted: 0 2px 6px rgb(0 0 0 / 0.25), 0 18px 48px rgb(0 0 0 / 0.3);
   --sidebar-width: 300px;
@@ -293,7 +309,7 @@ button.small .icon {
 
 button.toggle[aria-pressed="true"] {
   border-color: var(--accent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 button.toggle[aria-pressed="false"] {
@@ -535,7 +551,7 @@ body.dragging .drop-ring {
   justify-content: center;
   gap: 8px;
   margin: 0;
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 700;
 }
 
@@ -961,7 +977,7 @@ body.dragging .welcome-hint {
   height: 34px;
   border-radius: var(--radius-sm);
   background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .youtube-badge .icon {
@@ -1198,7 +1214,7 @@ body.dragging .welcome-hint {
 /* The open tab: amber, with a bar on its left. */
 .settings-tab[aria-selected="true"] {
   background: var(--surface-2);
-  color: var(--accent);
+  color: var(--accent-text);
   font-weight: 700;
 }
 
@@ -1308,7 +1324,7 @@ body.dragging .welcome-hint {
 .pref-options-row .pref-option:has(input:checked) {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 10%, var(--surface));
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .pref-options-row .pref-option:has(input:focus-visible) {
@@ -1435,7 +1451,7 @@ body.dragging .welcome-hint {
   padding: 3px 8px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--accent) 14%, transparent);
-  color: var(--accent);
+  color: var(--accent-text);
   font: 700 12px/1.4 var(--num);
   font-variant-numeric: tabular-nums;
   text-align: center;
@@ -1565,7 +1581,7 @@ body.dragging .welcome-hint {
 }
 
 .beat-menu .menu-item[aria-checked="true"] {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .beat-menu .menu-item[aria-checked="true"]::after {
@@ -1592,7 +1608,7 @@ body.dragging .welcome-hint {
 }
 
 .theme-item[aria-checked="true"] {
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .theme-item::after {
@@ -2105,7 +2121,7 @@ body.stage-split-dragging * {
   display: grid;
   min-height: 0;
   background: var(--inset);
-  box-shadow: inset 0 6px 10px -6px rgb(0 0 0 / 0.35);
+  box-shadow: inset 0 6px 10px -6px var(--inset-shade);
 }
 
 .timeline-track {
@@ -2458,7 +2474,8 @@ button.ring-button .icon {
   height: 14px;
 }
 
-/* Play is green and Stop red on every theme (fixed, not theme colours).
+/* Play is green and Stop red on every theme (fixed, not theme colours,
+   with a deeper shade on light themes: --play, --stop-button in :root).
    Play: a large green ring, filled while playing. (button. to outweigh
    button.primary.) */
 button.play-button {
@@ -2466,38 +2483,38 @@ button.play-button {
   min-width: 0;
   height: 40px;
   padding: 0;
-  border: 2px solid #2fbf71;
+  border: 2px solid var(--play);
   border-radius: 50%;
   background: transparent;
-  color: #5fd38d;
+  color: var(--play-icon);
 }
 
 button.play-button:hover {
-  border-color: #45d486;
-  background: rgb(47 191 113 / 0.14);
-  color: #7be6aa;
+  border-color: var(--play-hover);
+  background: color-mix(in srgb, var(--play) 14%, transparent);
+  color: var(--play-icon-hover);
 }
 
 button.play-button.playing,
 button.play-button.playing:hover {
-  border-color: #2fbf71;
-  background: #2fbf71;
-  color: #06210f;
+  border-color: var(--play);
+  background: var(--play);
+  color: var(--play-ink);
 }
 
 button.play-button.playing:hover {
-  border-color: #45d486;
-  background: #45d486;
+  border-color: var(--play-hover);
+  background: var(--play-hover);
 }
 
 button.ring-button#stop {
-  border-color: rgb(229 72 77 / 0.6);
-  color: #e5484d;
+  border-color: color-mix(in srgb, var(--stop-button) 60%, transparent);
+  color: var(--stop-button);
 }
 
 button.ring-button#stop:hover {
-  border-color: #ff6369;
-  color: #ff6369;
+  border-color: var(--stop-button-hover);
+  color: var(--stop-button-hover);
 }
 
 .play-button .icon {
@@ -2918,7 +2935,7 @@ button.beat-info.disabled {
 .chip.active {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 16%, var(--surface-2));
-  color: var(--accent);
+  color: var(--accent-text);
 }
 
 .speed-more {
@@ -3322,7 +3339,7 @@ body.panel-order-dragging * {
 
 .shortcut-group h3 {
   margin: 0 0 8px;
-  color: var(--accent);
+  color: var(--accent-text);
   font: 700 12px var(--sans);
   letter-spacing: 0.04em;
   text-transform: uppercase;

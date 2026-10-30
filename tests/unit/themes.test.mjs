@@ -9,6 +9,7 @@ import {
   REQUIRED_ROLES,
   ROLES,
   THEMES,
+  TRANSPORT_COLORS,
   contrast,
   cssVariables,
   getTheme,
@@ -37,7 +38,8 @@ describe("every theme", () => {
 
   // WCAG 2 contrast. Text needs 4.5:1 (AA); graphics such as the played
   // waveform, the loop and focus rings need 3:1. The unplayed waveform is
-  // deliberately soft, but must stay visible.
+  // deliberately soft, but must stay visible, on the panels and in the
+  // well it sits in (as much on light themes as on dark ones).
   for (const theme of THEMES) {
     test(`${theme.name}: readable`, () => {
       const v = cssVariables(theme);
@@ -58,6 +60,19 @@ describe("every theme", () => {
       atLeast(3, "--start", "--surface");
       atLeast(3, "--stop", "--surface");
       atLeast(1.5, "--wave", "--surface");
+      atLeast(1.7, "--wave", "--inset");
+      atLeast(1.5, "--minimap-wave", "--inset");
+      // The accent as text (labels, the chosen speed), and Play and Stop.
+      atLeast(3, "--accent-text", "--surface", "--surface-2");
+      atLeast(3, "--play", "--surface");
+      atLeast(3, "--play-icon", "--surface");
+      atLeast(4.5, "--play-ink", "--play");
+      // Stop's red is a little softer on a dark theme with mid-grey panels (Nord).
+      atLeast(2.5, "--stop-button", "--surface");
+      // The played part apart from the unplayed (by colour: EarBee Light's
+      // yellow is about as light as its wave).
+      const played = distance(v["--accent"], v["--wave"]);
+      assert.ok(played >= 100, `accent and wave too alike (${played.toFixed(0)})`);
       for (const color of MARK_COLORS) atLeast(3, `--mark-${color.id}`, "--bg", "--surface");
       const apart = distance(v["--loop"], v["--accent"]);
       assert.ok(apart >= 90, `loop and accent too alike (${apart.toFixed(0)})`);
@@ -82,7 +97,8 @@ describe("cssVariables", () => {
     assert.equal(nord.colors.surfaceHover, undefined);
     const v = cssVariables(nord);
     const marks = MARK_COLORS.map((color) => `--mark-${color.id}`);
-    assert.deepEqual(Object.keys(v).sort(), [...Object.values(ROLES), ...marks].sort());
+    const transport = Object.keys(TRANSPORT_COLORS);
+    assert.deepEqual(Object.keys(v).sort(), [...Object.values(ROLES), ...marks, ...transport].sort());
     for (const value of Object.values(v)) assert.match(value, /^#[0-9a-f]{6}$/i);
     assert.equal(v["--bg"], "#2e3440");
   });
@@ -91,6 +107,12 @@ describe("cssVariables", () => {
     const [rose] = MARK_COLORS;
     assert.equal(cssVariables(getTheme("nord"))["--mark-rose"], rose.dark);
     assert.equal(cssVariables(getTheme("github-light"))["--mark-rose"], rose.light);
+  });
+
+  test("a dark theme's well sinks toward black, a light one's toward its text", () => {
+    assert.equal(cssVariables(getTheme("earbee"))["--inset"], "#0e0b09");
+    assert.equal(cssVariables(getTheme("earbee-light"))["--inset"], "#ebe7de");
+    assert.equal(cssVariables(getTheme("github-light"))["--play"], TRANSPORT_COLORS["--play"].light);
   });
 
   test("a theme's own value wins over the derived one", () => {

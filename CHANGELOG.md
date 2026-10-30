@@ -43,6 +43,38 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-30: Light themes fit the new look
+
+- **What:** on every light theme:
+  - the waveform and minimap sit in a softly tinted well instead of a grey one, with a gentle shadow along its top;
+  - the waveform stands out as clearly as on the dark themes, and on EarBee Light the amber played part is clearly apart from the rest;
+  - Play and Stop use a deeper green and red;
+  - on EarBee Light, text in the accent (the chosen speed, the selected Settings tab and menu items, and so on) is a deeper amber that reads on its pale panels.
+  - The dark themes look the same as before.
+- **Why:** the owner, in the 0.3.0 scope: "After the UI upgrade all light themes look weird."
+  - The new look sank the waveform into a well made by mixing the background with black, which turns cream and white into a dull grey.
+  - The light themes' wave colours were picked for the white panel the waveform used to sit on. In the well they measured 1.17–1.49:1 (dark themes: 1.77–2.30:1).
+  - EarBee Light's amber was 1.12:1 against its wave.
+  - Play's green (made for dark panels) was about 1.8:1 on cream.
+- **How:**
+  - Three new optional theme roles, derived when a theme leaves them out:
+    - `inset`: a dark theme's background moved 7 % toward black (as before); a light theme's 4.5 % toward its own text colour, which keeps its hue.
+    - `insetShade`: the colour of the well's top shadow.
+    - `accentText`: the accent as text, which only EarBee Light sets (`#8a5f00`).
+  - Play's and Stop's colours are a fixed table with one shade per scheme, like the marks' colours.
+  - The 8 light themes' `wave` colours moved toward their text colour until they reach about 1.8:1 against the well.
+  - The logo's "Bee" and the file-kind icon keep the brand amber.
+- **Where:**
+  - `src/themes/index.js`: `ROLES`, `DERIVED`, `TRANSPORT_COLORS`, `cssVariables`.
+  - `src/themes/palettes.js`: the light themes' `wave`, EarBee Light's `accentText`.
+  - `style.css`: `:root` (`--inset`, `--inset-shade`, `--accent-text`, `--play…`, `--stop-button…`), `.timeline-wave`, `button.play-button`, `button.ring-button#stop`, and the rules that colour text with the accent.
+  - `tests/unit/themes.test.mjs`: new checks, on every theme, of the wave and minimap against the well, the accent text, Play and Stop, and the played part apart from the unplayed.
+- **Verified by:**
+  - `npm run check`; `npm run test:unit` (331 pass).
+  - `TB_TOPICS=03,10 npm test` (64 pass, smoke 28 pass); topic 17 passed.
+  - Screenshots of every theme: the light ones looked at; the dark ones' well and Play colours sampled, the same values as before.
+  - Not yet tried by the owner in a real window.
+
 ## 2026-10-30: Assistants may change the scratchpad, with the owner's approval (AGENTS.md)
 
 - **What:** an assistant may now add to, change or remove from `local/SCRATCHPAD.md`, but only after the owner has approved that exact change. Before, only the owner changed it.
