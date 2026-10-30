@@ -43,6 +43,36 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-30: The EQ's Focus: keep one range of notes, with presets for instruments and voices
+
+- **What:**
+  - The EQ has a **Focus**: it keeps one range of notes and cuts everything outside it, to hear one instrument or voice.
+  - The range is set in **note names**, with two knobs in the EQ's popover, Lowest and Highest. A double-click on a value types a note ("E2", "f#3", "Bb1"). An end pushed past the other pushes it along.
+  - **Presets**, as chips above the knobs: Bass guitar (B0–C5), Guitar (D2–C7), Soprano (A3–F6), Alto (D3–C6), Tenor (A2–G5), Bass voice (C2–C5), Piano, left hand (A0–F4) and Piano, right hand (B3–C8). A preset turns the EQ on. A range that matches no preset is "Custom". "Off" is the whole range, A0–C8, which cuts nothing.
+  - While it cuts, the side panel shows it under the EQ's title ("Bass guitar · B0–C5"), muted while the EQ is off. A click opens the popover.
+  - **It follows the pitch shift:** with the bass moved up an octave, the Bass guitar preset still keeps the bass.
+  - The EQ's On/Off turns the Focus off too. The popover has the Focus first, then the bands (with their Reset, which leaves the Focus alone). The side panel's button is now "Focus, bands".
+  - Saved in projects. A project saved before opens with the Focus off. A new file starts with it off, and Reset sound turns it off.
+- **Why:** the 0.3.0 item "EQ presets for different instruments": filter out everything that isn't in a bass guitar's range, SATB too, "maybe some smarter way to do EQ for the purposes of transcribing music". The five bands are too wide to isolate one instrument, and set in Hz. The owner chose a range of notes to keep, on top of the bands, with presets for the bass guitar, the guitar, the four voices and the piano's two hands. Built on an experiment branch (`exp/eq-focus`); the owner tried it as an AppImage ("good for now").
+- **How:**
+  - **Audio:** Signalsmith → the Focus (a high-pass, then a low-pass) → the bands → volume → limiter. Each cut is an 8-pole Butterworth filter (48 dB an octave): 4 two-pole biquads with the Butterworth Qs (`butterworthQs`), flat up to the cutoff and 3 dB down at it. Identical Q 0.707 stages would be 12 dB down there.
+  - The cutoffs are the edge notes' frequencies (A4 = 440 Hz), times 2^(pitch shift / 12): the EQ comes after Signalsmith, which is the source, so nothing can go before it.
+  - An end at A0 or C8 cuts nothing on that side, so no separate on/off flag is needed. The filters then sit at 10 Hz (the high-pass) and the Nyquist frequency (the low-pass). Changes ramp like the bands' gains, so they don't click.
+  - **The ranges** cover each instrument's notes plus its lowest overtones, which make a note easy to name. They are a first guess, to tune by ear.
+  - **Settings:** `eqFocusLow` and `eqFocusHigh`, MIDI note numbers, are two more `SLIDERS` entries, so the knobs, typing, Reset sound and a new file come for free. A `SliderSpec` can now have `typed` (how its value is shown and read when typed).
+  - **Projects:** the `sound` section saves `focus: { low, high }`. The high end is restored first, so the low one can't push it.
+- **Where:**
+  - `src/config.js` (`CONFIG.eq.focus`), `src/core/focus.js` (new: `noteNumber`, `noteFrequency`, `focusCutoffs`, `butterworthQs`, `focusPresetFor`), `src/core/format.js` (`noteName`).
+  - `src/audio/engine.js` (`buildGraph`, `applyEq`, `setFocus`), `src/context.js`, `src/ui/controls.js` (`buildEqKnobs`, `applyFocus`, `setFocusPreset`, `parseNote`, the `typed` option), `src/ui/dom.js` (`renderFocus`, `focusChips`), `src/features/project/sections.js`.
+  - `index.html` (the popover, `#eqFocusSummary`), `style.css` ("EQ: on/off in the dock, the Focus and the band knobs in a popover"), `src/app.js` (the header), `docs/glossary.md` (EQ, Focus).
+  - Tests: `tests/unit/focus.test.mjs` (new), `tests/e2e/01`, `05`, `07`, `16`.
+- **Verified by:**
+  - Unit: note names and numbers both ways for every note, frequencies, the cutoffs (the ends cut nothing, the pitch shift moves them), the Butterworth Qs for 1, 2 and 4 stages, the presets inside the range and matched back.
+  - e2e: 01 (the chips and knobs; a preset's notes, the EQ on, the summary; an end pushing the other; Off); 07 (a bad file keeps the Focus, a new file turns it off); 16 (saved and reopened in a project; an older project without it opens with it off); 05 (screenshots of the popover and the summary).
+  - The AppImage `dist/EarBee-0.2.0-exp-eq-focus-2026-10-30-2006-x86_64.AppImage`, smoke test passed, tried by the owner.
+  - `npm run check`, and `npm test` after the merge (342 unit, 581 e2e, 28 smoke).
+  - Not checked: a light theme, and every preset by ear.
+
 ## 2026-10-30: earbee.org in the app's new look (the website)
 
 - **What:** the site looks like the app since its new look.
