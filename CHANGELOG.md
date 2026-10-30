@@ -43,6 +43,27 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-30: Blog post "How to find the BPM of a song (with a tap tempo calculator)" (the website)
+
+- **What:** a seventh post, "How to find the BPM of a song (with a tap tempo calculator)", at `/blog/find-the-bpm-of-a-song-tap-tempo/`.
+  - A tap tempo calculator right under the first sentence: tap along (a click, a touch, or Space once clicked) for the tempo with half and double time; or type in a count of beats in 10, 15, 30 or 60 seconds; and the tempo heard at another speed.
+  - Which beat to count (half and double time), counting by ear in four steps with a click to check, what beat-finding software gets wrong, why the bars matter more than the number for learning a song, and the tempo heard when a song is slowed down.
+  - EarBee: it finds the beats and the bars, a click on each beat to check them, half or double time and moving the bars to fix them, stepping and looping by the bar.
+  - The site's reading time leaves out a post's own script and styles, which would otherwise count as words.
+- **Why:** post idea 8 in `docs/blog.md`, chosen by keyword research (`local/seo/opportunities-2026-10-30.md`): "how to find the BPM of a song" had the most search suggestions of the phrases looked at, and its top results were weak (copied "10 easy ways" pages). The owner asked for the calculator, near the top, and for the title and address to say so. An assistant wrote the post in the owner's style.
+- **How:**
+  - `keyword: "how to find the bpm of a song"`, in the title, the address and the first sentence; "tap tempo" in the title, the address and the calculator's heading.
+  - The calculator is HTML, an inline `<style>` and an inline `<script>` in the post itself: posts go online from `testing`, but `site/style.css` only from `main`. It uses the live site's colour variables and `.button` classes, so it follows both themes. Hidden without JavaScript.
+  - The tempo from taps is the average over the whole run of taps (steadier than the last few); a pause of over two seconds starts a new run.
+  - The heading has an `id` written in HTML (`#tap-tempo-calculator`): Markdown headings get none, and the post links to it twice.
+  - The reading-time change goes online when `main` moves up; until then the post shows a minute or two more.
+- **Where:** `site/blog/find-the-bpm-of-a-song-tap-tempo.md`; `site/eleventy.config.js` (`readingTime`).
+- **Verified by:**
+  - In Electron, on the preview: synthetic taps every 500 ms give 120 BPM ("half time 60, double time 240"), every 400 ms about 150; Space taps without scrolling the page; 30 beats in 15 s give 120, heard as 90 at 75 %; screenshots in both themes and at 390 px wide, with no sideways scrolling. Not tried on a real phone.
+  - `node scripts/seo/check.cjs`: no errors or warnings for the post.
+  - `npm --prefix site run build`: the post is built.
+  - `npm run check`.
+
 ## 2026-10-30: Outside the loop, playback runs normally until the loop catches it
 
 - **What:**

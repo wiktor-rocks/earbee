@@ -47,9 +47,11 @@ export default function (config) {
   );
   config.addFilter("isoDate", (date) => new Date(date).toISOString().slice(0, 10));
 
-  // Minutes to read a post, at about 220 words a minute.
+  // Minutes to read a post, at about 220 words a minute. A post's own
+  // script and styles (a calculator, say) aren't read, so they don't count.
   config.addFilter("readingTime", (html) => {
     const words = String(html)
+      .replace(/<(script|style)\b[\s\S]*?<\/\1>/g, " ")
       .replace(/<[^>]+>/g, " ")
       .split(/\s+/)
       .filter(Boolean).length;
