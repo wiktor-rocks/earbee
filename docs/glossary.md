@@ -17,15 +17,15 @@ The words the app and its docs use, and what they are in the code. Each entry: w
 
 ## Looping and marking
 
-| Word                    | What it is                                                                                  | In the code                                                                                              |
-| ----------------------- | ------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| **Loop**, **A–B loop**  | A stretch of the track that repeats. Shift+drag, `[` `]`, or `\` for a bar.                 | `loopRegion`, `setLoopRegion` in `src/features/playback.js`; drawn by `src/waveform.js`                  |
-| **Loop by bar**         | `\` loops the bar you're in; `=` / `-` double or halve the loop.                            | `loopThisBar`, `resizeLoopBy` (`src/features/playback.js`); `spanAt`, `resizeLoop` (`src/core/beats.js`) |
-| **Phrase**              | The loop moved on or back by its own length: Shift+`]` / Shift+`[`.                         | `moveLoopBy` (`src/features/playback.js`), `moveLoop` (`src/core/beats.js`)                              |
-| **Snapping**            | Loop edges and marks jump to a beat close by, while the beat lines show; Alt places freely. | `snapToBeat`, `snapForDrag` in `src/features/beats.js`                                                   |
-| **Mark**                | A point or a region on the track, named and coloured, listed in the sidebar.                | `Mark` in `src/marks/index.js`; `src/features/marks.js`                                                  |
-| **Point**               | A mark at one time (M).                                                                     | a `Mark` whose `end` is `null`; `markPoint`                                                              |
-| **Region**, **section** | A mark with a start and an end (R, then R). The site says "section".                        | a `Mark` with `end` > `start`; `markRegion`                                                              |
+| Word                    | What it is                                                                                                                                                        | In the code                                                                                              |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **Loop**, **A–B loop**  | A stretch of the track that repeats. Shift+drag, `[` `]`, or `\` for a bar. Playback started outside it plays normally; once it reaches the loop, it stays in it. | `loopRegion`, `setLoopRegion` in `src/features/playback.js`; drawn by `src/waveform.js`                  |
+| **Loop by bar**         | `\` loops the bar you're in; `=` / `-` double or halve the loop.                                                                                                  | `loopThisBar`, `resizeLoopBy` (`src/features/playback.js`); `spanAt`, `resizeLoop` (`src/core/beats.js`) |
+| **Phrase**              | The loop moved on or back by its own length: Shift+`]` / Shift+`[`.                                                                                               | `moveLoopBy` (`src/features/playback.js`), `moveLoop` (`src/core/beats.js`)                              |
+| **Snapping**            | Loop edges and marks jump to a beat close by, while the beat lines show; Alt places freely.                                                                       | `snapToBeat`, `snapForDrag` in `src/features/beats.js`                                                   |
+| **Mark**                | A point or a region on the track, named and coloured, listed in the sidebar.                                                                                      | `Mark` in `src/marks/index.js`; `src/features/marks.js`                                                  |
+| **Point**               | A mark at one time (M).                                                                                                                                           | a `Mark` whose `end` is `null`; `markPoint`                                                              |
+| **Region**, **section** | A mark with a start and an end (R, then R). The site says "section".                                                                                              | a `Mark` with `end` > `start`; `markRegion`                                                              |
 
 ## Beats
 

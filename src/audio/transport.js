@@ -24,8 +24,10 @@ import { timelinePositionAt } from "../core/timeline.js";
  *   - a segment copies the previous one's loop fields, so they are always
  *     sent explicitly (0, 0 = no loop);
  *   - a segment starting at or after loopEnd would be dragged back one
- *     loop length per audio block, so a playing segment never starts
- *     there: it starts at the loop start instead.
+ *     loop length per audio block, so a segment starting there carries
+ *     no loop: past the loop, playback runs on to the end of the track.
+ * Before the loop, playback runs normally until it reaches loopEnd; then
+ * it wraps to loopStart and stays in the loop ("caught" by it).
  *
  * Exposes: play, pause, stop, seek, retune, load, setLoop, on,
  *          playStartFor, positionAt, positionAtOutput, state, playing,
@@ -34,8 +36,8 @@ import { timelinePositionAt } from "../core/timeline.js";
  *   the AudioContext clock (before the output delay), for sounds
  *   scheduled to go with the track (the beat click).
  *   playStartFor(from) is where play() would start with the cursor at
- *   `from` (the start of the track after its end; the loop start outside
- *   an active loop), so a view can show where playback will start.
+ *   `from` (the start of the track after its end), so a view can show
+ *   where playback will start.
  *   pause(eventTime) pauses at what was being heard at `eventTime` (a
  *   performance.now()-style timestamp, e.g. event.timeStamp), not where
  *   the audio engine already is: that runs ahead of the speakers by the
@@ -117,11 +119,12 @@ export function createTransport({ engine, getRate, getSemitones }) {
   function apply({ input, active }) {
     const at = engine.now();
     const continuation = timelinePositionAt(segments, at, duration);
-    let start = clamp(input ?? continuation, 0, duration);
-    if (active && loop && start >= loop.end) start = loop.start;
+    const start = clamp(input ?? continuation, 0, duration);
+    // Up to the loop's end, the loop catches playback; past it, none.
+    const looping = loop !== null && start < loop.end;
     const rate = getRate();
-    const loopStart = loop?.start ?? 0;
-    const loopEnd = loop?.end ?? 0;
+    const loopStart = looping ? loop.start : 0;
+    const loopEnd = looping ? loop.end : 0;
 
     // Drop the local end-of-track marker (and anything else not yet reached).
     while (segments.length && segments.at(-1).outputTime >= at) segments.pop();
@@ -141,8 +144,8 @@ export function createTransport({ engine, getRate, getSemitones }) {
 
     clearTimeout(endTimer);
     endTimer = null;
-    // A looping track never reaches its end.
-    if (active && !loop) planEnd(at, start, rate);
+    // A loop ahead catches playback, so it never reaches the track's end.
+    if (active && !looping) planEnd(at, start, rate);
     return jumped;
   }
 
@@ -187,11 +190,10 @@ export function createTransport({ engine, getRate, getSemitones }) {
   }
 
   // Where playback starts with the cursor at `from`: past the end, from
-  // the top; with a loop on, inside it.
+  // the top. Outside a loop it starts where it is, and the loop catches
+  // it when it gets there.
   function playStartFor(from) {
-    if (from >= duration) return 0;
-    if (loop && !inLoop(from)) return loop.start;
-    return from;
+    return from >= duration ? 0 : from;
   }
 
   function play() {

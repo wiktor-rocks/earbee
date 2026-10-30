@@ -195,8 +195,8 @@
  *   playback                  "jump"/"loop") below, like the waveform and video.
  *   Where Space plays from    returnPoint and the start point (the green
  *                             line, its handle, the ▶ readout and S) in
- *                             features/playback.js; the rule that keeps
- *                             it inside the loop is transport.playStartFor.
+ *                             features/playback.js; after the end,
+ *                             transport.playStartFor starts from the top.
  *                             The red stop point (where playback last
  *                             stopped) is set there too, in stop() and on
  *                             the "paused"/"ended" states.

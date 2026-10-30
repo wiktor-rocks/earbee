@@ -200,7 +200,9 @@ describe("A–B loop", () => {
     const marks = [];
     transport.on("jump", (time, info) => marks.push(info));
     transport.setLoop({ start: 1, end: 3 });
-    transport.play(); // starts inside the loop: at its start
+    transport.seek(1);
+    events.length = marks.length = 0;
+    transport.play(); // starts inside the loop
     near(transport.position, 1);
     clock = 1.5;
     frame();
@@ -224,12 +226,35 @@ describe("A–B loop", () => {
     assert.equal(events.at(-1)[0], "jump");
   });
 
-  test("a playing segment never starts at or after the loop end", () => {
+  test("from before the loop, playback runs into it and is caught there", () => {
     const { transport } = setup();
-    transport.setLoop({ start: 1, end: 3 });
-    transport.play();
-    transport.seek(5);
-    near(scheduled.at(-1).input, 1);
+    transport.setLoop({ start: 2, end: 4 });
+    transport.play(); // from 0, outside the loop
+    near(transport.position, 0);
+    assert.deepEqual([scheduled.at(-1).loopStart, scheduled.at(-1).loopEnd], [2, 4]);
+    clock = 3;
+    near(transport.position, 3); // played on into the loop
+    clock = 4.5; // 4.5 → wraps to 2.5
+    near(transport.position, 2.5);
+  });
+
+  test("past the loop, a segment carries no loop and playback runs on to the end", () => {
+    mock.timers.enable({ apis: ["setTimeout"] });
+    try {
+      const { transport, events } = setup();
+      transport.setLoop({ start: 1, end: 3 });
+      transport.play();
+      transport.seek(5); // a click after the loop while playing
+      near(transport.position, 5);
+      assert.deepEqual([scheduled.at(-1).input, scheduled.at(-1).loopStart, scheduled.at(-1).loopEnd], [5, 0, 0]);
+      clock = 5;
+      near(transport.position, 10);
+      mock.timers.tick(10_000);
+      assert.equal(transport.state, "ended");
+      assert.ok(!events.some(([name, value]) => name === "jump" && value < 5));
+    } finally {
+      mock.timers.reset();
+    }
   });
 
   test("playStartFor says where play() would start, and setLoop reports the loop", () => {
@@ -241,7 +266,8 @@ describe("A–B loop", () => {
     transport.setLoop({ start: 1, end: 3 });
     assert.deepEqual(loops, [{ start: 1, end: 3 }]);
     near(transport.playStartFor(2), 2); // inside the loop
-    near(transport.playStartFor(5), 1); // outside: its start
+    near(transport.playStartFor(5), 5); // outside it too: the loop catches it later, if ahead
+    near(transport.playStartFor(0.5), 0.5);
     transport.seek(5);
     transport.play();
     near(transport.position, transport.playStartFor(5));

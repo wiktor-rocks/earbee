@@ -58,7 +58,7 @@ module.exports = async function (h) {
   check("plain click seeks", Math.abs((await pos()) - 5) < 0.05, await pos());
   check("plain click keeps loop", (await loopRange())?.end > 1.9);
 
-  // Play: starts at A (outside loop), wraps, stays inside
+  // Play inside the loop: wraps, stays inside
   async function loopRun(label, ms, minWraps) {
     key("Space");
     const s = await sample(ms);
@@ -91,11 +91,39 @@ module.exports = async function (h) {
     check(`${label}: no forward jumps (smooth)`, jumps.length === 0, JSON.stringify(jumps.slice(0, 3)));
     return s;
   }
+  await click(1.2);
   let s = await loopRun("1x loop", 3500, 2);
-  check("play started at A", Math.abs(s[2].pos - loop.start) < 0.1, s[2].pos);
+  check("play started where clicked, inside the loop", Math.abs(s[2].pos - 1.2) < 0.1, s[2].pos);
   await js(`document.querySelector('#speedChips [data-speed="0.5"]').click()`);
   await loopRun("0.5x loop", 3500, 1);
   await js(`document.querySelector('#speedChips [data-speed="1"]').click()`);
+
+  // Outside the loop, playback runs normally: from before it, into it,
+  // where it then stays; from after it, on toward the end.
+  await click(0.4);
+  key("Space");
+  s = await sample(2500);
+  await ensurePaused();
+  const caught = s.findIndex((q) => q.pos >= loop.start);
+  const afterCaught = caught < 0 ? [] : s.slice(caught + 5);
+  check(
+    "from a click before the loop: plays from there, runs into the loop and stays in it",
+    Math.abs(s[2].pos - 0.4) < 0.1 &&
+      caught > 0 &&
+      afterCaught.length > 0 &&
+      afterCaught.every((q) => q.pos >= loop.start - 0.002 && q.pos <= loop.end + 0.002) &&
+      afterCaught.some((q, i) => i > 0 && q.pos < afterCaught[i - 1].pos - 0.01),
+    `from ${s[2].pos}, caught at sample ${caught}, then ${Math.min(...afterCaught.map((q) => q.pos)).toFixed(3)}–${Math.max(...afterCaught.map((q) => q.pos)).toFixed(3)}`,
+  );
+  await click(5);
+  key("Space");
+  s = await sample(1000);
+  await ensurePaused();
+  check(
+    "from a click after the loop: plays on from there",
+    Math.abs(s[2].pos - 5) < 0.1 && s.at(-1).pos > 5.6 && s.every((q) => q.pos >= 4.99),
+    `${s[2].pos} → ${s.at(-1).pos}`,
+  );
 
   // Shift+, / Shift+.: the speed by 1 %, landing exactly on the presets.
   const speedNow = () =>
@@ -180,13 +208,13 @@ module.exports = async function (h) {
     `${await pos()} ${JSON.stringify(await loopRange())}`,
   );
 
-  // Seek after B while looping -> A
+  // A click after B while looping: playback goes on from there
   key("Space");
   await sleep(400);
   await click(12);
   await sleep(200);
   let p = await pos();
-  check("seek after B while looping goes to A", p >= loop.start - 0.01 && p < loop.end, p);
+  check("a click after B while looping plays on from there", p > 12 && p < 12.5, `${p} ${JSON.stringify(loop)}`);
   // Set loop B before cursor while playing -> jumps to A
   await drag(13, 14, ["shift"]);
   await sleep(400);

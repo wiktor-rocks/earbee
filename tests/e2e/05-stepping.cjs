@@ -167,7 +167,8 @@ module.exports = async function (h) {
   await sleep(200);
   p = await pos();
   await ensurePaused();
-  check("stepping past B while looping lands in loop", p >= 4.99 && p < 6.01, p);
+  // A step is a jump like a click: past B, playback runs on from there.
+  check("stepping past B while looping plays on from there", p > 6.8 && p < 7.3, p);
   key("L", ["shift"]);
   await click(10);
   key("Right");

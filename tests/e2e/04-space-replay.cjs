@@ -176,15 +176,16 @@ module.exports = async function (h) {
   await sleep(100);
   check("clicking the readout goes there", near(await pos(), await startAt(), 0.002), await pos());
 
-  // With a loop on, Space starts inside it, and so does the start point.
+  // Outside an active loop, the start point and Space are where you
+  // clicked: playback runs normally until the loop catches it.
   await drag(14, 16, ["shift"]);
   await click(5);
-  check("outside an active loop, it shows the loop start", near(await startAt(), 14, 0.05), await startAt());
+  check("outside an active loop, it shows where you clicked", near(await startAt(), 5, 0.03), await startAt());
   before = await pos();
   key("Space");
   s = await sample(300);
   await ensurePaused();
-  check("…where Space starts", near(firstMoved(s, before), 14, 0.08), firstMoved(s, before));
+  check("…where Space starts", near(firstMoved(s, before), 5, 0.08), firstMoved(s, before));
   // Started inside the loop, the start point holds still while it wraps:
   // each wrap lands a few ms past the loop start, which used to move it.
   await click(14.5);

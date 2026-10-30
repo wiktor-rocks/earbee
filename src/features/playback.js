@@ -51,8 +51,8 @@ export const stepForward = () => step(1);
 let returnPoint = null;
 
 // The start point: where Space plays from next. The transport has the
-// last word (from the top after the end, inside an active loop), so this
-// is always where playback really starts.
+// last word (from the top after the end), so this is always where
+// playback really starts.
 const startPoint = () => player.transport.playStartFor(returnPoint ?? player.transport.position);
 
 // Shows the start point: the green line on the waveform and the minimap,
@@ -79,7 +79,7 @@ function setStopPoint(time) {
   if (time !== null) dom.stopPointButton.textContent = `■ ${formatTrackTime(time)}`;
 }
 
-/** Where Space plays from next, as set (before the loop has its say). */
+/** Where Space plays from next, as set (before "from the top after the end"). */
 export const getStartPoint = () => returnPoint ?? player.transport.position;
 
 /** Space plays from `time` next (dragging the start point). @param {number} time */
@@ -160,8 +160,6 @@ export function bindPlayback() {
     returnPoint = time;
     showStartPoint();
   });
-  // With a loop on, Space starts inside it.
-  player.transport.on("loop", showStartPoint);
   showStartPoint();
 
   window.addEventListener("blur", () => {

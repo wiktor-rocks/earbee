@@ -43,6 +43,31 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-30: Outside the loop, playback runs normally until the loop catches it
+
+- **What:**
+  - With a loop on, a click outside it and Play (or Space) plays from where you clicked. From before the loop, playback runs into it and then stays in it. From after it, playback runs on to the end of the track.
+  - A click or a step (arrow keys) outside the loop while playing does the same.
+  - The start point (green line, ▶ readout) shows where you clicked, even outside the loop.
+  - Before, playback started outside an active loop always moved to the loop start.
+  - Drawing, moving (Shift+[ / Shift+]) or turning on a loop while playing still jumps into it at once, as before.
+- **Why:** the owner: "If the user clicks outside of the loop and plays back, it plays normally, only when the cursor is again 'caught' by the loop, it stays in there." They chose to keep the jump into a loop that is set while playing.
+- **How:**
+  - Signalsmith already plays a segment that starts before the loop normally, and wraps it once it reaches the loop's end. `timelinePositionAt` models the same.
+  - What it can't do is start a looping segment at or after the loop's end: it would drag it back one loop length per audio block. That's why playback used to be moved to the loop start.
+  - Now `apply()` sends a segment starting at or after the loop's end with no loop (0, 0), and plans the track's end for it. A segment before the loop's end carries the loop and plans no end.
+  - `playStartFor()` only sends playback back to the top after the end.
+  - The start point no longer listens to `"loop"`. A loop set while playing still moves it, through its `"jump"`.
+- **Where:**
+  - `src/audio/transport.js` (`apply`, `playStartFor`, the header).
+  - `src/features/playback.js` (`bindPlayback`, comments); `src/app.js` (COMMON CHANGES); `docs/glossary.md` (Loop).
+  - Tests: `tests/unit/transport.test.mjs` (from before the loop it is caught; past it, no loop and the end comes), `tests/e2e/03-audio-and-loop.cjs` (from before, caught and kept; from after, plays on; a click after B while looping plays on), `tests/e2e/04-space-replay.cjs` (the start point and Space outside a loop), `tests/e2e/05-stepping.cjs` (a step past B while looping plays on).
+- **Verified by:**
+  - `npm run check`; `npm run test:unit` (332 pass); `TB_TOPICS=03,04 npm test` (78 pass, smoke 28).
+  - Full `npm test`: 574 pass, 2 fail.
+    - Topic 05's "stepping past B while looping lands in loop" relied on the old rule. It now checks that playback runs on (`TB_TOPICS=03,05`: 72 pass).
+    - Topic 08's "a file chosen while zoomed in (and wheeled over while it loads)…" is a race in the test that also fails without this change.
+
 ## 2026-10-30: The start point holds still while a loop plays
 
 - **What:** while a loop plays, the start point (the green line and the ▶ readout) stays where you started playing. Space replays from there after a pause. Before, it moved on every wrap-around, by a few milliseconds each time. Outside an active loop it still shows the loop start, as before.
