@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-30: Assistants may change the scratchpad, with the owner's approval (AGENTS.md)
+
+- **What:** an assistant may now add to, change or remove from `local/SCRATCHPAD.md`, but only after the owner has approved that exact change. Before, only the owner changed it.
+- **Why:** the owner: "change the required docs so that scratchpad CAN be edited, but only after my approval".
+- **How:** the assistant shows the words to add, change or remove, and where, and edits only after a yes; each change needs its own yes. At the end of a session, loose ideas come with the exact lines proposed for the scratchpad.
+- **Where:** `AGENTS.md` ("First, in every session"; "Read first", item 0; "Ending a session", step 6); `local/README.md` (on this computer only).
+- **Verified by:** `npm run format:check`.
+
 ## 2026-10-30: Videos open without waiting for a preview nobody sees
 
 - **What:** opening a video no longer waits (up to 3 s) for the low-res copy's "overview", and "Preparing the picture X %" is gone from the loading screen. The low-res copy itself is built as before, in the background, with its progress beside the video's buttons.

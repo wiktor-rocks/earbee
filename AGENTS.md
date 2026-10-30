@@ -12,7 +12,7 @@ How to find your way in EarBee, check your work and avoid the known pitfalls. Pe
 
 - Do it once per session, at the start, every time, even if they were shown in an earlier session.
 - If a file or its section is missing, or has nothing to show, say nothing about it and go on.
-- **`local/SCRATCHPAD.md` is the owner's alone. Only the owner changes it, never an assistant, even when asked to add, remove or tidy something in it.** Read it; if something should go in it, say so, and the owner writes it there.
+- **`local/SCRATCHPAD.md` is the owner's. An assistant changes it only with the owner's approval:** show the exact change first (the words to add, change or remove, and where), and make it only after the owner says yes. Each change needs its own yes; an earlier one doesn't cover the next.
 
 ## What this is
 
@@ -24,8 +24,8 @@ A desktop player for transcribing music (Electron). There's no build step: the p
 
 ## Read first
 
-0. **`local/FOR-TOMORROW.md`, `local/SCRATCHPAD.md` and `local/NEXT-RELEASE-<version>.md`, if they exist** (shown first; see above): the owner's notes from earlier sessions: what's in flight with its next step, a scratchpad of loose notes and ideas, and what the next release holds. The `local/` folder is kept on the owner's computer only (git ignores it), so it may be missing. Check both before starting. Never edit the scratchpad (see above). Keep FOR-TOMORROW.md current: add what you leave half-done, with the next step, and remove what you finish. Never commit anything in `local/`.
-   - **The next release's file keeps the scope small:** only what goes into that release. Tick its items as they're done and keep its "Already in" list current, but don't add or remove items: the scope is the owner's. When the owner asks for something that isn't in it, say so in one line ("not in 0.3.0's scope") and ask whether it goes into the scratchpad (the owner writes it there) or takes an item's place. Then do what they say.
+0. **`local/FOR-TOMORROW.md`, `local/SCRATCHPAD.md` and `local/NEXT-RELEASE-<version>.md`, if they exist** (shown first; see above): the owner's notes from earlier sessions: what's in flight with its next step, a scratchpad of loose notes and ideas, and what the next release holds. The `local/` folder is kept on the owner's computer only (git ignores it), so it may be missing. Check both before starting. Change the scratchpad only with the owner's approval (see above). Keep FOR-TOMORROW.md current: add what you leave half-done, with the next step, and remove what you finish. Never commit anything in `local/`.
+   - **The next release's file keeps the scope small:** only what goes into that release. Tick its items as they're done and keep its "Already in" list current, but don't add or remove items: the scope is the owner's. When the owner asks for something that isn't in it, say so in one line ("not in 0.3.0's scope") and ask whether it goes into the scratchpad (with the owner's approval of the words) or takes an item's place. Then do what they say.
 1. **The comment at the top of `src/app.js`:** the architecture, every file and its role, and "COMMON CHANGES", which says where to make the usual changes.
 2. **[docs/glossary.md](docs/glossary.md):** the app's words ("start point", "region", "Peak + loudness", "the dock") and their names in the code.
 3. **Imports only go downward** through the page's layers: `core`, `themes`, `search` → `prefs`, `marks`, `project` → `config` → `audio`, `video`, `waveform`, `timeline` → `context` → `ui` → `features` → `app.js`. ESLint enforces it (`eslint.config.js`); a forbidden import fails `npm run check`.
@@ -118,7 +118,7 @@ When the owner says they're done ("done for today", "let's stop", "wrap up"), le
    - what waits for the owner's decision;
    - what's finished comes out (the CHANGELOG keeps the record);
    - check that what it says still holds: branches, what's pushed, test results.
-   - Loose ideas from the session go in the summary to the owner (step 8), who may add them to `local/SCRATCHPAD.md`. Never write to the scratchpad yourself.
+   - Loose ideas from the session go in the summary to the owner (step 8), with the exact lines you'd add to `local/SCRATCHPAD.md`. Add them only if the owner says yes.
    - In `local/NEXT-RELEASE-<version>.md`, tick what this session finished, and add what reached `testing` to its "Already in".
 7. **Leave the working copy on `testing`**, clean, unless the owner wants another branch open; FOR-TOMORROW.md says which.
 8. **End with a short summary for the owner:**
