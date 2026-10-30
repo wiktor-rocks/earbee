@@ -4,13 +4,16 @@
 import SignalsmithStretch from "../vendor/signalsmith-stretch/SignalsmithStretch.mjs";
 import { CONFIG } from "../config.js";
 import { AppError } from "../core/errors.js";
+import { butterworthQs } from "../core/focus.js";
+import { clamp } from "../core/format.js";
 
 /* =====================================================================
  * AUDIO ENGINE
- * Signalsmith → EQ chain → master volume → limiter → speakers.
+ * Signalsmith → Focus (high-pass, low-pass) → EQ bands → master volume
+ * → limiter → speakers.
  *
  * Exposes: init, useSampleRate, loadPieces, schedule, setVolume, setEq,
- *          now, outputDelay, resume, click
+ *          setFocus, now, outputDelay, resume, click
  * Values set before init() are remembered and applied when the graph
  * is built, so settings can change before any audio is loaded.
  *
@@ -31,20 +34,54 @@ export function createAudioEngine({ onError }) {
   let initPromise = null;
   let sampleRate; // wanted context rate; undefined = the device's default
   const eqFilters = {};
-  const desired = { volume: 1, eqGains: {}, eqEnabled: false };
+  // The Focus's cuts: a chain of two-pole stages each (CONFIG.eq.focus).
+  const focusFilters = { highpass: [], lowpass: [] };
+  const desired = {
+    volume: 1,
+    eqGains: {},
+    eqEnabled: false,
+    focus: /** @type {{ highpass: number | null, lowpass: number | null }} */ ({ highpass: null, lowpass: null }),
+  };
+  // Where a Focus that cuts nothing puts its filters: the high-pass below
+  // hearing, the low-pass at the Nyquist frequency, where it passes
+  // everything.
+  const FOCUS_FLOOR = 10;
 
   function rampParam(param, value) {
     param.setTargetAtTime(value, context.currentTime, paramRampSeconds);
   }
 
+  // A disabled EQ is flat: no gains, and a Focus that cuts nothing.
   function applyEq() {
     for (const [id, filter] of Object.entries(eqFilters)) {
       rampParam(filter.gain, desired.eqEnabled ? (desired.eqGains[id] ?? 0) : 0);
+    }
+    const nyquist = context.sampleRate / 2;
+    const cuts = desired.eqEnabled ? desired.focus : { highpass: null, lowpass: null };
+    const frequencies = {
+      highpass: clamp(cuts.highpass ?? FOCUS_FLOOR, FOCUS_FLOOR, nyquist),
+      lowpass: clamp(cuts.lowpass ?? nyquist, FOCUS_FLOOR, nyquist),
+    };
+    for (const [type, filters] of Object.entries(focusFilters)) {
+      for (const filter of filters) rampParam(filter.frequency, frequencies[type]);
     }
   }
 
   function buildGraph() {
     let node = stretch;
+
+    const qs = butterworthQs(CONFIG.eq.focus.stages);
+    for (const type of /** @type {const} */ (["highpass", "lowpass"])) {
+      for (const q of qs) {
+        const filter = context.createBiquadFilter();
+        filter.type = type;
+        filter.Q.value = q;
+        filter.frequency.value = type === "highpass" ? FOCUS_FLOOR : context.sampleRate / 2;
+        node.connect(filter);
+        node = filter;
+        focusFilters[type].push(filter);
+      }
+    }
 
     for (const band of CONFIG.eq.bands) {
       const filter = context.createBiquadFilter();
@@ -93,6 +130,7 @@ export function createAudioEngine({ onError }) {
     const old = context;
     context = stretch = masterGain = initPromise = null;
     for (const id of Object.keys(eqFilters)) delete eqFilters[id];
+    for (const filters of Object.values(focusFilters)) filters.length = 0;
     await old.close();
     sampleRate = rate;
     await init();
@@ -162,6 +200,13 @@ export function createAudioEngine({ onError }) {
     setEq(gains, enabled) {
       desired.eqGains = gains;
       desired.eqEnabled = enabled;
+      if (context) applyEq();
+    },
+
+    // The Focus's cutoffs in Hz (core/focus.js focusCutoffs), each null
+    // for no cut on that side. Off while the EQ is.
+    setFocus(cuts) {
+      desired.focus = cuts;
       if (context) applyEq();
     },
   };

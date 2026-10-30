@@ -17,6 +17,10 @@ export const settings = {
   stepSize: /** @type {number | "beat" | "bar"} */ (CONFIG.step.initial),
   // One gain (dB) per EQ band, keyed by band id: eqLow, eqLowMid, …
   ...Object.fromEntries(CONFIG.eq.bands.map((band) => [band.id, CONFIG.eq.gain.initial])),
+  // The Focus: the lowest and highest note kept (MIDI numbers). At the
+  // range's ends it cuts nothing, which is where it starts.
+  eqFocusLow: CONFIG.eq.focus.range.min,
+  eqFocusHigh: CONFIG.eq.focus.range.max,
 };
 
 // The open track's marks (points and regions; src/marks). Change them

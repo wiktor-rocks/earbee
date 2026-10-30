@@ -4,9 +4,11 @@
  * only reads state; it never changes it.
  * ===================================================================== */
 
+import { CONFIG } from "../config.js";
 import { beats, hasAudio, player, settings, totalSemitones } from "../context.js";
 import { AppError } from "../core/errors.js";
-import { formatPitchTotal, formatSpeed, formatStepSize, formatTrackTime } from "../core/format.js";
+import { focusPresetFor } from "../core/focus.js";
+import { formatPitchTotal, formatSpeed, formatStepSize, formatTrackTime, noteName } from "../core/format.js";
 
 /** @param {string} id */
 export const $ = (id) => document.getElementById(id);
@@ -76,6 +78,9 @@ export const dom = {
   resetPitchButton: $("resetPitch"),
   eqSection: $("eqSection"),
   eqKnobs: $("eqKnobs"),
+  eqFocusChips: $("eqFocusChips"),
+  eqFocusKnobs: $("eqFocusKnobs"),
+  eqFocusSummary: $("eqFocusSummary"),
   eqToggle: $("eqToggle"),
   resetEqButton: $("resetEq"),
   shortcutList: $("shortcutList"),
@@ -94,6 +99,8 @@ export const dom = {
 };
 
 // The few next to the speed knob, and all of them in its "…" popover.
+// "Off" and a chip per Focus preset, in the EQ popover.
+export const focusChips = () => /** @type {HTMLButtonElement[]} */ ([...dom.eqFocusChips.children]);
 export const speedChips = () =>
   /** @type {HTMLButtonElement[]} */ ([...dom.speedChips.children, ...dom.speedChipsAll.children]);
 const transportButtons = () => [dom.playButton, dom.stopButton, dom.stepBackButton, dom.stepForwardButton];
@@ -221,6 +228,20 @@ export function renderEqEnabled() {
   dom.eqToggle.textContent = settings.eqEnabled ? "On" : "Off";
   dom.eqToggle.setAttribute("aria-pressed", String(settings.eqEnabled));
   dom.eqSection.classList.toggle("bypassed", !settings.eqEnabled);
+}
+
+// The Focus's chip (its preset, "Off", or none for a custom range) and,
+// under the EQ's title in the side panel, its name and notes while it cuts.
+export function renderFocus() {
+  const { range, presets } = CONFIG.eq.focus;
+  const { eqFocusLow: low, eqFocusHigh: high } = settings;
+  const off = low === range.min && high === range.max;
+  const preset = focusPresetFor(low, high, presets);
+  for (const chip of focusChips()) {
+    chip.classList.toggle("active", chip.dataset.focus === (off ? "off" : preset?.id));
+  }
+  dom.eqFocusSummary.hidden = off;
+  dom.eqFocusSummary.textContent = `${preset?.label ?? "Custom"} · ${noteName(low)}–${noteName(high)}`;
 }
 
 // Shows that `name` (a file, or a link being downloaded) is loading, or

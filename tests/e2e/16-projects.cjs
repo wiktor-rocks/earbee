@@ -50,7 +50,8 @@ module.exports = async function (h) {
       return {
         speed: speedValue.textContent, volume: volumeValue.textContent, semitones: semitoneValue.textContent,
         cents: centValue.textContent, eqLow: eqLowValue.textContent, eqHigh: eqHighValue.textContent,
-        eq: eqToggle.textContent, step: stepSize.textContent, loop: loopInfo.hidden ? null : loopInfo.textContent,
+        eq: eqToggle.textContent, focus: eqFocusSummary.hidden ? null : eqFocusSummary.textContent,
+        step: stepSize.textContent, loop: loopInfo.hidden ? null : loopInfo.textContent,
         loopOff: loopInfo.classList.contains("disabled"),
         marks: [...document.querySelectorAll("#marksList .mark-row")].map((row) =>
           row.querySelector(".mark-name").value + " @ " + row.querySelector(".mark-time").textContent),
@@ -127,6 +128,8 @@ module.exports = async function (h) {
   await slide("eqLow", 4.5);
   await slide("eqHigh", -6);
   await js(`eqToggle.click()`);
+  await slide("eqFocusHigh", 64); // a custom Focus: E2–E4
+  await slide("eqFocusLow", 40);
   key("Up");
   await click(2);
   key("[");
@@ -197,6 +200,18 @@ module.exports = async function (h) {
   await open(tone);
   const fresh = await session();
   check("another file starts afresh", fresh.marks.length === 0 && fresh.split === "", JSON.stringify(fresh));
+  // A project saved before the Focus existed opens with it off.
+  const older = path.join(folder, "Before the Focus.ebee");
+  const olderData = structuredClone(saved);
+  delete olderData.sections.sound.focus;
+  fs.writeFileSync(older, JSON.stringify(olderData));
+  await open(older);
+  const olderSession = await session();
+  check(
+    "a project without a Focus opens with it off, the rest of its sound back",
+    olderSession.focus === null && olderSession.eqLow === before.eqLow && before.focus === "Custom · E2–E4",
+    `${before.focus} → ${olderSession.focus}`,
+  );
   await open(linked);
   const back = await session();
   check(

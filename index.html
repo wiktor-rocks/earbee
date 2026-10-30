@@ -500,7 +500,8 @@
         <div id="panel" class="panel">
           <!-- The sound dock: a column of knobs (ui/knob.js, over the range
                inputs), each with its name and value beside it; double-click a
-               value to type one. The EQ bands' knobs are in a popover. -->
+               value to type one. The EQ's Focus and its bands' knobs are in a
+               popover. -->
           <section class="dock" aria-label="Sound">
             <div class="dock-group speed-group">
               <div class="knob-cell">
@@ -577,13 +578,30 @@
                   </button>
                   <button id="eqOpen" class="small eq-open" type="button" popovertarget="eqPopover">
                     <svg class="icon" aria-hidden="true"><use href="#i-sliders" /></svg>
-                    Bands
+                    Focus, bands
                   </button>
                 </div>
               </div>
-              <div id="eqPopover" class="eq-popover" popover aria-label="EQ bands">
+              <!-- While the Focus cuts: its preset (or Custom) and its notes;
+                   a click opens the popover. -->
+              <button
+                id="eqFocusSummary"
+                class="eq-focus-summary"
+                type="button"
+                popovertarget="eqPopover"
+                hidden
+              ></button>
+              <!-- The Focus keeps a range of notes (its chips and knobs, made
+                   by buildEqKnobs in ui/controls.js), then the bands. -->
+              <div id="eqPopover" class="eq-popover" popover aria-label="EQ">
                 <div class="eq-popover-head">
-                  <h2>EQ bands</h2>
+                  <h2>Focus</h2>
+                </div>
+                <p class="eq-popover-note">Keeps one range of notes and cuts the rest.</p>
+                <div id="eqFocusChips" class="eq-focus-chips"></div>
+                <div id="eqFocusKnobs" class="eq-focus-knobs"></div>
+                <div class="eq-popover-head eq-bands-head">
+                  <h2>Bands</h2>
                   <button id="resetEq" class="small" type="button">Reset</button>
                 </div>
                 <div id="eqKnobs" class="eq-knobs"></div>

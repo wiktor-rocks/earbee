@@ -7,17 +7,28 @@
  * ===================================================================== */
 
 import { CONFIG } from "../config.js";
-import { barLength, beatLength, eqGains, player, settings } from "../context.js";
+import { barLength, beatLength, eqGains, player, settings, totalSemitones } from "../context.js";
 import { stepSizes } from "../core/beats.js";
-import { clamp, formatFrequency, formatGain, formatPercent, formatSigned, formatSpeed } from "../core/format.js";
+import { focusCutoffs, noteNumber } from "../core/focus.js";
+import {
+  clamp,
+  formatFrequency,
+  formatGain,
+  formatPercent,
+  formatSigned,
+  formatSpeed,
+  noteName,
+} from "../core/format.js";
 import {
   $,
   dom,
   renderBeatInfo,
   element,
+  focusChips,
   guarded,
   onClick,
   renderEqEnabled,
+  renderFocus,
   renderPitchTotal,
   renderSpeedChips,
   renderStepSize,
@@ -39,23 +50,36 @@ export function buildSpeedChips() {
   dom.speedChipsAll.append(...CONFIG.speed.presets.map(chip));
 }
 
-// A knob cell per band, in the EQ popover: the knob over its name, its
-// frequency and its value.
+// A knob cell: the knob over its name (and `detail`, e.g. its frequency)
+// and its value.
+const knobCell = (id, label, detail) =>
+  element(
+    "div",
+    { className: "knob-cell" },
+    element("input", { id, type: "range" }),
+    element(
+      "div",
+      { className: "knob-text" },
+      element("label", { htmlFor: id }, label, ...(detail ? [element("small", {}, detail)] : [])),
+      element("output", { id: `${id}Value`, className: "knob-value" }),
+    ),
+  );
+
+// The EQ popover's controls: the Focus's chips ("Off" and one per preset)
+// and its two knobs, then a knob per band.
 export function buildEqKnobs() {
+  const chip = (id, label) => {
+    const button = element("button", { type: "button", className: "chip" }, label);
+    button.dataset.focus = id;
+    return button;
+  };
+  dom.eqFocusChips.append(
+    chip("off", "Off"),
+    ...CONFIG.eq.focus.presets.map((preset) => chip(preset.id, preset.label)),
+  );
+  dom.eqFocusKnobs.append(knobCell("eqFocusLow", "Lowest"), knobCell("eqFocusHigh", "Highest"));
   for (const band of CONFIG.eq.bands) {
-    dom.eqKnobs.append(
-      element(
-        "div",
-        { className: "knob-cell" },
-        element("input", { id: band.id, type: "range" }),
-        element(
-          "div",
-          { className: "knob-text" },
-          element("label", { htmlFor: band.id }, band.label, element("small", {}, formatFrequency(band.frequency))),
-          element("output", { id: `${band.id}Value`, className: "knob-value" }),
-        ),
-      ),
-    );
+    dom.eqKnobs.append(knobCell(band.id, band.label, formatFrequency(band.frequency)));
   }
 }
 
@@ -65,9 +89,28 @@ function applyEq() {
   player.engine.setEq(eqGains(), settings.eqEnabled);
 }
 
+// The Focus's cutoffs follow the pitch shift, so it keeps the same notes
+// of the original (core/focus.js).
+function applyFocus() {
+  const { eqFocusLow: low, eqFocusHigh: high } = settings;
+  player.engine.setFocus(focusCutoffs({ low, high, range: CONFIG.eq.focus.range, semitones: totalSemitones() }));
+  renderFocus();
+}
+
 function applyPitch() {
   renderPitchTotal();
   player.transport.retune();
+  applyFocus();
+}
+
+// A note typed as "E2", "f#3" or "Bb1" (or its MIDI number); NaN if neither.
+function parseNote(text) {
+  const name = text.trim().replace(/^[a-g]/, (letter) => letter.toUpperCase());
+  try {
+    return noteNumber(name);
+  } catch {
+    return Number.parseFloat(text);
+  }
 }
 
 /**
@@ -79,6 +122,8 @@ function applyPitch() {
  * @property {(value: number) => string} format
  * @property {() => void} onChange Applies the new value (audio, other UI).
  * @property {boolean} [centred] Its knob's arc starts from the default, not the minimum.
+ * @property {{ text: (value: number) => string, parse: (text: string) => number }} [typed]
+ *   How its value is shown and read when typed (default: the number itself).
  */
 
 /** @type {Record<string, SliderSpec>} */
@@ -131,6 +176,30 @@ const SLIDERS = {
       },
     ]),
   ),
+  // The Focus's two ends, as notes. One end pushes the other along rather
+  // than pass it.
+  eqFocusLow: {
+    inputId: "eqFocusLow",
+    readoutId: "eqFocusLowValue",
+    range: { ...CONFIG.eq.focus.range, initial: CONFIG.eq.focus.range.min },
+    format: noteName,
+    typed: { text: noteName, parse: parseNote },
+    onChange: () => {
+      if (settings.eqFocusHigh < settings.eqFocusLow) setSetting("eqFocusHigh", settings.eqFocusLow);
+      applyFocus();
+    },
+  },
+  eqFocusHigh: {
+    inputId: "eqFocusHigh",
+    readoutId: "eqFocusHighValue",
+    range: { ...CONFIG.eq.focus.range, initial: CONFIG.eq.focus.range.max },
+    format: noteName,
+    typed: { text: noteName, parse: parseNote },
+    onChange: () => {
+      if (settings.eqFocusLow > settings.eqFocusHigh) setSetting("eqFocusLow", settings.eqFocusHigh);
+      applyFocus();
+    },
+  },
 };
 
 const sliderInput = (slider) => /** @type {HTMLInputElement} */ ($(slider.inputId));
@@ -173,8 +242,22 @@ export function resetSoundSettings() {
   setEqEnabled(CONFIG.eq.enabledInitially);
 }
 
+// The bands' Reset; the Focus has its own "Off".
 function resetEq() {
   for (const band of CONFIG.eq.bands) setSetting(band.id, CONFIG.eq.gain.initial);
+}
+
+/**
+ * A Focus chip: its preset's range, with the EQ turned on so it's heard;
+ * "off" (or an unknown id), the whole range, which cuts nothing.
+ * @param {string} id
+ */
+export function setFocusPreset(id) {
+  const { range, presets } = CONFIG.eq.focus;
+  const preset = presets.find((candidate) => candidate.id === id);
+  setSetting("eqFocusLow", preset ? noteNumber(preset.low) : range.min);
+  setSetting("eqFocusHigh", preset ? noteNumber(preset.high) : range.max);
+  if (preset) setEqEnabled(true);
 }
 
 // The step sizes in order: CONFIG.step.sizes, and "beat" and "bar" among
@@ -260,14 +343,14 @@ function bindTypedValue(key, slider) {
     const field = element("input", {
       type: "text",
       className: "knob-value-field",
-      value: String(settings[key]),
+      value: slider.typed ? slider.typed.text(settings[key]) : String(settings[key]),
       ariaLabel: readout.title,
     });
     let done = false;
     const finish = (apply) => {
       if (done) return;
       done = true;
-      const value = parseTyped(field.value);
+      const value = slider.typed ? slider.typed.parse(field.value) : parseTyped(field.value);
       field.replaceWith(readout);
       if (apply && Number.isFinite(value)) setSetting(key, snapToStep(value, slider.range));
     };
@@ -285,8 +368,9 @@ function bindTypedValue(key, slider) {
   });
 }
 
-// The speed chips, Reset buttons and EQ on/off.
+// The speed and Focus chips, Reset buttons and EQ on/off.
 export function bindSettingControls() {
+  for (const chip of focusChips()) onClick(chip, () => setFocusPreset(chip.dataset.focus));
   for (const chip of speedChips()) {
     onClick(chip, () => {
       setSetting("speed", chip.dataset.speed);

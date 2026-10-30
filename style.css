@@ -2967,13 +2967,31 @@ button.beat-info.disabled {
   grid-template-columns: repeat(6, auto);
 }
 
-/* ---------- EQ: on/off in the dock, the band knobs in a popover ---------- */
+/* ---------- EQ: on/off in the dock, the Focus and the band knobs in a popover ---------- */
 
 .eq-open {
   anchor-name: --eq-open;
 }
 
 .eq-group.bypassed .eq-open {
+  color: var(--muted);
+}
+
+/* Under the EQ's title while the Focus cuts: its name and notes, in the
+   accent; muted while the EQ is off. A click opens the popover. */
+.eq-focus-summary {
+  justify-content: flex-start;
+  width: 100%;
+  margin-top: 6px;
+  padding: 4px 8px;
+  border-color: transparent;
+  background: color-mix(in srgb, var(--accent) 12%, transparent);
+  color: var(--accent-text);
+  font-size: 12px;
+}
+
+.eq-group.bypassed .eq-focus-summary {
+  background: transparent;
   color: var(--muted);
 }
 
@@ -2994,6 +3012,11 @@ button.beat-info.disabled {
   box-shadow: var(--shadow-lifted);
 }
 
+/* As wide as the bands' five columns, which the Focus's chips wrap to. */
+.eq-popover {
+  --eq-width: calc(5 * 58px + 4 * 6px);
+}
+
 .eq-popover-head {
   display: flex;
   align-items: center;
@@ -3002,9 +3025,36 @@ button.beat-info.disabled {
   margin-bottom: 12px;
 }
 
-/* A column per band: the knob, bigger than the dock's, over its name,
-   frequency and value. */
-.eq-knobs {
+/* The bands under the Focus, set apart by a hairline. */
+.eq-bands-head {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--hairline);
+}
+
+.eq-popover-note {
+  width: var(--eq-width);
+  margin: -6px 0 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.eq-focus-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  width: var(--eq-width);
+}
+
+.eq-focus-chips .chip {
+  padding: 4px 8px;
+}
+
+/* A column per knob: the knob, bigger than the dock's, over its name
+   (for a band, its frequency) and value. The Focus has two: its lowest
+   and highest note. */
+.eq-knobs,
+.eq-focus-knobs {
   --knob-size: 42px;
 
   display: grid;
@@ -3012,18 +3062,22 @@ button.beat-info.disabled {
   gap: 6px;
 }
 
-.eq-knobs .knob-cell {
+.eq-focus-knobs {
+  margin-top: 12px;
+}
+
+:is(.eq-knobs, .eq-focus-knobs) .knob-cell {
   flex-direction: column;
   gap: 6px;
 }
 
-.eq-knobs .knob-text {
+:is(.eq-knobs, .eq-focus-knobs) .knob-text {
   align-items: center;
   min-width: 0;
   text-align: center;
 }
 
-.eq-knobs .knob-text label {
+:is(.eq-knobs, .eq-focus-knobs) .knob-text label {
   font-size: 10.5px;
   text-transform: uppercase;
 }
@@ -3034,11 +3088,12 @@ button.beat-info.disabled {
   text-transform: none;
 }
 
-.eq-knobs .knob-value {
+:is(.eq-knobs, .eq-focus-knobs) .knob-value {
   font-size: 12px;
 }
 
-.eq-group.bypassed .eq-knobs {
+/* Off: dimmed, but a Focus chip still works (it turns the EQ on). */
+.eq-group.bypassed :is(.eq-knobs, .eq-focus-knobs) {
   opacity: 0.45;
 }
 
