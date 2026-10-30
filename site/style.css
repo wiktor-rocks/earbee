@@ -1,6 +1,8 @@
-/* earbee.org: the landing page and the blog. Colours and fonts are the app's own
-   (style.css and src/themes/palettes.js at the top of the repository):
-   the EarBee theme, or EarBee Light on a light system. */
+/* earbee.org: the landing page and the blog. Colours, fonts and shapes are
+   the app's own (style.css and src/themes/palettes.js at the top of the
+   repository): the EarBee theme, or EarBee Light on a light system. Like
+   the app, the page is flat: its parts are set apart by hairlines, not
+   floating cards, and the waveform sits in a darker well. */
 
 @font-face {
   font-family: "Righteous";
@@ -16,19 +18,29 @@
 }
 
 :root {
-  --bg: #0e1014;
-  --surface: #161920;
-  --surface-2: #1d212a;
-  --border: #2a2f3a;
-  --text: #e6e8ee;
-  --muted: #8b93a7;
+  --bg: #0f0c0a;
+  --surface: #17120e;
+  --surface-2: #261f19;
+  --surface-hover: #30281f;
+  --border: #3b3129;
+  --text: #f1e9de;
+  --muted: #aa9b8a;
   --accent: #f5b301;
   --accent-hover: #ffc52e;
   --accent-ink: #1a1400;
-  --wave: #3b4252;
+  --wave: #4b3f34;
   --start: #5fd38d;
   --accent-text: var(--accent); /* amber as small text: darker on light */
   --glow: color-mix(in srgb, var(--accent) 16%, transparent);
+
+  /* Shape and depth, as in the app: hairlines between the parts, the
+     waveform sunk into a darker well (--inset, with a soft shadow along
+     its top, --inset-shade), 12 and 8 px corners. */
+  --hairline: color-mix(in srgb, var(--border) 62%, transparent);
+  --inset: #0e0b09;
+  --inset-shade: #090706;
+  --radius: 12px;
+  --radius-sm: 8px;
 
   --display: "Righteous", system-ui, sans-serif;
   --sans: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
@@ -45,13 +57,16 @@
     --bg: #f5f1e8;
     --surface: #fffcf5;
     --surface-2: #efe9dc;
+    --surface-hover: #e7e0d1;
     --border: #ddd3bf;
     --text: #1f1b14;
     --muted: #6b6252;
-    --wave: #cfc5b0;
+    --wave: #a69d8a;
     --start: #1f9d55;
-    --accent-text: #8a5d00;
+    --accent-text: #8a5f00;
     --glow: color-mix(in srgb, var(--accent) 22%, transparent);
+    --inset: #ebe7de;
+    --inset-shade: #d3cfc6;
     color-scheme: light;
   }
 }
@@ -59,13 +74,16 @@
   --bg: #f5f1e8;
   --surface: #fffcf5;
   --surface-2: #efe9dc;
+  --surface-hover: #e7e0d1;
   --border: #ddd3bf;
   --text: #1f1b14;
   --muted: #6b6252;
-  --wave: #cfc5b0;
+  --wave: #a69d8a;
   --start: #1f9d55;
-  --accent-text: #8a5d00;
+  --accent-text: #8a5f00;
   --glow: color-mix(in srgb, var(--accent) 22%, transparent);
+  --inset: #ebe7de;
+  --inset-shade: #d3cfc6;
   color-scheme: light;
 }
 

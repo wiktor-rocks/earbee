@@ -139,7 +139,7 @@ function setUpThemeSwitch() {
   const showMode = () => {
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute("content", currentMode() === "light" ? "#f5f1e8" : "#0e1014");
+      ?.setAttribute("content", currentMode() === "light" ? "#f5f1e8" : "#0f0c0a");
     showModeMedia();
   };
   showMode();
