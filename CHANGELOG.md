@@ -43,6 +43,31 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-30: earbee.org in the app's new look (the website)
+
+- **What:** the site looks like the app since its new look.
+  - **Colours:** the app's warm EarBee and EarBee Light themes, in place of the old blue-grey ones. The browser's theme colour too.
+  - **The top bar** is like the app's: across the whole window, held at the top, on the panels' colour with a hairline under it. The links are quiet buttons, Download a soft one, and the theme switch an icon button behind a hairline.
+  - **Buttons and keycaps** are soft, like the app's: a hairline and a tint on hover, 8 px corners.
+  - **Flat parts instead of cards:** the downloads are one panel with hairlines between the systems (the visitor's own has an amber line along its top, and its button is amber). The key list, the box after a post and the phone note are flat with hairlines. The screenshot and the clips lose their big shadow and ring.
+  - **The waveform strip** sits in a well, like the app's waveform.
+  - **The blog:** hairlines and the app's corners.
+  - **Two fixes:** buttons use the page's font (the BPM post's Tap and Start again were in the system font). On a 320 px phone, the hero's download keeps its label on one line, with the size under it when it doesn't fit beside it (it used to split into two narrow columns).
+- **Why:** the 0.3.0 item "Colors that match the app". The owner chose "a bolder redo", on an experiment branch (`exp/site-new-look`), with no new screenshots or clips yet.
+- **How:**
+  - The colours and the derived tokens (`--surface-hover`, `--hairline`, `--inset`, `--inset-shade`, `--radius`, `--radius-sm`) are the app's: `src/themes/palettes.js` and `cssVariables()` in `src/themes/index.js`, copied by hand into `site/style.css`.
+  - Every class name and colour variable the site had is kept, and new ones are only added. The posts go online from `testing` but with `main`'s `style.css`, so a post written against the new names would break online until `main` moves up.
+  - The top bar keeps the page's width inside it with `padding-inline: max(16px, (100% - 1120px) / 2)`. `scroll-padding-top` keeps a jump to `#download` clear of it.
+  - The well has a hairline edge, which the app's doesn't need: on the site it sits on the page's background, not on a panel.
+  - **Not changed:** the screenshot, the clips, the themes clip and its swatches. The EarBee swatch keeps the old colours to match the clip, until they are recorded again (the 0.3.0 item "New screenshots and clips").
+  - Goes online when `main` moves up.
+- **Where:** `site/style.css` (the tokens; "Top bar", buttons and keycaps, "Screenshot", "Sections" (the key list, the downloads), "Blog", "Narrower screens"); `site/_includes/base.njk` (`theme-color`); `site/download.js` (the theme colour by mode).
+- **Verified by:**
+  - In Electron, on the built site: screenshots of the home page (every section), the blog's page, a post with a table and the BPM post with its calculator, in both themes at 1280, 820, 390 and 320 px, with no sideways scrolling. The hero's button measured with the longest label and a size at 320, 360 and 390 px.
+  - The BPM post with `testing`'s old `site/style.css` still renders.
+  - `npm --prefix site run build`, `node scripts/seo/check.cjs` (only the 2 older warnings), `npm run check` on each commit, and `npm test` after the merge (332 unit, 576 e2e, 28 smoke). Its first run had one failure in the video tests (08, "a file chosen while zoomed in … opens with all of its picture": still at 1.2×), so the merge was undone; the second run passed. The redo changes only `site/`, which the app doesn't load, so that check fails now and then, independently of the redo.
+  - Not seen by the owner in a browser before the merge.
+
 ## 2026-10-30: The site's footer credits Electron and the author (the website)
 
 - **What:** the footer, on every page of earbee.org, now says EarBee is "built on Electron" (beside the MIT licence) and ends with "Created by wiktor.rocks", a link to the owner's site.
