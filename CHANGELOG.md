@@ -43,6 +43,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-30: The site's footer credits Electron and the author (the website)
+
+- **What:** the footer, on every page of earbee.org, now says EarBee is "built on Electron" (beside the MIT licence) and ends with "Created by wiktor.rocks", a link to the owner's site.
+- **Why:** the footer credited the libraries but not Electron, which the whole app is built on (0.3.0's to-do item, and a reminder in the owner's scratchpad). The owner asked for the author credit in the same session.
+- **How:** two more links in the footer's one line; no new styles. Goes online when `main` moves up (only the posts go online from `testing`).
+- **Where:** `site/_includes/base.njk` (the `<footer>`).
+- **Verified by:**
+  - In Electron, on the built site: screenshots of the footer in both themes, at 1280 and 390 px wide, with no sideways scrolling.
+  - `npm --prefix site run build`, `node scripts/seo/check.cjs` (no new warnings), `npm run check`.
+
 ## 2026-10-30: Blog post "How to find the BPM of a song (with a tap tempo calculator)" (the website)
 
 - **What:** a seventh post, "How to find the BPM of a song (with a tap tempo calculator)", at `/blog/find-the-bpm-of-a-song-tap-tempo/`.
