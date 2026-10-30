@@ -380,6 +380,7 @@ kbd {
   border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--text);
+  font-family: inherit; /* a <button> doesn't take the page's font by itself */
   font-weight: 700;
   text-decoration: none;
   transition:
@@ -958,7 +959,7 @@ main > .post {
 }
 .post-list li {
   padding: 24px 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--hairline);
 }
 .post-list h2 {
   font-size: 26px;
@@ -1038,7 +1039,7 @@ main > .post {
   max-width: 100%;
   height: auto;
   border: 1px solid var(--border);
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
 }
 .post-body figcaption {
   margin-top: 8px;
@@ -1053,7 +1054,7 @@ main > .post {
 .post-body pre {
   overflow-x: auto;
   padding: 14px 16px;
-  border-radius: 10px;
+  border-radius: var(--radius-sm);
   background: var(--surface-2);
 }
 .post-body pre code {
@@ -1063,7 +1064,7 @@ main > .post {
 .post-body hr {
   margin: 40px 0;
   border: 0;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--hairline);
 }
 .post-body table {
   width: 100%;
@@ -1074,7 +1075,7 @@ main > .post {
 .post-body th,
 .post-body td {
   padding: 8px 10px;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--hairline);
   text-align: left;
 }
 
