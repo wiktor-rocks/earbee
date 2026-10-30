@@ -34,6 +34,29 @@ export const CONFIG = {
       { id: "eqHighMid", label: "Hi-mid", type: "peaking", frequency: 3000, Q: 1 },
       { id: "eqHigh", label: "High", type: "highshelf", frequency: 6000 },
     ],
+    // Focus: keeps a range of notes and cuts everything outside it, to hear
+    // one instrument or voice. `range`: its lowest and highest note as MIDI
+    // numbers (A0 to C8); an end left at its limit cuts nothing on that side,
+    // so the whole range is "off". Each cut is a Butterworth filter of
+    // 2 × `stages` poles (4: 48 dB an octave), at the edge note's frequency,
+    // moved with the pitch shift so a preset still finds its instrument.
+    // `presets`: the chips in the EQ popover; their ranges cover the
+    // instrument's notes and its lowest overtones, which make a note easy to
+    // name (fundamentals alone sound muffled).
+    focus: {
+      range: { min: 21, max: 108, step: 1 },
+      stages: 4,
+      presets: [
+        { id: "bass", label: "Bass guitar", low: "B0", high: "C5" },
+        { id: "guitar", label: "Guitar", low: "D2", high: "C7" },
+        { id: "soprano", label: "Soprano", low: "A3", high: "F6" },
+        { id: "alto", label: "Alto", low: "D3", high: "C6" },
+        { id: "tenor", label: "Tenor", low: "A2", high: "G5" },
+        { id: "bassVoice", label: "Bass voice", low: "C2", high: "C5" },
+        { id: "pianoLeft", label: "Piano, left hand", low: "A0", high: "F4" },
+        { id: "pianoRight", label: "Piano, right hand", low: "B3", high: "C8" },
+      ],
+    },
   },
 
   // Step sizes (seconds) for ← / → and the step buttons; ↑ / ↓ pick one.

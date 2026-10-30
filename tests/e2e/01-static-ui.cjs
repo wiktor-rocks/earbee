@@ -9,13 +9,43 @@ module.exports = async function (h) {
   check(
     "every slider has a knob",
     await js(
-      `["speed", "volume", "semitoneShift", "centShift", "eqLow", "eqLowMid", "eqMid", "eqHighMid", "eqHigh"].every((id) => document.getElementById(id).parentElement.matches(".knob"))`,
+      `["speed", "volume", "semitoneShift", "centShift", "eqLow", "eqLowMid", "eqMid", "eqHighMid", "eqHigh", "eqFocusLow", "eqFocusHigh"].every((id) => document.getElementById(id).parentElement.matches(".knob"))`,
     ),
   );
   check(
     "the EQ bands are knobs in their popover",
     (await js(`eqPopover.querySelectorAll("#eqKnobs .knob").length`)) === 5,
   );
+  check(
+    "the Focus: Off and a chip per preset, two knobs, off to start with",
+    (await js(
+      `[eqFocusChips.children.length, eqFocusKnobs.querySelectorAll(".knob").length, eqFocusSummary.hidden, eqFocusChips.querySelector(".active")?.dataset.focus].join()`,
+    )) === "9,2,true,off",
+  );
+
+  // A preset keeps its range and turns the EQ on; the side panel names it.
+  // One end pushes the other along; Off cuts nothing again.
+  const focus = () =>
+    js(
+      `[eqFocusLowValue.textContent, eqFocusHighValue.textContent, eqToggle.textContent, eqFocusSummary.hidden ? "" : eqFocusSummary.textContent, eqFocusChips.querySelector(".active")?.dataset.focus ?? "custom"].join()`,
+    );
+  await js(`eqFocusChips.querySelector('[data-focus="bass"]').click()`);
+  check(
+    "a Focus preset: its notes, the EQ on, its name in the side panel",
+    (await focus()) === "B0,C5,On,Bass guitar · B0–C5,bass",
+    await focus(),
+  );
+  await js(
+    `(() => { const input = document.getElementById("eqFocusLow"); input.value = "79"; input.dispatchEvent(new Event("input")); })()`,
+  );
+  check(
+    "the lowest note past the highest pushes it along: a custom range",
+    (await focus()) === "G5,G5,On,Custom · G5–G5,custom",
+    await focus(),
+  );
+  await js(`eqFocusChips.querySelector('[data-focus="off"]').click(); eqToggle.click()`);
+  check("Off: the whole range, nothing named", (await focus()) === "A0,C8,Off,,off", await focus());
+
   check(
     "speed presets: 3 in the dock, 12 behind …",
     (await js(`[speedChips.children.length, speedChipsAll.children.length].join()`)) === "3,12",

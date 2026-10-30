@@ -12,7 +12,7 @@ module.exports = async function (h) {
   // What the sound settings show, and changing them as a user would.
   const settings = () =>
     js(
-      `({ speed: speedValue.textContent, volume: volumeValue.textContent, semitones: semitoneValue.textContent, cents: centValue.textContent, eqLow: eqLowValue.textContent, eq: eqToggle.textContent, step: stepSize.textContent })`,
+      `({ speed: speedValue.textContent, volume: volumeValue.textContent, semitones: semitoneValue.textContent, cents: centValue.textContent, eqLow: eqLowValue.textContent, eq: eqToggle.textContent, focus: eqFocusSummary.hidden ? null : eqFocusSummary.textContent, step: stepSize.textContent })`,
     );
   const defaults = await settings();
   await slide("speed", 0.5);
@@ -20,7 +20,7 @@ module.exports = async function (h) {
   await slide("semitoneShift", -3);
   await slide("centShift", 20);
   await slide("eqLow", 6);
-  await js(`eqToggle.click()`);
+  await js(`eqFocusChips.querySelector('[data-focus="alto"]').click()`); // turns the EQ on too
   key("Up"); // a larger step size
   await sleep(150);
   const changed = await settings();

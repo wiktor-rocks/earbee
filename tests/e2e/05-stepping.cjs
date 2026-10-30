@@ -106,9 +106,11 @@ module.exports = async function (h) {
   // CONFIG.knob), with Shift 5× less; the wheel with Shift by one step;
   // a double-clicked value can be typed.
   await h.shot("dock-knobs.png");
-  await js(`eqToggle.click(); eqPopover.showPopover()`);
+  await js(`eqFocusChips.querySelector('[data-focus="tenor"]').click(); eqPopover.showPopover()`);
   await h.shot("dock-eq-knobs.png");
-  await js(`eqPopover.hidePopover(); eqToggle.click()`);
+  await js(`eqPopover.hidePopover()`);
+  await h.shot("dock-eq-focus.png");
+  await js(`eqFocusChips.querySelector('[data-focus="off"]').click(); eqToggle.click()`);
   const speedNow = async () => Number(await js(`document.getElementById("speed").value`));
   const dragKnob = async (dy, modifiers = []) => {
     wc.sendInputEvent({ type: "mouseDown", x: sl.x, y: sl.y, button: "left", clickCount: 1, modifiers });

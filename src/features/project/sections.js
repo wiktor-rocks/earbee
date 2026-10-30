@@ -73,11 +73,16 @@ export const SECTIONS = [
       ...Object.fromEntries(SOUND_SLIDERS.map((key) => [key, settings[key]])),
       eqEnabled: settings.eqEnabled,
       eq: eqGains(),
+      focus: { low: settings.eqFocusLow, high: settings.eqFocusHigh },
     }),
     restore(data) {
       // setSetting keeps each value inside its slider's range.
       for (const key of SOUND_SLIDERS) if (finite(data[key])) setSetting(key, data[key]);
       for (const band of CONFIG.eq.bands) if (finite(data.eq?.[band.id])) setSetting(band.id, data.eq[band.id]);
+      // The Focus (none in projects saved before it: it stays off). The
+      // high end first, so the low one can't push it.
+      if (finite(data.focus?.high)) setSetting("eqFocusHigh", data.focus.high);
+      if (finite(data.focus?.low)) setSetting("eqFocusLow", data.focus.low);
       if (typeof data.eqEnabled === "boolean") setEqEnabled(data.eqEnabled);
     },
   },

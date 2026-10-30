@@ -13,7 +13,8 @@
  *                                └─► setSetting() ──────┘
  *   transport.on("position" | "state" | "jump") ─► waveform, video, UI
  *
- *   engine     Web Audio graph: Signalsmith (speed + pitch) → EQ → volume
+ *   engine     Web Audio graph: Signalsmith (speed + pitch) → EQ (the
+ *              Focus's high- and low-pass, then the bands) → volume
  *              → limiter, in a context at the open track's sample rate; it
  *              plays the track from several pieces, one after the other.
  *              Knows nothing about the UI or `settings`.
@@ -76,7 +77,8 @@
  *                  waveform), ruler, beats (the simple beat finder,
  *                  stepping by beats), beat-this (around the beat model:
  *                  its windows, picking beats from its answers),
- *                  beat-edits (a project's edits to the beats), melspec
+ *                  beat-edits (a project's edits to the beats), focus (the
+ *                  EQ's Focus: notes, cutoffs, presets), melspec
  *                  and resample (the model's input), fft, timeline (and the
  *                  Segment / Loop / LoopRegion types), emitter, errors,
  *                  media (the Media type, the memory check, waveform
@@ -148,6 +150,8 @@
  * COMMON CHANGES
  *   Speed preset or EQ band   Edit CONFIG.speed.presets / CONFIG.eq.bands.
  *                             The buttons and knobs are generated.
+ *   Focus preset              Edit CONFIG.eq.focus.presets (notes such as
+ *                             "B0"); its chip is generated.
  *   Step sizes (← / →)        Edit CONFIG.step.sizes (↑ / ↓ cycle through them).
  *   Slider range or default   Edit CONFIG. Sliders and their knobs get
  *                             min/max/step from it.

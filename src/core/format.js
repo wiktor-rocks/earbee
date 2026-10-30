@@ -10,6 +10,10 @@ export const formatPitchTotal = (semitones) => `${semitones >= 0 ? "+" : ""}${se
 // Prints a step size exactly as written in CONFIG.step.sizes: 0.25 → "0.25".
 export const formatStepSize = (seconds) => String(seconds);
 
+// A MIDI note number as musicians write it: 60 → "C4", 70 → "B♭4", 21 → "A0".
+const NOTE_NAMES = ["C", "C♯", "D", "E♭", "E", "F", "F♯", "G", "A♭", "A", "B♭", "B"];
+export const noteName = (note) => `${NOTE_NAMES[note % 12]}${Math.floor(note / 12) - 1}`;
+
 export function formatGain(gain) {
   const digits = Number.isInteger(gain) ? gain : gain.toFixed(1);
   return `${gain > 0 ? "+" : ""}${digits} dB`;
