@@ -127,7 +127,7 @@
  *                  beat click), marks.js (actions,
  *                  selection, the marks list), open-file.js, download.js
  *                  (and searching in the download dialog), settings.js
- *                  (the Settings dialog and the theme menu), file-menu.js
+ *                  (the Settings dialog, where the theme is chosen), file-menu.js
  *                  (the File menu), layout.js (the shortcuts dialog, the
  *                  sidebar toggle), project/ (saving and opening project
  *                  files: index.js; what they save: sections.js),
@@ -284,7 +284,7 @@ import { beatsAction, bindBeats, isBeatMenuOpen, snapForDrag, toggleBeatClick } 
 import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
 import { bindProject, isSaveDialogOpen, openFile, saveProject, saveProjectAs } from "./features/project/index.js";
-import { bindSettings, bindThemePicker, isSettingsOpen, isThemeMenuOpen } from "./features/settings.js";
+import { bindSettings, isSettingsOpen } from "./features/settings.js";
 import { bindFileMenu, isFileMenuOpen } from "./features/file-menu.js";
 import {
   bindPlayback,
@@ -695,7 +695,6 @@ function start() {
   bindFileDrop(openFile);
   bindProject();
   bindDownloads();
-  bindThemePicker();
   bindFileMenu();
   bindSettings();
   bindMarks();
@@ -712,7 +711,6 @@ function start() {
     isLoading() ||
     dom.downloadDialog.open ||
     isSaveDialogOpen() ||
-    isThemeMenuOpen() ||
     isFileMenuOpen() ||
     isBeatMenuOpen() ||
     isSettingsOpen() ||

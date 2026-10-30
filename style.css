@@ -6,7 +6,7 @@
  *   3 Controls     buttons, sliders, keys
  *   4 Screens      welcome, loading screen, loading overlay; the dialogs
  *                  (From YouTube and its search, Save project, Settings),
- *                  the colour-theme and File menus, the loader bars, and
+ *                  the File and beats menus, the loader bars, and
  *                  the animations off for reduced motion
  *   5 Player       the drop overlay, the layout (top bar; the workspace:
  *                  stage and transport, marks sidebar; the sound dock),
@@ -232,8 +232,7 @@ button:hover {
 }
 
 /* Square buttons that only show an icon (the label is aria-label/title). */
-.icon-button,
-.theme-button {
+.icon-button {
   position: relative;
   width: 34px;
   height: 34px;
@@ -243,8 +242,7 @@ button:hover {
   color: var(--muted);
 }
 
-.icon-button:hover,
-.theme-button:hover {
+.icon-button:hover {
   background: var(--surface-hover);
   color: var(--text);
 }
@@ -1474,17 +1472,17 @@ body.dragging .welcome-hint {
   }
 }
 
-/* ---------- Menus (colour theme, File), and the welcome corner ---------- */
+/* ---------- Menus (File, beats), and the welcome corner ---------- */
 
-/* The gear (Settings) and the palette, top right of the welcome screen:
-   there they stand on their own, so they keep a surface. */
-.welcome-corner .theme-button {
+/* The gear (Settings), top right of the welcome screen: there it stands
+   on its own, so it keeps a surface. */
+.welcome-corner .icon-button {
   border-color: var(--hairline);
   background: var(--surface-2);
   color: var(--text);
 }
 
-.welcome-corner .theme-button:hover {
+.welcome-corner .icon-button:hover {
   background: var(--surface-hover);
 }
 
@@ -1527,8 +1525,7 @@ body.dragging .welcome-hint {
   border-top: 1px solid var(--border);
 }
 
-.menu-item,
-.theme-item {
+.menu-item {
   display: flex;
   align-items: center;
   justify-content: flex-start;
@@ -1543,9 +1540,7 @@ body.dragging .welcome-hint {
 }
 
 .menu-item:hover,
-.menu-item:focus-visible,
-.theme-item:hover,
-.theme-item:focus-visible {
+.menu-item:focus-visible {
   background: var(--surface-hover);
 }
 
@@ -1565,7 +1560,7 @@ body.dragging .welcome-hint {
 }
 
 /* The beats menu (features/beats.js), from the ♩ chip: what's on is
-   ticked, like the colour-theme menu's choice. */
+   ticked. */
 .beat-menu {
   position-anchor: --beat-menu;
   position-area: left span-bottom;
@@ -1598,55 +1593,8 @@ body.dragging .welcome-hint {
   font-weight: 400;
 }
 
-/* The colour-theme menu (features/settings.js). One size whatever is picked
-   (long names and Automatic's "follows the system: …" are cut short, the
-   checked item isn't bolder, every item keeps room for its ✓). */
-.theme-menu {
-  position-anchor: --theme-open;
-  width: 300px;
-  scrollbar-gutter: stable;
-}
-
-.theme-item[aria-checked="true"] {
-  color: var(--accent-text);
-}
-
-.theme-item::after {
-  content: "✓";
-  flex: none;
-  font-weight: 700;
-  visibility: hidden;
-}
-
-.theme-item[aria-checked="true"]::after {
-  visibility: visible;
-}
-
-.theme-name {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-}
-
-/* The name and its detail each end in an ellipsis when cut off. */
-.theme-name > span,
-.theme-name small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.theme-name small {
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 400;
-}
-
-/* Four squares: background, panel, accent, loop. Automatic's shows its
-   dark and light themes' backgrounds (set by the menu). */
+/* Four squares: background, panel, accent, loop (Settings › Theme's
+   choices, ui/pref-fields.js swatch()). */
 .theme-swatch {
   display: flex;
   flex: none;

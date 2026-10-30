@@ -3,7 +3,7 @@
 // electron/prefs-store.js), reached through window.earbee.prefs;
 // outside Electron the values are kept in localStorage instead.
 //
-// Every change, from the Settings dialog, the palette menu or another
+// Every change, from the Settings dialog, a menu (the beat click) or another
 // window, reaches onPrefsChange() listeners, so whatever shows a setting
 // just listens. The sections themselves are declared in src/prefs.
 import { createEmitter } from "../core/emitter.js";

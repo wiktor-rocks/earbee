@@ -1,6 +1,6 @@
 // Settings: the dialog (generated from src/prefs), the General, Theme,
-// Downloads and Advanced sections, Reset, keeping the palette menu in step, what the main process
-// refuses, and keeping the values over a reload.
+// Layout, Downloads and Advanced sections, Reset, a change made elsewhere showing in the dialog,
+// the top bar hiding itself, what the main process refuses, and keeping the values over a reload.
 // Part of the end-to-end run (see run.cjs); `h` is the harness.
 const fs = require("fs");
 const path = require("path");
@@ -103,8 +103,8 @@ module.exports = async function (h) {
   await tab("theme");
   await sleep(100);
 
-  // A change made elsewhere (here the main process, as the palette menu or
-  // another window would) shows in the open dialog.
+  // A change made elsewhere (here the main process, as another window
+  // would) shows in the open dialog.
   prefsStore.set("theme", "choice", "nord");
   await sleep(300);
   check(
@@ -114,28 +114,21 @@ module.exports = async function (h) {
   );
 
   // Escape closes it (opened with a click, so no focus is left on the
-  // gear); the palette menu agrees.
+  // gear). The theme is chosen in its tab: the page follows at once.
   key("Escape");
   await sleep(200);
   check(
     "Escape closes Settings, no focus left on the gear",
     !(await isOpen()) && (await js(`document.activeElement === document.body`)),
   );
-  await js(`document.getElementById("themeButton").click()`);
-  await sleep(150);
-  check(
-    "the palette menu shows the theme chosen in Settings",
-    (await js(`document.querySelector('#themeMenu [aria-checked="true"]').dataset.choice`)) === "nord",
-  );
-  await js(`document.querySelector('#themeMenu [data-choice="one-dark"]').click()`);
-  await sleep(200);
-  key("Escape");
-  await sleep(150);
   await js(`document.getElementById("settingsButton").click()`);
   await sleep(200);
+  await tab("theme");
+  await choose("theme", "choice", "one-dark");
   check(
-    "…and Settings shows the theme chosen in the menu",
-    await js(`${radio("theme", "choice", "one-dark")}.checked`),
+    "choosing a theme in Settings shows it at once",
+    (await js(`${radio("theme", "choice", "one-dark")}.checked`)) &&
+      (await js(`document.documentElement.dataset.theme`)) === "one-dark",
   );
 
   // Downloads: the folder, the kind, the quality.

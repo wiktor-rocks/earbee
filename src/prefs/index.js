@@ -48,8 +48,8 @@ const generalSection = defineSection({
 
 // Settings › Theme: the colour theme, and for Automatic which theme each
 // system mode uses. The values are the themes' ThemePrefs
-// ({ choice, dark, light }); ui/theme.js applies them, the palette menu
-// (features/settings.js) is a shortcut to `choice`.
+// ({ choice, dark, light }); ui/theme.js applies them. They're chosen only
+// here (there's no other theme picker).
 /** @param {import("../themes/index.js").Theme} theme */
 const option = (theme) => ({
   value: theme.id,

@@ -1,13 +1,11 @@
 // The Settings dialog, opened by the gear buttons (the top bar and the
 // welcome screen). It's generated from the sections in src/prefs: one tab
 // per section, one control per field (ui/pref-fields.js). A change applies
-// and is saved at once (ui/prefs.js); there's no OK or Cancel. Below it,
-// the colour-theme menu, a shortcut to Settings › Theme.
+// and is saved at once (ui/prefs.js); there's no OK or Cancel. The colour
+// theme is chosen here too (Settings › Theme); there's no other way.
 import { SECTIONS } from "../prefs/index.js";
-import { THEMES } from "../themes/index.js";
 import { $, element, onClick } from "../ui/dom.js";
-import { bindMenu } from "../ui/menu.js";
-import { renderField, swatch } from "../ui/pref-fields.js";
+import { renderField } from "../ui/pref-fields.js";
 import {
   chooseFolder,
   defaultPaths,
@@ -129,81 +127,4 @@ export function bindSettings() {
     opener?.focus();
     opener = null;
   });
-}
-
-/* ---------- The colour-theme menu ---------- */
-
-// The colour-theme menu (the palette button in the top bar and on the
-// welcome screen): a shortcut to Settings › Theme. Choosing here sets the
-// same setting (ui/prefs.js), so the menu, the dialog and the theme on
-// screen (ui/theme.js) always agree. The menu keeps one size and stays on
-// the button that opened it (CSS anchor positioning, see .theme-menu), so
-// nothing moves while you pick.
-
-/** @param {string} choice A theme id, or "auto". */
-const choose = (choice) => setPref("theme", "choice", choice);
-
-const menu = $("themeMenu");
-const isOpen = () => menu.matches(":popover-open");
-export const isThemeMenuOpen = isOpen;
-
-function item(choice, label, detail, preview) {
-  const button = element("button", { type: "button", className: "theme-item", role: "menuitemradio" });
-  button.dataset.choice = choice;
-  button.append(preview ?? element("span", { className: "theme-swatch auto", ariaHidden: "true" }));
-  button.append(
-    element(
-      "span",
-      { className: "theme-name" },
-      element("span", {}, label),
-      detail ? element("small", {}, detail) : "",
-    ),
-  );
-  onClick(button, () => choose(choice));
-  return button;
-}
-
-function buildMenu() {
-  menu.append(
-    item("auto", "Automatic", "follows the system's dark or light mode"),
-    element("hr"),
-    ...THEMES.map((theme) =>
-      item(
-        theme.id,
-        theme.name,
-        theme.scheme === "light" ? "light" : "",
-        swatch(["bg", "surface", "accent", "loop"].map((role) => theme.colors[role])),
-      ),
-    ),
-  );
-}
-
-// Check marks: the current choice, and for Automatic which themes it uses.
-function renderMenu() {
-  const prefs = getPrefs("theme");
-  for (const button of menu.querySelectorAll(".theme-item")) {
-    const choice = /** @type {HTMLElement} */ (button).dataset.choice;
-    button.setAttribute("aria-checked", String(choice === prefs.choice));
-  }
-  const pair = [prefs.dark, prefs.light].map((id) => THEMES.find((theme) => theme.id === id));
-  // Cut short if it doesn't fit (the menu never widens); the full text on hover.
-  const auto = /** @type {HTMLElement} */ (menu.querySelector('[data-choice="auto"]'));
-  auto.querySelector("small").textContent = `follows the system: ${pair[0].name} or ${pair[1].name}`;
-  auto.title = `Automatic: ${pair[0].name} in dark mode, ${pair[1].name} in light mode`;
-  menu
-    .querySelector(".theme-swatch.auto")
-    .replaceChildren(...pair.map((theme) => element("span", { style: `background: ${theme.colors.bg}` })));
-}
-
-export function bindThemePicker() {
-  buildMenu();
-  bindMenu({
-    menu,
-    buttons: () => [$("themeButton"), $("welcomeThemeButton")],
-    anchor: "--theme-open",
-    itemSelector: ".theme-item",
-    onOpen: renderMenu,
-    initialFocus: () => menu.querySelector('[aria-checked="true"]'),
-  });
-  onPrefsChange("theme", () => isOpen() && renderMenu());
 }

@@ -1,8 +1,7 @@
 /* =====================================================================
  * POPOVER MENUS
- * A [popover] menu opened by one or more buttons: the colour-theme menu
- * (features/settings.js), the File menu (features/file-menu.js) and the
- * beats menu (features/beats.js).
+ * A [popover] menu opened by one or more buttons: the File menu
+ * (features/file-menu.js) and the beats menu (features/beats.js).
  * ===================================================================== */
 
 import { onClick } from "./dom.js";
