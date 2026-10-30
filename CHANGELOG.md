@@ -43,6 +43,45 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-30: Settings › Layout (the top bar can hide itself, the video's buttons always shown); no theme button
+
+- **What:**
+  - **A Layout tab in Settings**, after Waveform, with two settings:
+    - **Hide the top bar** (off by default). The bar slides away and the stage and the side panel take its room, once.
+      - It slides back over them when the pointer reaches the window's top edge, and stays while the pointer is on it or one of its menus is open.
+      - It goes 0.6 s after the pointer is off it: below it, or out of the window.
+      - A drag up to the top doesn't bring it. Tab into it shows it too.
+    - **The video's buttons** (the zoom, its own window, big video): **Always**, the new default, or **On hover**, as before (shown while the pointer is on the picture, one of them has focus, or the picture is zoomed in). The video's own window follows it.
+  - **No theme button or menu.** The palette button in the top bar and on the welcome screen, and its colour-theme menu, are gone. Themes are chosen in Settings › Theme only. The welcome screen keeps its gear.
+- **Why:** the owner asked for an auto-hiding top bar "as a setting", for the video's buttons to be visible at all times, as a setting with that as the default, and then for themes to be kept to Settings. The first two were added to 0.3.0's scope that day. Built on an experiment branch (`exp/layout-settings`); the owner tried it with `npm start` and asked for the bar not to hide while the pointer is on it.
+- **How:**
+  - **Settings:** one new section, `layout`, declared like the others (`defineSection`), so the dialog's tab and controls, the main process's checking and saving, and every window's updates come with it. Each setting is applied by its own small feature that reads it with `getPrefs` and follows it with `onPrefsChange`.
+  - **The top bar** (`features/topbar-autohide.js`):
+    - `.app.topbar-autohide` gives the grid's top row to the workspace (as big video does). The bar is then `position: fixed`, slid up out of sight by `transform`.
+    - `.revealed`, `:has(:focus-visible)` (keyboard focus only: a click leaves focus on a button, which mustn't hold it) and `:has([aria-expanded="true"])` (its File menu open) slide it down.
+    - Only `transform` changes as it comes and goes, so nothing under it is laid out or redrawn again (playback is king). The slide is 150 ms, off with reduced motion.
+    - One `pointermove` listener, only while the setting is on, follows the pointer's height. It shows the bar within `CONFIG.layout.topbarRevealPx` (4 px) of the top with no button held, keeps it while the pointer is within the bar's height, and hides it `topbarHideMs` (600 ms) after the pointer is below it or out of the window.
+    - The pointer's height, not `:hover`: a bar sliding in under a still pointer doesn't get `:hover` until the pointer moves, and it hid with the pointer on it.
+  - **The video's buttons** (`features/video-buttons.js`): `data-video-buttons` on `<html>`. The CSS shows the bar by default, and hides it under `[data-video-buttons="hover"]` with the old rules for showing it.
+  - **The video window** used to copy the theme on `onThemeChange`. It now mirrors `<html>`'s `style`, `data-theme` and `data-video-buttons` with a `MutationObserver`, whatever changes them, so it needs no settings code of its own.
+  - **The theme menu's removal:** its markup, its code in `features/settings.js` (`bindThemePicker`, `isThemeMenuOpen`) and its styles (`.theme-menu`, `.theme-item`, `.theme-name`).
+    - `.theme-swatch` stays: Settings › Theme uses it.
+    - The welcome screen's gear now has the `.icon-button` class, which `.theme-button` used to duplicate.
+- **Where:**
+  - `src/prefs/index.js` (`layoutSection`), `src/features/topbar-autohide.js` and `src/features/video-buttons.js` (new), `src/features/video-window/index.js` (`followLook`), `src/features/settings.js`, `src/config.js` (`CONFIG.layout`), `src/app.js` (wiring marked "Top bar autohide (" and "Video buttons ("; the header).
+  - `index.html`; `style.css` ("Top bar", "Video controls", "Menus (File, beats), and the welcome corner", the reduced-motion block); comments in `src/ui/menu.js`, `src/ui/prefs.js`, `src/ui/pref-fields.js`; `docs/glossary.md` (Top bar, The video's buttons, Settings).
+  - Tests: `tests/unit/prefs.test.mjs`, `tests/e2e/08`, `10`, `13`, `16`, `18`.
+- **Verified by:**
+  - Unit: the layout section's defaults; invalid values fall back.
+  - e2e:
+    - 13 (the Layout tab; Hide the top bar saved; the bar out of sight and the stage taking its room; a drag to the top doesn't bring it; the pointer at the top does, with the stage staying put; it stays with the pointer on it, at the very top and lower down; it goes after the pointer leaves; it stays while the File menu is open; off puts it back as it was; a theme chosen in Settings applies at once);
+    - 08 (the buttons shown without hovering; On hover: shown while zoomed in, hidden once all of the picture shows, shown with the pointer on it);
+    - 18 (the video window follows the setting and keeps the theme);
+    - 10 (no theme button, buttons or menu; themes through the setting);
+    - 16 (the menu checks that were the theme menu's, now on the File menu: shortcuts held off, a real click closes and reopens it, Shift+Tab, Enter and Esc bring focus back). They must not click the File menu's first item, Open…: its file chooser stays active and blocks the video window in topic 18. So the shortcut check presses M, not Space, and the menu opens with one click, as Enter does.
+  - `npm run check` on each commit, and `npm test` after the merge (344 unit, 589 e2e, 28 smoke; the third attempt: the first two were undone, for the flaky zoom check, fixed separately, and for test 16 clicking Open…).
+  - Not checked: a light theme, a touchpad, a window that isn't maximized.
+
 ## 2026-10-30: The flaky video zoom check (test 08) is fixed
 
 - **What:** the check "a file chosen while zoomed in (and wheeled over while it loads) opens with all of its picture" no longer fails now and then. Nothing in the app changed.
