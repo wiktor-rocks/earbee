@@ -72,7 +72,7 @@ jobs:
 
           **Downloads:**
           - **Windows:** the \`win-x64.exe\`, a portable app. Windows may warn about an unrecognised app the first time; choose *More info*, then *Run anyway*.
-          - **macOS:** the \`mac-arm64.dmg\` (Apple Silicon) or \`mac-x64.dmg\` (Intel). It isn't signed by Apple: the first time, right-click it and choose *Open*, or allow it in System Settings › Privacy & Security. *Not yet tried on a Mac; please report how it does.*
+          - **macOS:** the \`mac-arm64.dmg\` (Apple Silicon) or \`mac-x64.dmg\` (Intel). It isn't signed by Apple: the first time, right-click it and choose *Open*, or allow it in System Settings › Privacy & Security.
           - **Linux:** the \`linux-x86_64.AppImage\`. Make it executable (\`chmod +x\`) and run it.
 
           What changed: see [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/CHANGELOG.md).

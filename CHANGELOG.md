@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-30: No more "not tried on a Mac" (the website and the release notes)
+
+- **What:** the download section's macOS card no longer says "Not yet tested on a real Mac: tell us how it went", and the release notes no longer say "Not yet tried on a Mac; please report how it does."
+- **Why:** the owner has run the Mac builds (the 0.3.0 item "Mac notes"), and asked for both to go.
+- **How:** the two sentences are removed; the rest of each Mac note (drag it to Applications, the right-click Open the first time) stays. The site's "issues" link is set by `download.js` for any `data-link="issues"`, so it needs no change now that none is left on the home page. The site's change goes online when `main` moves up; the release notes change with the next release.
+- **Where:** `site/index.html` (the macOS card); `.github/workflows/release.yml` (the release body).
+- **Verified by:** `npm --prefix site run build`, `node scripts/seo/check.cjs` (only the 2 older warnings), `npm run check`.
+
 ## 2026-10-30: Settings › Layout (the top bar can hide itself, the video's buttons always shown); no theme button
 
 - **What:**
