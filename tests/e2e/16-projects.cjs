@@ -14,7 +14,6 @@ module.exports = async function (h) {
     key,
     click,
     slide,
-    playing,
     ensurePaused,
     check,
     sleep,
@@ -112,12 +111,18 @@ module.exports = async function (h) {
   // shortcuts are held off. A real click (press and release) on its button
   // again closes it: the press mustn't light-dismiss it and the click open
   // it again.
+  // M (mark a point) rather than Space: the menu's first item, Open…, has
+  // focus, and Space would click it (its file chooser would then block
+  // the video window in topic 18).
   await js(`fileMenuButton.click()`);
   await sleep(150);
-  key("Space");
+  const marksBefore = await js(`document.querySelectorAll("#marksList .mark-row").length`);
+  key("M");
   await sleep(300);
-  check("shortcuts don't fire while the File menu is open", !(await playing()));
-  await ensurePaused();
+  check(
+    "shortcuts don't fire while the File menu is open",
+    (await js(`document.querySelectorAll("#marksList .mark-row").length`)) === marksBefore,
+  );
   await js(`fileMenu.matches(":popover-open") || fileMenuButton.click()`);
   await sleep(150);
   const fileButtonAt = await js(
@@ -140,9 +145,11 @@ module.exports = async function (h) {
   key("Tab", ["shift"]);
   await sleep(50);
   const tabbedTo = await js(`document.activeElement.id`);
-  // Enter activates a button through its "char" event, which key() doesn't send.
-  for (const type of ["keyDown", "char", "keyUp"])
-    wc.sendInputEvent({ type, keyCode: type === "char" ? "\r" : "Enter" });
+  // Opened as Enter opens it: one click with no press (detail 0). Sending
+  // Enter's key events clicked twice, and the second click landed on the
+  // menu's first item, Open…, whose file chooser then stayed active and
+  // blocked the video window in topic 18.
+  await js(`fileMenuButton.click()`);
   await sleep(150);
   const openedByKey = await fileMenuOpen();
   key("Escape");
