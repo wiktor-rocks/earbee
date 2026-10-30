@@ -43,6 +43,17 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-10-30: The flaky video zoom check (test 08) is fixed
+
+- **What:** the check "a file chosen while zoomed in (and wheeled over while it loads) opens with all of its picture" no longer fails now and then. Nothing in the app changed.
+- **Why:** it failed twice in a full `npm test` that day, each time after a merge that couldn't affect it (still at 1.197×, one wheel notch), and passed on the next run. The owner asked to fix it "once and for all".
+- **How:**
+  - **The cause:** the test sent its 8 wheel turns over 200 ms after choosing the file, without checking that it was still loading. When the small test video opened sooner, the last turns reached the new picture and zoomed it, as they should: a user may zoom a file that has opened.
+  - **The app was right:** while a file loads, the loading overlay covers the window and the player is inert, so a turn can't zoom the picture then.
+  - **Now:** the test waits until the overlay is up, sends the turns at once, and the page notes for each turn it gets whether the overlay was still up. The check needs at least one turn (Chromium merges turns sent together), all of them during the load, and the new video showing all of its picture. If a turn ever comes late again, the failure says so.
+- **Where:** `tests/e2e/08-video.cjs`.
+- **Verified by:** `TB_TOPICS=03,08 npm test` three times, the third with every CPU core kept busy: the check passed each time, its turns arriving as 2 merged events, both during the load. In the busy run, "the proxy is built where a drag went" failed: background building is slower when the computer is saturated, by design (playback first); it passed in the other two.
+
 ## 2026-10-30: The EQ's Focus: keep one range of notes, with presets for instruments and voices
 
 - **What:**
