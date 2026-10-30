@@ -1723,7 +1723,8 @@ body.dragging .welcome-hint {
   html .pref-switch,
   html .pref-switch::after,
   html .toast,
-  html .search-thumb {
+  html .search-thumb,
+  html .app.topbar-autohide > .topbar {
     transition: none !important;
   }
 
@@ -1855,6 +1856,35 @@ body.dragging .drop-card {
   min-width: 0;
   height: 42px;
   padding: 0 14px;
+}
+
+/* Settings › Layout › Hide the top bar (features/topbar-autohide.js): the
+   grid gives its row to the workspace, and the bar floats over the top,
+   slid up out of sight. It slides down while .revealed (the pointer at the
+   window's top edge, or on it), while keyboard focus is in it (Tab; a
+   click leaves focus on a button, which mustn't hold it), and while one
+   of its menus is open. Only its transform changes, so nothing under it is laid
+   out again. */
+.app.topbar-autohide {
+  grid-template-rows: minmax(0, 1fr);
+}
+
+.app.topbar-autohide > .topbar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 15;
+  border-bottom: 1px solid var(--hairline);
+  box-shadow: var(--shadow);
+  transform: translateY(calc(-100% - 12px)); /* the shadow out of sight too */
+  transition: transform 150ms ease-out !important;
+}
+
+.app.topbar-autohide > .topbar.revealed,
+.app.topbar-autohide > .topbar:has(:focus-visible),
+.app.topbar-autohide > .topbar:has([aria-expanded="true"]) {
+  transform: none;
 }
 
 /* Its sections (the name, the File menu, the open file, the tools)

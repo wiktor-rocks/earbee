@@ -215,6 +215,71 @@ module.exports = async function (h) {
   );
   check("…and the folder picker only opens for folder settings", folderChoice.asked === 2);
 
+  // Settings › Layout › Hide the top bar (features/topbar-autohide.js): the
+  // stage takes the bar's room once; the bar slides back over it at the top
+  // edge (not during a drag), stays while its menu is open, goes once the
+  // pointer leaves.
+  const bars = () =>
+    js(`(() => {
+      const bar = document.querySelector(".topbar").getBoundingClientRect();
+      const stage = document.getElementById("stage").getBoundingClientRect();
+      return { bottom: Math.round(bar.bottom), stageTop: Math.round(stage.top), autohide: document.getElementById("app").classList.contains("topbar-autohide") };
+    })()`);
+  const pointerTo = async (y, modifiers = []) => {
+    h.wc.sendInputEvent({ type: "mouseMove", x: 300, y, modifiers });
+    await sleep(400); // the slide (150 ms) is over
+  };
+  const goneAfterLeaving = 1000; // CONFIG.layout.topbarHideMs (600) and the slide
+  const inLayout = await bars();
+  await js(`document.getElementById("settingsDialog").close()`);
+  await sleep(200);
+  await js(`document.getElementById("settingsButton").click()`);
+  await sleep(200);
+  await tab("layout");
+  await js(`${row("layout", "autohideTopBar")}.querySelector("input").click()`);
+  await sleep(300);
+  await js(`document.getElementById("settingsDialog").close()`);
+  await pointerTo(400);
+  const hidden = await bars();
+  check(
+    "Hide the top bar: saved; the bar out of sight, its room the stage's",
+    saved().layout?.autohideTopBar === true &&
+      hidden.autohide &&
+      hidden.bottom <= 0 &&
+      hidden.stageTop < inLayout.stageTop,
+    JSON.stringify({ inLayout, hidden }),
+  );
+  await pointerTo(1, ["leftButtonDown"]);
+  check("…a drag up to the top edge doesn't bring it", (await bars()).bottom <= 0);
+  await pointerTo(400);
+  await pointerTo(1);
+  const revealed = await bars();
+  check(
+    "…the pointer at the top edge brings it over the stage, which stays put",
+    revealed.bottom >= 40 && revealed.stageTop === hidden.stageTop,
+    JSON.stringify(revealed),
+  );
+  await shot("topbar-autohide.png");
+  await sleep(goneAfterLeaving);
+  check("…it stays while the pointer is on it, even at the very top", (await bars()).bottom >= 40);
+  await pointerTo(25);
+  await sleep(goneAfterLeaving);
+  check("…or lower down on it", (await bars()).bottom >= 40);
+  await pointerTo(400);
+  await sleep(goneAfterLeaving);
+  check("…and it goes a moment after the pointer leaves", (await bars()).bottom <= 0);
+  await pointerTo(1);
+  await js(`document.getElementById("fileMenuButton").click()`);
+  await pointerTo(400);
+  await sleep(goneAfterLeaving);
+  check("…it stays while its File menu is open", (await bars()).bottom >= 40);
+  await js(`document.getElementById("fileMenu").hidePopover()`);
+  await sleep(400);
+  check("…and goes once the menu closes", (await bars()).bottom <= 0);
+  await js(`earbee.prefs.set("layout", "autohideTopBar", false)`);
+  await sleep(300);
+  check("turned off, the bar is back in the layout", JSON.stringify(await bars()) === JSON.stringify(inLayout));
+
   // Kept over a reload (the preload reads them before the page starts).
   await h.wc.reload();
   await sleep(1500);
@@ -225,6 +290,7 @@ module.exports = async function (h) {
   );
 
   // Back to the defaults for anything after this.
+  prefsStore.reset("layout");
   prefsStore.reset("theme");
   prefsStore.reset("downloads");
   await sleep(300);

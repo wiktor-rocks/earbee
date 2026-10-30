@@ -144,7 +144,9 @@
  *                  into any order; wiring marked "Panel order ("),
  *                  video-buttons.js (Settings › Layout: the video's
  *                  buttons always shown or on hover; wiring marked
- *                  "Video buttons (")
+ *                  "Video buttons ("), topbar-autohide.js (Settings ›
+ *                  Layout: the top bar hides until the pointer reaches
+ *                  it; wiring marked "Top bar autohide (")
  *   app.js         This file: creates and wires the components, the
  *                  SHORTCUTS table, start()
  *   vendor/        Signalsmith Stretch, patched to read across several
@@ -276,6 +278,7 @@ import { bindLayout, openShortcuts } from "./features/layout.js";
 import { bindStageSplit } from "./features/stage-split.js"; // Stage split (src/features/stage-split.js)
 import { bindPanelOrder } from "./features/panel-order.js"; // Panel order (src/features/panel-order.js)
 import { bindVideoButtons } from "./features/video-buttons.js"; // Video buttons (src/features/video-buttons.js)
+import { bindTopbarAutohide } from "./features/topbar-autohide.js"; // Top bar autohide (src/features/topbar-autohide.js)
 import { bindVideoZoom, resetVideoZoom, videoZoomChanged, zoomVideoIn, zoomVideoOut } from "./features/video-zoom.js"; // Video zoom (src/features/video-zoom.js)
 import { beatsAction, bindBeats, isBeatMenuOpen, snapForDrag, toggleBeatClick } from "./features/beats.js";
 import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
@@ -703,6 +706,7 @@ function start() {
   bindPanelOrder(); // Panel order (src/features/panel-order.js)
   bindVideoZoom($("videoPane")); // Video zoom (src/features/video-zoom.js)
   bindVideoButtons(); // Video buttons (src/features/video-buttons.js)
+  bindTopbarAutohide(); // Top bar autohide (src/features/topbar-autohide.js)
   bindFocus();
   const keysBlocked = () =>
     isLoading() ||

@@ -203,6 +203,11 @@ export const CONFIG = {
   // project file is kept within `minShare`–`maxShare`.
   stage: { timelineShare: 0.23, minTimeline: 110, minVideo: 120, minShare: 0.1, maxShare: 0.9 },
 
+  // Settings › Layout › Hide the top bar (features/topbar-autohide.js): it
+  // comes back when the pointer is within `topbarRevealPx` of the window's
+  // top, and goes `topbarHideMs` after the pointer leaves it.
+  layout: { topbarRevealPx: 4, topbarHideMs: 600 },
+
   beats: {
     // The beat lines over the waveform (B; features/beats.js) are hidden
     // when zoomed out so far that beats are closer than this.
