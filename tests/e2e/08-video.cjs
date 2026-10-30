@@ -488,19 +488,33 @@ module.exports = async function (h) {
   };
 
   // Another file chosen while zoomed in, and wheeled over while it loads:
-  // it opens with all of its picture.
+  // it opens with all of its picture. The turns are sent at once, only
+  // after the loading overlay is up (it covers the picture, so they must
+  // not zoom it), and the page notes, for each turn it gets, whether the
+  // overlay was still up: a turn that came after the file opened would
+  // rightly zoom the new picture, and the check would be meaningless (it
+  // used to send them over 200 ms, which a quick load could outrun).
+  // Turns sent together may reach the page as fewer events (Chromium
+  // merges them), so it's at least one, every one while loading.
   await openFile(path.join(FIXTURES, "counter.webm"));
   await wheelOver(at.x, at.y, 120, 5);
+  await js(`window.__wheelsWhileLoading = [];
+    window.addEventListener("wheel", () => __wheelsWhileLoading.push(!document.getElementById("loadingOverlay").hidden), { capture: true });`);
   await h.setFiles(path.join(FIXTURES, "rotated.mp4"));
+  for (let i = 0; i < 100 && (await js(`document.getElementById("loadingOverlay").hidden`)); i++) await sleep(5);
   for (let i = 0; i < 8; i++) {
     wc.sendInputEvent({ type: "mouseWheel", x: Math.round(at.x), y: Math.round(at.y), deltaX: 0, deltaY: 120 });
-    await sleep(25);
   }
   await loaded();
+  const wheels = await js(`__wheelsWhileLoading`);
   check(
     "a file chosen while zoomed in (and wheeled over while it loads) opens with all of its picture",
-    (await zoomNow()) === "" && (await zoomBar()).level === "1.0×" && !(await stopped()),
-    `${await zoomNow()} ${JSON.stringify(await zoomBar())}`,
+    wheels.length > 0 &&
+      wheels.every(Boolean) &&
+      (await zoomNow()) === "" &&
+      (await zoomBar()).level === "1.0×" &&
+      !(await stopped()),
+    `${await zoomNow()} ${JSON.stringify(await zoomBar())} wheels while loading: ${JSON.stringify(wheels)}`,
   );
   // Zoomed in on it straight away: it's portrait, so the view is kept
   // within its own shape, not the last file's.
