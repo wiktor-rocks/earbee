@@ -1309,6 +1309,9 @@ main > .post {
   .cta .button {
     flex: 1 1 100%;
     justify-content: center;
+    flex-wrap: wrap; /* if the size doesn't fit beside the label, it goes under it */
+    row-gap: 0;
+    padding-inline: 16px;
   }
 }
 
