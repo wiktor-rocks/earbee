@@ -155,8 +155,8 @@ kbd {
   min-width: 26px;
   padding: 1px 7px;
   border: 1px solid var(--border);
-  border-bottom-width: 3px;
-  border-radius: 6px;
+  border-bottom-width: 2px;
+  border-radius: 5px;
   background: var(--surface-2);
   color: var(--text);
   font: 700 13px/1.6 var(--sans);
@@ -369,13 +369,15 @@ kbd {
   }
 }
 
+/* Buttons are soft, like the app's: a surface tint and a hairline; the
+   primary one is the accent. */
 .button {
   display: inline-flex;
   align-items: baseline;
   gap: 8px;
   padding: 12px 20px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
   background: var(--surface-2);
   color: var(--text);
   font-weight: 700;
@@ -386,7 +388,7 @@ kbd {
 }
 .button:hover {
   color: var(--text);
-  border-color: var(--muted);
+  background: var(--surface-hover);
 }
 .button small {
   font-weight: 600;
@@ -406,6 +408,9 @@ kbd {
 .button.quiet {
   background: none;
   align-self: center;
+}
+.button.quiet:hover {
+  background: var(--surface-hover);
 }
 
 /* On a phone or tablet ("phone" on <html>, set in the head, _includes/base.njk),
@@ -1125,12 +1130,13 @@ main > .post {
   }
   .platform .alt {
     padding: 10px 20px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius-sm);
     text-decoration: none;
   }
   .platform .alt:hover {
-    border-color: var(--muted);
+    background: var(--surface-hover);
+    color: var(--text);
   }
 }
 
