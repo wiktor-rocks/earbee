@@ -95,6 +95,7 @@
 
 html {
   scroll-behavior: smooth;
+  scroll-padding-top: 72px; /* a link to #download lands below the top bar */
 }
 
 body {
@@ -172,57 +173,93 @@ kbd {
   color: var(--accent);
 }
 
-/* ---------- Top bar ---------- */
+/* ---------- Top bar ----------
+   Like the app's: a bar across the whole window on the panels' colour,
+   a hairline under it, staying at the top. Its content keeps the page's
+   width. The links are quiet buttons, like the app's File button; Download
+   is a soft one; the theme switch, an icon button set apart by a hairline. */
 
 .top {
-  width: var(--page);
-  margin: 0 auto;
+  position: sticky;
+  top: 0;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 18px 0;
+  padding: 10px max(16px, (100% - 1120px) / 2);
+  border-bottom: 1px solid var(--hairline);
+  background: var(--surface);
 }
 .brand {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   text-decoration: none;
 }
 .brand:hover {
   color: inherit;
 }
+.brand img {
+  width: 38px;
+  height: auto;
+}
+.top .wordmark {
+  font-size: 25px;
+}
 .top nav {
   display: flex;
   align-items: center;
-  gap: 22px;
+  gap: 4px;
   font-size: 15px;
   font-weight: 600;
 }
 .top nav a {
-  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
   color: var(--muted);
+  text-decoration: none;
 }
 .top nav a:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+.top nav .nav-download {
+  margin-left: 4px;
+  border-color: var(--hairline);
+  background: var(--surface-2);
   color: var(--text);
 }
 
 /* Dark or light: shows the moon in the light theme, the sun in the dark. */
 .theme-switch {
+  position: relative;
   display: grid;
   place-items: center;
   width: 36px;
   height: 36px;
-  margin-left: -6px;
+  margin-left: 17px;
   padding: 0;
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
   background: none;
   color: var(--muted);
   cursor: pointer;
 }
+.theme-switch::before {
+  content: "";
+  position: absolute;
+  left: -10px;
+  top: 6px;
+  bottom: 6px;
+  border-left: 1px solid var(--hairline);
+}
 .theme-switch:hover {
-  border-color: var(--muted);
+  background: var(--surface-hover);
   color: var(--text);
 }
 .theme-switch svg {
@@ -1134,35 +1171,28 @@ main > .post {
     font-size: 16px;
   }
   .top {
-    padding: 12px 0;
+    padding-block: 6px;
   }
   .brand img {
-    width: 42px;
-    height: auto;
+    width: 34px;
   }
-  .wordmark {
-    font-size: 25px;
-  }
-  .top nav {
-    gap: 10px;
+  .top .wordmark {
+    font-size: 23px;
   }
   .top nav a[data-link="repo"] {
     display: none;
   }
-  /* A button-sized target for a thumb. */
-  .top nav .nav-download {
-    display: inline-flex;
-    align-items: center;
+  /* Button-sized targets for a thumb. */
+  .top nav a {
     min-height: 44px;
-    padding: 0 14px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    color: var(--text);
   }
   .theme-switch {
     width: 44px;
     height: 44px;
-    margin-left: 0;
+    margin-left: 13px;
+  }
+  .theme-switch::before {
+    left: -8px;
   }
   .hero h1 br {
     display: none;
@@ -1234,15 +1264,15 @@ main > .post {
     gap: 8px;
   }
   .brand img {
-    width: 34px;
+    width: 30px;
   }
-  .wordmark {
+  .top .wordmark {
     font-size: 21px;
   }
   .top nav {
-    gap: 8px;
+    gap: 0;
   }
-  .top nav .nav-download {
+  .top nav a {
     padding: 0 10px;
   }
 }
