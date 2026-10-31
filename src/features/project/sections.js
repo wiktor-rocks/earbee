@@ -11,6 +11,8 @@
 //   dirtyKey()  (optional) something smaller than capture() that changes
 //             whenever it does, for checking for unsaved changes (which
 //             happens after every click)
+//   prepare() (optional) a Promise a save waits for before capture(), for
+//             what is still being made (the stems' copies for saving)
 //   restore(data, track)
 //             brings it back after the project's media has loaded (so it
 //             starts from a new file's defaults). `data` comes from a file,
@@ -38,6 +40,7 @@ import { stemsSection } from "../stems/project.js"; // Stems (src/features/stems
  * @property {boolean} dirties
  * @property {() => object} capture
  * @property {() => any} [dirtyKey]
+ * @property {() => Promise<unknown>} [prepare]
  * @property {(data: any, track: { duration: number }) => void} restore
  */
 

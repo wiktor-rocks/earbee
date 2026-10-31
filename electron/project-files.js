@@ -298,33 +298,48 @@ function handleProjects(ipcMain, projectFiles, { mediaFiles, dialogs, state }) {
  * Before `win` closes with unsaved changes: Save / Don't save / Cancel.
  * Save asks the page to save, which closes the window once it has
  * ("project:close"); Cancel keeps it open.
+ *
+ * And first, while something that closing would stop is still running
+ * (`busy`: Stems (src/features/stems/), a separation or the model's
+ * download): close anyway, or keep it running. Closing anyway goes on to
+ * the unsaved changes; the window closing is what stops it.
  * @param {import("electron").BrowserWindow} win
  * @param {object} options
  * @param {import("electron").IpcMain} options.ipcMain
- * @param {ProjectDialogs} options.dialogs
+ * @param {ProjectDialogs & { confirmBusy?: (sender: any, what: string) => Promise<boolean> }} options.dialogs
  * @param {Map<number, { dirty: boolean, name: string }>} options.state
+ * @param {(contents: any) => string | null} [options.busy] What is running for this page, or null.
  */
-function guardClose(win, { ipcMain, dialogs, state }) {
+function guardClose(win, { ipcMain, dialogs, state, busy = () => null }) {
   const contents = win.webContents;
   const id = contents.id;
   let asking = false;
+  let leaving = false; // everything asked: the next close goes through
   // A reload starts the page afresh: nothing unsaved.
   contents.on("did-start-navigation", (details) => {
     if (details.isMainFrame && !details.isSameDocument) state.delete(id);
   });
   win.on("closed", () => state.delete(id));
+  const leave = () => {
+    leaving = true;
+    win.close();
+  };
   win.on("close", async (event) => {
+    if (leaving) return;
+    const running = busy(contents);
     const page = state.get(id);
-    if (!page?.dirty) return;
+    if (!running && !page?.dirty) return;
     event.preventDefault();
     if (asking) return;
     asking = true;
     try {
+      if (running && !(await dialogs.confirmBusy?.(contents, running))) return;
+      if (!page?.dirty) return leave();
       const choice = await dialogs.confirm(contents, page.name);
       if (choice === "save") contents.send("project:save-then-close");
       else if (choice === "discard") {
         state.delete(id);
-        win.close();
+        leave();
       }
     } finally {
       asking = false;
@@ -333,7 +348,7 @@ function guardClose(win, { ipcMain, dialogs, state }) {
   const close = (event) => {
     if (event.sender !== contents) return;
     state.delete(id);
-    win.close();
+    leave();
   };
   ipcMain.on("project:close", close);
   win.on("closed", () => ipcMain.removeListener("project:close", close));

@@ -14,10 +14,10 @@
  *      (audio/engine.js loadStems): they play through the same stretcher
  *      as the track, mixed into its input, so they keep in step at any
  *      speed, pitch or loop.
- *   4. While they already play, the worker encodes a copy of each as Opus
- *      for the project ("Preparing them for saving"); only then are they
- *      an unsaved change (saving before that saves the project without
- *      them).
+ *   4. While they already play, a few workers encode a copy of each as
+ *      Opus for the project ("Preparing them for saving"). They're an
+ *      unsaved change as soon as they play; a save started before their
+ *      copies are made waits for them (whenPrepared).
  * Cancel, or opening another file, stops it: the worker ends, and the main
  * process stops the stem process.
  *
@@ -34,7 +34,7 @@
  *   bindStems()        builds the section (once, at startup)
  *   resetStems(media)  a new file is open: what was found is forgotten
  *   stemsFound()       what was found for the open song (else null)
- *   stemsToSave(), stemsRevision(), loadStems(saved)
+ *   stemsToSave(), stemsRevision(), whenPrepared(), loadStems(saved)
  *                      for the project (project.js)
  * ===================================================================== */
 
@@ -162,17 +162,31 @@ async function takeStems(result, stillCurrent) {
   return true;
 }
 
-// The stems' Opus copies have come: they can be saved. `separated`: new
-// stems, an unsaved change (a project's own aren't).
-function takeAudio(result, separated) {
+// New stems play: they're an unsaved change from now on (a project's own
+// aren't), and a save waits for their copies (whenPrepared). The project
+// checks for unsaved changes after any change event (features/project/
+// index.js).
+function markNew() {
+  revision++;
+  window.dispatchEvent(new Event("change"));
+}
+
+// Saves waiting for the stems' copies for saving (whenPrepared).
+/** @type {(() => void)[]} */
+let preparedWaiters = [];
+function releaseWaiters() {
+  const waiters = preparedWaiters;
+  preparedWaiters = [];
+  for (const resolve of waiters) resolve();
+}
+
+// The stems' Opus copies have come: they can be saved.
+function takeAudio(result) {
   audio = result.audio;
   job = null;
   preparing = null;
-  if (separated) revision++;
   render();
-  // The project checks for unsaved changes after any change event
-  // (features/project/index.js): new stems are one.
-  if (separated) window.dispatchEvent(new Event("change"));
+  releaseWaiters();
 }
 
 // The job failed: the stems that already play stay (they just can't be
@@ -180,6 +194,7 @@ function takeAudio(result, separated) {
 function failJob(error, what) {
   job = null;
   preparing = null;
+  releaseWaiters();
   if (!found) mix = defaultMix(CONFIG.stems.list);
   show(found ? "ready" : "idle", 0);
   if (error) reportError(error instanceof AppError ? error : new AppError(`${what}: ${error.message ?? error}`, error));
@@ -213,7 +228,9 @@ async function separate() {
       (message) => new AppError(`The stems couldn't be separated: ${message}`),
       async (stems) => {
         preparing = 0; // their copies for saving come next
-        if (await takeStems(stems, stillCurrent)) notify("The stems are ready");
+        if (!(await takeStems(stems, stillCurrent))) return;
+        markNew();
+        notify("The stems are ready");
       },
     );
     if (!stillCurrent()) return;
@@ -227,7 +244,7 @@ async function separate() {
       failure: (message) => new AppError(`The stems couldn't be prepared for saving: ${message}`),
       onProgress: (_stage, fraction) => ((preparing = fraction), render()),
     });
-    if (stillCurrent()) takeAudio({ audio: Object.assign({}, ...encoded.map((done) => done.audio)) }, true);
+    if (stillCurrent()) takeAudio({ audio: Object.assign({}, ...encoded.map((done) => done.audio)) });
   } catch (error) {
     if (job !== current) return; // cancelled or replaced: nothing to report
     for (const stop of current.stops) stop(); // any other workers too
@@ -298,7 +315,7 @@ export async function loadStems({ sampleRate, length, urls, mix: savedMix }) {
     });
     if (!stillCurrent()) return;
     if (!(await takeStems(decoded, stillCurrent))) return;
-    takeAudio({ audio: Object.assign({}, ...results.map((result) => result.audio)) }, false);
+    takeAudio({ audio: Object.assign({}, ...results.map((result) => result.audio)) });
   } catch (error) {
     if (job !== current) return;
     for (const stop of current.stops) stop(); // the other workers too
@@ -314,6 +331,7 @@ function cancel() {
   for (const stop of stopping.stops) stop(); // each worker ends with its wait
   bridge?.cancel();
   preparing = null;
+  releaseWaiters();
   show(found ? "ready" : "idle", 0);
 }
 
@@ -474,6 +492,15 @@ export const stemsFound = () => found;
  * `revision`, which changes whenever the stems do. Null without stems.
  */
 export const stemsToSave = () => found && audio && { ...found, audio, mix, revision };
+
+/**
+ * Resolves once new stems' copies for saving are made (at once if there's
+ * nothing to wait for), so a save started meanwhile keeps the stems.
+ */
+export const whenPrepared = () =>
+  found && !audio && preparing !== null
+    ? new Promise((resolve) => preparedWaiters.push(() => resolve(undefined)))
+    : Promise.resolve();
 // While a project's stems load, their mix already counts: the project was
 // saved with it.
 export const stemsRevision = () => ({ revision, mix: found || stage === "load" ? mix : null });

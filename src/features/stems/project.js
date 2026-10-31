@@ -9,7 +9,7 @@
 // the background: the song plays at once, the stems follow.
 import { CONFIG } from "../../config.js";
 import { clamp } from "../../core/format.js";
-import { loadStems, stemsRevision, stemsToSave } from "./index.js";
+import { loadStems, stemsRevision, stemsToSave, whenPrepared } from "./index.js";
 import { defaultMix } from "./mix.js";
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
@@ -50,6 +50,8 @@ export const stemsSection = {
   },
   // Not the bytes: whether the stems changed, and the mix.
   dirtyKey: stemsRevision,
+  // New stems' copies for saving may still be being made.
+  prepare: whenPrepared,
   restore(data) {
     const stems = data.stems;
     if (!stems) return;

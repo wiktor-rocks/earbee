@@ -50,9 +50,15 @@ function setUp({ model = true } = {}) {
     send: (channel, message) => sender.sent.push({ channel, message }),
     postMessage: (channel, message, ports) => sender.posted.push({ channel, ports }),
   });
-  handleStems(ipcMain, { utilityProcess, MessageChannelMain, userData, devCopy, fetch: async () => new Response() });
+  const stems = handleStems(ipcMain, {
+    utilityProcess,
+    MessageChannelMain,
+    userData,
+    devCopy,
+    fetch: async () => new Response(),
+  });
   const call = (channel) => handlers.get(channel)({ sender });
-  return { call, forks, sender };
+  return { call, forks, sender, stems };
 }
 
 test("starts a process on the model, and hands one end of a channel to it and the other to the page", async () => {
@@ -132,4 +138,14 @@ test("navigating within the page doesn't stop it", async () => {
   assert.equal(forks[0].killed, false);
   forks[0].emit("exit", 0);
   assert.equal(sender.listenerCount("did-start-navigation"), 0, "and once it's done, its listeners are gone");
+});
+
+test("busy: while a page's separation runs, for that page only (closing asks then)", async () => {
+  const { call, forks, sender, stems } = setUp();
+  assert.equal(stems.busy(sender), null);
+  await call("stems:start");
+  assert.equal(stems.busy(sender), "separate");
+  assert.equal(stems.busy({}), null, "another window isn't busy");
+  forks[0].emit("exit", 0);
+  assert.equal(stems.busy(sender), null);
 });

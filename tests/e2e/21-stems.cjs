@@ -122,6 +122,27 @@ module.exports = async function (h) {
     "stems: …with a notification",
     (await toasts()).some((t) => /stems are ready/.test(t.text)),
   );
+  const title = () => js(`document.title`);
+  check("stems: new stems are an unsaved change as soon as they play", (await title()).endsWith(" •"), await title());
+
+  // Saved at once, while their copies are still being made: the save waits for them.
+  const early = path.join(OUTPUT, "projects", "Early.ebee");
+  fs.mkdirSync(path.dirname(early), { recursive: true });
+  fs.rmSync(early, { force: true });
+  projectDialogs.save = early;
+  key("S", ["control", "shift"]);
+  await sleep(200);
+  await js(`saveModeLink.click(); saveForm.requestSubmit()`);
+  for (let i = 0; i < 300 && !fs.existsSync(early); i++) await sleep(100);
+  await sleep(300);
+  const earlyHeader = fs.existsSync(early)
+    ? JSON.parse(fs.readFileSync(early).subarray(0, fs.readFileSync(early).indexOf(0)).toString() || "{}")
+    : {};
+  check(
+    "stems: a save while they're being prepared waits for them, and keeps them",
+    earlyHeader.version === 2 && Object.keys(earlyHeader.blobs ?? {}).length === 6,
+    JSON.stringify({ version: earlyHeader.version, blobs: Object.keys(earlyHeader.blobs ?? {}).length }),
+  );
   const stems = await found();
   const duration = await h.duration();
   check(
@@ -172,8 +193,6 @@ module.exports = async function (h) {
   // once their copies for saving are made (while they already play).
   state = await waitFor((s) => s.preparing === null, 60_000);
   check("stems: their copies for saving get made", state.ready && state.preparing === null, JSON.stringify(state));
-  const title = () => js(`document.title`);
-  check("stems: new stems are an unsaved change", (await title()).endsWith(" •"), await title());
   await press(`[data-stem="drums"] button[title^=Mute]`);
   await press(`[data-stem="guitar"] button[title^=Solo]`);
   const mixed = (await section()).rows;

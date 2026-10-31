@@ -148,7 +148,7 @@ const projectDialogs = {
     const { response } = await withOwner(sender, dialog.showMessageBox, {
       type: "warning",
       message: name ? `Save the changes to “${name}”?` : "Save this session as a project?",
-      detail: "Your marks and settings are lost if you don't save them.",
+      detail: "Your marks, settings and stems are lost if you don't save them.",
       buttons: ["Save…", "Don't save", "Cancel"],
       defaultId: 0,
       cancelId: 2,
@@ -156,7 +156,26 @@ const projectDialogs = {
     });
     return /** @type {const} */ (["save", "discard", "cancel"])[response] ?? "cancel";
   },
+  // Stems (src/features/stems/): closing would stop a separation, or the
+  // model's download. Resolves true to close anyway.
+  async confirmBusy(sender, what) {
+    const separating = what === "separate";
+    const { response } = await withOwner(sender, dialog.showMessageBox, {
+      type: "warning",
+      message: separating ? "The stems are still being separated" : "The stem model is still downloading",
+      detail: separating
+        ? "If you close EarBee now, separating stops and what's done so far is lost."
+        : "If you close EarBee now, the download stops, and starts over next time.",
+      buttons: [separating ? "Keep separating" : "Keep downloading", "Close anyway"],
+      defaultId: 0,
+      cancelId: 0,
+      noLink: true,
+    });
+    return response === 1;
+  },
 };
+
+let stems = null; // Stems (src/features/stems/): what handleStems gives, once ready
 
 // The app's own windows (not the video window, which stays black).
 const mainWindows = new Set();
@@ -197,7 +216,12 @@ function createWindow() {
   rememberWindowState(win);
   // Before handleRendererCrash: its dialog needs the window shown.
   showAfterSplash(win, { around: { x, y, width, height }, colors: themeView.current().colors, icon, maximized });
-  guardClose(win, { ipcMain, dialogs: projectDialogs, state: projectState });
+  guardClose(win, {
+    ipcMain,
+    dialogs: projectDialogs,
+    state: projectState,
+    busy: (contents) => stems?.busy(contents) ?? null, // Stems (src/features/stems/)
+  });
   handleRendererCrash(win, dialog);
   win.loadFile(path.join(ROOT, "index.html"));
 }
@@ -228,7 +252,7 @@ app.whenReady().then(() => {
   handleSystem(ipcMain);
   handleBeatModel(ipcMain, { utilityProcess });
   // Stems (src/features/stems/): from the source, the model exported into models/ is used.
-  handleStems(ipcMain, {
+  stems = handleStems(ipcMain, {
     utilityProcess,
     MessageChannelMain,
     userData,

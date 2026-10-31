@@ -235,6 +235,8 @@ async function writeProject(file, embed) {
   // field only commits on "change", which hasn't fired yet.
   const focused = document.activeElement;
   if (focused instanceof HTMLElement && isTextField(focused)) focused.dispatchEvent(new Event("change"));
+  // What a section is still making, first (sections.js, prepare).
+  await Promise.all(SECTIONS.map((section) => section.prepare?.()));
   const result = await bridge.save({
     file,
     mediaUrl: session.mediaUrl,
