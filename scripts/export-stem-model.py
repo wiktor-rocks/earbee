@@ -26,9 +26,14 @@ Needs (in a venv):
   pip install --no-deps git+https://github.com/adefossez/demucs.git
 Run from the project root:  python scripts/export-stem-model.py
 
-Demucs v4 (Rouard, Massa, Défossez, ICASSP 2023): code and weights under
-the MIT licence, https://github.com/adefossez/demucs. The weights are
-downloaded from Facebook's server by Demucs itself, which checks their hash.
+Demucs v4 (Rouard, Massa, Défossez, ICASSP 2023), https://github.com/adefossez/demucs:
+the code under the MIT licence. The weights' licence is unclear: their
+author says the six-stem model "was trained only on Meta internal dataset,
+which likely means CC-NC-BY license is applicable" (Demucs's README,
+"License"), so EarBee treats them as free for non-commercial use, with
+credit (THIRD_PARTY_NOTICES.md). They aren't part of EarBee's MIT licence:
+the app downloads them on its own, on first use. Demucs fetches them from
+Facebook's server here, and checks their hash.
 """
 
 import argparse

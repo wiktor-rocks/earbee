@@ -296,6 +296,9 @@ function render() {
   ui.action.title =
     "Split the song into vocals, drums, bass, guitar, piano and the rest. It runs in the background, " +
     "about as long as the song plays.";
+  // Before the model is downloaded: what it is, and its licence (see
+  // THIRD_PARTY_NOTICES.md).
+  ui.note.hidden = modelReady || stage !== "idle";
   const label = {
     download: `Downloading the stem model ${percent(fraction)}`,
     decode: `Reading the song ${percent(fraction)}`,
@@ -311,6 +314,12 @@ function build(section) {
   const status = element("span", { className: "stems-status" });
   const stopButton = element("button", { type: "button", className: "small", textContent: "Cancel" });
   const busy = element("div", { className: "stems-busy" }, status, stopButton);
+  const note = element("p", {
+    className: "stems-note",
+    textContent:
+      "The stem model is Demucs, by Meta. It isn't part of EarBee: its licence is unclear, " +
+      "likely free for non-commercial use only (CC BY-NC).",
+  });
   const reset = element("button", {
     type: "button",
     className: "icon-button small",
@@ -328,13 +337,14 @@ function build(section) {
       element("div", { className: "dock-title-row" }, reset),
     ),
     action,
+    note,
     busy,
     mixer,
   );
   onClick(action, separate);
   onClick(stopButton, cancel);
   onClick(reset, resetMix);
-  return { section, action, busy, status, mixer, mixerRows, reset };
+  return { section, action, note, busy, status, mixer, mixerRows, reset };
 }
 
 /* ---------- Wiring ---------- */

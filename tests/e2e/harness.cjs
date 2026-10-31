@@ -117,16 +117,21 @@ async function createHarness() {
   ipcMain.handle("system:available-memory", () => memory.available ?? availableMemory());
   // The beat model as main.js runs it.
   require(path.join(PROJECT, "electron", "beat-model.js")).handleBeatModel(ipcMain, { utilityProcess });
-  // Stems (src/features/stems/): as main.js runs it from the source, with
-  // the model exported into models/ if it's there; the download goes to
-  // the stand-in fetch, so without that copy it fails (21-stems.cjs).
+  // Stems (src/features/stems/): as main.js runs it from the source, but
+  // with a stand-in model (scripts/make-fake-stem-model.py: the stems are
+  // the song ÷ 6), so separating takes seconds and needs no download.
+  // TB_STEM_MODEL=real uses the model exported into models/ instead.
   const stemsUserData = path.join(OUTPUT, "stems-user-data");
   fs.rmSync(stemsUserData, { recursive: true, force: true });
+  const stemModel =
+    process.env.TB_STEM_MODEL === "real"
+      ? path.join(PROJECT, "models", "htdemucs-6s.onnx")
+      : path.join(TESTS, "unit", "fixtures", "stem-model-fake.onnx");
   require(path.join(PROJECT, "electron", "stems", "index.js")).handleStems(ipcMain, {
     utilityProcess,
     MessageChannelMain: require("electron").MessageChannelMain,
     userData: stemsUserData,
-    devCopy: path.join(PROJECT, "models", "htdemucs-6s.onnx"),
+    devCopy: stemModel,
     fetch: fakeFetch,
   });
   // Video window (src/features/video-window/): as main.js allows it, but

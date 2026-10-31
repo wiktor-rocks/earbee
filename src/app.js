@@ -50,6 +50,11 @@
  *              in src/project; reading and writing in the main process
  *              (electron/project-files.js). Unsaved changes show a • in the
  *              title and are asked about before they'd be lost.
+ *   stems      The song split into its instruments on demand, by the stem
+ *              model in the main process (electron/stems/), then mixed
+ *              into Signalsmith's input with a volume, solo and mute each
+ *              (features/stems/); a project keeps them (as Opus, after its
+ *              header). Off with CONFIG.stems.enabled.
  *   prefs      The user's Settings (general, theme, waveform, downloads),
  *              kept between runs by
  *              the main process (electron/prefs-store.js) and changed in the
@@ -246,6 +251,14 @@
  *                             Measure long files with `npm run
  *                             diagnose:loading` (its "seams" runs compare a
  *                             parallel decode with a one-part one).
+ *   Stems                     Their names and order: CONFIG.stems.list (ids
+ *                             are the model's). The mixer: features/stems/
+ *                             dock.js; the gains: mix.js. A new model:
+ *                             scripts/export-stem-model.py, then upload it
+ *                             to a release and change SOURCE in
+ *                             electron/stems/model-file.js. Turn them off:
+ *                             CONFIG.stems.enabled (everything marked
+ *                             "Stems (" goes quiet).
  *   A new feature             A file in features/ with a bind…() function,
  *                             called from start() below.
  *   Any change                Run `npm run check` and `npm test` (unit tests

@@ -2,10 +2,10 @@
 // (the patch in src/vendor/signalsmith-stretch), the Stems section,
 // separating the open song with the stem model (electron/stems/), the
 // mixer (volume, solo, mute), saving them in a project and bringing them
-// back, Cancel, and a new file forgetting them. With
-// the model exported into models/ (scripts/export-stem-model.py) it
-// separates for real; without it, the download fails against the
-// harness's stand-in fetch, which is checked instead.
+// back, Cancel, and a new file forgetting them. The harness's stand-in
+// model makes each stem the song ÷ 6 (TB_STEM_MODEL=real: the real one,
+// from models/); the model's download is checked by
+// tests/unit/stems-model-file.test.mjs.
 // Part of the end-to-end run (see run.cjs); `h` is the harness.
 const fs = require("fs");
 const path = require("path");
@@ -97,27 +97,10 @@ module.exports = async function (h) {
     check("stems: the rest is the track minus the stems", rest.max < 1e-3, JSON.stringify(rest));
   }
 
-  const model = fs.existsSync(path.join(__dirname, "..", "..", "models", "htdemucs-6s.onnx"));
-
   await openFile(path.join(FIXTURES, "verse-chorus.wav"));
   let state = await section();
   check("stems: the section shows once a file is open", state && !state.hidden, JSON.stringify(state));
-  check(
-    "stems: the button says whether the model has to be downloaded",
-    model ? state?.action === "Separate the stems" : /download, once/.test(state?.action ?? ""),
-    state?.action,
-  );
-
-  if (!model) {
-    await clearToasts();
-    await press(".stems-action");
-    state = await waitFor((s) => s.action !== null && s.busy === null, 10_000);
-    const message = await js(`document.getElementById("message").textContent`);
-    check("stems: without the model, a failed download says so", /stem model/.test(message), message);
-    check("stems: …and the button is back", state.action !== null, JSON.stringify(state));
-    console.log("  (stems: models/htdemucs-6s.onnx isn't there, so nothing was separated)");
-    return;
-  }
+  check("stems: with the model there, the button separates", state?.action === "Separate the stems", state?.action);
 
   // Separating: progress, then the stems.
   await clearToasts();
