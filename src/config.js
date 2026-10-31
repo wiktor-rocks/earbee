@@ -272,6 +272,14 @@ export const CONFIG = {
     bitrate: 192_000,
     // The model hears 44.1 kHz; a song at another rate is resampled for it.
     sampleRate: 44100,
+    // The stems' resampling (to and from Opus's 48 kHz, and to the song's
+    // rate) uses a shorter filter than the beat model's (core/resample.js):
+    // as accurate up to 19 kHz, 2.2× faster (measured: 48.3 dB against
+    // 48.6 for a round trip; 16 lost the top, at 41 dB).
+    resampleZeroCrossings: 24,
+    // Opening a project, this many workers decode its stems at once (at
+    // most half the cores), so playback keeps its share of the CPU.
+    loadWorkers: 3,
     // Samples per message to and from the stem process (4 MB), so no
     // message holds a whole song.
     chunk: 1 << 20,

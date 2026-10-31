@@ -86,8 +86,8 @@ let fraction = 0;
 let preparing = null;
 // Each stem's volume, solo and mute (mix.js).
 let mix = defaultMix(CONFIG.stems.list);
-// The separation or load going on: `stop` ends its wait (cancel).
-/** @type {{ cancelled: boolean, stop: () => void } | null} */
+// The separation or load going on: `stops` end its workers' waits (cancel).
+/** @type {{ cancelled: boolean, stops: Set<() => void> } | null} */
 let job = null;
 
 let ui = null; // the section's parts, once built
@@ -102,7 +102,7 @@ const nextPort = () => new Promise((resolve) => (portWaiter = resolve));
 
 /** A new job, replacing none (cancel() first). */
 function startJob() {
-  const current = { cancelled: false, stop: () => {} };
+  const current = { cancelled: false, stops: new Set() };
   job = current;
   return { current, stillCurrent: () => job === current && !current.cancelled };
 }
@@ -110,23 +110,27 @@ function startJob() {
 /**
  * Runs the worker on `message` (worker.js) until it's done; its progress
  * shows meanwhile, and its stems go to `onStems` as soon as they come
- * (before the Opus copies, which `done` brings). Rejects with `null` when
- * the job is cancelled.
- * @param {{ current: { stop: () => void }, stillCurrent: () => boolean }} running
+ * (before the Opus copies, which `done` brings). `onProgress` (stage,
+ * fraction) shows it unless given. Rejects with `null` when the job is
+ * cancelled.
+ * @param {{ current: { stops: Set<() => void> }, stillCurrent: () => boolean }} running
  * @param {Promise<[object, Transferable[]]>} message The message, and what it transfers.
  * @param {(error: string) => AppError} failure
  * @param {(stems: any) => Promise<unknown>} onStems
+ * @param {(stage: string, fraction: number) => void} [onProgress]
  */
-async function runWorker({ current, stillCurrent }, message, failure, onStems) {
+async function runWorker({ current, stillCurrent }, message, failure, onStems, onProgress = show) {
   const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
   let stopStopped = () => {};
+  let stop = () => {};
   return new Promise((resolve, reject) => {
-    current.stop = () => reject(null);
+    stop = () => reject(null);
+    current.stops.add(stop);
     if (bridge) stopStopped = bridge.onStopped((stopped) => reject(new AppError(stopped.error)));
     worker.addEventListener("message", ({ data }) => {
       if (data.type === "progress" && stillCurrent()) {
         if (data.stage === "encode") ((preparing = data.fraction), render());
-        else show(data.stage, data.fraction);
+        else onProgress(data.stage, data.fraction);
       } else if (data.type === "stems") onStems(data).catch(reject);
       else if (data.type === "done") resolve(data);
       else if (data.type === "error") reject(failure(data.message));
@@ -140,6 +144,7 @@ async function runWorker({ current, stillCurrent }, message, failure, onStems) {
       (error) => reject(error),
     );
   }).finally(() => {
+    current.stops.delete(stop);
     stopStopped();
     worker.terminate();
   });
@@ -225,9 +230,15 @@ async function separate() {
   }
 }
 
+// How many workers decode a project's stems at once: a few, so playback
+// keeps its share of the CPU.
+const loadWorkers = () =>
+  Math.max(1, Math.min(CONFIG.stems.loadWorkers, Math.floor((navigator.hardwareConcurrency || 2) / 2)));
+
 /**
  * A project's stems, back in the player and the mixer (project.js): their
- * Opus bytes fetched from the project (`urls`), decoded in the worker.
+ * Opus bytes fetched from the project (`urls`), decoded by a few workers
+ * at once, each a share of the stems; the player gets them all together.
  * @param {{ sampleRate: number, length: number, urls: Record<string, string>, mix: Record<string, any> }} saved
  */
 export async function loadStems({ sampleRate, length, urls, mix: savedMix }) {
@@ -243,22 +254,40 @@ export async function loadStems({ sampleRate, length, urls, mix: savedMix }) {
         if (!response.ok) throw new Error(`the ${id} stem can't be read (${response.status})`);
         return /** @type {[string, Uint8Array]} */ ([id, new Uint8Array(await response.arrayBuffer())]);
       }),
-    ).then(
-      (entries) =>
-        /** @type {[object, Transferable[]]} */ ([
-          { type: "load", audio: Object.fromEntries(entries), sampleRate, length },
-          [],
-        ]),
     );
-    const result = await runWorker(
-      running,
-      fetched,
-      (message) => new AppError(`The project's stems couldn't be brought back: ${message}`),
-      (stems) => takeStems(stems, stillCurrent),
+    // The stems dealt out to the workers in turn.
+    const count = loadWorkers();
+    const shares = Array.from({ length: count }, (_, w) =>
+      fetched.then((entries) => entries.filter((_, i) => i % count === w)),
     );
-    if (stillCurrent()) takeAudio(result, false);
+    const progress = new Array(count).fill(0);
+    const decoded = { sampleRate, length, stems: {} };
+    const results = await Promise.all(
+      shares.map((share, w) =>
+        runWorker(
+          running,
+          share.then(
+            (entries) =>
+              /** @type {[object, Transferable[]]} */ ([
+                { type: "load", audio: Object.fromEntries(entries), sampleRate, length },
+                [],
+              ]),
+          ),
+          (message) => new AppError(`The project's stems couldn't be brought back: ${message}`),
+          async (part) => Object.assign(decoded.stems, part.stems),
+          (stage, fraction) => {
+            progress[w] = fraction;
+            show(stage, progress.reduce((sum, value) => sum + value, 0) / count);
+          },
+        ),
+      ),
+    );
+    if (!stillCurrent()) return;
+    if (!(await takeStems(decoded, stillCurrent))) return;
+    takeAudio({ audio: Object.assign({}, ...results.map((result) => result.audio)) }, false);
   } catch (error) {
     if (job !== current) return;
+    for (const stop of current.stops) stop(); // the other workers too
     failJob(error, "The project's stems couldn't be brought back");
   }
 }
@@ -268,7 +297,7 @@ function cancel() {
   if (!stopping) return;
   job = null;
   stopping.cancelled = true;
-  stopping.stop(); // the worker ends with its wait
+  for (const stop of stopping.stops) stop(); // each worker ends with its wait
   bridge?.cancel();
   preparing = null;
   show(found ? "ready" : "idle", 0);

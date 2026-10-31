@@ -142,7 +142,7 @@ function receiveStems(port, rate) {
       if (data.type === "progress") progress(data.total ? data.done / data.total : 0);
       else if (data.type === "stems") {
         sentLength = data.length;
-        const { up, down } = resampleRatio(data.sampleRate, rate);
+        const { up, down } = resampleRatio(data.sampleRate, rate, CONFIG.stems.resampleZeroCrossings);
         const length = Math.ceil((data.length * up) / down);
         gathered = {
           sampleRate: rate,
@@ -159,7 +159,8 @@ function receiveStems(port, rate) {
         };
         for (const id of data.names) {
           for (const channel of [0, 1]) {
-            writers.set(`${id}/${channel}`, { resampler: createResampler(data.sampleRate, rate), at: 0 });
+            const resampler = createResampler(data.sampleRate, rate, CONFIG.stems.resampleZeroCrossings);
+            writers.set(`${id}/${channel}`, { resampler, at: 0 });
           }
         }
       } else if (data.type === "stem") {
@@ -186,13 +187,31 @@ function level({ scale, channels }) {
   }, 0);
 }
 
-// A stem in 16 bits, scaled to its loudest sample.
+// A stem in 16 bits, scaled to its loudest sample. Plain loops: from()
+// with a function, or reduce(), takes seconds over a song's samples
+// (measured: 3 s a stem).
 /** @param {Float32Array[]} channels */
 function quantize(channels) {
-  const peak = channels.reduce((most, channel) => channel.reduce((m, v) => Math.max(m, Math.abs(v)), most), 0);
+  let peak = 0;
+  for (const channel of channels) {
+    for (let i = 0; i < channel.length; i++) peak = Math.max(peak, Math.abs(channel[i]));
+  }
   const scale = Math.max(peak, 1e-6) / 32767;
-  const ints = channels.map((channel) => Int16Array.from(channel, (v) => Math.round(v / scale)));
+  const ints = channels.map((channel) => {
+    const out = new Int16Array(channel.length);
+    for (let i = 0; i < channel.length; i++) out[i] = Math.round(channel[i] / scale);
+    return out;
+  });
   return { scale, channels: ints };
+}
+
+// A stem's samples back from its 16 bits.
+function unquantize({ scale, channels }) {
+  return channels.map((channel) => {
+    const out = new Float32Array(channel.length);
+    for (let i = 0; i < channel.length; i++) out[i] = channel[i] * scale;
+    return out;
+  });
 }
 
 // Each stem as Opus, from its 16 bits.
@@ -201,9 +220,7 @@ async function encodeAll(stems, rate) {
   const audio = {};
   const ids = Object.keys(stems);
   for (const [index, id] of ids.entries()) {
-    const { scale, channels } = stems[id];
-    const floats = channels.map((channel) => Float32Array.from(channel, (v) => v * scale));
-    audio[id] = await encodeStem(floats, rate, CONFIG.stems.bitrate);
+    audio[id] = await encodeStem(unquantize(stems[id]), rate, CONFIG.stems.bitrate);
     progress((index + 1) / ids.length);
   }
   return audio;

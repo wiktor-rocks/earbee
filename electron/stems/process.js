@@ -59,7 +59,12 @@ async function createSession() {
   };
 }
 
-const largest = (samples) => samples.reduce((most, value) => Math.max(most, Math.abs(value)), 0);
+// The loudest sample (a plain loop: reduce() over millions of samples takes seconds).
+function largest(samples) {
+  let most = 0;
+  for (let i = 0; i < samples.length; i++) most = Math.max(most, Math.abs(samples[i]));
+  return most;
+}
 
 // `port`: the MessagePortMain the main process handed over.
 function serve(port) {

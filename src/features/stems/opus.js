@@ -20,6 +20,7 @@ import {
   Output,
   Quality,
 } from "../../../node_modules/mediabunny/dist/bundles/mediabunny.mjs";
+import { CONFIG } from "../../config.js";
 import { createResampler } from "../../core/resample.js";
 
 const OPUS_RATE = 48000;
@@ -27,7 +28,7 @@ const BLOCK = OPUS_RATE; // samples handed to the encoder at a time (1 s)
 
 /** @param {Float32Array} samples @param {number} from @param {number} to */
 function resampled(samples, from, to) {
-  const resampler = createResampler(from, to);
+  const resampler = createResampler(from, to, CONFIG.stems.resampleZeroCrossings);
   resampler.push(samples);
   resampler.finish();
   return resampler.take();
