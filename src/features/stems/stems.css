@@ -103,13 +103,16 @@
 }
 
 /* The name: plain text that opens the stem's panel (an underline on hover
-   says so); one line. */
+   says so); one line. A block, so a name too long ends in "…"; padded
+   (and pulled back by as much, to stay in line), so the clipping never
+   shaves a letter's edge: a "V" or "D" reaches past the text's start. */
 .stems-name {
+  display: block;
   overflow: hidden;
-  justify-content: flex-start;
   min-width: 0;
   height: auto;
-  padding: 0;
+  margin: 0 -4px;
+  padding: 2px 4px;
   border: 0;
   background: none;
   color: var(--text);
