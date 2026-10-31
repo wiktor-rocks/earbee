@@ -4,7 +4,7 @@
 // GitHub, downloaded into <userData>/models and checked against the size
 // and SHA-256 below, as yt-dlp is (downloader.js).
 //
-//   createModelFile({ userData, devCopy?, fetch? })
+//   createModelFile({ userData, devCopy?, fetch?, source? })
 //     status()                → { ready, bytes }  ready: the file is there
 //     path()                  → where it is, or null
 //     download(onProgress, signal) → resolves when it's there and checked;
@@ -13,25 +13,30 @@
 //
 // Running from the source (not packaged), a copy in models/ (exported
 // there by the script) is used as it is, without the check: re-exporting
-// can change its bytes.
+// can change its bytes. `source` ({ url, bytes, sha256 }) is for the tests.
 const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 
 const NAME = "htdemucs-6s.onnx";
 // When the model changes, upload it to a new release and change all three.
-const URL = "https://github.com/wiktor-rocks/earbee/releases/download/stem-model-1/htdemucs-6s.onnx";
-const BYTES = 115_952_475;
-const SHA256 = "d884b1c84c89a2eecd8c26ec7e606a8419fecb1cb97bf4b6b8639a696dc11e30";
+const SOURCE = {
+  url: "https://github.com/wiktor-rocks/earbee/releases/download/stem-model-1/htdemucs-6s.onnx",
+  bytes: 115_952_475,
+  sha256: "d884b1c84c89a2eecd8c26ec7e606a8419fecb1cb97bf4b6b8639a696dc11e30",
+};
 const STALL_MS = 30_000; // give up after this long without data
 
 // A failure whose message is written for the user.
 class ModelFileError extends Error {}
 
 /**
- * @param {{ userData: string, devCopy?: string | null, fetch?: typeof globalThis.fetch }} options
+ * @param {{
+ *   userData: string, devCopy?: string | null, fetch?: typeof globalThis.fetch,
+ *   source?: { url: string, bytes: number, sha256: string },
+ * }} options
  */
-function createModelFile({ userData, devCopy = null, fetch = globalThis.fetch }) {
+function createModelFile({ userData, devCopy = null, fetch = globalThis.fetch, source = SOURCE }) {
   const folder = path.join(userData, "models");
   const downloaded = path.join(folder, NAME);
   let downloading = null; // the download in progress: { promise, listeners }
@@ -56,7 +61,7 @@ function createModelFile({ userData, devCopy = null, fetch = globalThis.fetch })
     const partial = `${downloaded}.part`;
     let out = null;
     try {
-      const response = await fetch(URL, { signal: abort });
+      const response = await fetch(source.url, { signal: abort });
       if (!response.ok) throw new ModelFileError(`Couldn't download the stem model (HTTP ${response.status}).`);
       fs.mkdirSync(folder, { recursive: true });
       out = fs.createWriteStream(partial);
@@ -68,12 +73,12 @@ function createModelFile({ userData, devCopy = null, fetch = globalThis.fetch })
         hash.update(chunk);
         received += chunk.length;
         if (!out.write(chunk)) await new Promise((resolve) => out.once("drain", () => resolve(undefined)));
-        onProgress(Math.min(1, received / BYTES));
+        onProgress(Math.min(1, received / source.bytes));
       }
       await new Promise((resolve, reject) =>
         out.end((/** @type {any} */ error) => (error ? reject(error) : resolve(undefined))),
       );
-      if (received !== BYTES || hash.digest("hex") !== SHA256) {
+      if (received !== source.bytes || hash.digest("hex") !== source.sha256) {
         throw new ModelFileError("The downloaded stem model was damaged. Try again.");
       }
       fs.renameSync(partial, downloaded);
@@ -89,7 +94,7 @@ function createModelFile({ userData, devCopy = null, fetch = globalThis.fetch })
   }
 
   return {
-    status: () => ({ ready: where() !== null, bytes: BYTES }),
+    status: () => ({ ready: where() !== null, bytes: source.bytes }),
     path: where,
     /**
      * @param {(fraction: number) => void} onProgress
@@ -111,4 +116,4 @@ function createModelFile({ userData, devCopy = null, fetch = globalThis.fetch })
   };
 }
 
-module.exports = { createModelFile, ModelFileError, BYTES, NAME };
+module.exports = { createModelFile, ModelFileError, NAME };
