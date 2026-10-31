@@ -14,6 +14,10 @@
  *      (audio/engine.js loadStems): they play through the same stretcher
  *      as the track, mixed into its input, so they keep in step at any
  *      speed, pitch or loop.
+ *   4. While they already play, the worker encodes a copy of each as Opus
+ *      for the project ("Preparing them for saving"); only then are they
+ *      an unsaved change (saving before that saves the project without
+ *      them).
  * Cancel, or opening another file, stops it: the worker ends, and the main
  * process stops the stem process.
  *
@@ -72,10 +76,14 @@ let audio = null; // each stem as Opus, for the project (opus.js)
 let revision = 0; // counts the stems separated (not those a project brings back), for unsaved changes
 let modelBytes = 0;
 let modelReady = false;
-// What's going on: "idle", "download", "decode", "separate", "encode",
-// "load" (from a project) or "ready".
+// What's going on: "idle", "download", "decode", "separate", "load" (from
+// a project) or "ready".
 let stage = "idle";
 let fraction = 0;
+// While new stems already play: how far encoding them for saving is (null:
+// not encoding).
+/** @type {number | null} */
+let preparing = null;
 // Each stem's volume, solo and mute (mix.js).
 let mix = defaultMix(CONFIG.stems.list);
 // The separation or load going on: `stop` ends its wait (cancel).
@@ -101,19 +109,25 @@ function startJob() {
 
 /**
  * Runs the worker on `message` (worker.js) until it's done; its progress
- * shows meanwhile. Rejects with `null` when the job is cancelled.
+ * shows meanwhile, and its stems go to `onStems` as soon as they come
+ * (before the Opus copies, which `done` brings). Rejects with `null` when
+ * the job is cancelled.
  * @param {{ current: { stop: () => void }, stillCurrent: () => boolean }} running
  * @param {Promise<[object, Transferable[]]>} message The message, and what it transfers.
  * @param {(error: string) => AppError} failure
+ * @param {(stems: any) => Promise<unknown>} onStems
  */
-async function runWorker({ current, stillCurrent }, message, failure) {
+async function runWorker({ current, stillCurrent }, message, failure, onStems) {
   const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
   let stopStopped = () => {};
   return new Promise((resolve, reject) => {
     current.stop = () => reject(null);
     if (bridge) stopStopped = bridge.onStopped((stopped) => reject(new AppError(stopped.error)));
     worker.addEventListener("message", ({ data }) => {
-      if (data.type === "progress") stillCurrent() && show(data.stage, data.fraction);
+      if (data.type === "progress" && stillCurrent()) {
+        if (data.stage === "encode") ((preparing = data.fraction), render());
+        else show(data.stage, data.fraction);
+      } else if (data.type === "stems") onStems(data).catch(reject);
       else if (data.type === "done") resolve(data);
       else if (data.type === "error") reject(failure(data.message));
     });
@@ -132,23 +146,40 @@ async function runWorker({ current, stillCurrent }, message, failure) {
 }
 
 // The worker's stems, to the player (in its order; the samples are
-// transferred); then the mixer shows. `separated`: new stems, an unsaved
-// change (a project's own aren't).
-async function takeStems(result, stillCurrent, separated) {
+// transferred); then the mixer shows. Resolves false if the job ended
+// meanwhile.
+async function takeStems(result, stillCurrent) {
   const ids = CONFIG.stems.list.map(({ id }) => id).filter((id) => result.stems[id]);
   await player.engine.loadStems(ids.map((id) => result.stems[id]));
   if (!stillCurrent()) return false;
   const levels = Object.fromEntries(ids.map((id) => [id, result.stems[id].level]));
   found = { sampleRate: result.sampleRate, length: result.length, ids, levels };
-  audio = result.audio;
-  if (separated) revision++;
-  job = null;
   applyMix();
   show("ready", 1);
-  // The project checks for unsaved changes after any change event
-  // (features/project/index.js): the stems are one.
-  window.dispatchEvent(new Event("change"));
   return true;
+}
+
+// The stems' Opus copies have come: they can be saved. `separated`: new
+// stems, an unsaved change (a project's own aren't).
+function takeAudio(result, separated) {
+  audio = result.audio;
+  job = null;
+  preparing = null;
+  if (separated) revision++;
+  render();
+  // The project checks for unsaved changes after any change event
+  // (features/project/index.js): new stems are one.
+  if (separated) window.dispatchEvent(new Event("change"));
+}
+
+// The job failed: the stems that already play stay (they just can't be
+// saved); before that, back to the button.
+function failJob(error, what) {
+  job = null;
+  preparing = null;
+  if (!found) mix = defaultMix(CONFIG.stems.list);
+  show(found ? "ready" : "idle", 0);
+  if (error) reportError(error instanceof AppError ? error : new AppError(`${what}: ${error.message ?? error}`, error));
 }
 
 async function separate() {
@@ -176,14 +207,21 @@ async function separate() {
         (received) =>
           /** @type {[object, Transferable[]]} */ ([{ type: "separate", media, port: received }, [received]]),
       ),
-      (message) => new AppError(`The stems couldn't be separated: ${message}`),
+      (message) =>
+        new AppError(
+          found
+            ? `The stems couldn't be prepared for saving: ${message}`
+            : `The stems couldn't be separated: ${message}`,
+        ),
+      async (stems) => {
+        preparing = 0; // their copies for saving come next
+        if (await takeStems(stems, stillCurrent)) notify("The stems are ready");
+      },
     );
-    if (stillCurrent() && (await takeStems(result, stillCurrent, true))) notify("The stems are ready");
+    if (stillCurrent()) takeAudio(result, true);
   } catch (error) {
     if (job !== current) return; // cancelled or replaced: nothing to report
-    job = null;
-    show("idle", 0);
-    if (error) reportError(error);
+    failJob(error, "The stems couldn't be separated");
   }
 }
 
@@ -216,19 +254,12 @@ export async function loadStems({ sampleRate, length, urls, mix: savedMix }) {
       running,
       fetched,
       (message) => new AppError(`The project's stems couldn't be brought back: ${message}`),
+      (stems) => takeStems(stems, stillCurrent),
     );
-    if (stillCurrent()) await takeStems(result, stillCurrent, false);
+    if (stillCurrent()) takeAudio(result, false);
   } catch (error) {
     if (job !== current) return;
-    job = null;
-    mix = defaultMix(CONFIG.stems.list);
-    show("idle", 0);
-    if (error)
-      reportError(
-        error instanceof AppError
-          ? error
-          : new AppError(`The project's stems couldn't be brought back: ${error.message ?? error}`, error),
-      );
+    failJob(error, "The project's stems couldn't be brought back");
   }
 }
 
@@ -239,6 +270,7 @@ function cancel() {
   stopping.cancelled = true;
   stopping.stop(); // the worker ends with its wait
   bridge?.cancel();
+  preparing = null;
   show(found ? "ready" : "idle", 0);
 }
 
@@ -284,7 +316,7 @@ function show(nextStage, nextFraction) {
 function render() {
   if (!ui) return;
   ui.section.hidden = !media;
-  const busy = ["download", "decode", "separate", "encode", "load"].includes(stage);
+  const busy = ["download", "decode", "separate", "load"].includes(stage);
   ui.action.hidden = busy || stage === "ready";
   ui.busy.hidden = !busy;
   ui.mixer.hidden = stage !== "ready";
@@ -303,10 +335,12 @@ function render() {
     download: `Downloading the stem model ${percent(fraction)}`,
     decode: `Reading the song ${percent(fraction)}`,
     separate: `Separating ${percent(fraction)}`,
-    encode: `Preparing them for saving ${percent(fraction)}`,
     load: `Loading the stems ${percent(fraction)}`,
   }[stage];
   if (label) ui.status.textContent = label;
+  // New stems play while their copies for saving are made.
+  ui.preparing.hidden = stage !== "ready" || preparing === null;
+  ui.preparing.textContent = `Preparing them for saving ${percent(preparing ?? 0)}`;
 }
 
 function build(section) {
@@ -314,6 +348,7 @@ function build(section) {
   const status = element("span", { className: "stems-status" });
   const stopButton = element("button", { type: "button", className: "small", textContent: "Cancel" });
   const busy = element("div", { className: "stems-busy" }, status, stopButton);
+  const preparing = element("p", { className: "stems-note stems-preparing" });
   const note = element("p", {
     className: "stems-note",
     textContent:
@@ -340,11 +375,12 @@ function build(section) {
     note,
     busy,
     mixer,
+    preparing,
   );
   onClick(action, separate);
   onClick(stopButton, cancel);
   onClick(reset, resetMix);
-  return { section, action, note, busy, status, mixer, mixerRows, reset };
+  return { section, action, note, busy, status, mixer, mixerRows, preparing, reset };
 }
 
 /* ---------- Wiring ---------- */

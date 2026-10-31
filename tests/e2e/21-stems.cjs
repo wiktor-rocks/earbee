@@ -22,6 +22,7 @@ module.exports = async function (h) {
         action: part(".stems-action").hidden ? null : part(".stems-action").textContent,
         busy: part(".stems-busy").hidden ? null : part(".stems-status").textContent,
         ready: !part(".stems-mixer").hidden,
+        preparing: part(".stems-preparing").hidden ? null : part(".stems-preparing").textContent,
         rows: [...s.querySelectorAll(".stems-row")].map((row) => ({
           id: row.dataset.stem,
           silent: row.classList.contains("silent"),
@@ -111,6 +112,11 @@ module.exports = async function (h) {
   await shot("stems-separating.png");
   state = await waitFor((s) => s.ready || (s.busy === null && s.action !== null), 120_000);
   check("stems: then they're ready", state.ready, JSON.stringify(state));
+  check(
+    "stems: …to play while their copies for saving are still being made",
+    state.ready && /Preparing them for saving/.test(state.preparing ?? ""),
+    state.preparing,
+  );
   await shot("stems-ready.png");
   check(
     "stems: …with a notification",
@@ -162,7 +168,10 @@ module.exports = async function (h) {
     JSON.stringify(state.rows),
   );
 
-  // Saved in a project (with the song inside), and brought back from it.
+  // Saved in a project (with the song inside), and brought back from it,
+  // once their copies for saving are made (while they already play).
+  state = await waitFor((s) => s.preparing === null, 60_000);
+  check("stems: their copies for saving get made", state.ready && state.preparing === null, JSON.stringify(state));
   const title = () => js(`document.title`);
   check("stems: new stems are an unsaved change", (await title()).endsWith(" •"), await title());
   await press(`[data-stem="drums"] button[title^=Mute]`);
