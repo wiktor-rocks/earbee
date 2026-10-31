@@ -61,6 +61,51 @@ def pad1d(x, paddings, mode="constant", value=0.0):
 
 htdemucs.pad1d = pad1d
 
+QUERIES = 336  # queries per slice in ChunkedAttention
+
+
+class ChunkedAttention(torch.nn.Module):
+    """nn.MultiheadAttention's arithmetic, with the same weights, done a
+    slice of queries at a time. Exported whole, attention holds every
+    query's scores against every key at once (8 × 2688 × 2688 numbers,
+    231 MB, twice: before and after the softmax), which took ONNX Runtime
+    to 2.7 GB for a segment where PyTorch needs 1.2. In slices, each score
+    matrix is an eighth of that; the result is the same."""
+
+    def __init__(self, attention):
+        super().__init__()
+        assert attention.batch_first and attention._qkv_same_embed_dim
+        assert attention.bias_k is None and not attention.add_zero_attn
+        self.heads = attention.num_heads
+        self.in_proj_weight = attention.in_proj_weight
+        self.in_proj_bias = attention.in_proj_bias
+        self.out_proj = attention.out_proj
+
+    def forward(self, query, key, value, attn_mask=None, key_padding_mask=None, need_weights=False, **_):
+        assert attn_mask is None and key_padding_mask is None
+        B, Lq, E = query.shape
+        H, D = self.heads, E // self.heads
+        wq, wk, wv = self.in_proj_weight.chunk(3)
+        bq, bk, bv = self.in_proj_bias.chunk(3)
+
+        def heads(x, w, b):
+            return F.linear(x, w, b).view(B, -1, H, D).transpose(1, 2)  # [B, H, L, D]
+
+        q = heads(query, wq, bq) * (D**-0.5)
+        k = heads(key, wk, bk).transpose(2, 3)
+        v = heads(value, wv, bv)
+        out = torch.cat(
+            [torch.softmax(q[:, :, s : s + QUERIES] @ k, dim=-1) @ v for s in range(0, Lq, QUERIES)], dim=2
+        )
+        return self.out_proj(out.transpose(1, 2).reshape(B, Lq, E)), None
+
+
+def chunk_attention(model):
+    for module in list(model.modules()):
+        for name, child in list(module.named_children()):
+            if isinstance(child, torch.nn.MultiheadAttention):
+                setattr(module, name, ChunkedAttention(child))
+
 
 class Separator(torch.nn.Module):
     """HTDemucs.forward (demucs 4.1.0, htdemucs.py) for one full segment in
@@ -199,14 +244,19 @@ def main():
     model = get_model(NAME).models[0].eval()
     assert model.samplerate == RATE and int(model.segment * RATE) == SEGMENT
     print("stems:", model.sources)
-    separator = Separator(model).eval()
 
     mix = test_mix()
     with torch.no_grad():
         full = model(mix).numpy()
+    # The original model stays for the references below; the exported one
+    # has its attention in slices.
+    exported = get_model(NAME).models[0].eval()
+    chunk_attention(exported)
+    separator = Separator(exported).eval()
+    with torch.no_grad():
         spec, wave = separator(mix)
         mine = finish(model, spec, wave).numpy()
-    print(f"the cut model in PyTorch against the whole one: {sdr(full, mine):.1f} dB")
+    print(f"the cut model, attention in slices, against the whole one: {sdr(full, mine):.1f} dB")
 
     MODEL.parent.mkdir(exist_ok=True)
     torch.onnx.export(
