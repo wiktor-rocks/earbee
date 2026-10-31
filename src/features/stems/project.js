@@ -22,6 +22,8 @@ function mixFrom(saved) {
     const stem = isObject(saved) ? saved[id] : null;
     if (!isObject(stem)) continue;
     if (Number.isFinite(stem.volume)) mix[id].volume = clamp(stem.volume, min, max);
+    // (Projects from before the pan have none: centred.)
+    if (Number.isFinite(stem.pan)) mix[id].pan = clamp(stem.pan, CONFIG.stems.pan.min, CONFIG.stems.pan.max);
     mix[id].solo = stem.solo === true;
     mix[id].mute = stem.mute === true;
   }

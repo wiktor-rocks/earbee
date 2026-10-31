@@ -29,6 +29,7 @@ module.exports = async function (h) {
           solo: row.querySelector("button[title^=Solo]").ariaPressed === "true",
           mute: row.querySelector("button[title^=Mute]").ariaPressed === "true",
           volume: row.querySelector(".knob-value").textContent,
+          pan: Number(row.querySelector(".stems-pan input").value),
         })),
       };
     })()`);
@@ -96,6 +97,50 @@ module.exports = async function (h) {
       JSON.stringify(solo),
     );
     check("stems: the rest is the track minus the stems", rest.max < 1e-3, JSON.stringify(rest));
+  }
+
+  {
+    // In stereo: a stem's 2×2 mix (its pan) moves it from side to side.
+    // One stem holding the whole track, its left and right different.
+    const pans = await js(`(async () => {
+      const { default: SignalsmithStretch } = await import("./src/vendor/signalsmith-stretch/SignalsmithStretch.mjs");
+      const { panMatrix } = await import("./src/features/stems/mix.js");
+      const rate = 44100, n = rate * 2, scale = 0.5 / 32767;
+      const left = Float32Array.from({ length: n }, (_, i) => Math.sin((i * i) / 4e6) * 0.4);
+      const right = Float32Array.from({ length: n }, (_, i) => Math.sin(i / 7) * 0.4);
+      const ints = [left, right].map((c) => Int16Array.from(c, (v) => Math.round(v / scale)));
+      // The stem's own samples, as a track: the same input as the stem.
+      const stemTrack = ints.map((c) => Float32Array.from(c, (v) => v * scale));
+      async function render(gains, track = [left, right]) {
+        const context = new OfflineAudioContext(2, n, rate);
+        const stretch = await SignalsmithStretch(context);
+        stretch.connect(context.destination);
+        await stretch.addBuffers(track.map((c) => c.slice()));
+        await stretch.addStems({ tracks: [ints.map((c) => c.slice())], scales: [scale] });
+        if (gains) await stretch.setStemGains([gains], gains === 1 ? 1 : 0);
+        await stretch.schedule({ active: true, input: 0, rate: 1, semitones: 0, output: 0 });
+        const out = await context.startRendering();
+        return [out.getChannelData(0), out.getChannelData(1)];
+      }
+      const loudest = (c) => c.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+      const plain = await render(null);
+      const stemAlone = await render(null, stemTrack);
+      const centred = await render(panMatrix(0));
+      const farLeft = await render(panMatrix(-100));
+      let centredOff = 0;
+      for (let c = 0; c < 2; c++) for (let i = 0; i < n; i++) centredOff = Math.max(centredOff, Math.abs(centred[c][i] - stemAlone[c][i]));
+      return { centredOff, leftLoud: loudest(farLeft[0]), rightLoud: loudest(farLeft[1]), plainRight: loudest(plain[1]) };
+    })()`);
+    check(
+      "stems: centred, a stem in stereo plays as itself, on both sides",
+      pans.centredOff < 1e-6,
+      JSON.stringify(pans),
+    );
+    check(
+      "stems: panned fully left, it's all on the left and nothing on the right",
+      pans.rightLoud < 1e-6 && pans.leftLoud > 0.3 && pans.plainRight > 0.1,
+      JSON.stringify(pans),
+    );
   }
 
   await openFile(path.join(FIXTURES, "verse-chorus.wav"));
@@ -195,7 +240,15 @@ module.exports = async function (h) {
   check("stems: their copies for saving get made", state.ready && state.preparing === null, JSON.stringify(state));
   await press(`[data-stem="drums"] button[title^=Mute]`);
   await press(`[data-stem="guitar"] button[title^=Solo]`);
+  await js(
+    `(() => { const i = document.querySelector('#stemsSection [data-stem="guitar"] .stems-pan input'); i.value = "-60"; i.dispatchEvent(new Event("input")); })()`,
+  );
   const mixed = (await section()).rows;
+  check(
+    "stems: each row has a pan knob, and turning it sets the stem's pan",
+    mixed.every((r) => Number.isFinite(r.pan)) && mixed.find((r) => r.id === "guitar").pan === -60,
+    JSON.stringify(mixed),
+  );
   const projectFile = path.join(OUTPUT, "projects", "Stems.ebee");
   fs.mkdirSync(path.dirname(projectFile), { recursive: true });
   fs.rmSync(projectFile, { force: true });
@@ -215,6 +268,7 @@ module.exports = async function (h) {
       saved?.codec === "opus" &&
       saved.audio?.guitar?.blob === "stems/stems/audio/guitar" &&
       saved.mix?.guitar?.solo === true &&
+      saved.mix?.guitar?.pan === -60 &&
       saved.mix?.drums?.mute === true,
     JSON.stringify({ version: header?.version, blobs: header?.blobs, mix: saved?.mix }),
   );

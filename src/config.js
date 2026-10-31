@@ -269,6 +269,8 @@ export const CONFIG = {
     ],
     // Each stem's volume knob (1 = as separated).
     volume: { min: 0, max: 1, step: 0.01, initial: 1 },
+    // Each stem's pan knob: percent, -100 (all left) … 100 (all right).
+    pan: { min: -100, max: 100, step: 1, initial: 0 },
     // A project keeps the stems as Opus at this bitrate (stems/opus.js):
     // about 6 MB a stem for a 4-minute song.
     bitrate: 192_000,

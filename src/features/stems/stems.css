@@ -77,15 +77,15 @@
 }
 
 /* Once separated: a row per stem (dock.js): its name, a small volume knob
-   with its value, then S and M. */
+   with its value, a smaller pan knob, then S and M. */
 .stems-mixer {
   --knob-size: 28px;
 
   display: grid;
   flex: 1 1 100%;
-  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
   align-items: center;
-  gap: 2px 6px;
+  gap: 2px 5px;
 }
 
 .stems-mixer[hidden] {
@@ -105,10 +105,18 @@
   white-space: nowrap;
 }
 
+/* Room for the pan's "Centre" too, so the row doesn't shift as it shows. */
 .stems-row .knob-value {
-  min-width: 4ch;
+  min-width: 6ch;
   font-size: 12px;
-  text-align: right;
+  text-align: left;
+}
+
+/* The pan knob: smaller, centred (its arc grows from the middle). */
+.stems-pan {
+  --knob-size: 22px;
+
+  display: flex;
 }
 
 .stems-row .toggle {
@@ -119,6 +127,6 @@
 
 /* A stem that isn't heard (muted, or another one soloed): dimmed, its
    buttons still bright. */
-.stems-row.silent :is(.stems-name, .knob-cell) {
+.stems-row.silent :is(.stems-name, .knob-cell, .stems-pan) {
   opacity: 0.4;
 }

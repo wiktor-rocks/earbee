@@ -44,7 +44,7 @@ import { AppError } from "../../core/errors.js";
 import { $, element, onClick, reportError } from "../../ui/dom.js";
 import { notify } from "../../ui/toast.js";
 import { buildMixer } from "./dock.js";
-import { defaultMix, isUnchanged, stemGains } from "./mix.js";
+import { defaultMix, isUnchanged, stemMixes } from "./mix.js";
 
 /**
  * The part of window.earbee (electron/preload.js) used here; missing
@@ -337,15 +337,16 @@ function cancel() {
 
 /* ---------- The mix ---------- */
 
-// The player's gains from the mix. Every stem at full volume: the song
-// itself (the stems' gains 1, the song's 1: the player leaves it as it is);
-// otherwise the stems alone (the song's 0), each at its gain.
+// The player's gains from the mix. Every stem at full volume and centred:
+// the song itself (the stems' gains 1, the song's 1: the player leaves it
+// as it is); otherwise the stems alone (the song's 0), each through its
+// 2×2 mix (its gain and pan: mix.js).
 function applyMix() {
   if (!found) return;
-  const gains = stemGains(CONFIG.stems.list, mix);
-  const whole = isUnchanged(gains);
+  const mixes = stemMixes(CONFIG.stems.list, mix);
+  const whole = isUnchanged(mixes);
   player.engine.setStemGains(
-    found.ids.map((id) => (whole ? 1 : gains[id])),
+    found.ids.map((id) => (whole ? 1 : mixes[id])),
     whole ? 1 : 0,
   );
 }
@@ -424,7 +425,12 @@ function build(section) {
     innerHTML: '<svg class="icon" aria-hidden="true"><use href="#i-reset" /></svg>',
   });
   const mixer = element("div", { className: "stems-mixer" });
-  const mixerRows = buildMixer(mixer, { list: CONFIG.stems.list, range: CONFIG.stems.volume, onChange: changeMix });
+  const mixerRows = buildMixer(mixer, {
+    list: CONFIG.stems.list,
+    range: CONFIG.stems.volume,
+    panRange: CONFIG.stems.pan,
+    onChange: changeMix,
+  });
   // A part of the Mixer (index.html): its own small heading, the reset beside it.
   section.append(
     element("div", { className: "stems-head" }, element("h3", { textContent: "Stems" }), reset),

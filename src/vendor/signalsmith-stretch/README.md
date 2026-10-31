@@ -28,11 +28,11 @@ audioSamples = bufferEnd; // replaces the else branch that skipped a buffer
 
 Stems (`src/features/stems/`) play through the same stretcher as the track, so they stay in step at any speed and pitch, at the cost of one stretcher. The worklet keeps the track's stems beside its buffers and mixes them in where it copies its input:
 
-- three remote methods: `addStems({ tracks, scales })` (each stem's channels as `Int16Array`s from the track's first sample, at its rate, and the factor that turns them back into samples), `setStemGains(gains, other)` and `dropStems()`; `dropBuffers()` with no time (a new track) drops them too;
+- three remote methods: `addStems({ tracks, scales })` (each stem's channels as `Int16Array`s from the track's first sample, at its rate, and the factor that turns them back into samples), `setStemGains(gains, other)` and `dropStems()`; `dropBuffers()` with no time (a new track) drops them too. A stem's gain is a number (the same for both channels) or a 2×2 mix, `[left from left, left from right, right from left, right from right]`, which can move it from one side to the other (a pan);
 - one line in the input loop, after a piece of the track is copied: `if (this.stems?.active) this.mixStems(…)`;
 - `mixStems`, which turns those samples into `other × track + Σ (gain − other) × stem`: "other" is the track minus the stems, so it needs no array of its own, and with every gain at 1 the result is the track.
 
-**Opt-in:** without stems, or with every gain at 1 (`active` false), the line does nothing and the input is the track exactly as before. Search for `patched` to find each part.
+**Opt-in:** without stems, or with every gain at 1 (or the identity mix) and `other` at 1 (`active` false), the line does nothing and the input is the track exactly as before. Search for `patched` to find each part.
 
 **Verified by `tests/e2e/21-stems.cjs`:** an offline render with stems loaded at full volume is identical, sample for sample, to one without; a muted stem and a soloed one come out as expected.
 

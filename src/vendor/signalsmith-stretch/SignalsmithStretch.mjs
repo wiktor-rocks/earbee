@@ -174,12 +174,15 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 					this.stems = {tracks: stems.tracks, scales: stems.scales, gains: stems.tracks.map(() => 1), other: 1, active: false};
 					return true;
 				},
-				// patched: each stem's gain, and the rest's (the track minus the stems)
+				// patched: each stem's gain (a number, the same for both channels, or
+				// [left from left, left from right, right from left, right from right]),
+				// and the rest's (the track minus the stems)
 				setStemGains: (gains, other) => {
 					if (!this.stems) return false;
 					this.stems.gains = gains.slice(0, this.stems.tracks.length);
 					this.stems.other = other;
-					this.stems.active = other !== 1 || this.stems.gains.some(gain => gain !== 1);
+					let identity = gain => typeof gain === 'number' ? gain === 1 : gain[0] === 1 && gain[1] === 0 && gain[2] === 0 && gain[3] === 1;
+					this.stems.active = other !== 1 || !this.stems.gains.every(identity);
 					return true;
 				},
 				dropStems: () => {
@@ -244,17 +247,25 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 		// patched: turns `count` samples of the track, from buffer[at] (the
 		// track's sample `from`, channel `channel`), into the stems' mix:
 		// other × track + Σ (gain - other) × stem, "other" being the track
-		// minus the stems. Only while a gain isn't 1: otherwise the track is
-		// left exactly as it was.
+		// minus the stems. A stem's gain may be a 2×2 mix (setStemGains): then
+		// this channel takes from both of the stem's, (gain[c][k] - other·δck)
+		// × stem[k]. Only while a gain isn't 1: otherwise the track is left
+		// exactly as it was.
 		mixStems(buffer, at, count, channel, from) {
 			let {tracks, scales, gains, other} = this.stems;
 			for (let i = 0; i < count; ++i) buffer[at + i] *= other;
+			let c = channel%2;
 			for (let s = 0; s < tracks.length; ++s) {
-				let weight = (gains[s] - other)*scales[s];
-				if (weight === 0) continue;
-				let samples = tracks[s][channel%tracks[s].length];
-				let end = Math.min(count, samples.length - from);
-				for (let i = 0; i < end; ++i) buffer[at + i] += weight*samples[from + i];
+				let gain = gains[s];
+				for (let k = 0; k < 2; ++k) {
+					let matrix = typeof gain !== 'number';
+					if (!matrix && k !== c) continue; // a number: this channel from its own
+					let weight = ((matrix ? gain[c*2 + k] : gain) - (k === c ? other : 0))*scales[s];
+					if (weight === 0) continue;
+					let samples = tracks[s][(matrix ? k : channel)%tracks[s].length];
+					let end = Math.min(count, samples.length - from);
+					for (let i = 0; i < end; ++i) buffer[at + i] += weight*samples[from + i];
+				}
 			}
 		}
 
