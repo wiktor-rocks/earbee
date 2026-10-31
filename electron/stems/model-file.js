@@ -1,8 +1,9 @@
 // The stem model's file (htdemucs-6s.onnx, from scripts/export-stem-model.py):
 // where it is, and fetching it the first time it's needed. At 116 MB it
-// isn't in the app or in git; it's an asset of its own release on EarBee's
-// GitHub, downloaded into <userData>/models and checked against the size
-// and SHA-256 below, as yt-dlp is (downloader.js).
+// isn't in the app or in git; it's an asset of a release in the EarBee
+// organisation's models repository (github.com/EarBee/models, which also
+// says its licence), downloaded into <userData>/models and checked against
+// the size and SHA-256 below, as yt-dlp is (downloader.js).
 //
 //   createModelFile({ userData, devCopy?, fetch?, source? })
 //     status()                → { ready, bytes }  ready: the file is there
@@ -19,9 +20,10 @@ const fs = require("fs");
 const path = require("path");
 
 const NAME = "htdemucs-6s.onnx";
-// When the model changes, upload it to a new release and change all three.
+// When the model changes, upload it to a new release of EarBee/models and
+// change all three.
 const SOURCE = {
-  url: "https://github.com/wiktor-rocks/earbee/releases/download/stem-model-1/htdemucs-6s.onnx",
+  url: "https://github.com/EarBee/models/releases/download/stem-model-1/htdemucs-6s.onnx",
   bytes: 115_952_475,
   sha256: "d884b1c84c89a2eecd8c26ec7e606a8419fecb1cb97bf4b6b8639a696dc11e30",
 };
