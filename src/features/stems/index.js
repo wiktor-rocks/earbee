@@ -128,10 +128,8 @@ async function runWorker({ current, stillCurrent }, message, failure, onStems, o
     current.stops.add(stop);
     if (bridge) stopStopped = bridge.onStopped((stopped) => reject(new AppError(stopped.error)));
     worker.addEventListener("message", ({ data }) => {
-      if (data.type === "progress" && stillCurrent()) {
-        if (data.stage === "encode") ((preparing = data.fraction), render());
-        else onProgress(data.stage, data.fraction);
-      } else if (data.type === "stems") onStems(data).catch(reject);
+      if (data.type === "progress" && stillCurrent()) onProgress(data.stage, data.fraction);
+      else if (data.type === "stems") onStems(data).catch(reject);
       else if (data.type === "done") resolve(data);
       else if (data.type === "error") reject(failure(data.message));
     });
@@ -212,28 +210,63 @@ async function separate() {
         (received) =>
           /** @type {[object, Transferable[]]} */ ([{ type: "separate", media, port: received }, [received]]),
       ),
-      (message) =>
-        new AppError(
-          found
-            ? `The stems couldn't be prepared for saving: ${message}`
-            : `The stems couldn't be separated: ${message}`,
-        ),
+      (message) => new AppError(`The stems couldn't be separated: ${message}`),
       async (stems) => {
         preparing = 0; // their copies for saving come next
         if (await takeStems(stems, stillCurrent)) notify("The stems are ready");
       },
     );
-    if (stillCurrent()) takeAudio(result, true);
+    if (!stillCurrent()) return;
+    // Their copies for saving, made by a few workers at once while they play.
+    const { sampleRate, stems } = result.toEncode;
+    const encoded = await inWorkers(running, Object.entries(stems), {
+      message: (share) => [
+        { type: "encode", stems: share, sampleRate },
+        Object.values(share).flatMap((stem) => stem.channels.map((channel) => channel.buffer)),
+      ],
+      failure: (message) => new AppError(`The stems couldn't be prepared for saving: ${message}`),
+      onProgress: (_stage, fraction) => ((preparing = fraction), render()),
+    });
+    if (stillCurrent()) takeAudio({ audio: Object.assign({}, ...encoded.map((done) => done.audio)) }, true);
   } catch (error) {
     if (job !== current) return; // cancelled or replaced: nothing to report
+    for (const stop of current.stops) stop(); // any other workers too
     failJob(error, "The stems couldn't be separated");
   }
 }
 
-// How many workers decode a project's stems at once: a few, so playback
-// keeps its share of the CPU.
-const loadWorkers = () =>
-  Math.max(1, Math.min(CONFIG.stems.loadWorkers, Math.floor((navigator.hardwareConcurrency || 2) / 2)));
+// How many workers encode or decode stems at once: a few, at most half the
+// cores, so playback keeps its share of the CPU.
+const workerCount = () =>
+  Math.max(1, Math.min(CONFIG.stems.workers, Math.floor((navigator.hardwareConcurrency || 2) / 2)));
+
+/**
+ * Runs a few workers at once (runWorker), each on a share of `entries`
+ * ([id, value] pairs, dealt out in turn): `message(share)` is what each is
+ * sent, and what it transfers. Their progress goes to `onProgress` as one,
+ * the average; resolves to each worker's `done`.
+ * @param {{ current: { stops: Set<() => void> }, stillCurrent: () => boolean }} running
+ * @param {[string, any][]} entries
+ * @param {{
+ *   message: (share: Record<string, any>) => [object, Transferable[]],
+ *   failure: (error: string) => AppError,
+ *   onProgress: (stage: string, fraction: number) => void,
+ *   onStems?: (part: any) => Promise<unknown>,
+ * }} options
+ */
+function inWorkers(running, entries, { message, failure, onProgress, onStems = async () => {} }) {
+  const count = Math.min(workerCount(), entries.length);
+  const progress = new Array(count).fill(0);
+  return Promise.all(
+    Array.from({ length: count }, (_, w) => {
+      const share = Object.fromEntries(entries.filter((_, i) => i % count === w));
+      return runWorker(running, Promise.resolve(message(share)), failure, onStems, (stage, fraction) => {
+        progress[w] = fraction;
+        onProgress(stage, progress.reduce((sum, value) => sum + value, 0) / count);
+      });
+    }),
+  );
+}
 
 /**
  * A project's stems, back in the player and the mixer (project.js): their
@@ -248,40 +281,21 @@ export async function loadStems({ sampleRate, length, urls, mix: savedMix }) {
   mix = savedMix;
   try {
     show("load", 0);
-    const fetched = Promise.all(
+    const fetched = await Promise.all(
       Object.entries(urls).map(async ([id, url]) => {
         const response = await fetch(url);
         if (!response.ok) throw new Error(`the ${id} stem can't be read (${response.status})`);
         return /** @type {[string, Uint8Array]} */ ([id, new Uint8Array(await response.arrayBuffer())]);
       }),
     );
-    // The stems dealt out to the workers in turn.
-    const count = loadWorkers();
-    const shares = Array.from({ length: count }, (_, w) =>
-      fetched.then((entries) => entries.filter((_, i) => i % count === w)),
-    );
-    const progress = new Array(count).fill(0);
+    if (!stillCurrent()) return;
     const decoded = { sampleRate, length, stems: {} };
-    const results = await Promise.all(
-      shares.map((share, w) =>
-        runWorker(
-          running,
-          share.then(
-            (entries) =>
-              /** @type {[object, Transferable[]]} */ ([
-                { type: "load", audio: Object.fromEntries(entries), sampleRate, length },
-                [],
-              ]),
-          ),
-          (message) => new AppError(`The project's stems couldn't be brought back: ${message}`),
-          async (part) => Object.assign(decoded.stems, part.stems),
-          (stage, fraction) => {
-            progress[w] = fraction;
-            show(stage, progress.reduce((sum, value) => sum + value, 0) / count);
-          },
-        ),
-      ),
-    );
+    const results = await inWorkers(running, fetched, {
+      message: (share) => [{ type: "load", audio: share, sampleRate, length }, []],
+      failure: (message) => new AppError(`The project's stems couldn't be brought back: ${message}`),
+      onProgress: show,
+      onStems: async (part) => Object.assign(decoded.stems, part.stems),
+    });
     if (!stillCurrent()) return;
     if (!(await takeStems(decoded, stillCurrent))) return;
     takeAudio({ audio: Object.assign({}, ...results.map((result) => result.audio)) }, false);

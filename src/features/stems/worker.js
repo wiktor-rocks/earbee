@@ -7,22 +7,26 @@
 // hears; core/resample.js for other rates), and streams it to the stem
 // process (electron/stems/process.js) over the port it's given; then it
 // gathers the stems the process sends back, at the track's own rate in 16
-// bits (what the player mixes them from: audio/engine.js), hands them over
-// to be played, and then encodes each as Opus (opus.js) for saving in a
-// project, while they already play. The song and its stems never pass
-// through the page's main thread on the way.
+// bits (what the player mixes them from: audio/engine.js), and hands them
+// over to be played, then its own copies to the page, which has a few of
+// these workers encode them as Opus (opus.js) for saving in a project while
+// they already play. The song and its stems never pass through the page's
+// main thread on their way to the player.
 //
 // Loading: a project's Opus stems decoded back to the same form.
 //
 //   page → { type: "separate", media, port }  media: a File, or { name, url } (core/media.js)
-//   ←      { type: "progress", stage: "decode" | "separate" | "encode", fraction } …
+//   ←      { type: "progress", stage: "decode" | "separate", fraction } …
+//   ←      { type: "stems", … } (below), then { type: "done", toEncode: { sampleRate, stems } }
+//          the same stems again, transferred, for encoding
+//   page → { type: "encode", stems, sampleRate }  some of those stems
+//   ←      { type: "progress", stage: "encode", fraction } …, then { type: "done", audio }
 //   page → { type: "load", audio: { [id]: bytes }, sampleRate, length }
 //   ←      { type: "progress", stage: "load", fraction } …
 //   ←      { type: "stems", sampleRate, length, stems: { [id]: { scale, channels, level } } }
 //          to play, at the track's own rate: each channel an Int16Array
 //          (× scale: the samples), level its loudness
 //   ←      { type: "done", audio }  each stem's Opus bytes, for the project
-//          (after "encode" progress, when separating)
 //   ←      { type: "error", message }
 import { AudioSampleSink } from "../../../node_modules/mediabunny/dist/bundles/mediabunny.mjs";
 import { CONFIG } from "../../config.js";
@@ -261,9 +265,17 @@ scope.addEventListener("message", async ({ data }) => {
       const result = await received;
       port.postMessage({ type: "close" });
       handOver(result, true);
-      scope.postMessage({ type: "done", audio: await encodeAll(result.stems, result.sampleRate) });
+      // Its own copies, for the page to have encoded.
+      const buffers = Object.values(result.stems).flatMap((stem) => stem.channels.map((channel) => channel.buffer));
+      scope.postMessage({ type: "done", toEncode: { sampleRate: result.sampleRate, stems: result.stems } }, buffers);
     } catch (error) {
       port.close();
+      scope.postMessage({ type: "error", message: String(error?.message ?? error) });
+    }
+  } else if (data?.type === "encode") {
+    try {
+      scope.postMessage({ type: "done", audio: await encodeAll(data.stems, data.sampleRate) });
+    } catch (error) {
       scope.postMessage({ type: "error", message: String(error?.message ?? error) });
     }
   } else if (data?.type === "load") {

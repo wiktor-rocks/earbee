@@ -277,9 +277,9 @@ export const CONFIG = {
     // as accurate up to 19 kHz, 2.2× faster (measured: 48.3 dB against
     // 48.6 for a round trip; 16 lost the top, at 41 dB).
     resampleZeroCrossings: 24,
-    // Opening a project, this many workers decode its stems at once (at
-    // most half the cores), so playback keeps its share of the CPU.
-    loadWorkers: 3,
+    // This many workers encode new stems for saving, or decode a project's,
+    // at once (at most half the cores), so playback keeps its share of the CPU.
+    workers: 3,
     // Samples per message to and from the stem process (4 MB), so no
     // message holds a whole song.
     chunk: 1 << 20,
