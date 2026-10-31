@@ -12,6 +12,8 @@ export const CONFIG = {
     dockPresets: [0.5, 0.75, 1],
   },
   volume: { min: 0, max: 200, step: 1, initial: 100 }, // percent
+  // The Mixer's Balance: percent, -100 (only the left) … 100 (only the right).
+  balance: { min: -100, max: 100, step: 1, initial: 0 },
   semitones: { min: -12, max: 12, step: 1, initial: 0 },
   cents: { min: -50, max: 50, step: 1, initial: 0 },
 

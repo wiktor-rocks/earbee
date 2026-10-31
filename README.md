@@ -25,7 +25,7 @@ Get the latest version from the [releases page](https://github.com/wiktor-rocks/
 - **Videos too,** in sync at any speed; in their own window if you like.
 - **Save your session** (marks, loop, speed and EQ) in a `.ebee` project file.
 - **Open from YouTube:** paste a link or search, and it opens once downloaded (only download what you have the rights to).
-- **EQ, volume up to 200 %, 17 colour themes,** and long files (an hour or two) open in seconds.
+- **EQ, volume up to 200 %, a balance between left and right** (for the old stereo recordings with an instrument on one side), **17 colour themes,** and long files (an hour or two) open in seconds.
 - **Works offline;** only downloading needs the internet.
 
 ## Build from source

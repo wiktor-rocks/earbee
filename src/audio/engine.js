@@ -5,14 +5,15 @@ import SignalsmithStretch from "../vendor/signalsmith-stretch/SignalsmithStretch
 import { CONFIG } from "../config.js";
 import { AppError } from "../core/errors.js";
 import { butterworthQs } from "../core/focus.js";
+import { balanceGains } from "../core/balance.js";
 import { clamp } from "../core/format.js";
 
 /* =====================================================================
  * AUDIO ENGINE
  * Signalsmith → Focus (high-pass, low-pass) → EQ bands → master volume
- * → limiter → speakers.
+ * → balance (a gain for each side) → limiter → speakers.
  *
- * Exposes: init, useSampleRate, loadPieces, schedule, setVolume, setEq,
+ * Exposes: init, useSampleRate, loadPieces, schedule, setVolume, setBalance, setEq,
  *          setFocus, now, outputDelay, resume, click; and loadStems,
  *          setStemGains, dropStems for Stems (src/features/stems/)
  * Values set before init() are remembered and applied when the graph
@@ -32,6 +33,7 @@ export function createAudioEngine({ onError }) {
   let context = null;
   let stretch = null;
   let masterGain = null;
+  let sides = null; // the balance's { left, right } gain nodes
   let initPromise = null;
   let sampleRate; // wanted context rate; undefined = the device's default
   const eqFilters = {};
@@ -39,6 +41,7 @@ export function createAudioEngine({ onError }) {
   const focusFilters = { highpass: [], lowpass: [] };
   const desired = {
     volume: 1,
+    balance: 0, // percent: -100 (only the left) … 100 (only the right)
     eqGains: {},
     eqEnabled: false,
     focus: /** @type {{ highpass: number | null, lowpass: number | null }} */ ({ highpass: null, lowpass: null }),
@@ -98,11 +101,25 @@ export function createAudioEngine({ onError }) {
 
     masterGain = context.createGain();
     masterGain.gain.value = desired.volume;
+    // Always two channels from here (a mono click or track up-mixed), so
+    // the balance has a left and a right to set.
+    Object.assign(masterGain, { channelCount: 2, channelCountMode: "explicit", channelInterpretation: "speakers" });
+
+    // The balance: each side through a gain of its own.
+    const splitter = context.createChannelSplitter(2);
+    const merger = context.createChannelMerger(2);
+    sides = { left: context.createGain(), right: context.createGain() };
+    splitter.connect(sides.left, 0).connect(merger, 0, 0);
+    splitter.connect(sides.right, 1).connect(merger, 0, 1);
+    const { left, right } = balanceGains(desired.balance);
+    sides.left.gain.value = left;
+    sides.right.gain.value = right;
 
     const limiter = context.createDynamicsCompressor();
     for (const [param, value] of Object.entries(limiterConfig)) limiter[param].value = value;
 
-    node.connect(masterGain).connect(limiter).connect(context.destination);
+    node.connect(masterGain).connect(splitter);
+    merger.connect(limiter).connect(context.destination);
   }
 
   async function create() {
@@ -129,7 +146,7 @@ export function createAudioEngine({ onError }) {
     if (context.sampleRate === rate) return;
 
     const old = context;
-    context = stretch = masterGain = initPromise = null;
+    context = stretch = masterGain = sides = initPromise = null;
     for (const id of Object.keys(eqFilters)) delete eqFilters[id];
     for (const filters of Object.values(focusFilters)) filters.length = 0;
     await old.close();
@@ -214,6 +231,15 @@ export function createAudioEngine({ onError }) {
     setVolume(volume) {
       desired.volume = volume;
       if (masterGain) rampParam(masterGain.gain, volume);
+    },
+
+    // The Balance knob (the Mixer): percent, -100 … 100 (core/balance.js).
+    setBalance(balance) {
+      desired.balance = balance;
+      if (!sides) return;
+      const { left, right } = balanceGains(balance);
+      rampParam(sides.left.gain, left);
+      rampParam(sides.right.gain, right);
     },
 
     // `gains` maps band id → dB. A disabled EQ is flat.

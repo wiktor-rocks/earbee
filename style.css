@@ -2857,6 +2857,13 @@ button.beat-info.disabled {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* The Mixer: Volume and Balance side by side under its title, as the
+   pitch's two knobs are; then the stems across (features/stems/stems.css). */
+.mixer-group {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 /* A group's title (Pitch, EQ) across its section: the name on the left,
    its total or buttons on the right. */
 .dock-title {

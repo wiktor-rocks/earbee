@@ -181,7 +181,7 @@ module.exports = async function (h) {
     row(state, "guitar").mute && state.rows.every((r) => r.silent === (r.id === "guitar")),
     JSON.stringify(state.rows),
   );
-  await press(`.dock-title button[aria-label="Reset the stems"]`);
+  await press(`button[aria-label="Reset the stems"]`);
   state = await section();
   check(
     "stems: Reset puts them all back",

@@ -14,7 +14,7 @@
  *   transport.on("position" | "state" | "jump") ─► waveform, video, UI
  *
  *   engine     Web Audio graph: Signalsmith (speed + pitch) → EQ (the
- *              Focus's high- and low-pass, then the bands) → volume
+ *              Focus's high- and low-pass, then the bands) → volume → balance
  *              → limiter, in a context at the open track's sample rate; it
  *              plays the track from several pieces, one after the other.
  *              Knows nothing about the UI or `settings`.
@@ -36,7 +36,7 @@
  *   video      Frame-exact picture for video files: decodes frames itself
  *              (Mediabunny + WebCodecs) and draws the frame at the transport
  *              position. No second clock, so it can't drift from the audio.
- *   settings   The player's controls (speed, pitch, volume, EQ, step):
+ *   settings   The player's controls (speed, pitch, volume, balance, EQ, step):
  *              plain values in context.js, saved in project files (the
  *              "sound" section).
  *   marks      Points and regions on the open track, with a label and a

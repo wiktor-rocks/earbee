@@ -425,13 +425,9 @@ function build(section) {
   });
   const mixer = element("div", { className: "stems-mixer" });
   const mixerRows = buildMixer(mixer, { list: CONFIG.stems.list, range: CONFIG.stems.volume, onChange: changeMix });
+  // A part of the Mixer (index.html): its own small heading, the reset beside it.
   section.append(
-    element(
-      "div",
-      { className: "dock-title" },
-      element("h2", { textContent: "Stems" }),
-      element("div", { className: "dock-title-row" }, reset),
-    ),
+    element("div", { className: "stems-head" }, element("h3", { textContent: "Stems" }), reset),
     action,
     note,
     busy,

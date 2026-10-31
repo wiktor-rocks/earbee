@@ -44,7 +44,8 @@ import { stemsSection } from "../stems/project.js"; // Stems (src/features/stems
  * @property {(data: any, track: { duration: number }) => void} restore
  */
 
-const SOUND_SLIDERS = ["speed", "volume", "semitones", "cents"];
+// (A project from before the Balance has none: it stays centred.)
+const SOUND_SLIDERS = ["speed", "volume", "balance", "semitones", "cents"];
 const finite = (value) => Number.isFinite(value);
 const timeIn = (value, duration) => (finite(value) ? clamp(value, 0, duration) : null);
 // Times to the millisecond, enough for a beat, and a much shorter file.

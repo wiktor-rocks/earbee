@@ -8,6 +8,7 @@
 
 import { CONFIG } from "../config.js";
 import { barLength, beatLength, eqGains, player, settings, totalSemitones } from "../context.js";
+import { formatBalance } from "../core/balance.js";
 import { stepSizes } from "../core/beats.js";
 import { focusCutoffs, noteNumber } from "../core/focus.js";
 import {
@@ -145,6 +146,14 @@ const SLIDERS = {
     range: CONFIG.volume,
     format: formatPercent,
     onChange: () => player.engine.setVolume(settings.volume / 100),
+  },
+  balance: {
+    inputId: "balance",
+    readoutId: "balanceValue",
+    range: CONFIG.balance,
+    format: formatBalance,
+    onChange: () => player.engine.setBalance(settings.balance),
+    centred: true,
   },
   semitones: {
     inputId: "semitoneShift",

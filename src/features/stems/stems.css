@@ -1,9 +1,41 @@
-/* Stems (src/features/stems/): the section in the side panel's dock. Its
-   frame (a .dock-group with its .dock-title) is style.css's; this is what's
-   inside. */
+/* Stems (src/features/stems/): their part of the Mixer in the side panel's
+   dock (the Mixer itself, .mixer-group, is style.css's): across its width,
+   under the volume and balance, as a column of its own. */
+.stems-part {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 10px 12px;
+  min-width: 0;
+  padding-top: 6px;
+}
 
-/* The button that separates them, across the section, like the ♩ button. */
-.stems-group .stems-action {
+.stems-part[hidden] {
+  display: none;
+}
+
+/* "Stems", and the reset beside it (once separated). */
+.stems-head {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* As a section's title (.dock-title h2 in style.css), a sub-section's. */
+.stems-head h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+/* The button that separates them, across the part, like the ♩ button. */
+.stems-part .stems-action {
   flex: 1 1 100%;
   justify-content: flex-start;
   overflow: hidden;
@@ -68,7 +100,7 @@
 .stems-name {
   overflow: hidden;
   font-size: 13px;
-  font-weight: 700;
+  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
