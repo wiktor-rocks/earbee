@@ -24,15 +24,22 @@ module.exports = async function (h) {
         ready: !part(".stems-mixer").hidden,
         preparing: part(".stems-preparing").hidden ? null : part(".stems-preparing").textContent,
         folded: part(".stems-folded").hidden ? null : part(".stems-folded").textContent,
-        folds: s.querySelectorAll("button.stems-fold").length,
+        // Calm rows: one knob each, nothing else to turn.
+        knobsPerRow: [...s.querySelectorAll(".stems-row")].map((row) => row.querySelectorAll("input").length),
+        panel: document.querySelector(".stems-menu:popover-open") && {
+          name: document.querySelector(".stems-menu h3").textContent,
+          volume: document.querySelectorAll(".stems-menu .knob-value")[0].textContent,
+          pan: document.querySelectorAll(".stems-menu .knob-value")[1].textContent,
+          fold: !document.querySelector(".stems-menu .menu-item").hidden,
+        },
         rows: [...s.querySelectorAll(".stems-row")].map((row) => ({
           id: row.dataset.stem,
           silent: row.classList.contains("silent"),
           solo: row.querySelector("button[title^=Solo]").ariaPressed === "true",
           mute: row.querySelector("button[title^=Mute]").ariaPressed === "true",
-          volume: row.querySelector(".knob-value").textContent,
-          pan: Number(row.querySelector(".stems-pan input").value),
+          volume: Number(row.querySelector("input").value),
           name: row.querySelector(".stems-name").textContent,
+          oneLine: row.querySelector(".stems-name").getBoundingClientRect().height < 24,
           hidden: row.hidden,
         })),
       };
@@ -211,7 +218,8 @@ module.exports = async function (h) {
   check(
     "stems: the mixer has a row per stem, all at full volume",
     state.rows.map((row) => row.id).join() === "vocals,drums,bass,guitar,piano,other" &&
-      state.rows.every((row) => row.volume === "100%" && !row.solo && !row.mute && !row.silent),
+      state.rows.every((row) => row.volume === 1 && !row.solo && !row.mute && !row.silent) &&
+      state.knobsPerRow.every((n) => n === 1),
     JSON.stringify(state.rows),
   );
   const row = (s, id) => s.rows.find((r) => r.id === id);
@@ -234,7 +242,7 @@ module.exports = async function (h) {
   state = await section();
   check(
     "stems: Reset puts them all back",
-    state.rows.every((r) => !r.solo && !r.mute && !r.silent && r.volume === "100%"),
+    state.rows.every((r) => !r.solo && !r.mute && !r.silent && r.volume === 1),
     JSON.stringify(state.rows),
   );
 
@@ -244,33 +252,40 @@ module.exports = async function (h) {
   check("stems: their copies for saving get made", state.ready && state.preparing === null, JSON.stringify(state));
   await press(`[data-stem="drums"] button[title^=Mute]`);
   await press(`[data-stem="guitar"] button[title^=Solo]`);
-  await js(
-    `(() => { const i = document.querySelector('#stemsSection [data-stem="guitar"] .stems-pan input'); i.value = "-60"; i.dispatchEvent(new Event("input")); })()`,
-  );
-  let mixed = (await section()).rows;
-  check(
-    "stems: each row has a pan knob, and turning it sets the stem's pan",
-    mixed.every((r) => Number.isFinite(r.pan)) && mixed.find((r) => r.id === "guitar").pan === -60,
-    JSON.stringify(mixed),
-  );
-  check("stems: every row but Other's can be folded into Other", (await section()).folds === 5);
-  await press(`[data-stem="piano"] .stems-fold`);
+  // A stem's panel, from its name: its volume and pan, and Fold into Other.
+  const closePanel = () => js(`document.querySelector(".stems-menu").hidePopover()`);
+  const setInPanel = (label, value) =>
+    js(
+      `(() => { const i = document.querySelector('.stems-menu input[aria-label="${label}"]'); i.value = "${value}"; i.dispatchEvent(new Event("input")); })()`,
+    );
+  await press(`[data-stem="guitar"] .stems-name`);
+  await setInPanel("Pan", -60);
   state = await section();
-  mixed = state.rows;
   check(
-    "stems: folding the piano hides its row, and Other says it holds it",
+    "stems: a stem's name opens its panel, where its pan is set",
+    state.panel?.name === "Guitar" && state.panel.pan === "L 60" && state.panel.volume === "100%" && state.panel.fold,
+    JSON.stringify(state.panel),
+  );
+  await shot("stems-panel.png");
+  await closePanel();
+  await press(`[data-stem="other"] .stems-name`);
+  state = await section();
+  check("stems: Other's panel has no Fold into Other", state.panel?.name === "Other" && !state.panel.fold);
+  await closePanel();
+  await press(`[data-stem="piano"] .stems-name`);
+  await press(`.stems-menu .menu-item`);
+  state = await section();
+  let mixed = state.rows;
+  check(
+    "stems: folding the piano from its panel hides its row; Other keeps its name; the line says it",
     row(state, "piano").hidden &&
-      row(state, "other").name === "Other + Piano" &&
+      row(state, "other").name === "Other" &&
       state.folded === "Piano is in Other · Show" &&
-      state.rows.filter((r) => r.hidden).length === 1,
-    JSON.stringify({ folded: state.folded, rows: state.rows }),
+      state.rows.filter((r) => r.hidden).length === 1 &&
+      state.panel === null &&
+      state.rows.every((r) => r.hidden || r.oneLine),
+    JSON.stringify({ folded: state.folded, panel: state.panel, rows: state.rows }),
   );
-  // The pointer on the guitar's row: its × shows.
-  const guitarName = await js(
-    `(() => { const r = document.querySelector('#stemsSection [data-stem="guitar"] .stems-name').getBoundingClientRect(); return { x: Math.round(r.left + 5), y: Math.round(r.top + r.height / 2) }; })()`,
-  );
-  h.wc.sendInputEvent({ type: "mouseMove", ...guitarName });
-  await sleep(200);
   await shot("stems-folded.png");
   const projectFile = path.join(OUTPUT, "projects", "Stems.ebee");
   fs.mkdirSync(path.dirname(projectFile), { recursive: true });
@@ -318,6 +333,10 @@ module.exports = async function (h) {
   );
   check("stems: …and that isn't an unsaved change", !(await title()).endsWith(" •"), await title());
   check("stems: …and the fold with it", state.folded === "Piano is in Other · Show", state.folded);
+  await press(`[data-stem="guitar"] .stems-name`);
+  state = await section();
+  check("stems: …and the guitar's pan", state.panel?.pan === "L 60", JSON.stringify(state.panel));
+  await closePanel();
   await press(`.stems-show`);
   state = await section();
   check(
