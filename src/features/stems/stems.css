@@ -1,0 +1,40 @@
+/* Stems (src/features/stems/): the section in the side panel's dock. Its
+   frame (a .dock-group with its .dock-title) is style.css's; this is what's
+   inside. */
+
+/* The button that separates them, across the section, like the ♩ button. */
+.stems-group .stems-action {
+  flex: 1 1 100%;
+  justify-content: flex-start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* While it works: what it's doing, and Cancel. */
+.stems-busy {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  gap: 8px;
+}
+
+.stems-busy[hidden] {
+  display: none;
+}
+
+.stems-status {
+  flex: 1 1 auto;
+  overflow: hidden;
+  font: 800 13px var(--num);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stems-ready {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}

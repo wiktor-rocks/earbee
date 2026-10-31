@@ -7,8 +7,9 @@
 // with triangular weights. Pure: the model is a function passed in, so
 // this runs in the utility process and in tests alike.
 //
-//   separate({ left, right, runModel, onProgress?, cancelled? })
-//     the song at 44.1 kHz, two Float32Arrays → { stems: { [name]: [left, right] } }
+//   separate({ left, right, runModel, keep?, onProgress?, cancelled? })
+//     the song at 44.1 kHz, two Float32Arrays → { stems: { [name]: [left, right] } },
+//     for the stems named in `keep` (all six unless given)
 //     runModel(mix) gets a segment ([1, 2, SEGMENT] as one Float32Array)
 //     and resolves to the model's { spec, wave } (see the export script).
 //     Stops with an error named "Cancelled" when cancelled() turns true.
@@ -60,18 +61,20 @@ function meanAndSpread(left, right) {
  * @param {{
  *   left: Float32Array, right: Float32Array,
  *   runModel: (mix: Float32Array) => Promise<{ spec: Float32Array, wave: Float32Array }>,
+ *   keep?: string[],
  *   onProgress?: (done: number, total: number) => void,
  *   cancelled?: () => boolean,
  * }} options
  */
-async function separate({ left, right, runModel, onProgress = () => {}, cancelled = () => false }) {
+async function separate({ left, right, runModel, keep = STEMS, onProgress = () => {}, cancelled = () => false }) {
   const length = left.length;
   const { mean, spread } = meanAndSpread(left, right);
   const starts = segmentStarts(length);
   const weight = triangle(SEGMENT);
   const ispec = createIspec({ hop: HOP, frames: FRAMES, length: SEGMENT });
 
-  const out = STEMS.map(() => [new Float32Array(length), new Float32Array(length)]);
+  // Only the stems asked for are made (their sound and their memory).
+  const out = STEMS.map((name) => (keep.includes(name) ? [new Float32Array(length), new Float32Array(length)] : null));
   const weights = new Float32Array(length);
   const mix = new Float32Array(2 * SEGMENT);
   const soundA = new Float32Array(SEGMENT);
@@ -98,6 +101,7 @@ async function separate({ left, right, runModel, onProgress = () => {}, cancelle
     // Each stem: its spectral branch as sound, plus its time branch, its
     // middle `part` samples weighted into the song (center_trim).
     for (let s = 0; s < STEMS.length; s++) {
+      if (!out[s]) continue;
       // spec is [stem][channel][real, imaginary][bin][frame]
       const base = s * 4 * block;
       ispec(
@@ -122,11 +126,11 @@ async function separate({ left, right, runModel, onProgress = () => {}, cancelle
   }
 
   for (const channels of out) {
-    for (const channel of channels) {
+    for (const channel of channels ?? []) {
       for (let i = 0; i < length; i++) channel[i] = (channel[i] / weights[i]) * spread + mean;
     }
   }
-  return { stems: Object.fromEntries(STEMS.map((name, s) => [name, out[s]])) };
+  return { stems: Object.fromEntries(STEMS.flatMap((name, s) => (out[s] ? [[name, out[s]]] : []))) };
 }
 
 module.exports = { separate, segmentStarts, triangle, RATE, SEGMENT, STEMS, BINS, FRAMES };

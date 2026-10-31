@@ -117,6 +117,18 @@ async function createHarness() {
   ipcMain.handle("system:available-memory", () => memory.available ?? availableMemory());
   // The beat model as main.js runs it.
   require(path.join(PROJECT, "electron", "beat-model.js")).handleBeatModel(ipcMain, { utilityProcess });
+  // Stems (src/features/stems/): as main.js runs it from the source, with
+  // the model exported into models/ if it's there; the download goes to
+  // the stand-in fetch, so without that copy it fails (21-stems.cjs).
+  const stemsUserData = path.join(OUTPUT, "stems-user-data");
+  fs.rmSync(stemsUserData, { recursive: true, force: true });
+  require(path.join(PROJECT, "electron", "stems", "index.js")).handleStems(ipcMain, {
+    utilityProcess,
+    MessageChannelMain: require("electron").MessageChannelMain,
+    userData: stemsUserData,
+    devCopy: path.join(PROJECT, "models", "htdemucs-6s.onnx"),
+    fetch: fakeFetch,
+  });
   // Video window (src/features/video-window/): as main.js allows it, but
   // hidden (an offscreen window.open window gets no size); videoWin() is
   // the open one (or null).

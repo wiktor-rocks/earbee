@@ -249,4 +249,26 @@ export const CONFIG = {
   // The notifications (ui/toast.js): how long one shows, and how many at
   // once (a new one pushes out the oldest).
   notifications: { showMs: 4000, max: 3 },
+
+  // Stems (src/features/stems/): the open song split into its instruments
+  // by the stem model (electron/stems/). Off, none of it loads: no section
+  // in the panel, nothing asked of the main process.
+  stems: {
+    enabled: true,
+    // In the panel's order; `id` is the model's name for it. "other" is
+    // what's left: the song minus the rest.
+    list: [
+      { id: "vocals", label: "Vocals" },
+      { id: "drums", label: "Drums" },
+      { id: "bass", label: "Bass" },
+      { id: "guitar", label: "Guitar" },
+      { id: "piano", label: "Piano" },
+      { id: "other", label: "Other" },
+    ],
+    // The model hears 44.1 kHz; a song at another rate is resampled for it.
+    sampleRate: 44100,
+    // Samples per message to the stem process (4 MB): Chromium refuses a
+    // message over 128 MB.
+    chunk: 1 << 20,
+  },
 };

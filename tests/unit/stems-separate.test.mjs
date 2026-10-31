@@ -51,6 +51,13 @@ describe("separate", () => {
     assert.equal(progress.length, total + 1);
   });
 
+  test("makes only the stems asked for", async () => {
+    const left = song(10_000, 6);
+    const { stems } = await separate({ left, right: left, runModel: echo, keep: ["guitar", "bass"] });
+    assert.deepEqual(Object.keys(stems).sort(), ["bass", "guitar"]);
+    assert.ok(largestDifference(stems.guitar[0], left) < 1e-4);
+  });
+
   test("handles a song shorter than one segment", async () => {
     const left = song(10_000, 3);
     const right = song(10_000, 4);

@@ -14,6 +14,9 @@
 //              window.
 //   Beats      The beat model, run for the page in a utility process
 //              (beat-model.js) on the native ONNX Runtime.
+//   Stems      Splitting a song into stems (stems/, for src/features/stems/):
+//              the model's file, fetched on first use, and a utility
+//              process per song that the page's worker talks to directly.
 //   Settings   The user's preferences (prefs-store.js, prefs.json): read
 //              and changed by the page's Settings dialog through the
 //              preload; the folder picker is here. The colour theme
@@ -32,7 +35,18 @@
 //              rendering if the GPU process keeps crashing.
 //              `npm run start:no-gpu` forces software rendering;
 //              `npm run start:gpu-info` logs what the GPU is doing.
-const { app, BrowserWindow, dialog, ipcMain, nativeTheme, net, protocol, shell, utilityProcess } = require("electron");
+const {
+  app,
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  MessageChannelMain,
+  nativeTheme,
+  net,
+  protocol,
+  shell,
+  utilityProcess,
+} = require("electron");
 const fs = require("fs");
 const path = require("path");
 const { handleBeatModel } = require("./beat-model");
@@ -43,6 +57,7 @@ const { createPrefsStore, createThemeView, handlePrefs } = require("./prefs-stor
 const { createProjectFiles, guardClose, handleProjects } = require("./project-files");
 const { handleSplash, loadWindowState, rememberWindowState, showAfterSplash } = require("./windows");
 const { allowVideoWindow, handleVideoWindows } = require("./windows"); // Video window (src/features/video-window/)
+const { handleStems } = require("./stems"); // Stems (src/features/stems/)
 
 const ROOT = path.join(__dirname, ".."); // the app's files: index.html, src/, assets/
 
@@ -95,7 +110,9 @@ if (!app.isPackaged) {
   // Its types declare a default export, but the module is the function itself.
   /** @type {(glob: string, options: object) => void} */ (/** @type {unknown} */ (require("electron-reload")))(ROOT, {
     electron: require(path.join(ROOT, "node_modules", "electron")),
-    ignored: [/node_modules|[/\\]\./, /[/\\](dist|site|tests[/\\](output|fixtures))([/\\]|$)/],
+    // local/: the owner's notes and work files (a Python venv of 26,000
+    // files among them, which made quitting slow to watch).
+    ignored: [/node_modules|[/\\]\./, /[/\\](dist|site|local|tests[/\\](output|fixtures))([/\\]|$)/],
   });
 }
 
@@ -210,6 +227,14 @@ app.whenReady().then(() => {
   prefsStore.onChange((section) => section === "theme" && followTheme());
   handleSystem(ipcMain);
   handleBeatModel(ipcMain, { utilityProcess });
+  // Stems (src/features/stems/): from the source, the model exported into models/ is used.
+  handleStems(ipcMain, {
+    utilityProcess,
+    MessageChannelMain,
+    userData,
+    devCopy: app.isPackaged ? null : path.join(ROOT, "models", "htdemucs-6s.onnx"),
+    fetch: net.fetch,
+  });
   handleSplash(ipcMain);
   handleVideoWindows(ipcMain); // Video window (src/features/video-window/)
   nativeTheme.on("updated", followTheme); // "Automatic" follows the system

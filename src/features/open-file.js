@@ -39,6 +39,7 @@ import {
   showPlayer,
 } from "../ui/dom.js";
 import { resetBeats } from "./beats.js";
+import { resetStems } from "./stems/index.js"; // Stems (src/features/stems/)
 import { setLoopRegion } from "./playback.js";
 import { resetMarks } from "./marks.js";
 
@@ -192,6 +193,7 @@ export async function loadMediaFile(media, signal) {
   setLoopRegion(null);
   resetMarks(decoded.duration);
   resetBeats(media);
+  resetStems(media); // Stems (src/features/stems/)
   resetSoundSettings();
   resetTimelineShare(); // Stage split (src/features/stage-split.js)
   dom.fileName.textContent = media.name;

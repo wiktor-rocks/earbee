@@ -77,7 +77,8 @@
       "package.json",
       "!node_modules/onnxruntime-node/bin/napi-v*/!(${platform})/**",
       "!node_modules/onnxruntime-node/bin/napi-v*/${platform}/!(${arch})/**",
-      "!node_modules/onnxruntime-node/bin/napi-v*/linux/x64/libonnxruntime_providers_{cuda,tensorrt}.so"
+      "!node_modules/onnxruntime-node/bin/napi-v*/linux/x64/libonnxruntime_providers_{cuda,tensorrt}.so",
+      "!models/htdemucs-6s.onnx"
     ],
     "asarUnpack": [
       "models/**",

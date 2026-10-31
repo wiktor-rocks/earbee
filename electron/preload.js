@@ -3,6 +3,8 @@
 //     buttons when this is missing (e.g. opened in a plain browser);
 //   - the memory available for a track (see system.js);
 //   - running the beat model on one window of a spectrogram (see beat-model.js);
+//   - separating the open song's stems (see stems/index.js): the model's
+//     file, and a process the page's worker talks to over a port;
 //   - saying the page is ready, so its window shows (see windows.js, "The splash");
 //   - project files (.ebee; see project-files.js): opening, saving, and
 //     whether there are unsaved changes; a File's path is found here, so
@@ -51,6 +53,9 @@ if (initialTheme?.variables) {
   }
 }
 
+// Stems (src/features/stems/): the stem process's port, to the page.
+ipcRenderer.on("stems:port", (event) => window.postMessage("earbee:stems-port", "*", event.ports));
+
 contextBridge.exposeInMainWorld("earbee", {
   // Resolves to { ok: true, name, path, url } or { ok: false, canceled, error };
   // `url` serves the saved file in pieces (media-files.js).
@@ -85,6 +90,27 @@ contextBridge.exposeInMainWorld("earbee", {
     input instanceof Float32Array
       ? ipcRenderer.invoke("beats:window", input)
       : Promise.resolve({ ok: false, error: "not a Float32Array" }),
+
+  // Stems (src/features/stems/): see electron/stems/index.js. After
+  // start(), the process's port arrives as a window "message" event whose
+  // data is "earbee:stems-port" (a port can't cross the bridge itself).
+  stems: {
+    model: () => ipcRenderer.invoke("stems:model"),
+    download: () => ipcRenderer.invoke("stems:download"),
+    start: () => ipcRenderer.invoke("stems:start"),
+    cancel: () => ipcRenderer.invoke("stems:cancel"),
+    // Each calls `callback` with what was sent; returns a function that stops it.
+    onProgress(callback) {
+      const listener = (_event, progress) => callback(progress);
+      ipcRenderer.on("stems:progress", listener);
+      return () => ipcRenderer.removeListener("stems:progress", listener);
+    },
+    onStopped(callback) {
+      const listener = (_event, stopped) => callback(stopped);
+      ipcRenderer.on("stems:stopped", listener);
+      return () => ipcRenderer.removeListener("stems:stopped", listener);
+    },
+  },
 
   // The page is built: the window shows and the splash closes.
   ready: () => ipcRenderer.send("app:ready"),

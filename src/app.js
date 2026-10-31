@@ -146,7 +146,11 @@
  *                  buttons always shown or on hover; wiring marked
  *                  "Video buttons ("), topbar-autohide.js (Settings ›
  *                  Layout: the top bar hides until the pointer reaches
- *                  it; wiring marked "Top bar autohide (")
+ *                  it; wiring marked "Top bar autohide ("), stems/ (the
+ *                  song split into its instruments by the stem model in
+ *                  the main process, electron/stems/: index.js, its
+ *                  worker.js and stems.css; self-contained, its wiring
+ *                  marked "Stems (", off with CONFIG.stems.enabled)
  *   app.js         This file: creates and wires the components, the
  *                  SHORTCUTS table, start()
  *   vendor/        Signalsmith Stretch, patched to read across several
@@ -282,6 +286,7 @@ import { bindTopbarAutohide } from "./features/topbar-autohide.js"; // Top bar a
 import { bindVideoZoom, resetVideoZoom, videoZoomChanged, zoomVideoIn, zoomVideoOut } from "./features/video-zoom.js"; // Video zoom (src/features/video-zoom.js)
 import { beatsAction, bindBeats, isBeatMenuOpen, snapForDrag, toggleBeatClick } from "./features/beats.js";
 import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
+import { bindStems } from "./features/stems/index.js"; // Stems (src/features/stems/)
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
 import { bindProject, isSaveDialogOpen, openFile, saveProject, saveProjectAs } from "./features/project/index.js";
 import { bindSettings, isSettingsOpen } from "./features/settings.js";
@@ -702,6 +707,7 @@ function start() {
   bindLayout();
   bindBigVideo(); // Big video (src/features/big-video.js)
   bindStageSplit(); // Stage split (src/features/stage-split.js)
+  bindStems(); // Stems (src/features/stems/): before the panel order, which finds its section
   bindPanelOrder(); // Panel order (src/features/panel-order.js)
   bindVideoZoom($("videoPane")); // Video zoom (src/features/video-zoom.js)
   bindVideoButtons(); // Video buttons (src/features/video-buttons.js)
