@@ -1,7 +1,8 @@
 // Stems (src/features/stems/): the stretcher mixing stems into its input
 // (the patch in src/vendor/signalsmith-stretch), the Stems section,
 // separating the open song with the stem model (electron/stems/), the
-// mixer (volume, solo, mute), Cancel, and a new file forgetting them. With
+// mixer (volume, solo, mute), saving them in a project and bringing them
+// back, Cancel, and a new file forgetting them. With
 // the model exported into models/ (scripts/export-stem-model.py) it
 // separates for real; without it, the download fails against the
 // harness's stand-in fetch, which is checked instead.
@@ -10,7 +11,7 @@ const fs = require("fs");
 const path = require("path");
 
 module.exports = async function (h) {
-  const { js, openFile, check, sleep, toasts, clearToasts, shot, FIXTURES } = h;
+  const { js, openFile, setFiles, key, check, sleep, toasts, clearToasts, shot, projectDialogs, FIXTURES, OUTPUT } = h;
 
   const section = () =>
     js(`(() => {
@@ -135,9 +136,9 @@ module.exports = async function (h) {
   const stems = await found();
   const duration = await h.duration();
   check(
-    "stems: five stems, at the song's rate and as long as it",
+    "stems: six stems, at the song's rate and as long as it",
     stems &&
-      stems.ids.join() === "vocals,drums,bass,guitar,piano" &&
+      stems.ids.join() === "vocals,drums,bass,guitar,piano,other" &&
       Math.abs(stems.length / stems.sampleRate - duration) < 0.01,
     JSON.stringify(stems),
   );
@@ -177,6 +178,56 @@ module.exports = async function (h) {
     state.rows.every((r) => !r.solo && !r.mute && !r.silent && r.volume === "100%"),
     JSON.stringify(state.rows),
   );
+
+  // Saved in a project (with the song inside), and brought back from it.
+  const title = () => js(`document.title`);
+  check("stems: new stems are an unsaved change", (await title()).endsWith(" •"), await title());
+  await press(`[data-stem="drums"] button[title^=Mute]`);
+  await press(`[data-stem="guitar"] button[title^=Solo]`);
+  const mixed = (await section()).rows;
+  const projectFile = path.join(OUTPUT, "projects", "Stems.ebee");
+  fs.mkdirSync(path.dirname(projectFile), { recursive: true });
+  fs.rmSync(projectFile, { force: true });
+  projectDialogs.save = projectFile;
+  key("S", ["control", "shift"]);
+  await sleep(200);
+  await js(`saveModeEmbed.click(); saveForm.requestSubmit()`);
+  for (let i = 0; i < 100 && !fs.existsSync(projectFile); i++) await sleep(100);
+  await sleep(300);
+  const bytes = fs.existsSync(projectFile) ? fs.readFileSync(projectFile) : Buffer.alloc(0);
+  const header = bytes.indexOf(0) > 0 ? JSON.parse(bytes.subarray(0, bytes.indexOf(0)).toString()) : null;
+  const saved = header?.sections?.stems?.stems;
+  check(
+    "stems: a project keeps them as six Opus files after the song (version 2), and the mix",
+    header?.version === 2 &&
+      Object.keys(header.blobs ?? {}).length === 6 &&
+      saved?.codec === "opus" &&
+      saved.audio?.guitar?.blob === "stems/stems/audio/guitar" &&
+      saved.mix?.guitar?.solo === true &&
+      saved.mix?.drums?.mute === true,
+    JSON.stringify({ version: header?.version, blobs: header?.blobs, mix: saved?.mix }),
+  );
+  const stemBytes = Object.values(header?.blobs ?? {}).reduce((sum, blob) => sum + blob.size, 0);
+  console.log(`  (stems: ${(stemBytes / 1e6).toFixed(2)} MB of Opus for ${duration.toFixed(1)} s)`);
+  check("stems: …and saved, nothing is unsaved", !(await title()).endsWith(" •"), await title());
+
+  await openFile(path.join(FIXTURES, "bars.wav"));
+  await setFiles(projectFile);
+  state = await waitFor((s) => s.ready, 30_000);
+  check(
+    "stems: opening the project brings them back, with its mix",
+    state.ready && JSON.stringify(state.rows) === JSON.stringify(mixed),
+    JSON.stringify(state.rows),
+  );
+  const back = await found();
+  check(
+    "stems: …the same six, as loud as before",
+    back?.ids.join() === stems.ids.join() &&
+      back.length === stems.length &&
+      back.ids.every((id) => Math.abs(back.levels[id] - stems.levels[id]) <= 0.05 * stems.levels[id] + 1e-4),
+    JSON.stringify({ before: stems.levels, after: back?.levels }),
+  );
+  check("stems: …and that isn't an unsaved change", !(await title()).endsWith(" •"), await title());
 
   // A new file forgets them; Cancel stops a separation.
   await openFile(path.join(FIXTURES, "bars.wav"));

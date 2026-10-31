@@ -14,9 +14,11 @@
 //                   it), then where it was; if it's in neither, the user is
 //                   asked where it is.
 //   save            the header the page sends, plus the media's bytes when
-//                   it goes inside, written to a temporary file then renamed
-//                   over the target, so a crash never leaves half a file.
-//                   With no path yet, the native Save dialog asks for one.
+//                   it goes inside, then the sections' binary data (blobs:
+//                   src/project/format.js), written to a temporary file then
+//                   renamed over the target, so a crash never leaves half a
+//                   file. With no path yet, the native Save dialog asks for one.
+//                   Opening, each blob is served by URL, as the media is.
 //   confirm         Save / Don't save / Cancel, before unsaved changes are lost.
 //   dirty, close    whether the page has unsaved changes, for guardClose().
 //
@@ -136,13 +138,25 @@ function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
     async open(sender, file) {
       if (!project.isProjectName(file)) throw new project.ProjectFormatError("This isn't a EarBee project.");
       const header = await readHeader(file);
-      const { media, sections } = project.parseProject(header.text);
+      const { media, sections: saved, blobs } = project.parseProject(header.text);
+      const payload = header.mediaOffset; // where the media and blobs start
+      // Each blob, as a slice of the project to read it from.
+      const sections = project.attachBlobs(saved, (id) => {
+        const place = blobs[id];
+        if (!place || payload === null || payload + place.offset + place.size > header.fileSize) return null;
+        return {
+          url: mediaFiles.share(file, { offset: payload + place.offset, size: place.size, name: id }),
+          size: place.size,
+        };
+      });
       const opened = { ok: true, path: file, name: path.basename(file), sections, embedded: media.embedded };
       // The media inside is served as a slice of the project; a linked file whole.
       if (media.embedded) {
-        if (header.mediaOffset === null)
+        if (payload === null)
           throw new project.ProjectFormatError("This project should have its song or video inside, but it's missing.");
-        const slice = { offset: header.mediaOffset, size: header.fileSize - header.mediaOffset, name: media.name };
+        // With blobs after it, the media ends at its size; before blobs, at the end of the file.
+        const size = Object.keys(blobs).length ? media.size : header.fileSize - payload;
+        const slice = { offset: payload, size, name: media.name };
         const url = mediaFiles.share(file, slice);
         return { ...opened, media: { name: media.name, url }, linkable: false, relinked: false };
       }
@@ -190,20 +204,30 @@ function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
         duration,
         embedded: embed,
       };
-      const headerBytes = Buffer.from(project.serializeProject({ media, sections, appVersion }), "utf8");
+      // The sections' binary data goes after the media, each at its place.
+      const { sections: plain, blobs } = project.extractBlobs(sections);
+      let at = embed ? size : 0;
+      const places = Object.fromEntries(
+        blobs.map(({ id, bytes }) => {
+          const place = { offset: at, size: bytes.byteLength };
+          at += bytes.byteLength;
+          return [id, place];
+        }),
+      );
+      const header = project.serializeProject({ media, sections: plain, blobs: places, appVersion });
+      const headerBytes = Buffer.from(header, "utf8");
 
       const temporary = `${target}.${process.pid}-${Date.now()}.tmp`;
       try {
         await fs.promises.writeFile(temporary, headerBytes);
-        if (embed) {
-          await fs.promises.appendFile(temporary, Buffer.from([project.MEDIA_SEPARATOR]));
-          if (size > 0) {
-            await pipeline(
-              fs.createReadStream(source.path, { start: source.offset, end: source.offset + size - 1 }),
-              fs.createWriteStream(temporary, { flags: "a" }),
-            );
-          }
+        if (embed || blobs.length) await fs.promises.appendFile(temporary, Buffer.from([project.MEDIA_SEPARATOR]));
+        if (embed && size > 0) {
+          await pipeline(
+            fs.createReadStream(source.path, { start: source.offset, end: source.offset + size - 1 }),
+            fs.createWriteStream(temporary, { flags: "a" }),
+          );
         }
+        for (const { bytes } of blobs) await fs.promises.appendFile(temporary, bytes);
         await replaceFile(temporary, target);
       } catch (error) {
         await fs.promises.rm(temporary, { force: true });

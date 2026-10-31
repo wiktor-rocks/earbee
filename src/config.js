@@ -256,7 +256,7 @@ export const CONFIG = {
   stems: {
     enabled: true,
     // In the panel's order; `id` is the model's name for it. "other" is
-    // what's left: the song minus the rest.
+    // whatever the model didn't put in the rest.
     list: [
       { id: "vocals", label: "Vocals" },
       { id: "drums", label: "Drums" },
@@ -267,10 +267,13 @@ export const CONFIG = {
     ],
     // Each stem's volume knob (1 = as separated).
     volume: { min: 0, max: 1, step: 0.01, initial: 1 },
+    // A project keeps the stems as Opus at this bitrate (stems/opus.js):
+    // about 6 MB a stem for a 4-minute song.
+    bitrate: 192_000,
     // The model hears 44.1 kHz; a song at another rate is resampled for it.
     sampleRate: 44100,
-    // Samples per message to the stem process (4 MB): Chromium refuses a
-    // message over 128 MB.
+    // Samples per message to and from the stem process (4 MB), so no
+    // message holds a whole song.
     chunk: 1 << 20,
   },
 };

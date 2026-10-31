@@ -28,6 +28,7 @@ import { restoreBeats, savedBeats } from "../beats.js";
 import { resetMarks } from "../marks.js";
 import { getLoopRegion, getStartPoint, setLoopRegion, setStartPoint } from "../playback.js";
 import { getTimelineShare, setTimelineShare } from "../stage-split.js"; // Stage split (src/features/stage-split.js)
+import { stemsSection } from "../stems/project.js"; // Stems (src/features/stems/)
 
 /**
  * @typedef {object} Section
@@ -187,4 +188,7 @@ export const SECTIONS = [
       if (finite(data.timelineShare)) setTimelineShare(data.timelineShare);
     },
   },
+  // Stems (src/features/stems/): the stems as Opus, in the file after its
+  // header, and their mix; not with the feature off.
+  ...(CONFIG.stems.enabled ? [stemsSection] : []),
 ];

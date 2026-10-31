@@ -15,8 +15,9 @@
 //   page → { type: "close" }                            got it all: the process exits
 //                                                       (as it does when the page's end closes)
 //
-// Chunks, because Chromium refuses a message over 128 MB (a stereo channel
-// of 12 minutes). Cancelling kills the process (index.js).
+// In chunks, so no message holds a whole song (its six stems are hundreds
+// of MB), and the page can turn each one to 16 bits as it comes.
+// Cancelling kills the process (index.js).
 const fs = require("fs");
 const os = require("os");
 const { separate, RATE, SEGMENT, STEMS } = require("./separate");
@@ -25,9 +26,8 @@ const CHUNK = 1 << 20; // samples a message (4 MB)
 // More threads stopped helping at 4 (measured: 8.6 s a segment on 1, 5.9
 // on 2, 5.0 on 4, 4.9 on 6), and playback needs some CPU too.
 const THREADS = Math.max(1, Math.min(4, Math.floor(os.cpus().length / 2)));
-// "other" is the song minus the other five, made where the stems are
-// played (src/features/stems/), so all six always add up to the song.
-const KEEP = STEMS.filter((name) => name !== "other");
+// All six, "other" too: a changed mix plays their sum (src/features/stems/).
+const KEEP = STEMS;
 
 // Below normal priority, so separating gives way to playback, the video
 // and drawing. Set before ONNX Runtime starts its threads, which take it

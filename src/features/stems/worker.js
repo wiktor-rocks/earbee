@@ -1,24 +1,31 @@
-// Stems (src/features/stems/): the page's side of separating one song, off
-// its main thread (a module Worker). It decodes the file again (the
-// player's samples went to the audio thread when it opened), at 44.1 kHz
-// in stereo (what the model hears; core/resample.js for other rates), and
-// streams it to the stem process (electron/stems/process.js) over the port
-// it's given; then it gathers the stems the process sends back, at the
-// track's own rate in 16 bits (what the player mixes them from: audio/
-// engine.js), and hands them to the page whole, transferred (no copy). The song and its stems
-// never pass through the page's main thread on the way.
+// Stems (src/features/stems/): the page's side of separating one song, and
+// of bringing back a project's stems, off its main thread (a module
+// Worker).
+//
+// Separating: it decodes the file again (the player's samples went to the
+// audio thread when it opened), at 44.1 kHz in stereo (what the model
+// hears; core/resample.js for other rates), and streams it to the stem
+// process (electron/stems/process.js) over the port it's given; then it
+// gathers the stems the process sends back, at the track's own rate in 16
+// bits (what the player mixes them from: audio/engine.js), and encodes each
+// as Opus (opus.js) for saving in a project. The song and its stems never
+// pass through the page's main thread on the way.
+//
+// Loading: a project's Opus stems decoded back to the same form.
 //
 //   page → { type: "separate", media, port }  media: a File, or { name, url } (core/media.js)
-//   ←      { type: "progress", stage: "decode", fraction } … then
-//          { type: "progress", stage: "separate", fraction } …
-//   ←      { type: "done", sampleRate, length, stems: { [id]: { scale, channels, level } } }
+//   ←      { type: "progress", stage: "decode" | "separate" | "encode", fraction } …
+//   page → { type: "load", audio: { [id]: bytes }, sampleRate, length }
+//   ←      { type: "progress", stage: "load", fraction } …
+//   ←      { type: "done", sampleRate, length, stems: { [id]: { scale, channels, level } }, audio }
 //          at the track's own rate: each channel an Int16Array (× scale: the
-//          samples), level its loudness
+//          samples), level its loudness; audio: each stem's Opus bytes
 //   ←      { type: "error", message }
 import { AudioSampleSink } from "../../../node_modules/mediabunny/dist/bundles/mediabunny.mjs";
 import { CONFIG } from "../../config.js";
 import { createResampler, resampleRatio } from "../../core/resample.js";
 import { openTrack } from "../../audio/open-track.js";
+import { decodeStem, encodeStem } from "./opus.js";
 
 const scope = /** @type {any} */ (self);
 const { sampleRate: RATE, chunk: CHUNK } = CONFIG.stems;
@@ -176,20 +183,68 @@ function level({ scale, channels }) {
   }, 0);
 }
 
+// A stem in 16 bits, scaled to its loudest sample.
+/** @param {Float32Array[]} channels */
+function quantize(channels) {
+  const peak = channels.reduce((most, channel) => channel.reduce((m, v) => Math.max(m, Math.abs(v)), most), 0);
+  const scale = Math.max(peak, 1e-6) / 32767;
+  const ints = channels.map((channel) => Int16Array.from(channel, (v) => Math.round(v / scale)));
+  return { scale, channels: ints };
+}
+
+// Each stem as Opus, from its 16 bits.
+async function encodeAll(stems, rate) {
+  const progress = progressReporter("encode");
+  const audio = {};
+  const ids = Object.keys(stems);
+  for (const [index, id] of ids.entries()) {
+    const { scale, channels } = stems[id];
+    const floats = channels.map((channel) => Float32Array.from(channel, (v) => v * scale));
+    audio[id] = await encodeStem(floats, rate, CONFIG.stems.bitrate);
+    progress((index + 1) / ids.length);
+  }
+  return audio;
+}
+
+// A project's Opus stems, decoded back.
+async function decodeAll(audio, rate, length) {
+  const progress = progressReporter("load");
+  const stems = {};
+  const ids = Object.keys(audio);
+  for (const [index, id] of ids.entries()) {
+    stems[id] = quantize(await decodeStem(audio[id], rate, length));
+    progress((index + 1) / ids.length);
+  }
+  return stems;
+}
+
+// Hands the stems over, their samples transferred.
+function finish({ sampleRate, length, stems, audio }) {
+  for (const stem of Object.values(stems)) stem.level = level(stem);
+  const buffers = Object.values(stems).flatMap((stem) => stem.channels.map((channel) => channel.buffer));
+  scope.postMessage({ type: "done", sampleRate, length, stems, audio }, buffers);
+}
+
 scope.addEventListener("message", async ({ data }) => {
-  if (data?.type !== "separate") return;
-  const { media, port } = data;
-  try {
-    const { length, sampleRate } = await sendTrack(media, port);
-    const received = receiveStems(port, sampleRate);
-    port.postMessage({ type: "separate", length });
-    const result = await received;
-    port.postMessage({ type: "close" });
-    for (const stem of Object.values(result.stems)) stem.level = level(stem);
-    const buffers = Object.values(result.stems).flatMap((stem) => stem.channels.map((channel) => channel.buffer));
-    scope.postMessage({ type: "done", ...result }, buffers);
-  } catch (error) {
-    port.close();
-    scope.postMessage({ type: "error", message: String(error?.message ?? error) });
+  if (data?.type === "separate") {
+    const { media, port } = data;
+    try {
+      const { length, sampleRate } = await sendTrack(media, port);
+      const received = receiveStems(port, sampleRate);
+      port.postMessage({ type: "separate", length });
+      const result = await received;
+      port.postMessage({ type: "close" });
+      finish({ ...result, audio: await encodeAll(result.stems, result.sampleRate) });
+    } catch (error) {
+      port.close();
+      scope.postMessage({ type: "error", message: String(error?.message ?? error) });
+    }
+  } else if (data?.type === "load") {
+    const { audio, sampleRate, length } = data;
+    try {
+      finish({ sampleRate, length, stems: await decodeAll(audio, sampleRate, length), audio });
+    } catch (error) {
+      scope.postMessage({ type: "error", message: String(error?.message ?? error) });
+    }
   }
 });
