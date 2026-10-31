@@ -13,3 +13,7 @@ tests/output/
 
 # Files kept on this computer only: notes, to-dos (see local/README.md)
 local/
+
+# The stem model (scripts/export-stem-model.py): too large for git, downloaded on first use
+models/htdemucs-6s.onnx
+models/htdemucs-6s.onnx.data
