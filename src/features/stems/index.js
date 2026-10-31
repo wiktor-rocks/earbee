@@ -9,9 +9,18 @@
  *   2. A worker (worker.js) decodes the song again at 44.1 kHz and streams
  *      it to the stem process, which separates it one 7.8 s segment at a
  *      time, at low priority (about as long as the song plays).
- *   3. The stems come back to the worker, then here, transferred.
+ *   3. The stems come back to the worker, which turns them into the
+ *      track's rate in 16 bits, then here, and on to the player
+ *      (audio/engine.js loadStems): they play through the same stretcher
+ *      as the track, mixed into its input, so they keep in step at any
+ *      speed, pitch or loop.
  * Cancel, or opening another file, stops it: the worker ends, and the main
  * process stops the stem process.
+ *
+ * Then the section is a mixer (dock.js): each stem's volume, solo and
+ * mute, turned into gains (mix.js) for the player. "Other" is the song
+ * minus the five stems, so with every stem at full volume it plays the
+ * song exactly as it is.
  *
  * Self-contained: this folder, its stems.css, electron/stems/, and the
  * lines marked "Stems (" (app.js, open-file.js, index.html, config.js,
@@ -20,13 +29,16 @@
  *
  *   bindStems()        builds the section (once, at startup)
  *   resetStems(media)  a new file is open: what was found is forgotten
- *   stemsFound()       the open song's stems, once separated (else null)
+ *   stemsFound()       what was found for the open song (else null)
  * ===================================================================== */
 
 import { CONFIG } from "../../config.js";
+import { player } from "../../context.js";
 import { AppError } from "../../core/errors.js";
 import { $, element, onClick, reportError } from "../../ui/dom.js";
 import { notify } from "../../ui/toast.js";
+import { buildMixer } from "./dock.js";
+import { defaultMix, stemGains } from "./mix.js";
 
 /**
  * The part of window.earbee (electron/preload.js) used here; missing
@@ -43,10 +55,11 @@ import { notify } from "../../ui/toast.js";
 const bridge = /** @type {StemsBridge | undefined} */ (/** @type {any} */ (window).earbee?.stems);
 
 /**
- * The stems of the open song, once separated: each stem's two channels at
- * `sampleRate`, `length` samples long (without "other", which is the song
- * minus these).
- * @typedef {{ sampleRate: number, length: number, stems: Record<string, Float32Array[]> }} Stems
+ * What was found for the open song (the samples themselves went to the
+ * player): the stems' ids in the player's order (without "other", the song
+ * minus these), at `sampleRate`, `length` samples long, and each one's
+ * loudness.
+ * @typedef {{ sampleRate: number, length: number, ids: string[], levels: Record<string, number> }} Stems
  */
 
 /** @type {import("../../core/media.js").Media | null} */
@@ -58,6 +71,8 @@ let modelReady = false;
 // What's going on: "idle", "download", "decode", "separate" or "ready".
 let stage = "idle";
 let fraction = 0;
+// Each stem's volume, solo and mute (mix.js).
+let mix = defaultMix(CONFIG.stems.list);
 // The separation going on: `stop` ends its wait (cancel).
 /** @type {{ cancelled: boolean, stop: () => void } | null} */
 let job = null;
@@ -112,8 +127,14 @@ async function separate() {
       worker.terminate();
     });
     if (!stillCurrent()) return;
-    found = { sampleRate: result.sampleRate, length: result.length, stems: result.stems };
+    // To the player, in its order; the samples are transferred.
+    const ids = CONFIG.stems.list.map(({ id }) => id).filter((id) => result.stems[id]);
+    await player.engine.loadStems(ids.map((id) => result.stems[id]));
+    if (!stillCurrent()) return;
+    const levels = Object.fromEntries(ids.map((id) => [id, result.stems[id].level]));
+    found = { sampleRate: result.sampleRate, length: result.length, ids, levels };
     job = null;
+    applyMix();
     show("ready", 1);
     notify("The stems are ready");
   } catch (error) {
@@ -134,6 +155,31 @@ function cancel() {
   show(found ? "ready" : "idle", 0);
 }
 
+/* ---------- The mix ---------- */
+
+// The player's gains from the mix (it ignores them until stems are loaded).
+function applyMix() {
+  if (!found) return;
+  const gains = stemGains(CONFIG.stems.list, mix);
+  player.engine.setStemGains(
+    found.ids.map((id) => gains[id]),
+    gains.other,
+  );
+}
+
+/** @param {string} id @param {Partial<import("./mix.js").StemSetting>} change */
+function changeMix(id, change) {
+  mix = { ...mix, [id]: { ...mix[id], ...change } };
+  applyMix();
+  render();
+}
+
+function resetMix() {
+  mix = defaultMix(CONFIG.stems.list);
+  applyMix();
+  render();
+}
+
 /* ---------- The section ---------- */
 
 const percent = (value) => `${Math.floor(value * 100)} %`;
@@ -151,7 +197,9 @@ function render() {
   const busy = stage === "download" || stage === "decode" || stage === "separate";
   ui.action.hidden = busy || stage === "ready";
   ui.busy.hidden = !busy;
-  ui.ready.hidden = stage !== "ready";
+  ui.mixer.hidden = stage !== "ready";
+  ui.reset.hidden = stage !== "ready";
+  if (stage === "ready") ui.mixerRows.render(mix);
   ui.action.textContent = modelReady
     ? "Separate the stems"
     : `Separate the stems (${megabytes(modelBytes)} download, once)`;
@@ -171,16 +219,30 @@ function build(section) {
   const status = element("span", { className: "stems-status" });
   const stopButton = element("button", { type: "button", className: "small", textContent: "Cancel" });
   const busy = element("div", { className: "stems-busy" }, status, stopButton);
-  const ready = element("p", { className: "stems-ready", textContent: "Stems ready" });
+  const reset = element("button", {
+    type: "button",
+    className: "icon-button small",
+    title: "All stems back to full volume, none soloed or muted",
+    ariaLabel: "Reset the stems",
+    innerHTML: '<svg class="icon" aria-hidden="true"><use href="#i-reset" /></svg>',
+  });
+  const mixer = element("div", { className: "stems-mixer" });
+  const mixerRows = buildMixer(mixer, { list: CONFIG.stems.list, range: CONFIG.stems.volume, onChange: changeMix });
   section.append(
-    element("div", { className: "dock-title" }, element("h2", { textContent: "Stems" })),
+    element(
+      "div",
+      { className: "dock-title" },
+      element("h2", { textContent: "Stems" }),
+      element("div", { className: "dock-title-row" }, reset),
+    ),
     action,
     busy,
-    ready,
+    mixer,
   );
   onClick(action, separate);
   onClick(stopButton, cancel);
-  return { section, action, busy, status, ready };
+  onClick(reset, resetMix);
+  return { section, action, busy, status, mixer, mixerRows, reset };
 }
 
 /* ---------- Wiring ---------- */
@@ -214,9 +276,13 @@ export function bindStems() {
 export function resetStems(next) {
   cancel();
   media = next;
+  // The player dropped them with the old track; this is for a load that
+  // was on its way.
+  if (found) player.engine.dropStems();
   found = null;
+  mix = defaultMix(CONFIG.stems.list);
   show("idle", 0);
 }
 
-/** The open song's stems, once separated (else null). @returns {Stems | null} */
+/** What was found for the open song (else null). @returns {Stems | null} */
 export const stemsFound = () => found;

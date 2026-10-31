@@ -3,18 +3,21 @@
 // player's samples went to the audio thread when it opened), at 44.1 kHz
 // in stereo (what the model hears; core/resample.js for other rates), and
 // streams it to the stem process (electron/stems/process.js) over the port
-// it's given; then it gathers the stems the process sends back, and hands
-// them to the page whole, transferred (no copy). The song and its stems
+// it's given; then it gathers the stems the process sends back, at the
+// track's own rate in 16 bits (what the player mixes them from: audio/
+// engine.js), and hands them to the page whole, transferred (no copy). The song and its stems
 // never pass through the page's main thread on the way.
 //
 //   page → { type: "separate", media, port }  media: a File, or { name, url } (core/media.js)
 //   ←      { type: "progress", stage: "decode", fraction } … then
 //          { type: "progress", stage: "separate", fraction } …
-//   ←      { type: "done", sampleRate, length, stems: { [id]: [left, right] } }
+//   ←      { type: "done", sampleRate, length, stems: { [id]: { scale, channels, level } } }
+//          at the track's own rate: each channel an Int16Array (× scale: the
+//          samples), level its loudness
 //   ←      { type: "error", message }
 import { AudioSampleSink } from "../../../node_modules/mediabunny/dist/bundles/mediabunny.mjs";
 import { CONFIG } from "../../config.js";
-import { createResampler } from "../../core/resample.js";
+import { createResampler, resampleRatio } from "../../core/resample.js";
 import { openTrack } from "../../audio/open-track.js";
 
 const scope = /** @type {any} */ (self);
@@ -34,7 +37,7 @@ function progressReporter(stage) {
 }
 
 // Sends the track, at RATE in stereo, to `port` in chunks; resolves to its
-// length in samples. A mono track goes to both sides; a track with more
+// length in samples (at RATE) and its own sample rate. A mono track goes to both sides; a track with more
 // channels sends its first two.
 async function sendTrack(media, port) {
   const { track, first, duration, sampleRate } = await openTrack(media);
@@ -102,41 +105,88 @@ async function sendTrack(media, port) {
     flush(channel, true);
   }
   progress(1);
-  return Math.min(sent[0], sent[1]);
+  return { length: Math.min(sent[0], sent[1]), sampleRate };
 }
 
-// Gathers the stems the process sends; resolves to { sampleRate, length, stems }.
-function receiveStems(port) {
+// Gathers the stems the process sends, each channel turned back to the
+// track's rate (`rate`) and into 16 bits as its chunks arrive, so the 44.1
+// kHz floats are never all held; resolves to { sampleRate, length, stems }.
+function receiveStems(port, rate) {
   const progress = progressReporter("separate");
   return new Promise((resolve, reject) => {
     let gathered = null;
+    let sentLength = 0; // the process's length, at its rate
+    const writers = new Map(); // "<id>/<channel>" → { resampler, at }
+
+    // Appends resampled samples to a stem's channel, in 16 bits.
+    const write = (stem, channel, writer, samples) => {
+      const out = stem.channels[channel];
+      const end = Math.min(out.length, writer.at + samples.length);
+      for (let i = writer.at; i < end; i++) {
+        out[i] = Math.max(-32768, Math.min(32767, Math.round(samples[i - writer.at] / stem.scale)));
+      }
+      writer.at = end;
+    };
+
     port.onmessage = ({ data }) => {
       if (data.type === "progress") progress(data.total ? data.done / data.total : 0);
       else if (data.type === "stems") {
+        sentLength = data.length;
+        const { up, down } = resampleRatio(data.sampleRate, rate);
+        const length = Math.ceil((data.length * up) / down);
         gathered = {
-          sampleRate: data.sampleRate,
-          length: data.length,
+          sampleRate: rate,
+          length,
           stems: Object.fromEntries(
-            data.names.map((id) => [id, [new Float32Array(data.length), new Float32Array(data.length)]]),
+            data.names.map((id, i) => [
+              id,
+              {
+                scale: Math.max(data.peaks[i], 1e-6) / 32767,
+                channels: [new Int16Array(length), new Int16Array(length)],
+              },
+            ]),
           ),
         };
-      } else if (data.type === "stem") gathered.stems[data.name][data.channel].set(data.samples, data.offset);
-      else if (data.type === "done") resolve(gathered);
+        for (const id of data.names) {
+          for (const channel of [0, 1]) {
+            writers.set(`${id}/${channel}`, { resampler: createResampler(data.sampleRate, rate), at: 0 });
+          }
+        }
+      } else if (data.type === "stem") {
+        const stem = gathered.stems[data.name];
+        const writer = writers.get(`${data.name}/${data.channel}`);
+        writer.resampler.push(data.samples);
+        write(stem, data.channel, writer, writer.resampler.take());
+        if (data.offset + data.samples.length >= sentLength) {
+          writer.resampler.finish();
+          write(stem, data.channel, writer, writer.resampler.take());
+        }
+      } else if (data.type === "done") resolve(gathered);
       else if (data.type === "error") reject(new Error(data.message));
     };
   });
+}
+
+// A stem's loudness (its two channels' RMS, added), for the tests.
+function level({ scale, channels }) {
+  return channels.reduce((sum, channel) => {
+    let squares = 0;
+    for (let i = 0; i < channel.length; i++) squares += channel[i] * channel[i];
+    return sum + Math.sqrt(squares / Math.max(1, channel.length)) * scale;
+  }, 0);
 }
 
 scope.addEventListener("message", async ({ data }) => {
   if (data?.type !== "separate") return;
   const { media, port } = data;
   try {
-    const length = await sendTrack(media, port);
-    const received = receiveStems(port);
+    const { length, sampleRate } = await sendTrack(media, port);
+    const received = receiveStems(port, sampleRate);
     port.postMessage({ type: "separate", length });
     const result = await received;
     port.postMessage({ type: "close" });
-    const buffers = Object.values(result.stems).flatMap((channels) => channels.map((channel) => channel.buffer));
+    for (const stem of Object.values(result.stems)) stem.level = level(stem);
+    const buffers = Object.values(result.stems).flatMap((stem) => stem.channels.map((channel) => channel.buffer));
     scope.postMessage({ type: "done", ...result }, buffers);
   } catch (error) {
     port.close();

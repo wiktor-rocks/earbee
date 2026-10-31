@@ -1,7 +1,8 @@
 // @ts-nocheck
 // Signalsmith Stretch 1.3.2 (https://signalsmith-audio.co.uk/code/stretch/,
-// MIT licence), from npm's signalsmith-stretch, with one fix by this
-// project, marked "patched" (see README.md beside this file).
+// MIT licence), from npm's signalsmith-stretch, with one fix and one
+// addition (mixing stems) by this project, marked "patched" (see README.md
+// beside this file).
 let module = {}, exports = {};
 
 var SignalsmithStretch = (() => {
@@ -35,6 +36,7 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 			this.audioBuffers = []; // list of (multi-channel) audio buffers
 			this.audioBuffersStart = 0; // time-stamp for the first audio buffer
 			this.audioBuffersEnd = 0; // just to be helpful
+			this.stems = null; // patched: stems mixed into the input (mixStems)
 			
 			this.timeIntervalSamples = sampleRate*0.1;
 			this.timeIntervalCounter = 0;
@@ -135,6 +137,7 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 						let buffers = this.audioBuffers.flat(1).map(b => b.buffer);
 						this.audioBuffers = [];
 						this.audioBuffersStart = this.audioBuffersEnd = 0;
+						this.stems = null; // patched: a new track: its stems are gone too
 						return {
 							value: {start: 0, end: 0},
 							transfer: buffers
@@ -165,6 +168,23 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 					let length = sampleBuffers[0].length;
 					this.audioBuffersEnd += length;
 					return this.audioBuffersEnd/sampleRate;
+				},
+				// patched: the track's stems, { tracks: [stem][channel] Int16Array, scales: [stem] }, from sample 0
+				addStems: stems => {
+					this.stems = {tracks: stems.tracks, scales: stems.scales, gains: stems.tracks.map(() => 1), other: 1, active: false};
+					return true;
+				},
+				// patched: each stem's gain, and the rest's (the track minus the stems)
+				setStemGains: (gains, other) => {
+					if (!this.stems) return false;
+					this.stems.gains = gains.slice(0, this.stems.tracks.length);
+					this.stems.other = other;
+					this.stems.active = other !== 1 || this.stems.gains.some(gain => gain !== 1);
+					return true;
+				},
+				dropStems: () => {
+					this.stems = null;
+					return true;
 				}
 			};
 
@@ -221,6 +241,23 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 			this.outputLatencySeconds = this.wasmModule._outputLatency()/sampleRate;
 		}
 		
+		// patched: turns `count` samples of the track, from buffer[at] (the
+		// track's sample `from`, channel `channel`), into the stems' mix:
+		// other × track + Σ (gain - other) × stem, "other" being the track
+		// minus the stems. Only while a gain isn't 1: otherwise the track is
+		// left exactly as it was.
+		mixStems(buffer, at, count, channel, from) {
+			let {tracks, scales, gains, other} = this.stems;
+			for (let i = 0; i < count; ++i) buffer[at + i] *= other;
+			for (let s = 0; s < tracks.length; ++s) {
+				let weight = (gains[s] - other)*scales[s];
+				if (weight === 0) continue;
+				let samples = tracks[s][channel%tracks[s].length];
+				let end = Math.min(count, samples.length - from);
+				for (let i = 0; i < end; ++i) buffer[at + i] += weight*samples[from + i];
+			}
+		}
+
 		updateBuffers() {
 			let wasmModule = this.wasmModule;
 			// longer than one STFT block, so we can seek smoothly
@@ -322,6 +359,7 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 						buffers.forEach((buffer, c) => {
 							let channelBuffer = audioBuffer[c%audioBuffer.length];
 							buffer.subarray(blockSamples).set(channelBuffer.subarray(startIndex, startIndex + count));
+							if (this.stems?.active) this.mixStems(buffer, blockSamples, count, c, inputSamples); // patched
 						});
 						inputSamples += count; // patched: was audioSamples += count
 						blockSamples += count;

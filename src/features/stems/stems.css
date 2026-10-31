@@ -32,9 +32,49 @@
   white-space: nowrap;
 }
 
-.stems-ready {
+/* Once separated: a row per stem (dock.js): its name, a small volume knob
+   with its value, then S and M. */
+.stems-mixer {
+  --knob-size: 28px;
+
+  display: grid;
   flex: 1 1 100%;
-  margin: 0;
-  color: var(--muted);
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 2px 6px;
+}
+
+.stems-mixer[hidden] {
+  display: none;
+}
+
+/* Each row's parts sit in the mixer's columns. */
+.stems-row {
+  display: contents;
+}
+
+.stems-name {
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stems-row .knob-value {
+  min-width: 4ch;
   font-size: 12px;
+  text-align: right;
+}
+
+.stems-row .toggle {
+  min-width: 26px;
+  padding: 2px 6px;
+  font-weight: 800;
+}
+
+/* A stem that isn't heard (muted, or another one soloed): dimmed, its
+   buttons still bright. */
+.stems-row.silent :is(.stems-name, .knob-cell) {
+  opacity: 0.4;
 }

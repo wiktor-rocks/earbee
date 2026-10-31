@@ -8,7 +8,7 @@
 //   page → { type: "audio", channel, offset, samples }  the song at 44.1 kHz, in chunks
 //   page → { type: "separate", length }                 all of it has come
 //   ←      { type: "progress", done, total }            segments done
-//   ←      { type: "stems", names, length, sampleRate } then, for each stem and channel,
+//   ←      { type: "stems", names, length, sampleRate, peaks } then, for each stem and channel,
 //   ←      { type: "stem", name, channel, offset, samples }  in chunks
 //   ←      { type: "done" }
 //   ←      { type: "error", message }
@@ -59,6 +59,8 @@ async function createSession() {
   };
 }
 
+const largest = (samples) => samples.reduce((most, value) => Math.max(most, Math.abs(value)), 0);
+
 // `port`: the MessagePortMain the main process handed over.
 function serve(port) {
   const chunks = [[], []]; // per channel: { offset, samples }
@@ -83,7 +85,9 @@ function serve(port) {
       keep: KEEP,
       onProgress: (done, total) => send({ type: "progress", done, total }),
     });
-    send({ type: "stems", names: KEEP, length, sampleRate: RATE });
+    // Each stem's loudest sample, so the page can store it in 16 bits as it comes.
+    const peaks = KEEP.map((name) => stems[name].reduce((peak, channel) => Math.max(peak, largest(channel)), 0));
+    send({ type: "stems", names: KEEP, length, sampleRate: RATE, peaks });
     for (const name of KEEP) {
       for (const channel of [0, 1]) {
         const samples = stems[name][channel];

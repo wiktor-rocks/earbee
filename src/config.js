@@ -265,6 +265,8 @@ export const CONFIG = {
       { id: "piano", label: "Piano" },
       { id: "other", label: "Other" },
     ],
+    // Each stem's volume knob (1 = as separated).
+    volume: { min: 0, max: 1, step: 0.01, initial: 1 },
     // The model hears 44.1 kHz; a song at another rate is resampled for it.
     sampleRate: 44100,
     // Samples per message to the stem process (4 MB): Chromium refuses a

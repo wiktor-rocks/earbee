@@ -13,7 +13,8 @@ import { clamp } from "../core/format.js";
  * → limiter → speakers.
  *
  * Exposes: init, useSampleRate, loadPieces, schedule, setVolume, setEq,
- *          setFocus, now, outputDelay, resume, click
+ *          setFocus, now, outputDelay, resume, click; and loadStems,
+ *          setStemGains, dropStems for Stems (src/features/stems/)
  * Values set before init() are remembered and applied when the graph
  * is built, so settings can change before any audio is loaded.
  *
@@ -155,11 +156,30 @@ export function createAudioEngine({ onError }) {
     }
   }
 
+  // Stems (src/features/stems/): the track's stems, mixed into
+  // Signalsmith's input by its worklet (see src/vendor/signalsmith-stretch).
+  // Each is { scale, channels } (Int16Arrays at the track's rate, from its
+  // first sample, transferred); setStemGains gives each stem's gain, in
+  // the same order, and the rest's. A new track drops them by itself.
+  async function loadStems(stems) {
+    await init();
+    const tracks = stems.map((stem) => stem.channels);
+    await stretch.addStems(
+      { tracks, scales: stems.map((stem) => stem.scale) },
+      tracks.flat().map((c) => c.buffer),
+    );
+  }
+  const setStemGains = (gains, other) => void stretch?.setStemGains(gains, other).catch(onError);
+  const dropStems = () => void stretch?.dropStems().catch(onError);
+
   return {
     init,
     useSampleRate,
     schedule,
     loadPieces,
+    loadStems,
+    setStemGains,
+    dropStems,
     now: () => context?.currentTime ?? 0,
     // Time from audio leaving the graph to it reaching the speakers.
     outputDelay: () => (context ? (context.baseLatency || 0) + (context.outputLatency || 0) : 0),
