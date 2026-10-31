@@ -23,6 +23,8 @@ module.exports = async function (h) {
         busy: part(".stems-busy").hidden ? null : part(".stems-status").textContent,
         ready: !part(".stems-mixer").hidden,
         preparing: part(".stems-preparing").hidden ? null : part(".stems-preparing").textContent,
+        folded: part(".stems-folded").hidden ? null : part(".stems-folded").textContent,
+        folds: s.querySelectorAll("button.stems-fold").length,
         rows: [...s.querySelectorAll(".stems-row")].map((row) => ({
           id: row.dataset.stem,
           silent: row.classList.contains("silent"),
@@ -30,6 +32,8 @@ module.exports = async function (h) {
           mute: row.querySelector("button[title^=Mute]").ariaPressed === "true",
           volume: row.querySelector(".knob-value").textContent,
           pan: Number(row.querySelector(".stems-pan input").value),
+          name: row.querySelector(".stems-name").textContent,
+          hidden: row.hidden,
         })),
       };
     })()`);
@@ -243,12 +247,31 @@ module.exports = async function (h) {
   await js(
     `(() => { const i = document.querySelector('#stemsSection [data-stem="guitar"] .stems-pan input'); i.value = "-60"; i.dispatchEvent(new Event("input")); })()`,
   );
-  const mixed = (await section()).rows;
+  let mixed = (await section()).rows;
   check(
     "stems: each row has a pan knob, and turning it sets the stem's pan",
     mixed.every((r) => Number.isFinite(r.pan)) && mixed.find((r) => r.id === "guitar").pan === -60,
     JSON.stringify(mixed),
   );
+  check("stems: every row but Other's can be folded into Other", (await section()).folds === 5);
+  await press(`[data-stem="piano"] .stems-fold`);
+  state = await section();
+  mixed = state.rows;
+  check(
+    "stems: folding the piano hides its row, and Other says it holds it",
+    row(state, "piano").hidden &&
+      row(state, "other").name === "Other + Piano" &&
+      state.folded === "Piano is in Other · Show" &&
+      state.rows.filter((r) => r.hidden).length === 1,
+    JSON.stringify({ folded: state.folded, rows: state.rows }),
+  );
+  // The pointer on the guitar's row: its × shows.
+  const guitarName = await js(
+    `(() => { const r = document.querySelector('#stemsSection [data-stem="guitar"] .stems-name').getBoundingClientRect(); return { x: Math.round(r.left + 5), y: Math.round(r.top + r.height / 2) }; })()`,
+  );
+  h.wc.sendInputEvent({ type: "mouseMove", ...guitarName });
+  await sleep(200);
+  await shot("stems-folded.png");
   const projectFile = path.join(OUTPUT, "projects", "Stems.ebee");
   fs.mkdirSync(path.dirname(projectFile), { recursive: true });
   fs.rmSync(projectFile, { force: true });
@@ -269,6 +292,7 @@ module.exports = async function (h) {
       saved.audio?.guitar?.blob === "stems/stems/audio/guitar" &&
       saved.mix?.guitar?.solo === true &&
       saved.mix?.guitar?.pan === -60 &&
+      saved.mix?.piano?.folded === true &&
       saved.mix?.drums?.mute === true,
     JSON.stringify({ version: header?.version, blobs: header?.blobs, mix: saved?.mix }),
   );
@@ -293,6 +317,14 @@ module.exports = async function (h) {
     JSON.stringify({ before: stems.levels, after: back?.levels }),
   );
   check("stems: …and that isn't an unsaved change", !(await title()).endsWith(" •"), await title());
+  check("stems: …and the fold with it", state.folded === "Piano is in Other · Show", state.folded);
+  await press(`.stems-show`);
+  state = await section();
+  check(
+    "stems: Show brings the piano back",
+    !row(state, "piano").hidden && row(state, "other").name === "Other" && state.folded === null,
+    JSON.stringify({ folded: state.folded, piano: row(state, "piano"), other: row(state, "other") }),
+  );
 
   // A new file forgets them; Cancel stops a separation.
   await openFile(path.join(FIXTURES, "bars.wav"));

@@ -74,3 +74,28 @@ test("the pan's readout", () => {
   assert.equal(formatPan(-40), "L 40");
   assert.equal(formatPan(100), "R 100");
 });
+
+test("a stem folded into Other plays as Other does", () => {
+  const folded = { piano: { folded: true, volume: 0.2, pan: 80, mute: true } };
+  const listed = [...list, { id: "piano" }];
+  const mixWithPiano = (changes) => {
+    const mix = defaultMix(listed);
+    for (const [id, change] of Object.entries(changes)) mix[id] = { ...mix[id], ...change };
+    return mix;
+  };
+  assert.equal(isUnchanged(stemMixes(listed, mixWithPiano(folded))), true, "folding alone: the song as it is");
+  const quieter = stemMixes(listed, mixWithPiano({ ...folded, other: { volume: 0.5, pan: -100 } }));
+  assert.deepEqual(quieter.piano, quieter.other, "Other's volume and pan, not its own");
+  assert.equal(stemGains(listed, mixWithPiano({ ...folded, other: { mute: true } })).piano, 0, "Other muted: it too");
+  assert.equal(
+    stemGains(listed, mixWithPiano({ ...folded, other: { solo: true } })).piano,
+    1,
+    "Other soloed: it plays",
+  );
+  const hiddenSolo = stemGains(listed, mixWithPiano({ piano: { folded: true, solo: true } }));
+  assert.deepEqual(
+    hiddenSolo,
+    { vocals: 1, guitar: 1, other: 1, piano: 1 },
+    "its own solo, hidden, counts for nothing",
+  );
+});

@@ -26,6 +26,8 @@ function mixFrom(saved) {
     if (Number.isFinite(stem.pan)) mix[id].pan = clamp(stem.pan, CONFIG.stems.pan.min, CONFIG.stems.pan.max);
     mix[id].solo = stem.solo === true;
     mix[id].mute = stem.mute === true;
+    // Folded into Other (not Other itself); projects from before: none.
+    mix[id].folded = id !== "other" && stem.folded === true;
   }
   return mix;
 }

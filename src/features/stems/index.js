@@ -358,8 +358,18 @@ function changeMix(id, change) {
   render();
 }
 
+// Every folded stem back in the mixer, with the settings it had.
+function unfoldAll() {
+  mix = Object.fromEntries(Object.entries(mix).map(([id, setting]) => [id, { ...setting, folded: false }]));
+  applyMix();
+  render();
+}
+
+// Back to full volume and centred, nothing soloed or muted; what's folded
+// into Other stays folded (Show brings it back).
 function resetMix() {
-  mix = defaultMix(CONFIG.stems.list);
+  const fresh = defaultMix(CONFIG.stems.list);
+  mix = Object.fromEntries(Object.entries(fresh).map(([id, setting]) => [id, { ...setting, folded: mix[id].folded }]));
   applyMix();
   render();
 }
@@ -420,7 +430,7 @@ function build(section) {
   const reset = element("button", {
     type: "button",
     className: "icon-button small",
-    title: "All stems back to full volume, none soloed or muted",
+    title: "All stems back to full volume and centred, none soloed or muted",
     ariaLabel: "Reset the stems",
     innerHTML: '<svg class="icon" aria-hidden="true"><use href="#i-reset" /></svg>',
   });
@@ -430,6 +440,7 @@ function build(section) {
     range: CONFIG.stems.volume,
     panRange: CONFIG.stems.pan,
     onChange: changeMix,
+    onUnfoldAll: unfoldAll,
   });
   // A part of the Mixer (index.html): its own small heading, the reset beside it.
   section.append(

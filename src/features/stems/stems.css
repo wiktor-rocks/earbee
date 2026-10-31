@@ -77,13 +77,13 @@
 }
 
 /* Once separated: a row per stem (dock.js): its name, a small volume knob
-   with its value, a smaller pan knob, then S and M. */
+   with its value, a smaller pan knob, S and M, then × (fold into Other). */
 .stems-mixer {
   --knob-size: 28px;
 
   display: grid;
   flex: 1 1 100%;
-  grid-template-columns: minmax(0, 1fr) auto auto auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto auto auto;
   align-items: center;
   gap: 2px 5px;
 }
@@ -97,12 +97,63 @@
   display: contents;
 }
 
+/* A stem folded into Other (display: contents would show it anyway). */
+.stems-row[hidden] {
+  display: none;
+}
+
+/* × folds a stem into Other: there to be found, not to be seen until the
+   row is pointed at or reached with Tab. Other's row has an empty one. */
+.stems-fold {
+  width: 16px;
+  min-width: 0;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1;
+  opacity: 0;
+}
+
+.stems-row:is(:hover, :focus-within) .stems-fold,
+.stems-fold:focus-visible {
+  opacity: 1;
+}
+
+.stems-fold:hover {
+  color: var(--text);
+}
+
+/* "Piano is in Other · Show", across the rows. */
+.stems-folded {
+  grid-column: 1 / -1;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.stems-folded[hidden] {
+  display: none;
+}
+
+.stems-show {
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+/* A name wraps rather than being cut: Other's can grow ("Other + Piano"). */
 .stems-name {
-  overflow: hidden;
   font-size: 13px;
   font-weight: 500;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 
 /* Room for the pan's "Centre" too, so the row doesn't shift as it shows. */

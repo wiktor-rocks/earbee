@@ -6,9 +6,15 @@
 // Each stem reaches the two sides through a 2×2 mix, [left from left,
 // left from right, right from left, right from right], so a pan can move
 // it from one side to the other (panMatrix).
+//
+// A stem can be folded into "other" (removed from the mixer, its sound
+// kept): it then plays exactly as Other does, its own settings kept for
+// when it comes back.
 
-/** @typedef {{ volume: number, pan: number, solo: boolean, mute: boolean }} StemSetting */
+/** @typedef {{ volume: number, pan: number, solo: boolean, mute: boolean, folded: boolean }} StemSetting */
 /** @typedef {[number, number, number, number]} StemMatrix */
+
+const OTHER = "other";
 
 /**
  * Every stem at full volume and centred, none soloed or muted.
@@ -16,7 +22,15 @@
  * @returns {Record<string, StemSetting>}
  */
 export const defaultMix = (list) =>
-  Object.fromEntries(list.map(({ id }) => [id, { volume: 1, pan: 0, solo: false, mute: false }]));
+  Object.fromEntries(list.map(({ id }) => [id, { volume: 1, pan: 0, solo: false, mute: false, folded: false }]));
+
+/**
+ * The settings a stem plays with: Other's when it's folded into it.
+ * @param {Record<string, StemSetting>} mix
+ * @param {string} id
+ * @returns {Partial<StemSetting>}
+ */
+const playing = (mix, id) => (mix[id]?.folded && id !== OTHER && mix[OTHER] ? mix[OTHER] : mix[id]) ?? {};
 
 /**
  * @param {{ id: string }[]} list
@@ -24,10 +38,11 @@ export const defaultMix = (list) =>
  * @returns {Record<string, number>} each stem's gain, by id
  */
 export function stemGains(list, mix) {
-  const anySolo = list.some(({ id }) => mix[id]?.solo);
+  // Only stems in the mixer count: a folded one's solo is hidden with it.
+  const anySolo = list.some(({ id }) => mix[id]?.solo && !(mix[id].folded && id !== OTHER));
   return Object.fromEntries(
     list.map(({ id }) => {
-      const { volume = 1, solo = false, mute = false } = mix[id] ?? {};
+      const { volume = 1, solo = false, mute = false } = playing(mix, id);
       return [id, mute || (anySolo && !solo) ? 0 : volume];
     }),
   );
@@ -61,7 +76,10 @@ export function panMatrix(pan) {
 export function stemMixes(list, mix) {
   const gains = stemGains(list, mix);
   return Object.fromEntries(
-    list.map(({ id }) => [id, /** @type {StemMatrix} */ (panMatrix(mix[id]?.pan ?? 0).map((v) => v * gains[id]))]),
+    list.map(({ id }) => [
+      id,
+      /** @type {StemMatrix} */ (panMatrix(playing(mix, id).pan ?? 0).map((v) => v * gains[id])),
+    ]),
   );
 }
 
