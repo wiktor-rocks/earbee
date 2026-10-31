@@ -43,13 +43,13 @@ function setUp({ model = true } = {}) {
     port1 = { name: "port1" };
     port2 = { name: "port2" };
   }
-  const sender = {
+  const sender = Object.assign(new EventEmitter(), {
     sent: [],
     posted: [],
     isDestroyed: () => false,
     send: (channel, message) => sender.sent.push({ channel, message }),
     postMessage: (channel, message, ports) => sender.posted.push({ channel, ports }),
-  };
+  });
   handleStems(ipcMain, { utilityProcess, MessageChannelMain, userData, devCopy, fetch: async () => new Response() });
   const call = (channel) => handlers.get(channel)({ sender });
   return { call, forks, sender };
@@ -105,4 +105,31 @@ test("a process that dies tells the page; one that finishes doesn't", async () =
   assert.equal(sender.sent.length, 1);
   assert.equal(sender.sent[0].channel, "stems:stopped");
   assert.match(sender.sent[0].message.error, /stopped \(134\)/);
+});
+
+test("the page reloading, closing or crashing stops the process at once", async () => {
+  for (const [event, details] of [
+    ["did-start-navigation", { isMainFrame: true, isSameDocument: false }],
+    ["destroyed", undefined],
+    ["render-process-gone", {}],
+  ]) {
+    const { call, forks, sender } = setUp();
+    await call("stems:start");
+    sender.emit(event, details);
+    assert.equal(forks[0].killed, true, event);
+    forks[0].emit("exit", 9);
+    assert.deepEqual(sender.sent, [], `${event}: nobody to tell`);
+    assert.equal(sender.listenerCount(event), 0, `${event}: its listeners go with the process`);
+    fs.rmSync(devCopy, { force: true });
+  }
+});
+
+test("navigating within the page doesn't stop it", async () => {
+  const { call, forks, sender } = setUp();
+  await call("stems:start");
+  sender.emit("did-start-navigation", { isMainFrame: true, isSameDocument: true });
+  sender.emit("did-start-navigation", { isMainFrame: false, isSameDocument: false });
+  assert.equal(forks[0].killed, false);
+  forks[0].emit("exit", 0);
+  assert.equal(sender.listenerCount("did-start-navigation"), 0, "and once it's done, its listeners are gone");
 });

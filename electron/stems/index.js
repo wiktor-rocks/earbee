@@ -13,7 +13,8 @@
 //     "stems:cancel"    stops the download or the process
 //   The process exits once the page has the stems (it says "close"); if it
 //   stops before that, the page gets "stems:stopped" { error }. One song at
-//   a time: starting another stops the one before.
+//   a time: starting another stops the one before, and the page reloading,
+//   closing or crashing stops it too.
 const path = require("path");
 const { createModelFile, ModelFileError } = require("./model-file");
 
@@ -58,8 +59,21 @@ function handleStems(ipcMain, { utilityProcess, MessageChannelMain, userData, de
     const child = utilityProcess.fork(SCRIPT, [model], { serviceName: "EarBee stem separation" });
     const started = { child, sender };
     job = started;
+    // The page reloading, closing or crashing: nobody wants the stems any
+    // more, so the process stops at once (it doesn't notice by itself:
+    // measured, it ran on to the end of the song).
+    const pageGone = () => job === started && stop();
+    const navigated = (details) => details?.isMainFrame && !details.isSameDocument && pageGone();
+    sender.on("did-start-navigation", navigated);
+    sender.on("render-process-gone", pageGone);
+    sender.on("destroyed", pageGone);
     child.on("exit", (code) => {
-      // Stopped here (cancelled, or another song started): the page knows.
+      if (!sender.isDestroyed()) {
+        sender.off("did-start-navigation", navigated);
+        sender.off("render-process-gone", pageGone);
+        sender.off("destroyed", pageGone);
+      }
+      // Stopped here (cancelled, another song, the page gone): nobody to tell.
       if (job !== started) return;
       job = null;
       if (code !== 0 && !sender.isDestroyed()) {
@@ -68,8 +82,6 @@ function handleStems(ipcMain, { utilityProcess, MessageChannelMain, userData, de
     });
     const { port1, port2 } = new MessageChannelMain();
     child.postMessage({ type: "port" }, [port1]);
-    // The window closing or reloading closes the page's end, and the
-    // process exits (process.js).
     sender.postMessage("stems:port", null, [port2]);
     return { ok: true };
   });

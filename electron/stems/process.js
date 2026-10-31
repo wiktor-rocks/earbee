@@ -13,7 +13,7 @@
 //   ←      { type: "done" }
 //   ←      { type: "error", message }
 //   page → { type: "close" }                            got it all: the process exits
-//                                                       (as it does when the page's end closes)
+//                                                       (index.js stops it if the page goes away)
 //
 // In chunks, so no message holds a whole song (its six stems are hundreds
 // of MB), and the page can turn each one to 16 bits as it comes.
@@ -111,7 +111,8 @@ function serve(port) {
       run(data.length).catch((error) => send({ type: "error", message: String(error?.message ?? error) }));
     } else if (data?.type === "close") process.exit(0);
   });
-  // The page's end went away (the window closed or reloaded): nobody wants the stems.
+  // The page's end went away. Not to be relied on (it didn't come when the
+  // page reloaded, measured): the main process stops this one then.
   port.on("close", () => process.exit(0));
   port.start();
 }
