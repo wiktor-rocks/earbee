@@ -43,7 +43,7 @@
   white-space: nowrap;
 }
 
-/* Before the model is downloaded: what it is, and its licence. */
+/* A quiet line ("Preparing them for saving"). */
 .stems-note {
   flex: 1 1 100%;
   margin: 0;

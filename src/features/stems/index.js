@@ -394,15 +394,13 @@ function render() {
   ui.mixer.hidden = stage !== "ready";
   ui.reset.hidden = stage !== "ready";
   if (stage === "ready") ui.mixerRows.render(mix);
-  ui.action.textContent = modelReady
-    ? "Separate the stems"
-    : `Separate the stems (${megabytes(modelBytes)} download, once)`;
+  // Short: what the model is and its licence are on EarBee/models and in
+  // THIRD_PARTY_NOTICES.md; the first time's download size, in the tooltip.
+  ui.action.textContent = "Separate the stems";
   ui.action.title =
-    "Split the song into vocals, drums, bass, guitar, piano and the rest. It runs in the background, " +
-    "about as long as the song plays.";
-  // Before the model is downloaded: what it is, and its licence (see
-  // THIRD_PARTY_NOTICES.md).
-  ui.note.hidden = modelReady || stage !== "idle";
+    "Split the song into vocals, drums, bass, guitar, piano and the rest, in the background, " +
+    "in about as long as the song plays." +
+    (modelReady ? "" : ` The first time, the stem model is downloaded (${megabytes(modelBytes)}).`);
   const label = {
     download: `Downloading the stem model ${percent(fraction)}`,
     decode: `Reading the song ${percent(fraction)}`,
@@ -421,12 +419,6 @@ function build(section) {
   const stopButton = element("button", { type: "button", className: "small", textContent: "Cancel" });
   const busy = element("div", { className: "stems-busy" }, status, stopButton);
   const preparing = element("p", { className: "stems-note stems-preparing" });
-  const note = element("p", {
-    className: "stems-note",
-    textContent:
-      "The stem model is Demucs, by Meta. It isn't part of EarBee: its licence is unclear, " +
-      "likely free for non-commercial use only (CC BY-NC).",
-  });
   const reset = element("button", {
     type: "button",
     className: "icon-button small",
@@ -446,7 +438,6 @@ function build(section) {
   section.append(
     element("div", { className: "stems-head" }, element("h3", { textContent: "Stems" }), reset),
     action,
-    note,
     busy,
     mixer,
     preparing,
@@ -454,7 +445,7 @@ function build(section) {
   onClick(action, separate);
   onClick(stopButton, cancel);
   onClick(reset, resetMix);
-  return { section, action, note, busy, status, mixer, mixerRows, preparing, reset };
+  return { section, action, busy, status, mixer, mixerRows, preparing, reset };
 }
 
 /* ---------- Wiring ---------- */
