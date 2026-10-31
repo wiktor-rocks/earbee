@@ -99,3 +99,9 @@ test("a stem folded into Other plays as Other does", () => {
     "its own solo, hidden, counts for nothing",
   );
 });
+
+test("a stem can be turned up past where it was, to twice as loud", () => {
+  const mixes = stemMixes(list, mixWith({ guitar: { volume: 2 } }));
+  assert.deepEqual(mixes.guitar, [2, 0, 0, 2]);
+  assert.equal(isUnchanged(mixes), false);
+});

@@ -260,11 +260,17 @@ module.exports = async function (h) {
     );
   await press(`[data-stem="guitar"] .stems-name`);
   await setInPanel("Pan", -60);
+  await setInPanel("Volume", 1.5);
   state = await section();
+  const guitarTip = await js(`document.querySelector('#stemsSection [data-stem="guitar"] .knob').title`);
   check(
-    "stems: a stem's name opens its panel, where its pan is set",
-    state.panel?.name === "Guitar" && state.panel.pan === "L 60" && state.panel.volume === "100%" && state.panel.fold,
-    JSON.stringify(state.panel),
+    "stems: a stem's name opens its panel, where its pan is set, and its volume up to 200 %",
+    state.panel?.name === "Guitar" &&
+      state.panel.pan === "L 60" &&
+      state.panel.volume === "150%" &&
+      state.panel.fold &&
+      guitarTip === "Guitar volume: 150%",
+    JSON.stringify({ panel: state.panel, guitarTip }),
   );
   await shot("stems-panel.png");
   await closePanel();
@@ -307,6 +313,7 @@ module.exports = async function (h) {
       saved.audio?.guitar?.blob === "stems/stems/audio/guitar" &&
       saved.mix?.guitar?.solo === true &&
       saved.mix?.guitar?.pan === -60 &&
+      saved.mix?.guitar?.volume === 1.5 &&
       saved.mix?.piano?.folded === true &&
       saved.mix?.drums?.mute === true,
     JSON.stringify({ version: header?.version, blobs: header?.blobs, mix: saved?.mix }),
@@ -335,7 +342,11 @@ module.exports = async function (h) {
   check("stems: …and the fold with it", state.folded === "Piano is in Other · Show", state.folded);
   await press(`[data-stem="guitar"] .stems-name`);
   state = await section();
-  check("stems: …and the guitar's pan", state.panel?.pan === "L 60", JSON.stringify(state.panel));
+  check(
+    "stems: …and the guitar's pan and volume",
+    state.panel?.pan === "L 60" && state.panel.volume === "150%",
+    JSON.stringify(state.panel),
+  );
   await closePanel();
   await press(`.stems-show`);
   state = await section();
