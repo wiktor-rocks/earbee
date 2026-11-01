@@ -7,9 +7,19 @@ import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { describe, test } from "node:test";
 
-const { separate, segmentStarts, triangle, SEGMENT, STEMS, BINS, FRAMES } = createRequire(import.meta.url)(
-  "../../electron/stems/separate.js",
-);
+const {
+  separate,
+  createSeparator,
+  segmentStarts,
+  segmentSpan,
+  segmentsFor,
+  orderOutward,
+  triangle,
+  SEGMENT,
+  STEMS,
+  BINS,
+  FRAMES,
+} = createRequire(import.meta.url)("../../electron/stems/separate.js");
 
 // Every stem's time branch is the segment; the spectral branch is silent.
 const silentSpec = new Float32Array(STEMS.length * 4 * BINS * FRAMES);
@@ -75,6 +85,67 @@ describe("separate", () => {
     );
     assert.equal(calls, 1);
   });
+});
+
+// A model whose answer differs from segment to segment (each stem the
+// segment times its own scrambled factor), so a blend of two segments
+// differs from either alone, and the order the segments are done in
+// would show if it mattered.
+const varied = async (mix) => {
+  const wave = new Float32Array(STEMS.length * 2 * SEGMENT);
+  const factor = 1 + 0.1 * Math.sin(mix[1000] * 1e3);
+  for (let s = 0; s < STEMS.length; s++) {
+    for (let i = 0; i < 2 * SEGMENT; i++) wave[s * 2 * SEGMENT + i] = mix[i] * factor * (s + 1);
+  }
+  return { spec: silentSpec, wave };
+};
+
+describe("createSeparator", () => {
+  const length = Math.round(4.2 * SEGMENT);
+  const left = song(length, 7);
+  const right = song(length, 8);
+
+  test("any order of segments gives the same stems as all in order", async () => {
+    const { stems: inOrder } = await separate({ left, right, runModel: varied });
+    const starts = segmentStarts(length);
+    const outward = orderOutward(starts, length, { from: 2.5 * SEGMENT, to: 2.7 * SEGMENT }, starts.keys());
+    for (const order of [outward, [...starts.keys()].reverse()]) {
+      const separator = createSeparator({ left, right, runModel: varied });
+      for (const index of order) await separator.runSegment(index);
+      const stems = separator.read(0, length);
+      for (const name of STEMS) {
+        assert.ok(largestDifference(stems[name][0], inOrder[name][0]) < 1e-5, `${name}, order ${order}`);
+        assert.ok(largestDifference(stems[name][1], inOrder[name][1]) < 1e-5, `${name}, order ${order}`);
+      }
+    }
+  });
+
+  test("a segment done alone gives its part, and silence elsewhere", async () => {
+    const separator = createSeparator({ left, right, runModel: echo });
+    const changed = await separator.runSegment(2);
+    assert.deepEqual(changed, segmentSpan(separator.starts, length, 2));
+    const { guitar } = separator.read(0, length);
+    assert.ok(
+      largestDifference(guitar[0].subarray(changed.from, changed.to), left.subarray(changed.from, changed.to)) < 1e-4,
+    );
+    assert.equal(guitar[0][changed.from - 1], 0);
+    assert.equal(guitar[0][changed.to], 0);
+  });
+});
+
+test("the segments a span touches, and the order to do them in: those first, then outward", () => {
+  const length = 5 * SEGMENT;
+  const starts = segmentStarts(length);
+  const stride = starts[1];
+  assert.deepEqual(segmentsFor(starts, length, 0, 10), [0]);
+  // Just inside segment 2's start: also within segment 1's part.
+  assert.deepEqual(segmentsFor(starts, length, 2 * stride + 10, 2 * stride + 20), [1, 2]);
+  const order = orderOutward(starts, length, { from: 3 * stride + 10, to: 3 * stride + 20 }, starts.keys());
+  assert.deepEqual(order.slice(0, 2), [2, 3]);
+  assert.deepEqual(new Set(order), new Set(starts.keys()));
+  // Nearest the span's middle next: one either side before those further away.
+  assert.deepEqual(new Set(order.slice(2, 4)), new Set([1, 4]));
+  assert.deepEqual(orderOutward(starts, length, { from: 0, to: 10 }, [5, 3]), [3, 5], "only those left");
 });
 
 test("the segments overlap by a quarter", () => {

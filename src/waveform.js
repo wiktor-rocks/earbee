@@ -60,6 +60,8 @@ import { drawWaveform } from "./waveform-draw.js";
  *          setAppearance (the look, from Settings › Waveform),
  *          getView / setView (the zoom and scroll, for project files),
  *          lockFit (the whole track in view, no zooming, for big video),
+ *          setStemsCovered (the parts of the song the stems cover so far,
+ *          drawn as a strip along the bottom: src/features/stems/),
  *          refreshColors (after the colour variables changed, e.g. a
  *          theme), and for the lanes: onView, timeAtClientX,
  *          clientXAt, wheel (an event handler), scrollNearEdge, holdFollow
@@ -103,6 +105,10 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   /** @type {LoopRegion | null} */
   let loop = null; // as last set by setLoop()
   let loopElement = null;
+  // Stems (src/features/stems/): the parts separated so far, in seconds.
+  /** @type {[number, number][] | null} */
+  let stemsCovered = null;
+  let stemsElement = null;
   let hoverLine = null; // { line, label, text, flip }
   let hoverX = null; // pointer x of the mouse hovering the waveform (no drag), or null
   const viewEvents = createEmitter(); // "view", after the view changed
@@ -439,6 +445,33 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     loopElement.style.setProperty("--loop-after", `${(1 - shown.end / duration) * 100}%`);
   }
 
+  /* ---------- The stems' parts ---------- */
+
+  // Stems (src/features/stems/): while they're being separated, a thin
+  // strip along the bottom under each part done, so it's clear where the
+  // mix applies (elsewhere the song plays as it is). Hidden once all of it
+  // is, or without stems. Positioned in percent, like the loop.
+  function renderStemsCovered() {
+    if (!waveSurfer) return;
+    const wrapper = waveSurfer.getWrapper();
+    if (!stemsElement || stemsElement.parentNode !== wrapper) {
+      stemsElement = document.createElement("div");
+      stemsElement.setAttribute("part", "stems-covered");
+      wrapper.append(stemsElement);
+    }
+    const spans = duration && stemsCovered ? stemsCovered : [];
+    stemsElement.hidden = spans.length === 0;
+    stemsElement.replaceChildren(
+      ...spans.map(([from, to]) => {
+        const part = document.createElement("div");
+        part.setAttribute("part", "stems-covered-part");
+        part.style.left = `${(from / duration) * 100}%`;
+        part.style.width = `${((to - from) / duration) * 100}%`;
+        return part;
+      }),
+    );
+  }
+
   /* ---------- The view, for the lanes ---------- */
 
   // The whole (zoomed) waveform's width and left edge, relative to the
@@ -691,7 +724,9 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     zoomLevel = null;
     zoomAnchor = null;
     loop = null;
+    stemsCovered = null;
     renderLoop();
+    renderStemsCovered();
     renderHoverLine(null);
     emitView();
     if (!waveSurfer) return;
@@ -821,6 +856,11 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       loop = next && { ...next };
       renderLoop();
       if (hoverX !== null) refreshHover();
+    },
+    /** Stems: the parts separated so far, in seconds (null: none to show). @param {[number, number][] | null} spans */
+    setStemsCovered(spans) {
+      stemsCovered = spans;
+      renderStemsCovered();
     },
     getView,
     setView,

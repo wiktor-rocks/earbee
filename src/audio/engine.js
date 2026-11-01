@@ -15,7 +15,7 @@ import { clamp } from "../core/format.js";
  *
  * Exposes: init, useSampleRate, loadPieces, schedule, setVolume, setBalance, setEq,
  *          setFocus, now, outputDelay, resume, click; and loadStems,
- *          setStemGains, dropStems for Stems (src/features/stems/)
+ *          writeStems, setStemGains, dropStems for Stems (src/features/stems/)
  * Values set before init() are remembered and applied when the graph
  * is built, so settings can change before any audio is loaded.
  *
@@ -176,14 +176,26 @@ export function createAudioEngine({ onError }) {
   // Stems (src/features/stems/): the track's stems, mixed into
   // Signalsmith's input by its worklet (see src/vendor/signalsmith-stretch).
   // Each is { scale, channels } (Int16Arrays at the track's rate, from its
-  // first sample, transferred); setStemGains gives each stem's gain, in
-  // the same order, and the rest's. A new track drops them by itself.
-  async function loadStems(stems) {
+  // first sample, transferred); `covered`, the spans of samples separated
+  // so far (all of it if not given: elsewhere the track plays as it is).
+  // writeStems adds pieces as they're separated ([stem][channel], from
+  // sample `from`, transferred), with the spans covered now. setStemGains
+  // gives each stem's gain, in the same order, and the rest's. A new track
+  // drops them by itself.
+  async function loadStems(stems, covered = null) {
     await init();
     const tracks = stems.map((stem) => stem.channels);
     await stretch.addStems(
-      { tracks, scales: stems.map((stem) => stem.scale) },
+      { tracks, scales: stems.map((stem) => stem.scale), covered },
       tracks.flat().map((c) => c.buffer),
+    );
+  }
+  async function writeStems(from, pieces, covered) {
+    await stretch?.writeStems(
+      from,
+      pieces,
+      covered,
+      pieces.flat().map((c) => c.buffer),
     );
   }
   const setStemGains = (gains, other) => void stretch?.setStemGains(gains, other).catch(onError);
@@ -195,6 +207,7 @@ export function createAudioEngine({ onError }) {
     schedule,
     loadPieces,
     loadStems,
+    writeStems,
     setStemGains,
     dropStems,
     now: () => context?.currentTime ?? 0,

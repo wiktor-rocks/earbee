@@ -2,7 +2,8 @@
 // (the patch in src/vendor/signalsmith-stretch), the Stems section,
 // separating the open song with the stem model (electron/stems/), the
 // mixer (volume, solo, mute), saving them in a project and bringing them
-// back, Cancel, and a new file forgetting them. The harness's stand-in
+// back, the loop first and the rest after (Stop, saving part of a song,
+// Separate the rest), Cancel, and a new file forgetting them. The harness's stand-in
 // model makes each stem the song ÷ 6 (TB_STEM_MODEL=real: the real one,
 // from models/); the model's download is checked by
 // tests/unit/stems-model-file.test.mjs.
@@ -11,7 +12,8 @@ const fs = require("fs");
 const path = require("path");
 
 module.exports = async function (h) {
-  const { js, openFile, setFiles, key, check, sleep, toasts, clearToasts, shot, projectDialogs, FIXTURES, OUTPUT } = h;
+  const { js, openFile, setFiles, key, check, sleep, toasts, clearToasts, shot, projectDialogs, setStemDelay } = h;
+  const { FIXTURES, OUTPUT } = h;
 
   const section = () =>
     js(`(() => {
@@ -154,6 +156,35 @@ module.exports = async function (h) {
     );
   }
 
+  {
+    // Where the stems aren't separated yet, the track plays as it is: a
+    // stem covering only the first half, every gain at 0.
+    const halves = await js(`(async () => {
+      const { default: SignalsmithStretch } = await import("./src/vendor/signalsmith-stretch/SignalsmithStretch.mjs");
+      const rate = 44100, n = rate * 2, scale = 0.5 / 32767;
+      const signal = Float32Array.from({ length: n }, (_, i) => Math.sin(i / 9) * 0.5);
+      const ints = Int16Array.from(signal, (v) => Math.round(v / scale));
+      const context = new OfflineAudioContext(1, n, rate);
+      const stretch = await SignalsmithStretch(context);
+      stretch.connect(context.destination);
+      await stretch.addBuffers([signal.slice()]);
+      await stretch.addStems({ tracks: [[new Int16Array(n)]], scales: [scale], covered: [] });
+      // The first half comes later, as a piece.
+      await stretch.writeStems(0, [[ints.slice(0, n / 2)]], [[0, n / 2]]);
+      await stretch.setStemGains([0], 0);
+      await stretch.schedule({ active: true, input: 0, rate: 1, semitones: 0, output: 0 });
+      const out = (await context.startRendering()).getChannelData(0);
+      const loudest = (from, to) => { let m = 0; for (let i = from; i < to; i++) m = Math.max(m, Math.abs(out[i])); return m; };
+      // Away from the middle, where the stretcher's window spans both.
+      return { first: loudest(rate * 0.1, rate * 0.8), second: loudest(rate * 1.3, rate * 1.9) };
+    })()`);
+    check(
+      "stems: the mix applies where they're separated; elsewhere the track plays as it is",
+      halves.first < 1e-4 && halves.second > 0.3,
+      JSON.stringify(halves),
+    );
+  }
+
   await openFile(path.join(FIXTURES, "verse-chorus.wav"));
   let state = await section();
   check("stems: the section shows once a file is open", state && !state.hidden, JSON.stringify(state));
@@ -166,7 +197,8 @@ module.exports = async function (h) {
   check("stems: separating shows what it's doing", /Reading the song|Separating/.test(state.busy ?? ""), state.busy);
   await waitFor((s) => /Separating/.test(s.busy ?? "") || s.ready, 30_000);
   await shot("stems-separating.png");
-  state = await waitFor((s) => s.ready || (s.busy === null && s.action !== null), 120_000);
+  // (The mixer shows once the first part is done; this waits for all of it.)
+  state = await waitFor((s) => (s.ready && s.busy === null) || (s.busy === null && s.action !== null), 120_000);
   check("stems: then they're ready", state.ready, JSON.stringify(state));
   check(
     "stems: …to play while their copies for saving are still being made",
@@ -355,6 +387,101 @@ module.exports = async function (h) {
     !row(state, "piano").hidden && row(state, "other").name === "Other" && state.folded === null,
     JSON.stringify({ folded: state.folded, piano: row(state, "piano"), other: row(state, "other") }),
   );
+
+  // The loop first, then the rest, nearest it first. Each segment slowed
+  // down, so the separation can be seen in the middle.
+  setStemDelay(400);
+  const app = `Promise.all([import("./src/context.js"), import("./src/features/playback.js")])`;
+  await openFile(path.join(FIXTURES, "long-chirp.m4a")); // 90 s: 16 segments
+  await js(`${app}.then(([, { setLoopRegion }]) => setLoopRegion({ start: 60, end: 64, enabled: true }))`);
+  // Whether the stems cover [from, to) (seconds).
+  const covers = (stems, from, to) =>
+    Boolean(stems?.covered.some(([a, b]) => a <= from * stems.sampleRate && b >= to * stems.sampleRate));
+  const strip = () =>
+    js(`document.querySelector("#waveform > div").shadowRoot.querySelectorAll('[part~="stems-covered-part"]').length`);
+  await clearToasts();
+  await press(".stems-action");
+  state = await waitFor((s) => s.ready, 60_000);
+  let partly = await found();
+  check(
+    "stems: the loop's stems come first, the mixer with them, while the rest is separated",
+    state.ready && /Separating the rest/.test(state.busy ?? "") && covers(partly, 60, 64) && !covers(partly, 0, 90),
+    JSON.stringify({ busy: state.busy, covered: partly?.covered }),
+  );
+  check(
+    "stems: …with a notification",
+    (await toasts()).some((t) => /loop's stems are ready/.test(t.text)),
+  );
+  check("stems: …and the waveform shows the part done", (await strip()) > 0, await strip());
+  const first = partly.covered;
+  await sleep(1500);
+  partly = await found();
+  // One span still, around the loop and longer: its neighbours came next.
+  const around = (stems) => stems?.covered.length === 1 && covers(stems, 60, 64);
+  check(
+    "stems: …then the rest, nearest the loop first",
+    around(partly) && partly.covered[0][1] - partly.covered[0][0] > first[0][1] - first[0][0] && !covers(partly, 0, 10),
+    JSON.stringify({ first, then: partly?.covered }),
+  );
+  await press(".stems-busy button");
+  state = await waitFor((s) => s.busy === null, 5000);
+  partly = await found();
+  check(
+    "stems: Stop keeps what's done, and offers the rest",
+    state.ready && state.action === "Separate the rest" && covers(partly, 60, 64) && !covers(partly, 0, 90),
+    JSON.stringify({ action: state.action, busy: state.busy, covered: partly?.covered }),
+  );
+  await shot("stems-partly.png");
+
+  // Saved part done, and brought back so.
+  const partlyFile = path.join(OUTPUT, "projects", "Partly.ebee");
+  fs.rmSync(partlyFile, { force: true });
+  projectDialogs.save = partlyFile;
+  key("S", ["control", "shift"]);
+  await sleep(200);
+  await js(`saveModeLink.click(); saveForm.requestSubmit()`);
+  for (let i = 0; i < 300 && !fs.existsSync(partlyFile); i++) await sleep(100);
+  await sleep(300);
+  const partlyHeader = fs.existsSync(partlyFile)
+    ? JSON.parse(fs.readFileSync(partlyFile).subarray(0, fs.readFileSync(partlyFile).indexOf(0)).toString() || "{}")
+    : {};
+  const savedCovered = partlyHeader.sections?.stems?.stems?.covered;
+  check(
+    "stems: a project keeps the parts done",
+    JSON.stringify(savedCovered) === JSON.stringify(partly?.covered),
+    JSON.stringify({ saved: savedCovered, found: partly?.covered }),
+  );
+  await openFile(path.join(FIXTURES, "bars.wav"));
+  await setFiles(partlyFile);
+  state = await waitFor((s) => s.ready, 30_000);
+  const reopened = await found();
+  check(
+    "stems: …and brings them back so, with Separate the rest",
+    state.ready &&
+      state.action === "Separate the rest" &&
+      JSON.stringify(reopened?.covered) === JSON.stringify(savedCovered),
+    JSON.stringify({ action: state.action, covered: reopened?.covered }),
+  );
+
+  // Carrying on: the rest, until all of it is done.
+  await press(".stems-action");
+  state = await waitFor((s) => s.busy !== null, 5000);
+  check("stems: Separate the rest carries on, the mixer still there", state.ready, JSON.stringify(state));
+  setStemDelay(0);
+  state = await waitFor((s) => s.busy === null, 60_000);
+  const whole = await found();
+  check(
+    "stems: …until all of it is done",
+    state.ready && state.action === null && covers(whole, 0, 89.9) && (await strip()) === 0,
+    JSON.stringify({ action: state.action, covered: whole?.covered }),
+  );
+  check(
+    "stems: …sound throughout",
+    whole && Object.values(whole.levels).every(Number.isFinite) && Object.values(whole.levels).some((l) => l > 1e-3),
+    JSON.stringify(whole?.levels),
+  );
+  check("stems: …which is an unsaved change", (await title()).endsWith(" •"), await title());
+  await waitFor((s) => s.preparing === null, 60_000);
 
   // A new file forgets them; Cancel stops a separation.
   await openFile(path.join(FIXTURES, "bars.wav"));

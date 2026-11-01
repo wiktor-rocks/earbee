@@ -2079,6 +2079,24 @@ body.stage-split-dragging * {
   background: var(--loop-fill-off);
 }
 
+/* Stems (src/features/stems/): the parts separated so far, while some
+   aren't, as a strip along the bottom (waveform.js). */
+.waveform ::part(stems-covered) {
+  position: absolute;
+  inset: auto 0 0;
+  height: 4px;
+  z-index: 3;
+  pointer-events: none;
+}
+
+.waveform ::part(stems-covered-part) {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: var(--accent);
+  opacity: 0.7;
+}
+
 /* ---------- Timeline: the lanes above the waveform ----------
    The ruler and the marks lane sit above the waveform in one column with
    one border, so x = 0 is the same pixel in all of them. Each lane holds
