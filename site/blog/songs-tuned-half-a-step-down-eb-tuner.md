@@ -297,7 +297,7 @@ Whatever the reason, the result for you is the same: you play the song's shapes 
 
 ## How can you tell a song is tuned down?
 
-Start with the key. E♭ is an uncomfortable key for a guitar in standard tuning: its chords are barre chords, most of the open strings are outside the key, and the open low E and A, which so many riffs are built on, don't fit. Tuned half a step down, though, E♭ is played with E shapes, the most natural key on the guitar. So if a guitar-driven song is in E♭ major or E♭ minor, that's your first clue that the band tuned down. It's only a clue; the next signs tell you for sure.
+Start with the key. E♭ is an uncomfortable key for a guitar in standard tuning: its chords are barre chords, most of the open strings are outside the key, and the open low E and A, which so many riffs are built on, don't fit. Tuned half a step down, though, E♭ is played with E shapes, the most natural key on the guitar. So if a guitar-driven song is in E♭ major or E♭ minor, that's your first clue that the band tuned down. It's only a clue; the next one tells you for sure.
 
 The most reliable sign is the bottom of the guitar. In standard tuning, the lowest note a guitar can play is the open low E. If a riff goes down to a note a semitone below that, and it's clearly a guitar, not a bass or a keyboard, then the guitar isn't in standard tuning. Nothing you can do with your fingers in standard tuning reaches that note.
 
@@ -319,7 +319,7 @@ A semitone barely changes the sound of a recording, so it doesn't get in the way
 
 ## Songs to test your ear on
 
-Some of these are tuned half a step down; some are in standard tuning. Use the method above: play along, listen for the lowest guitar note, check with a tuner. Don't look it up first. Working it out is the point.
+Some of these are tuned half a step down; some are in standard tuning. Use the method above: check the key, then listen for the lowest guitar note. Don't look it up first. Working it out is the point.
 
 - Jimi Hendrix, "Little Wing"
 - Stevie Ray Vaughan, "Pride and Joy"
