@@ -43,6 +43,23 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-01: Blog post "Songs tuned half a step down (with an E♭ tuner)" (the website)
+
+- **What:** an eighth post, "Songs tuned half a step down (with an E♭ tuner)", at `/blog/songs-tuned-half-a-step-down-eb-tuner/`.
+  - An E♭ standard tuner right under the first paragraph. It listens through the microphone and shows the string, a needle from −50 to +50 cents, "In tune" (within 5 cents), "Tune up" or "Tune down", and the note it actually hears. Auto finds the string; a string's button plays its note (a plucked-like tone) and tunes that string only. The sound stays in the browser.
+  - Why bands tune down; how to tell (E♭ is an awkward key in standard tuning, so a guitar song in E♭ is a first clue; a guitar note below the open low E proves it); tuning down versus shifting the recording up a semitone (a capo can't help); six songs to test your ear on, with no answers given.
+- **Why:** post idea 5 in `docs/blog.md`. The owner asked for the tuner and for the title and address to name it ("E♭ tuner" is searched on its own). Naming a song's tuning is a spoiler (the owner's call), so the songs are a test for the ear. An assistant drafted the post; the owner cut and added passages (the key clue is the owner's).
+- **How:**
+  - `keyword: "songs tuned half a step down"`, in the title, the address and the first sentence.
+  - Like the tap tempo calculator: HTML, an inline `<style>` and an inline `<script>` in the post, because posts go online from `testing` and `site/style.css` only from `main`. Only colour variables and `.button` classes that `main`'s stylesheet has too. Hidden without JavaScript. The heading's `id` (`#eb-tuner`) is written in HTML, as the post links to it.
+  - The pitch: the McLeod pitch method (normalized square difference, the first peak at least 0.9 of the highest, parabolic interpolation) on 4096 samples, 60–420 Hz, about 30 times a second; a level gate, the median of the last five readings, the reading held a second after the note fades. A picked string is read in its own octave, as low strings sometimes sound loudest an octave up. The microphone without echo cancellation, noise suppression or automatic gain. The tuner doesn't listen while a string's note plays.
+  - On phones (≤ 520 px), Auto takes a row of its own and the six strings share the next.
+- **Where:** `site/blog/songs-tuned-half-a-step-down-eb-tuner.md`.
+- **Verified by:**
+  - In Electron, on the preview, with WAV files as a fake microphone: E♭2, D♭3, B♭3 and E♭4 read in tune; 80 Hz as E♭ +49 ("Tune down"); a standard E as E♭ +100, "heard E"; a low E♭ with a weak fundamental in tune; silence shows nothing; a picked string (with its note played) and Stop work; no errors. Screenshots in both themes at 900 and 390 px wide, with no sideways scrolling.
+  - Not tried: a real guitar, Firefox or Safari, a real phone. Not checked against sources: which of the six songs are tuned down.
+  - `node scripts/seo/check.cjs`: no errors or warnings for the post. `npm --prefix site run build`: the post is built. `npm run check`.
+
 ## 2026-10-30: No more "not tried on a Mac" (the website and the release notes)
 
 - **What:** the download section's macOS card no longer says "Not yet tested on a real Mac: tell us how it went", and the release notes no longer say "Not yet tried on a Mac; please report how it does."

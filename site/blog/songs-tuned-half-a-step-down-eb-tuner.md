@@ -2,8 +2,7 @@
 title: "Songs tuned half a step down (with an E♭ tuner)"
 description: "Songs tuned half a step down: how to tell a recording is tuned down, an E♭ tuner for your guitar, and how to play along without retuning."
 keyword: "songs tuned half a step down"
-date: 2026-10-31
-draft: true
+date: 2026-11-01
 ---
 
 A lot of songs are tuned half a step down: every string a semitone lower than standard, E♭ A♭ D♭ G♭ B♭ E♭. You hear it most in blues, hard rock, grunge and metal. To play along, you can either tune your guitar down a half step, or leave it in standard and shift the recording up a semitone. While I'm learning a song, I'd do the second: [EarBee](/) is a free, open-source player that does it in a click (I make it, so weigh my opinion accordingly).
