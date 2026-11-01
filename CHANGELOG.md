@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-01: The post ideas say which have become posts (docs)
+
+- **What:** in `docs/blog.md`, "Post ideas", ideas 1, 3, 5, 8 and 17 end with **Written:** and a link to their post; the list's introduction says so.
+- **Why:** the owner asked; finished ideas were still listed as if open.
+- **How:** marked rather than removed, so the numbers other notes refer to ("idea 5") stay put. Idea 12 ("ear training by transcribing songs") is left open: whether "Why transcribe" covers it is the owner's call.
+- **Where:** `docs/blog.md`.
+- **Verified by:** `npm run format:check`.
+
 ## 2026-11-01: Blog post "Songs tuned half a step down (with an E♭ tuner)" (the website)
 
 - **What:** an eighth post, "Songs tuned half a step down (with an E♭ tuner)", at `/blog/songs-tuned-half-a-step-down-eb-tuner/`.

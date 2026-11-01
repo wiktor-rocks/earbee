@@ -217,16 +217,16 @@ Search engines send visitors to the page that best answers what they typed. So:
 
 ## Post ideas
 
-Each idea gives the phrase it aims at, then the angle and how EarBee fits.
+Each idea gives the phrase it aims at, then the angle and how EarBee fits. An idea that has become a post ends with **Written:** and a link to it.
 
-1. **"how to slow down a song without changing the pitch":** what time-stretching is, which speeds work for practice (start at 50–70 %), and the artefacts to expect at very low speeds. EarBee: 0.05× to 3×, same pitch.
+1. **"how to slow down a song without changing the pitch":** what time-stretching is, which speeds work for practice (start at 50–70 %), and the artefacts to expect at very low speeds. EarBee: 0.05× to 3×, same pitch. **Written:** [How to slow down a song without changing the pitch](https://earbee.org/blog/slow-down-a-song-without-changing-pitch/).
 2. **"how to transcribe a guitar solo by ear":** a step-by-step method: map the structure, loop one phrase, slow it down, find the first note, sing it, then write it down. EarBee: marks, loop the bar, step through it.
-3. **"free alternative to Transcribe!":** an honest comparison of what you need for transcribing (speed, loops, EQ, markers, video) and the free options, with EarBee among them. Fair to the others.
+3. **"free alternative to Transcribe!":** an honest comparison of what you need for transcribing (speed, loops, EQ, markers, video) and the free options, with EarBee among them. Fair to the others. **Written:** [Free alternative to Transcribe! for music: 5 compared fairly](https://earbee.org/blog/free-alternative-to-transcribe/).
 4. **"how to learn bass lines by ear":** EQ to bring the bass forward and cut the rest, pitch up an octave to hear it better, and loop a bar at a time. EarBee: the EQ and pitch shift.
-5. **"song tuned half step down: how to play along":** shift the recording up a semitone (or down) so it matches standard tuning, plus cents for old recordings that are slightly off. EarBee: pitch in semitones and cents.
+5. **"song tuned half step down: how to play along":** shift the recording up a semitone (or down) so it matches standard tuning, plus cents for old recordings that are slightly off. EarBee: pitch in semitones and cents. **Written:** [Songs tuned half a step down (with an E♭ tuner)](https://earbee.org/blog/songs-tuned-half-a-step-down-eb-tuner/).
 6. **"how to loop a section of a song to practise":** the right loop length, adding a bar either side, and moving the loop on phrase by phrase. EarBee: <kbd>\\</kbd>, double and halve, Shift + [ and ].
 7. **"how slow should I practise a song":** practice tempos: start slow enough to play it clean, then step up 5–10 % at a time. EarBee: the speed steps.
-8. **"how to find the tempo / BPM of a song":** tap tempo versus beat detection, and why the bars matter more than the number. EarBee: <kbd>B</kbd> finds the beats and the tempo.
+8. **"how to find the tempo / BPM of a song":** tap tempo versus beat detection, and why the bars matter more than the number. EarBee: <kbd>B</kbd> finds the beats and the tempo. **Written:** [How to find the BPM of a song (with a tap tempo calculator)](https://earbee.org/blog/find-the-bpm-of-a-song-tap-tempo/).
 9. **"how to transcribe a jazz solo":** listen first, sing it, then note down rhythm before pitches; work through it phrase by phrase. EarBee: marks for each chorus.
 10. **"how to learn a song from a YouTube video lesson":** open the lesson, slow the video, loop the teacher's hands; a note on respecting the creator's rights. EarBee: paste a link, the video stays in sync.
 11. **"how to transcribe drums by ear":** separate the kick, snare and hi-hat with EQ, and use the beat grid to count. EarBee: EQ and the beat lines.
@@ -235,7 +235,7 @@ Each idea gives the phrase it aims at, then the angle and how EarBee fits.
 14. **"how to hear chords in a song":** start from the bass note, listen for major or minor, and slow down the changes. EarBee: loop and slow down.
 15. **"keyboard shortcuts for transcribing music":** a workflow without the mouse: play, replay, step, loop. EarBee: one key per step (a good page to link from other posts).
 16. **"how to learn a song by ear":** the whole song, start to finish: map its structure, then the chords, the riffs and the melody, section by section, and play along with the recording to check. The broad page the narrower ones (2, 4, 13, 14) link back to. EarBee: marks for the sections, loop and slow down.
-17. **"the importance of ear training drills" (or "are ear training exercises worth it"):** what drills (intervals, chord quality, rhythm) train well, and why they work: practising one skill on its own, like children drilling sums before adding up a real bill. How much to drill, and how to pair drills with transcribing real music. The other side of "Why transcribing music by ear makes you a better musician", and the two link to each other. EarBee: not a drill tool; it's where the drilled skills get used, on real recordings.
+17. **"the importance of ear training drills" (or "are ear training exercises worth it"):** what drills (intervals, chord quality, rhythm) train well, and why they work: practising one skill on its own, like children drilling sums before adding up a real bill. How much to drill, and how to pair drills with transcribing real music. The other side of "Why transcribing music by ear makes you a better musician", and the two link to each other. EarBee: not a drill tool; it's where the drilled skills get used, on real recordings. **Written:** [Is ear training worth it? What drills can and can't do](https://earbee.org/blog/is-ear-training-worth-it/).
 
 ## Getting found
 
