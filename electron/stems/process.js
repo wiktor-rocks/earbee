@@ -4,25 +4,40 @@
 // worker (src/features/stems/worker.js) directly, over the port it's given
 // first: the song and its stems never pass through the main process.
 //
+// The part wanted (the loop) is separated first, then the rest, nearest it
+// first; each segment's stems go back as soon as it's done, so they play
+// there at once. All positions are samples at 44.1 kHz.
+//
 //   main → { type: "port" } with the port
 //   page → { type: "audio", channel, offset, samples }  the song at 44.1 kHz, in chunks
-//   page → { type: "separate", length }                 all of it has come
-//   ←      { type: "progress", done, total }            segments done
-//   ←      { type: "stems", names, length, sampleRate, peaks } then, for each stem and channel,
-//   ←      { type: "stem", name, channel, offset, samples }  in chunks
-//   ←      { type: "done" }
+//   page → { type: "separate", length, want: { from, to }, covered }
+//          all of it has come; `covered`: [[from, to], …] already separated
+//          (an earlier run's), skipped where it can be
+//   page → { type: "want", from, to }                   the loop moved: that next
+//   ←      { type: "piece", from, to, start, names, samples }
+//          the stems over [from, to): `samples` is each stem's left and
+//          right, in `names` order, from `start`, with up to MARGIN samples
+//          either side (to resample the piece on its own)
+//   ←      { type: "progress", done, total, part, wanted }
+//          segments done; part: how much of the part wanted is, wanted: all of it
+//   ←      { type: "done" }                             every segment is
 //   ←      { type: "error", message }
-//   page → { type: "close" }                            got it all: the process exits
+//   page → { type: "close" }                            no more wanted: the process exits
 //                                                       (index.js stops it if the page goes away)
 //
-// In chunks, so no message holds a whole song (its six stems are hundreds
-// of MB), and the page can turn each one to 16 bits as it comes.
-// Cancelling kills the process (index.js).
+// The song comes in chunks, so no message holds a whole song (its six
+// stems are hundreds of MB). Cancelling kills the process (index.js).
 const fs = require("fs");
 const os = require("os");
-const { separate, RATE, SEGMENT, STEMS } = require("./separate");
+const { createSeparator, orderOutward, segmentSpan, segmentsFor, SEGMENT, STEMS } = require("./separate");
 
-const CHUNK = 1 << 20; // samples a message (4 MB)
+// Samples either side of a piece, beyond what it changed: enough for the
+// page's resampler to make the piece's own samples exactly (its filter
+// reaches a few dozen).
+const MARGIN = 1024;
+// A span counts as separated before if it's within this of one: the page
+// gives them at the song's own rate, rounded.
+const SLACK = 4;
 // More threads stopped helping at 4 (measured: 8.6 s a segment on 1, 5.9
 // on 2, 5.0 on 4, 4.9 on 6), and playback needs some CPU too.
 const THREADS = Math.max(1, Math.min(4, Math.floor(os.cpus().length / 2)));
@@ -59,17 +74,14 @@ async function createSession() {
   };
 }
 
-// The loudest sample (a plain loop: reduce() over millions of samples takes seconds).
-function largest(samples) {
-  let most = 0;
-  for (let i = 0; i < samples.length; i++) most = Math.max(most, Math.abs(samples[i]));
-  return most;
-}
+// Whether [from, to) is within the spans `covered` ([[from, to], …]).
+const within = (covered, { from, to }) => covered.some(([start, end]) => start - SLACK <= from && to <= end + SLACK);
 
 // `port`: the MessagePortMain the main process handed over.
 function serve(port) {
   const chunks = [[], []]; // per channel: { offset, samples }
   const send = (message) => port.postMessage(message);
+  let aim = null; // while running: points it at the part wanted next
 
   // A channel's chunks, put together.
   const join = (list, length) => {
@@ -78,37 +90,76 @@ function serve(port) {
     return channel;
   };
 
-  async function run(length) {
+  async function run(length, want, covered) {
     const left = join(chunks[0], length);
     const right = join(chunks[1], length);
     chunks[0] = chunks[1] = [];
     const runModel = await createSession();
-    const { stems } = await separate({
-      left,
-      right,
-      runModel,
-      keep: KEEP,
-      onProgress: (done, total) => send({ type: "progress", done, total }),
-    });
-    // Each stem's loudest sample, so the page can store it in 16 bits as it comes.
-    const peaks = KEEP.map((name) => stems[name].reduce((peak, channel) => Math.max(peak, largest(channel)), 0));
-    send({ type: "stems", names: KEEP, length, sampleRate: RATE, peaks });
-    for (const name of KEEP) {
-      for (const channel of [0, 1]) {
-        const samples = stems[name][channel];
-        for (let offset = 0; offset < length; offset += CHUNK) {
-          send({ type: "stem", name, channel, offset, samples: samples.slice(offset, offset + CHUNK) });
-        }
+    const separator = createSeparator({ left, right, runModel, keep: KEEP });
+    const { starts } = separator;
+    const span = (i) => segmentSpan(starts, length, i);
+    const total = starts.length;
+
+    // An earlier run's segments need doing again only where they meet one
+    // that isn't done: their blend there needs both.
+    const separated = (i) => i < 0 || i >= total || within(covered, span(i));
+    const skipped = new Set([...starts.keys()].filter((i) => separated(i - 1) && separated(i) && separated(i + 1)));
+    const done = new Set(); // this run's
+    let pending = [...starts.keys()].filter((i) => !skipped.has(i));
+    let wanted = new Set();
+    aim = (next) => {
+      pending = orderOutward(starts, length, next, pending);
+      wanted = new Set(segmentsFor(starts, length, next.from, next.to).filter((i) => !skipped.has(i)));
+    };
+    aim(want);
+    const progress = () => {
+      const wantedDone = [...wanted].filter((i) => done.has(i)).length;
+      send({
+        type: "progress",
+        done: done.size + skipped.size,
+        total,
+        part: wanted.size ? wantedDone / wanted.size : 1,
+        wanted: wantedDone === wanted.size,
+      });
+    };
+    progress();
+
+    while (pending.length) {
+      const index = /** @type {number} */ (pending.shift());
+      let { from, to } = await separator.runSegment(index);
+      done.add(index);
+      // Where it overlaps a neighbour not done in this run but separated
+      // before, the earlier blend of both stays: this one alone would be
+      // worse there.
+      if (index > 0 && !done.has(index - 1)) {
+        const overlap = { from, to: Math.min(span(index - 1).to, to) };
+        if (within(covered, overlap)) from = overlap.to;
       }
-      delete stems[name]; // its memory can go as soon as it's sent
+      if (index + 1 < total && !done.has(index + 1)) {
+        const overlap = { from: Math.max(span(index + 1).from, from), to };
+        if (within(covered, overlap)) to = overlap.from;
+      }
+      if (from < to) {
+        const start = Math.max(0, from - MARGIN);
+        const stems = separator.read(start, Math.min(length, to + MARGIN));
+        send({ type: "piece", from, to, start, names: KEEP, samples: KEEP.flatMap((name) => stems[name]) });
+      }
+      progress();
     }
+    aim = null;
     send({ type: "done" });
   }
 
+  let want = null; // a "want" that came before the run began
   port.on("message", ({ data }) => {
     if (data?.type === "audio") chunks[data.channel].push({ offset: data.offset, samples: data.samples });
     else if (data?.type === "separate") {
-      run(data.length).catch((error) => send({ type: "error", message: String(error?.message ?? error) }));
+      run(data.length, want ?? data.want, data.covered ?? []).catch((error) =>
+        send({ type: "error", message: String(error?.message ?? error) }),
+      );
+    } else if (data?.type === "want") {
+      want = { from: data.from, to: data.to };
+      aim?.(want);
     } else if (data?.type === "close") process.exit(0);
   });
   // The page's end went away. Not to be relied on (it didn't come when the

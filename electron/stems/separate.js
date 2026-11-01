@@ -13,6 +13,12 @@
 //     runModel(mix) gets a segment ([1, 2, SEGMENT] as one Float32Array)
 //     and resolves to the model's { spec, wave } (see the export script).
 //     Stops with an error named "Cancelled" when cancelled() turns true.
+//   createSeparator({ left, right, runModel, keep? })
+//     → { length, starts, runSegment(index), read(from, to) }: the same, a
+//     segment at a time in any order (the stem process does the loop
+//     first), the stems so far readable for any span
+//   segmentsFor(starts, length, from, to), orderOutward(starts, length, want, left)
+//     which segments touch a span, and the order to do them in
 const { createIspec } = require("./stft");
 
 const RATE = 44100;
@@ -58,15 +64,18 @@ function meanAndSpread(left, right) {
 }
 
 /**
+ * A song ready to be separated a segment at a time, in any order: the
+ * segments lie on one grid (segmentStarts), each is weighted into the
+ * stems as it's done, and read() gives the stems so far for any span,
+ * blended from the segments done there. Once every segment is done, the
+ * stems are what separate() gives (up to the order of the additions).
  * @param {{
  *   left: Float32Array, right: Float32Array,
  *   runModel: (mix: Float32Array) => Promise<{ spec: Float32Array, wave: Float32Array }>,
  *   keep?: string[],
- *   onProgress?: (done: number, total: number) => void,
- *   cancelled?: () => boolean,
  * }} options
  */
-async function separate({ left, right, runModel, keep = STEMS, onProgress = () => {}, cancelled = () => false }) {
+function createSeparator({ left, right, runModel, keep = STEMS }) {
   const length = left.length;
   const { mean, spread } = meanAndSpread(left, right);
   const starts = segmentStarts(length);
@@ -81,9 +90,10 @@ async function separate({ left, right, runModel, keep = STEMS, onProgress = () =
   const soundB = new Float32Array(SEGMENT);
   const block = BINS * FRAMES; // one channel's real or imaginary part
 
-  onProgress(0, starts.length);
-  for (const [index, offset] of starts.entries()) {
-    if (cancelled()) throw Object.assign(new Error("cancelled"), { name: "Cancelled" });
+  // Segment `index`, weighted into the stems; resolves to the span it
+  // changed, [from, to).
+  async function runSegment(index) {
+    const offset = starts[index];
     // The segment, centred on its part of the song (TensorChunk.padded):
     // a last, shorter part takes the song around it, or silence.
     const part = Math.min(SEGMENT, length - offset);
@@ -122,15 +132,97 @@ async function separate({ left, right, runModel, keep = STEMS, onProgress = () =
       }
     }
     for (let i = 0; i < part; i++) weights[offset + i] += weight[i];
-    onProgress(index + 1, starts.length);
+    return { from: offset, to: offset + part };
   }
 
-  for (const channels of out) {
-    for (const channel of channels ?? []) {
-      for (let i = 0; i < length; i++) channel[i] = (channel[i] / weights[i]) * spread + mean;
+  // The stems so far over [from, to): { [name]: [left, right] }, silence
+  // where no segment is done yet.
+  function read(from, to) {
+    const stems = {};
+    for (const [s, name] of STEMS.entries()) {
+      if (!out[s]) continue;
+      stems[name] = out[s].map((channel) => {
+        const samples = new Float32Array(to - from);
+        for (let i = from; i < to; i++) {
+          if (weights[i] > 0) samples[i - from] = (channel[i] / weights[i]) * spread + mean;
+        }
+        return samples;
+      });
     }
+    return stems;
   }
-  return { stems: Object.fromEntries(STEMS.flatMap((name, s) => (out[s] ? [[name, out[s]]] : []))) };
+
+  return { length, starts, runSegment, read };
 }
 
-module.exports = { separate, segmentStarts, triangle, RATE, SEGMENT, STEMS, BINS, FRAMES };
+// Segment i's part of a song `length` long: [from, to).
+const segmentSpan = (starts, length, i) => ({ from: starts[i], to: Math.min(starts[i] + SEGMENT, length) });
+
+/**
+ * The segments whose parts touch [from, to), in order.
+ * @param {number[]} starts
+ * @param {number} length
+ * @param {number} from
+ * @param {number} to
+ */
+function segmentsFor(starts, length, from, to) {
+  return starts.flatMap((_, i) => {
+    const span = segmentSpan(starts, length, i);
+    return span.from < to && span.to > from ? [i] : [];
+  });
+}
+
+/**
+ * The segments in `left` (indices), in the order to do them: those that
+ * touch [from, to) first, then the rest, nearest the span's middle first.
+ * @param {number[]} starts
+ * @param {number} length
+ * @param {{ from: number, to: number }} want
+ * @param {Iterable<number>} left
+ */
+function orderOutward(starts, length, { from, to }, left) {
+  const first = new Set(segmentsFor(starts, length, from, to));
+  const middle = (from + to) / 2;
+  const distance = (i) => {
+    const span = segmentSpan(starts, length, i);
+    return Math.abs((span.from + span.to) / 2 - middle);
+  };
+  return [...left].sort((a, b) => Number(first.has(b)) - Number(first.has(a)) || distance(a) - distance(b) || a - b);
+}
+
+/**
+ * The whole song, every segment in order (see createSeparator).
+ * @param {{
+ *   left: Float32Array, right: Float32Array,
+ *   runModel: (mix: Float32Array) => Promise<{ spec: Float32Array, wave: Float32Array }>,
+ *   keep?: string[],
+ *   onProgress?: (done: number, total: number) => void,
+ *   cancelled?: () => boolean,
+ * }} options
+ */
+async function separate({ left, right, runModel, keep = STEMS, onProgress = () => {}, cancelled = () => false }) {
+  const separator = createSeparator({ left, right, runModel, keep });
+  const total = separator.starts.length;
+  onProgress(0, total);
+  for (let index = 0; index < total; index++) {
+    if (cancelled()) throw Object.assign(new Error("cancelled"), { name: "Cancelled" });
+    await separator.runSegment(index);
+    onProgress(index + 1, total);
+  }
+  return { stems: separator.read(0, separator.length) };
+}
+
+module.exports = {
+  separate,
+  createSeparator,
+  segmentStarts,
+  segmentSpan,
+  segmentsFor,
+  orderOutward,
+  triangle,
+  RATE,
+  SEGMENT,
+  STEMS,
+  BINS,
+  FRAMES,
+};

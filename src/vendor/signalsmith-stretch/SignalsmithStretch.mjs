@@ -169,9 +169,21 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 					this.audioBuffersEnd += length;
 					return this.audioBuffersEnd/sampleRate;
 				},
-				// patched: the track's stems, { tracks: [stem][channel] Int16Array, scales: [stem] }, from sample 0
+				// patched: the track's stems, { tracks: [stem][channel] Int16Array, scales: [stem], covered? }, from
+				// sample 0; covered: the spans of samples separated so far, [[from, to], …] (all of it if not given)
 				addStems: stems => {
-					this.stems = {tracks: stems.tracks, scales: stems.scales, gains: stems.tracks.map(() => 1), other: 1, active: false};
+					this.stems = {tracks: stems.tracks, scales: stems.scales, covered: stems.covered || null, gains: stems.tracks.map(() => 1), other: 1, active: false};
+					return true;
+				},
+				// patched: more of the stems, separated since: pieces [stem][channel] Int16Array from sample
+				// `from`, and the spans covered now
+				writeStems: (from, pieces, covered) => {
+					if (!this.stems) return false;
+					pieces.forEach((channels, s) => channels.forEach((piece, c) => {
+						let samples = this.stems.tracks[s][c];
+						samples.set(piece.subarray(0, Math.max(0, samples.length - from)), from);
+					}));
+					this.stems.covered = covered;
 					return true;
 				},
 				// patched: each stem's gain (a number, the same for both channels, or
@@ -245,13 +257,23 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 		}
 		
 		// patched: turns `count` samples of the track, from buffer[at] (the
-		// track's sample `from`, channel `channel`), into the stems' mix:
-		// other × track + Σ (gain - other) × stem, "other" being the track
-		// minus the stems. A stem's gain may be a 2×2 mix (setStemGains): then
-		// this channel takes from both of the stem's, (gain[c][k] - other·δck)
-		// × stem[k]. Only while a gain isn't 1: otherwise the track is left
-		// exactly as it was.
+		// track's sample `from`, channel `channel`), into the stems' mix where
+		// they're separated (mixStemsPart); elsewhere the track plays as it is.
 		mixStems(buffer, at, count, channel, from) {
+			let covered = this.stems.covered;
+			if (!covered) return this.mixStemsPart(buffer, at, count, channel, from);
+			for (let [start, end] of covered) {
+				let a = Math.max(start, from), b = Math.min(end, from + count);
+				if (a < b) this.mixStemsPart(buffer, at + a - from, b - a, channel, a);
+			}
+		}
+
+		// patched: other × track + Σ (gain - other) × stem, "other" being the
+		// track minus the stems. A stem's gain may be a 2×2 mix (setStemGains):
+		// then this channel takes from both of the stem's, (gain[c][k] -
+		// other·δck) × stem[k]. Only while a gain isn't 1: otherwise the track
+		// is left exactly as it was.
+		mixStemsPart(buffer, at, count, channel, from) {
 			let {tracks, scales, gains, other} = this.stems;
 			for (let i = 0; i < count; ++i) buffer[at + i] *= other;
 			let c = channel%2;

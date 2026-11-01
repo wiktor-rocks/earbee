@@ -8,28 +8,35 @@
  *      process checks it).
  *   2. A worker (worker.js) decodes the song again at 44.1 kHz and streams
  *      it to the stem process, which separates it one 7.8 s segment at a
- *      time, at low priority (about as long as the song plays).
- *   3. The stems come back to the worker, which turns them into the
- *      track's rate in 16 bits, then here, and on to the player
- *      (audio/engine.js loadStems): they play through the same stretcher
- *      as the track, mixed into its input, so they keep in step at any
- *      speed, pitch or loop.
- *   4. While they already play, a few workers encode a copy of each as
- *      Opus for the project ("Preparing them for saving"). They're an
- *      unsaved change as soon as they play; a save started before their
- *      copies are made waits for them (whenPrepared).
- * Cancel, or opening another file, stops it: the worker ends, and the main
- * process stops the stem process.
+ *      time, at low priority (about as long as the song plays): the loop
+ *      first (or the part around the playhead), then the rest, nearest the
+ *      loop first. Moving the loop meanwhile moves what's next.
+ *   3. Each piece comes back to the worker, which turns it into the track's
+ *      rate in 16 bits, then here, and on to the player (audio/engine.js
+ *      writeStems): the stems play through the same stretcher as the track,
+ *      mixed into its input, so they keep in step at any speed, pitch or
+ *      loop. Where they aren't separated yet, the song plays as it is
+ *      (spans.js), and a strip on the waveform shows what's done.
+ *   4. Once the loop's part is done the mixer shows ("The loop's stems are
+ *      ready") while the rest goes on in the background; Stop ends it,
+ *      keeping what's done, and "Separate the rest" carries on later.
+ *   5. When it ends, a few workers encode a copy of each stem as Opus for
+ *      the project ("Preparing them for saving"). They're an unsaved change
+ *      as soon as they play; a save started before their copies are made
+ *      waits for them (whenPrepared), and a save while separating takes the
+ *      stems so far.
+ * Opening another file stops it: the worker ends, and the main process
+ * stops the stem process.
  *
- * Then the section is a mixer (dock.js): each stem's volume, solo and
+ * The section is then a mixer (dock.js): each stem's volume, solo and
  * mute, turned into gains (mix.js) for the player. With every stem at full
  * volume it plays the song itself, exactly; any other mix is the sum of
  * the six stems (so a muted one is gone, with nothing of it left).
  *
  * Self-contained: this folder, its stems.css, electron/stems/, and the
  * lines marked "Stems (" (app.js, open-file.js, index.html, config.js,
- * main.js, preload.js). With CONFIG.stems.enabled off, the section is
- * removed and nothing else happens.
+ * main.js, preload.js, waveform.js). With CONFIG.stems.enabled off, the
+ * section is removed and nothing else happens.
  *
  *   bindStems()        builds the section (once, at startup)
  *   resetStems(media)  a new file is open: what was found is forgotten
@@ -45,6 +52,7 @@ import { $, element, onClick, reportError } from "../../ui/dom.js";
 import { notify } from "../../ui/toast.js";
 import { buildMixer } from "./dock.js";
 import { defaultMix, isUnchanged, stemMixes } from "./mix.js";
+import { coveredLength, coversAll } from "./spans.js";
 
 /**
  * The part of window.earbee (electron/preload.js) used here; missing
@@ -60,34 +68,53 @@ import { defaultMix, isUnchanged, stemMixes } from "./mix.js";
  */
 const bridge = /** @type {StemsBridge | undefined} */ (/** @type {any} */ (window).earbee?.stems);
 
+// The stems' samples are 16 bits × this (worker.js).
+const SCALE = CONFIG.stems.headroom / 32767;
+const IDS = CONFIG.stems.list.map(({ id }) => id); // the player's order
+
 /**
  * What was found for the open song (the samples themselves went to the
  * player): the stems' ids in the player's order, at `sampleRate`,
- * `length` samples long, and each one's loudness.
- * @typedef {{ sampleRate: number, length: number, ids: string[], levels: Record<string, number> }} Stems
+ * `length` samples long, each one's loudness (once all of it is done), and
+ * the spans of samples separated so far (spans.js).
+ * @typedef {{
+ *   sampleRate: number, length: number, ids: string[], levels: Record<string, number>,
+ *   covered: import("./spans.js").Spans,
+ * }} Stems
  */
+
+/** @typedef {Record<string, Int16Array[]>} Samples each stem's left and right (worker.js) */
 
 /** @type {import("../../core/media.js").Media | null} */
 let media = null; // the open song's, to read again
 /** @type {Stems | null} */
 let found = null;
+// The page's copy of the stems' samples, to carry on separating from and to
+// encode: null while a worker has it (or before there are stems).
+/** @type {Samples | null} */
+let copies = null;
 /** @type {Record<string, Uint8Array> | null} */
 let audio = null; // each stem as Opus, for the project (opus.js)
+/** @type {import("./spans.js").Spans} */
+let audioCovered = []; // the spans `audio` holds
 let revision = 0; // counts the stems separated (not those a project brings back), for unsaved changes
+let preparedRevision = 0; // the revision `audio` was made at
 let modelBytes = 0;
 let modelReady = false;
-// What's going on: "idle", "download", "decode", "separate", "load" (from
-// a project) or "ready".
+// What's going on: "idle", "download", "decode", "separate" (the first
+// part), "rest" (the rest, while the mixer shows), "load" (from a
+// project) or "ready".
 let stage = "idle";
 let fraction = 0;
-// While new stems already play: how far encoding them for saving is (null:
-// not encoding).
+let fromLoop = false; // the first part is the loop (else around the playhead)
+// While the stems' copies for saving are made: how far (null: not encoding).
 /** @type {number | null} */
 let preparing = null;
 // Each stem's volume, solo and mute (mix.js).
 let mix = defaultMix(CONFIG.stems.list);
-// The separation or load going on: `stops` end its workers' waits (cancel).
-/** @type {{ cancelled: boolean, stops: Set<() => void> } | null} */
+// The separation or load going on: `stops` end its workers' waits (cancel);
+// `worker`, a separation's, to tell it where the loop moved, or to stop.
+/** @type {{ cancelled: boolean, stops: Set<() => void>, worker?: Worker } | null} */
 let job = null;
 
 let ui = null; // the section's parts, once built
@@ -107,31 +134,48 @@ function startJob() {
   return { current, stillCurrent: () => job === current && !current.cancelled };
 }
 
+const buffersOf = (/** @type {Samples} */ stems) =>
+  Object.values(stems).flatMap((channels) => channels.map((channel) => channel.buffer));
+
 /**
- * Runs the worker on `message` (worker.js) until it's done; its progress
- * shows meanwhile, and its stems go to `onStems` as soon as they come
- * (before the Opus copies, which `done` brings). `onProgress` (stage,
- * fraction) shows it unless given. Rejects with `null` when the job is
- * cancelled.
+ * Runs a worker (worker.js) on `message` until it's done; its progress
+ * shows meanwhile (`onProgress`, else show()), and its other messages go
+ * to `onMessage` as they come. Rejects with `null` when the job is
+ * cancelled. If the stem process stops early, `onStopped` hears it (else
+ * the worker fails).
  * @param {{ current: { stops: Set<() => void> }, stillCurrent: () => boolean }} running
- * @param {Promise<[object, Transferable[]]>} message The message, and what it transfers.
- * @param {(error: string) => AppError} failure
- * @param {(stems: any) => Promise<unknown>} onStems
- * @param {(stage: string, fraction: number) => void} [onProgress]
+ * @param {{
+ *   message: Promise<[object, Transferable[]]>,
+ *   failure: (error: string) => AppError,
+ *   onMessage?: (data: any) => Promise<unknown> | void,
+ *   onProgress?: (stage: string, fraction: number, data: any) => void,
+ *   onStopped?: (error: AppError) => void,
+ *   onWorker?: (worker: Worker) => void,
+ * }} options
  */
-async function runWorker({ current, stillCurrent }, message, failure, onStems, onProgress = show) {
+async function runWorker(
+  { current, stillCurrent },
+  { message, failure, onMessage, onProgress = show, onStopped, onWorker },
+) {
   const worker = new Worker(new URL("./worker.js", import.meta.url), { type: "module" });
+  onWorker?.(worker);
   let stopStopped = () => {};
   let stop = () => {};
   return new Promise((resolve, reject) => {
     stop = () => reject(null);
     current.stops.add(stop);
-    if (bridge) stopStopped = bridge.onStopped((stopped) => reject(new AppError(stopped.error)));
+    if (bridge) {
+      stopStopped = bridge.onStopped((stopped) => {
+        const error = new AppError(stopped.error);
+        if (onStopped) onStopped(error);
+        else reject(error);
+      });
+    }
     worker.addEventListener("message", ({ data }) => {
-      if (data.type === "progress" && stillCurrent()) onProgress(data.stage, data.fraction);
-      else if (data.type === "stems") onStems(data).catch(reject);
+      if (data.type === "progress") stillCurrent() && onProgress(data.stage, data.fraction, data);
       else if (data.type === "done") resolve(data);
       else if (data.type === "error") reject(failure(data.message));
+      else Promise.resolve(onMessage?.(data)).catch(reject);
     });
     worker.addEventListener("error", (event) => {
       event.preventDefault();
@@ -148,16 +192,42 @@ async function runWorker({ current, stillCurrent }, message, failure, onStems, o
   });
 }
 
-// The worker's stems, to the player (in its order; the samples are
+// What to separate first, in seconds: the loop, or the part around the playhead.
+function firstPart() {
+  const loop = player.transport.loop;
+  fromLoop = Boolean(loop);
+  if (loop) return { from: loop.start, to: loop.end };
+  const at = player.transport.position;
+  const { before, after } = CONFIG.stems.firstPart;
+  return { from: Math.max(0, at - before), to: at + after };
+}
+
+// The strip on the waveform: what's separated so far, while not all of it is.
+function drawCovered() {
+  const spans = found ?? pending;
+  const partly = spans && !coversAll(spans.covered, spans.length);
+  player.waveform?.setStemsCovered(
+    partly ? spans.covered.map(([from, to]) => [from / spans.sampleRate, to / spans.sampleRate]) : null,
+  );
+}
+// A separation's stems before its first part is done (found is set then).
+/** @type {Stems | null} */
+let pending = null;
+
+// The stems found, to the player (in its order; the samples are
 // transferred); then the mixer shows. Resolves false if the job ended
 // meanwhile.
-async function takeStems(result, stillCurrent) {
-  const ids = CONFIG.stems.list.map(({ id }) => id).filter((id) => result.stems[id]);
-  await player.engine.loadStems(ids.map((id) => result.stems[id]));
+async function takeStems(result, covered, stillCurrent) {
+  const ids = IDS.filter((id) => result.stems[id]);
+  await player.engine.loadStems(
+    ids.map((id) => result.stems[id]),
+    covered,
+  );
   if (!stillCurrent()) return false;
   const levels = Object.fromEntries(ids.map((id) => [id, result.stems[id].level]));
-  found = { sampleRate: result.sampleRate, length: result.length, ids, levels };
+  found = { sampleRate: result.sampleRate, length: result.length, ids, levels, covered };
   applyMix();
+  drawCovered();
   show("ready", 1);
   return true;
 }
@@ -171,31 +241,17 @@ function markNew() {
   window.dispatchEvent(new Event("change"));
 }
 
-// Saves waiting for the stems' copies for saving (whenPrepared).
-/** @type {(() => void)[]} */
-let preparedWaiters = [];
-function releaseWaiters() {
-  const waiters = preparedWaiters;
-  preparedWaiters = [];
-  for (const resolve of waiters) resolve();
-}
-
-// The stems' Opus copies have come: they can be saved.
-function takeAudio(result) {
-  audio = result.audio;
-  job = null;
-  preparing = null;
-  render();
-  releaseWaiters();
-}
-
-// The job failed: the stems that already play stay (they just can't be
-// saved); before that, back to the button.
+// The job failed: the stems that already play stay; before that, back to
+// the button.
 function failJob(error, what) {
   job = null;
-  preparing = null;
-  releaseWaiters();
-  if (!found) mix = defaultMix(CONFIG.stems.list);
+  endSnapshot();
+  pending = null;
+  if (!found) {
+    mix = defaultMix(CONFIG.stems.list);
+    player.engine.dropStems();
+  }
+  drawCovered();
   show(found ? "ready" : "idle", 0);
   if (error) reportError(error instanceof AppError ? error : new AppError(`${what}: ${error.message ?? error}`, error));
 }
@@ -204,6 +260,10 @@ async function separate() {
   if (!bridge || !media || job) return;
   const running = startJob();
   const { current, stillCurrent } = running;
+  // "Separate the rest": an earlier run's stems play already.
+  const carryOn = Boolean(found);
+  /** @type {AppError | null} */
+  let stoppedEarly = null;
   try {
     if (!modelReady) {
       show("download", 0);
@@ -215,41 +275,121 @@ async function separate() {
     }
 
     show("decode", 0);
+    // Their copy is the worker's while it runs (made for saving first, if it's on its way).
+    await preparation;
+    if (!stillCurrent()) return;
+    const earlier = carryOn ? copies : null;
+    if (carryOn && !earlier) throw new AppError("The stems separated so far can't be added to.");
+    copies = null;
     const port = nextPort();
     const started = await bridge.start();
-    if (!stillCurrent()) return;
-    if (!started.ok) throw new AppError(started.error);
-    const result = await runWorker(
-      running,
-      port.then(
-        (received) =>
-          /** @type {[object, Transferable[]]} */ ([{ type: "separate", media, port: received }, [received]]),
-      ),
-      (message) => new AppError(`The stems couldn't be separated: ${message}`),
-      async (stems) => {
-        preparing = 0; // their copies for saving come next
-        if (!(await takeStems(stems, stillCurrent))) return;
-        markNew();
-        notify("The stems are ready");
+    if (!stillCurrent()) {
+      if (earlier) copies = earlier;
+      return;
+    }
+    if (!started.ok) {
+      if (earlier) copies = earlier;
+      throw new AppError(started.error);
+    }
+
+    let loaded = Promise.resolve();
+    const result = await runWorker(running, {
+      message: port.then((received) => [
+        { type: "separate", media, port: received, want: firstPart(), covered: found?.covered ?? [], stems: earlier },
+        [received, ...(earlier ? buffersOf(earlier) : [])],
+      ]),
+      failure: (message) => new AppError(`The stems couldn't be separated: ${message}`),
+      onWorker: (worker) => (current.worker = worker),
+      // The process stopped early: the worker hands over what's done.
+      onStopped: (error) => {
+        stoppedEarly = error;
+        current.worker?.postMessage({ type: "stop" });
       },
-    );
-    if (!stillCurrent()) return;
-    // Their copies for saving, made by a few workers at once while they play.
-    const { sampleRate, stems } = result.toEncode;
-    const encoded = await inWorkers(running, Object.entries(stems), {
-      message: (share) => [
-        { type: "encode", stems: share, sampleRate },
-        Object.values(share).flatMap((stem) => stem.channels.map((channel) => channel.buffer)),
-      ],
-      failure: (message) => new AppError(`The stems couldn't be prepared for saving: ${message}`),
-      onProgress: (_stage, fraction) => ((preparing = fraction), render()),
+      onProgress: (_stage, value, data) => {
+        if (data.stage === "decode") return show("decode", value);
+        // The first part is done: the mixer shows, the rest goes on.
+        if (data.wanted && !found && pending) {
+          found = pending;
+          pending = null;
+          applyMix();
+          markNew();
+          notify(fromLoop ? "The loop's stems are ready" : "The first stems are ready");
+        }
+        if (found) show("rest", value);
+        else show("separate", data.part ?? 0);
+      },
+      onMessage: (data) => {
+        if (!stillCurrent()) return;
+        if (data.type === "begin" && !carryOn) {
+          // Silent stems to begin with; the pieces fill them in.
+          const empty = () => new Int16Array(data.length);
+          loaded = player.engine.loadStems(
+            IDS.map(() => ({ scale: SCALE, channels: [empty(), empty()] })),
+            [],
+          );
+          pending = { sampleRate: data.sampleRate, length: data.length, ids: IDS, levels: {}, covered: [] };
+        } else if (data.type === "piece") {
+          const stems = found ?? pending;
+          if (!stems) return;
+          stems.covered = data.covered;
+          loaded = loaded.then(() =>
+            player.engine.writeStems(
+              data.from,
+              IDS.map((id) => data.stems[id]),
+              data.covered,
+            ),
+          );
+          drawCovered();
+        } else if (data.type === "snapshot") snapshotWaiter?.(data);
+      },
     });
-    if (stillCurrent()) takeAudio({ audio: Object.assign({}, ...encoded.map((done) => done.audio)) });
+    if (!stillCurrent()) return;
+    // Ended (all done, Stop, or the process failed): the stems so far are the page's again.
+    endSnapshot();
+    copies = result.stems;
+    found ??= pending;
+    pending = null;
+    if (!found || coveredLength(result.covered) === 0)
+      throw stoppedEarly ?? new AppError(result.error ?? "nothing was separated");
+    found.covered = result.covered;
+    if (coversAll(result.covered, found.length)) found.levels = result.levels;
+    job = null;
+    applyMix();
+    drawCovered();
+    markNew();
+    show("ready", 1);
+    if (result.error || stoppedEarly) {
+      reportError(stoppedEarly ?? new AppError(`Separating the stems stopped: ${result.error}`));
+    }
+    prepare();
   } catch (error) {
     if (job !== current) return; // cancelled or replaced: nothing to report
     for (const stop of current.stops) stop(); // any other workers too
     failJob(error, "The stems couldn't be separated");
   }
+}
+
+// Stop: what's separated stays (the worker hands it over and the separation
+// ends as if done). Before the first part is done, it's Cancel.
+function stopSeparating() {
+  if (!job?.worker || !found || !["rest", "decode"].includes(stage)) return cancel();
+  bridge?.cancel();
+  job.worker.postMessage({ type: "stop" });
+}
+
+// While separating: a copy of the stems so far, from the worker.
+/** @type {((data: { stems: Samples, covered: import("./spans.js").Spans } | null) => void) | null} */
+let snapshotWaiter = null;
+// The separation ended before its snapshot came: none (the page has the stems again).
+const endSnapshot = () => snapshotWaiter?.(null);
+function snapshot() {
+  return new Promise((resolve) => {
+    snapshotWaiter = (data) => {
+      snapshotWaiter = null;
+      resolve(data);
+    };
+    job?.worker?.postMessage({ type: "snapshot" });
+  });
 }
 
 // How many workers encode or decode stems at once: a few, at most half the
@@ -277,21 +417,93 @@ function inWorkers(running, entries, { message, failure, onProgress, onStems = a
   return Promise.all(
     Array.from({ length: count }, (_, w) => {
       const share = Object.fromEntries(entries.filter((_, i) => i % count === w));
-      return runWorker(running, Promise.resolve(message(share)), failure, onStems, (stage, fraction) => {
-        progress[w] = fraction;
-        onProgress(stage, progress.reduce((sum, value) => sum + value, 0) / count);
+      return runWorker(running, {
+        message: Promise.resolve(message(share)),
+        failure,
+        onMessage: (data) => (data.type === "stems" ? onStems(data) : undefined),
+        onProgress: (stage, fraction) => {
+          progress[w] = fraction;
+          onProgress(stage, progress.reduce((sum, value) => sum + value, 0) / count);
+        },
       });
     }),
   );
+}
+
+/* ---------- Copies for saving ---------- */
+
+// The Opus copies being made (prepare), or null.
+/** @type {Promise<void> | null} */
+let preparation = null;
+// Its workers' waits, ended when the song changes.
+let preparationJob = { cancelled: false, stops: new Set() };
+
+// Whether the Opus copies are older than the stems.
+const stale = () =>
+  Boolean(found) &&
+  (preparedRevision !== revision || coveredLength(audioCovered) !== coveredLength(found?.covered ?? []));
+
+// Makes the stems' Opus copies for the project, by a few workers at once,
+// while they play: from the page's copy, or while separating, from a copy
+// of the stems so far. Again if they changed meanwhile.
+function prepare() {
+  if (preparation || !stale()) return preparation ?? Promise.resolve();
+  const current = { cancelled: false, stops: new Set() };
+  preparationJob = current;
+  const forSong = media;
+  const running = { current, stillCurrent: () => !current.cancelled && media === forSong };
+  preparation = (async () => {
+    while (running.stillCurrent() && stale()) {
+      const target = revision;
+      const separating = Boolean(job?.worker);
+      // The page's copy goes to the workers and comes back; a snapshot is theirs.
+      const source = separating ? await snapshot() : copies && { stems: copies, covered: found.covered };
+      if (!running.stillCurrent()) return;
+      if (!source) {
+        if (separating) continue; // it ended meanwhile: from the page's copy
+        return;
+      }
+      if (!separating) copies = null;
+      preparing = 0;
+      render();
+      const sampleRate = found.sampleRate;
+      try {
+        const encoded = await inWorkers(running, Object.entries(source.stems), {
+          message: (share) => [{ type: "encode", stems: share, sampleRate }, buffersOf(share)],
+          failure: (message) => new AppError(`The stems couldn't be prepared for saving: ${message}`),
+          onProgress: (_stage, value) => ((preparing = value), render()),
+        });
+        if (!separating) copies = Object.assign({}, ...encoded.map((done) => done.stems));
+        if (!running.stillCurrent()) return;
+        audio = Object.assign({}, ...encoded.map((done) => done.audio));
+        audioCovered = source.covered;
+        preparedRevision = target;
+      } catch (error) {
+        if (error && running.stillCurrent()) reportError(error);
+        return;
+      }
+    }
+  })().finally(() => {
+    if (preparationJob === current) {
+      preparation = null;
+      preparing = null;
+      render();
+    }
+  });
+  return preparation;
 }
 
 /**
  * A project's stems, back in the player and the mixer (project.js): their
  * Opus bytes fetched from the project (`urls`), decoded by a few workers
  * at once, each a share of the stems; the player gets them all together.
- * @param {{ sampleRate: number, length: number, urls: Record<string, string>, mix: Record<string, any> }} saved
+ * `covered`: the parts separated, if not all of it.
+ * @param {{
+ *   sampleRate: number, length: number, urls: Record<string, string>, mix: Record<string, any>,
+ *   covered: import("./spans.js").Spans,
+ * }} saved
  */
-export async function loadStems({ sampleRate, length, urls, mix: savedMix }) {
+export async function loadStems({ sampleRate, length, urls, mix: savedMix, covered }) {
   cancel();
   const running = startJob();
   const { current, stillCurrent } = running;
@@ -314,8 +526,13 @@ export async function loadStems({ sampleRate, length, urls, mix: savedMix }) {
       onStems: async (part) => Object.assign(decoded.stems, part.stems),
     });
     if (!stillCurrent()) return;
-    if (!(await takeStems(decoded, stillCurrent))) return;
-    takeAudio({ audio: Object.assign({}, ...results.map((result) => result.audio)) });
+    if (!(await takeStems(decoded, covered, stillCurrent))) return;
+    job = null;
+    copies = Object.assign({}, ...results.map((result) => result.stems));
+    audio = Object.assign({}, ...results.map((result) => result.audio));
+    audioCovered = covered;
+    preparedRevision = revision;
+    render();
   } catch (error) {
     if (job !== current) return;
     for (const stop of current.stops) stop(); // the other workers too
@@ -323,6 +540,9 @@ export async function loadStems({ sampleRate, length, urls, mix: savedMix }) {
   }
 }
 
+// Ends the job at once: its workers stop, and so does the stem process. A
+// separation's stems so far are lost: for a new song (or a project's
+// stems), or before its first part is done.
 function cancel() {
   const stopping = job;
   if (!stopping) return;
@@ -330,8 +550,10 @@ function cancel() {
   stopping.cancelled = true;
   for (const stop of stopping.stops) stop(); // each worker ends with its wait
   bridge?.cancel();
-  preparing = null;
-  releaseWaiters();
+  endSnapshot();
+  if (pending && !found) player.engine.dropStems();
+  pending = null;
+  drawCovered();
   show(found ? "ready" : "idle", 0);
 }
 
@@ -388,36 +610,42 @@ function show(nextStage, nextFraction) {
 function render() {
   if (!ui) return;
   ui.section.hidden = !media;
-  const busy = ["download", "decode", "separate", "load"].includes(stage);
-  ui.action.hidden = busy || stage === "ready";
+  const busy = ["download", "decode", "separate", "rest", "load"].includes(stage);
+  const partly = Boolean(found) && !coversAll(found.covered, found.length);
+  ui.action.hidden = busy || (stage === "ready" && !partly);
   ui.busy.hidden = !busy;
-  ui.mixer.hidden = stage !== "ready";
-  ui.reset.hidden = stage !== "ready";
-  if (stage === "ready") ui.mixerRows.render(mix);
+  ui.stop.textContent = stage === "rest" ? "Stop" : "Cancel";
+  ui.stop.title = stage === "rest" ? "Stop separating; what's done stays" : "";
+  ui.mixer.hidden = !found;
+  ui.reset.hidden = !found;
+  if (found) ui.mixerRows.render(mix);
   // Short: what the model is and its licence are on EarBee/models and in
   // THIRD_PARTY_NOTICES.md; the first time's download size, in the tooltip.
-  ui.action.textContent = "Separate the stems";
+  ui.action.textContent = partly ? "Separate the rest" : "Separate the stems";
   ui.action.title =
-    "Split the song into vocals, drums, bass, guitar, piano and the rest, in the background, " +
-    "in about as long as the song plays." +
+    (partly
+      ? "Separate the rest of the song, in the background."
+      : "Split the song into vocals, drums, bass, guitar, piano and the rest, the loop first " +
+        "(or from the playhead), then the rest in the background.") +
     (modelReady ? "" : ` The first time, the stem model is downloaded (${megabytes(modelBytes)}).`);
   const label = {
     download: `Downloading the stem model ${percent(fraction)}`,
     decode: `Reading the song ${percent(fraction)}`,
-    separate: `Separating ${percent(fraction)}`,
+    separate: `${fromLoop ? "Separating the loop" : "Separating from the playhead"} ${percent(fraction)}`,
+    rest: `Separating the rest ${percent(fraction)}`,
     load: `Loading the stems ${percent(fraction)}`,
   }[stage];
   if (label) ui.status.textContent = label;
   // New stems play while their copies for saving are made.
-  ui.preparing.hidden = stage !== "ready" || preparing === null;
+  ui.preparing.hidden = !found || busy || preparing === null;
   ui.preparing.textContent = `Preparing them for saving ${percent(preparing ?? 0)}`;
 }
 
 function build(section) {
   const action = element("button", { type: "button", className: "stems-action" });
   const status = element("span", { className: "stems-status" });
-  const stopButton = element("button", { type: "button", className: "small", textContent: "Cancel" });
-  const busy = element("div", { className: "stems-busy" }, status, stopButton);
+  const stop = element("button", { type: "button", className: "small", textContent: "Cancel" });
+  const busy = element("div", { className: "stems-busy" }, status, stop);
   const preparing = element("p", { className: "stems-note stems-preparing" });
   const reset = element("button", {
     type: "button",
@@ -434,18 +662,20 @@ function build(section) {
     onChange: changeMix,
     onUnfoldAll: unfoldAll,
   });
-  // A part of the Mixer (index.html): its own small heading, the reset beside it.
+  // A part of the Mixer (index.html): its own small heading, the reset
+  // beside it. While the rest is separated, the mixer shows above its
+  // progress.
   section.append(
     element("div", { className: "stems-head" }, element("h3", { textContent: "Stems" }), reset),
+    mixer,
     action,
     busy,
-    mixer,
     preparing,
   );
   onClick(action, separate);
-  onClick(stopButton, cancel);
+  onClick(stop, stopSeparating);
   onClick(reset, resetMix);
-  return { section, action, busy, status, mixer, mixerRows, preparing, reset };
+  return { section, action, busy, status, stop, mixer, mixerRows, preparing, reset };
 }
 
 /* ---------- Wiring ---------- */
@@ -465,6 +695,10 @@ export function bindStems() {
     if (waiter) waiter(event.ports[0]);
     else event.ports[0]?.close(); // nobody's waiting: the process exits
   });
+  // The loop moved while separating: that part next.
+  player.transport.on("loop", (loop) => {
+    if (loop && job?.worker) job.worker.postMessage({ type: "want", from: loop.start, to: loop.end });
+  });
   bridge
     .model()
     .then((model) => {
@@ -478,13 +712,20 @@ export function bindStems() {
 /** @param {import("../../core/media.js").Media | null} next */
 export function resetStems(next) {
   cancel();
+  preparationJob.cancelled = true;
+  for (const stop of preparationJob.stops) stop();
+  preparation = null;
+  preparing = null;
   media = next;
   // The player dropped them with the old track; this is for a load that
   // was on its way.
   if (found) player.engine.dropStems();
   found = null;
+  copies = null;
   audio = null;
+  audioCovered = [];
   mix = defaultMix(CONFIG.stems.list);
+  drawCovered();
   show("idle", 0);
 }
 
@@ -492,19 +733,18 @@ export function resetStems(next) {
 export const stemsFound = () => found;
 
 /**
- * What a project saves (project.js): the stems' Opus bytes, the mix, and
- * `revision`, which changes whenever the stems do. Null without stems.
+ * What a project saves (project.js): the stems' Opus bytes and the spans
+ * they cover, the mix, and `revision`, which changes whenever the stems
+ * do. Null without stems.
  */
-export const stemsToSave = () => found && audio && { ...found, audio, mix, revision };
+export const stemsToSave = () => found && audio && { ...found, covered: audioCovered, audio, mix, revision };
 
 /**
- * Resolves once new stems' copies for saving are made (at once if there's
- * nothing to wait for), so a save started meanwhile keeps the stems.
+ * Resolves once the stems' copies for saving are made (at once if there's
+ * nothing to wait for), so a save started meanwhile keeps the stems; while
+ * separating, the stems so far.
  */
-export const whenPrepared = () =>
-  found && !audio && preparing !== null
-    ? new Promise((resolve) => preparedWaiters.push(() => resolve(undefined)))
-    : Promise.resolve();
+export const whenPrepared = () => prepare();
 // While a project's stems load, their mix already counts: the project was
 // saved with it.
 export const stemsRevision = () => ({ revision, mix: found || stage === "load" ? mix : null });

@@ -5,48 +5,64 @@
 // Separating: it decodes the file again (the player's samples went to the
 // audio thread when it opened), at 44.1 kHz in stereo (what the model
 // hears; core/resample.js for other rates), and streams it to the stem
-// process (electron/stems/process.js) over the port it's given; then it
-// gathers the stems the process sends back, at the track's own rate in 16
-// bits (what the player mixes them from: audio/engine.js), and hands them
-// over to be played, then its own copies to the page, which has a few of
-// these workers encode them as Opus (opus.js) for saving in a project while
-// they already play. The song and its stems never pass through the page's
-// main thread on their way to the player.
+// process (electron/stems/process.js) over the port it's given. The process
+// does the part wanted first (the loop), then the rest, and sends each
+// piece back as it's done; here each piece is turned back to the track's
+// rate in 16 bits, kept in this worker's copy of the stems, and handed over
+// at once to be played. At the end (or Stop) the copy goes to the page,
+// which has a few of these workers encode it as Opus (opus.js) for saving
+// in a project. The song and its stems never pass through the page's main
+// thread on their way to the player.
 //
 // Loading: a project's Opus stems decoded back to the same form.
 //
-//   page → { type: "separate", media, port }  media: a File, or { name, url } (core/media.js)
-//   ←      { type: "progress", stage: "decode" | "separate", fraction } …
-//   ←      { type: "stems", … } (below), then { type: "done", toEncode: { sampleRate, stems } }
-//          the same stems again, transferred, for encoding
-//   page → { type: "encode", stems, sampleRate }  some of those stems
-//   ←      { type: "progress", stage: "encode", fraction } …, then { type: "done", audio }
+// Stems here are { id: [left, right] } Int16Arrays at the track's rate,
+// from its first sample, each sample × SCALE (CONFIG.stems.headroom); the
+// parts separated, `covered`, are spans of those samples (spans.js).
+//
+//   page → { type: "separate", media, port, want: { from, to }, covered, stems? }
+//          media: a File, or { name, url } (core/media.js); want: seconds;
+//          stems and covered: an earlier run's, to carry on from (transferred)
+//   ←      { type: "progress", stage: "decode" | "separate", fraction, part?, wanted? } …
+//          fraction: of the whole song; part: of the part wanted; wanted: that's done
+//   ←      { type: "begin", sampleRate, length }   the stems' rate and length
+//   ←      { type: "piece", from, stems, covered } stems from sample `from` (transferred)
+//   page → { type: "want", from, to }               seconds: the loop moved
+//   page → { type: "snapshot" }
+//   ←      { type: "snapshot", stems, covered }     copies of the stems so far
+//   page → { type: "stop" }                         no more: ends with what's done
+//   ←      { type: "done", stems, covered, levels, error } the stems (transferred);
+//          error: why the process stopped early, if it did
+//   page → { type: "encode", stems, sampleRate }    some stems (transferred)
+//   ←      { type: "progress", stage: "encode", fraction } …, then { type: "done", audio, stems }
+//          their Opus bytes, and the stems back
 //   page → { type: "load", audio: { [id]: bytes }, sampleRate, length }
 //   ←      { type: "progress", stage: "load", fraction } …
 //   ←      { type: "stems", sampleRate, length, stems: { [id]: { scale, channels, level } } }
-//          to play, at the track's own rate: each channel an Int16Array
-//          (× scale: the samples), level its loudness
-//   ←      { type: "done", audio }  each stem's Opus bytes, for the project
+//          to play: each channel an Int16Array (× scale: the samples), level its loudness
+//   ←      { type: "done", audio, stems }  each stem's Opus bytes, for the project, and its samples
 //   ←      { type: "error", message }
 import { AudioSampleSink } from "../../../node_modules/mediabunny/dist/bundles/mediabunny.mjs";
 import { CONFIG } from "../../config.js";
 import { createResampler, resampleRatio } from "../../core/resample.js";
 import { openTrack } from "../../audio/open-track.js";
 import { decodeStem, encodeStem } from "./opus.js";
+import { addSpan, scaleSpans } from "./spans.js";
 
 const scope = /** @type {any} */ (self);
 const { sampleRate: RATE, chunk: CHUNK } = CONFIG.stems;
+const SCALE = CONFIG.stems.headroom / 32767;
 
 // Progress at most this often, so the page isn't flooded.
 const PROGRESS_MS = 100;
 
 function progressReporter(stage) {
   let last = 0;
-  return (fraction) => {
+  return (fraction, more = {}) => {
     const now = performance.now();
     if (now - last < PROGRESS_MS && fraction < 1) return;
     last = now;
-    scope.postMessage({ type: "progress", stage, fraction });
+    scope.postMessage({ type: "progress", stage, fraction, ...more });
   };
 }
 
@@ -122,63 +138,99 @@ async function sendTrack(media, port) {
   return { length: Math.min(sent[0], sent[1]), sampleRate };
 }
 
-// Gathers the stems the process sends, each channel turned back to the
-// track's rate (`rate`) and into 16 bits as its chunks arrive, so the 44.1
-// kHz floats are never all held; resolves to { sampleRate, length, stems }.
-function receiveStems(port, rate) {
+// The samples at the track's rate over [from, to) (its samples) from a
+// piece of the process's (`samples`, at RATE, from `start`), resampled on
+// its own: the piece carries enough either side for the filter.
+function resamplePiece(samples, start, from, to, rate) {
+  const { up, down } = resampleRatio(RATE, rate, CONFIG.stems.resampleZeroCrossings);
+  if (up === down) return samples.subarray(from - start, to - start);
+  // The resampler starts at a multiple of `down`, with silence before the piece.
+  const first = Math.floor(start / down) * down;
+  const resampler = createResampler(RATE, rate, CONFIG.stems.resampleZeroCrossings);
+  resampler.push(new Float32Array(start - first));
+  resampler.push(samples);
+  resampler.finish();
+  const out = resampler.take();
+  const offset = (first * up) / down; // the track sample out[0] is
+  return out.subarray(from - offset, to - offset);
+}
+
+// Writes float samples into a stem's channel from `at`, in 16 bits.
+function write(channel, at, samples) {
+  const end = Math.min(channel.length, at + samples.length);
+  for (let i = at; i < end; i++) channel[i] = Math.max(-32768, Math.min(32767, Math.round(samples[i - at] / SCALE)));
+}
+
+// What this worker is separating: its copy of the stems, what's covered,
+// and the process's port.
+let separating = null;
+let stopSoon = false; // Stop came while the song was still being read
+
+// Hands the stems over and ends: at the end, on Stop, or when the process
+// failed (`error`, its message: what was done until then still plays).
+function finish(error = null) {
+  if (!separating) return;
+  const { port, stems, covered } = separating;
+  separating = null;
+  port.postMessage({ type: "close" });
+  port.close();
+  const levels = Object.fromEntries(
+    Object.entries(stems).map(([id, channels]) => [id, level({ scale: SCALE, channels })]),
+  );
+  scope.postMessage({ type: "done", stems, covered, levels, error }, buffersOf(stems));
+}
+
+// Separates `media`: sends it to the process, then takes its pieces as they
+// come, until it's all done (finish) or stopped. `previous`: an earlier
+// run's stems and covered, to carry on from.
+async function separateTrack({ media, port, want, covered = [], stems: previous }) {
+  const { length, sampleRate: rate } = await sendTrack(media, port);
+  const { up, down } = resampleRatio(RATE, rate, CONFIG.stems.resampleZeroCrossings);
+  const trackLength = Math.ceil((length * up) / down);
+  // The track's samples → the process's (at RATE), and back.
+  const toRate = (from, to) => ({ from: Math.round(from * RATE), to: Math.round(to * RATE) });
+  const toTrack = (sample) => Math.min(trackLength, Math.ceil((sample * up) / down));
+  const ids = CONFIG.stems.list.map(({ id }) => id);
+  const stems =
+    previous ?? Object.fromEntries(ids.map((id) => [id, [new Int16Array(trackLength), new Int16Array(trackLength)]]));
+  separating = { port, stems, covered, toRate };
+  scope.postMessage({ type: "begin", sampleRate: rate, length: trackLength });
+  if (stopSoon) return finish();
+
   const progress = progressReporter("separate");
-  return new Promise((resolve, reject) => {
-    let gathered = null;
-    let sentLength = 0; // the process's length, at its rate
-    const writers = new Map(); // "<id>/<channel>" → { resampler, at }
-
-    // Appends resampled samples to a stem's channel, in 16 bits.
-    const write = (stem, channel, writer, samples) => {
-      const out = stem.channels[channel];
-      const end = Math.min(out.length, writer.at + samples.length);
-      for (let i = writer.at; i < end; i++) {
-        out[i] = Math.max(-32768, Math.min(32767, Math.round(samples[i - writer.at] / stem.scale)));
+  let wanted = false;
+  port.onmessage = ({ data }) => {
+    if (!separating) return;
+    if (data.type === "progress") {
+      const fraction = data.total ? data.done / data.total : 0;
+      // The part wanted being done is news at once; the rest, at most every PROGRESS_MS.
+      if (data.wanted && !wanted) {
+        scope.postMessage({ type: "progress", stage: "separate", fraction, part: 1, wanted: true });
       }
-      writer.at = end;
-    };
-
-    port.onmessage = ({ data }) => {
-      if (data.type === "progress") progress(data.total ? data.done / data.total : 0);
-      else if (data.type === "stems") {
-        sentLength = data.length;
-        const { up, down } = resampleRatio(data.sampleRate, rate, CONFIG.stems.resampleZeroCrossings);
-        const length = Math.ceil((data.length * up) / down);
-        gathered = {
-          sampleRate: rate,
-          length,
-          stems: Object.fromEntries(
-            data.names.map((id, i) => [
-              id,
-              {
-                scale: Math.max(data.peaks[i], 1e-6) / 32767,
-                channels: [new Int16Array(length), new Int16Array(length)],
-              },
-            ]),
-          ),
-        };
-        for (const id of data.names) {
-          for (const channel of [0, 1]) {
-            const resampler = createResampler(data.sampleRate, rate, CONFIG.stems.resampleZeroCrossings);
-            writers.set(`${id}/${channel}`, { resampler, at: 0 });
-          }
-        }
-      } else if (data.type === "stem") {
-        const stem = gathered.stems[data.name];
-        const writer = writers.get(`${data.name}/${data.channel}`);
-        writer.resampler.push(data.samples);
-        write(stem, data.channel, writer, writer.resampler.take());
-        if (data.offset + data.samples.length >= sentLength) {
-          writer.resampler.finish();
-          write(stem, data.channel, writer, writer.resampler.take());
-        }
-      } else if (data.type === "done") resolve(gathered);
-      else if (data.type === "error") reject(new Error(data.message));
-    };
+      wanted = data.wanted;
+      progress(fraction, { part: data.part, wanted });
+    } else if (data.type === "piece") {
+      const from = toTrack(data.from);
+      const to = data.to >= length ? trackLength : toTrack(data.to);
+      if (!(from < to)) return;
+      const piece = {};
+      for (const [s, id] of data.names.entries()) {
+        if (!stems[id]) continue;
+        piece[id] = [0, 1].map((c) => {
+          write(stems[id][c], from, resamplePiece(data.samples[s * 2 + c], data.start, from, to, rate));
+          return stems[id][c].slice(from, to);
+        });
+      }
+      separating.covered = addSpan(separating.covered, from, to);
+      scope.postMessage({ type: "piece", from, stems: piece, covered: separating.covered }, buffersOf(piece));
+    } else if (data.type === "done") finish();
+    else if (data.type === "error") finish(data.message);
+  };
+  port.postMessage({
+    type: "separate",
+    length,
+    want: toRate(want.from, want.to),
+    covered: scaleSpans(covered, down / up),
   });
 }
 
@@ -191,29 +243,26 @@ function level({ scale, channels }) {
   }, 0);
 }
 
-// A stem in 16 bits, scaled to its loudest sample. Plain loops: from()
-// with a function, or reduce(), takes seconds over a song's samples
-// (measured: 3 s a stem).
+// A stem in 16 bits (SCALE). A plain loop: from() with a function takes
+// seconds over a song's samples (measured: 3 s a stem).
 /** @param {Float32Array[]} channels */
 function quantize(channels) {
-  let peak = 0;
-  for (const channel of channels) {
-    for (let i = 0; i < channel.length; i++) peak = Math.max(peak, Math.abs(channel[i]));
-  }
-  const scale = Math.max(peak, 1e-6) / 32767;
-  const ints = channels.map((channel) => {
-    const out = new Int16Array(channel.length);
-    for (let i = 0; i < channel.length; i++) out[i] = Math.round(channel[i] / scale);
-    return out;
-  });
-  return { scale, channels: ints };
+  return {
+    scale: SCALE,
+    channels: channels.map((channel) => {
+      const out = new Int16Array(channel.length);
+      write(out, 0, channel);
+      return out;
+    }),
+  };
 }
 
 // A stem's samples back from its 16 bits.
-function unquantize({ scale, channels }) {
+/** @param {Int16Array[]} channels */
+function unquantize(channels) {
   return channels.map((channel) => {
     const out = new Float32Array(channel.length);
-    for (let i = 0; i < channel.length; i++) out[i] = channel[i] * scale;
+    for (let i = 0; i < channel.length; i++) out[i] = channel[i] * SCALE;
     return out;
   });
 }
@@ -242,12 +291,13 @@ async function decodeAll(audio, rate, length) {
   return stems;
 }
 
-// Hands the stems over to be played, their samples transferred; `keep`:
-// copies, so the worker keeps its own (to encode).
-function handOver({ sampleRate, length, stems }, keep) {
+// Hands copies of the stems over to be played, their samples transferred;
+// the worker keeps its own (for the page, to carry on separating or to
+// encode).
+function handOver({ sampleRate, length, stems }) {
   const copies = Object.fromEntries(
     Object.entries(stems).map(([id, { scale, channels }]) => {
-      const stem = { scale, channels: keep ? channels.map((channel) => channel.slice()) : channels };
+      const stem = { scale, channels: channels.map((channel) => channel.slice()) };
       return [id, { ...stem, level: level(stem) }];
     }),
   );
@@ -255,36 +305,41 @@ function handOver({ sampleRate, length, stems }, keep) {
   scope.postMessage({ type: "stems", sampleRate, length, stems: copies }, buffers);
 }
 
+const buffersOf = (stems) => Object.values(stems).flatMap((channels) => channels.map((channel) => channel.buffer));
+const fail = (error) => scope.postMessage({ type: "error", message: String(error?.message ?? error) });
+
 scope.addEventListener("message", async ({ data }) => {
   if (data?.type === "separate") {
-    const { media, port } = data;
     try {
-      const { length, sampleRate } = await sendTrack(media, port);
-      const received = receiveStems(port, sampleRate);
-      port.postMessage({ type: "separate", length });
-      const result = await received;
-      port.postMessage({ type: "close" });
-      handOver(result, true);
-      // Its own copies, for the page to have encoded.
-      const buffers = Object.values(result.stems).flatMap((stem) => stem.channels.map((channel) => channel.buffer));
-      scope.postMessage({ type: "done", toEncode: { sampleRate: result.sampleRate, stems: result.stems } }, buffers);
+      await separateTrack(data);
     } catch (error) {
-      port.close();
-      scope.postMessage({ type: "error", message: String(error?.message ?? error) });
+      separating = null;
+      data.port.close();
+      fail(error);
     }
+  } else if (data?.type === "want") {
+    if (separating) separating.port.postMessage({ type: "want", ...separating.toRate(data.from, data.to) });
+  } else if (data?.type === "snapshot") {
+    if (separating) scope.postMessage({ type: "snapshot", stems: separating.stems, covered: separating.covered });
+  } else if (data?.type === "stop") {
+    if (separating) finish();
+    else stopSoon = true;
   } else if (data?.type === "encode") {
     try {
-      scope.postMessage({ type: "done", audio: await encodeAll(data.stems, data.sampleRate) });
+      const audio = await encodeAll(data.stems, data.sampleRate);
+      scope.postMessage({ type: "done", audio, stems: data.stems }, buffersOf(data.stems));
     } catch (error) {
-      scope.postMessage({ type: "error", message: String(error?.message ?? error) });
+      fail(error);
     }
   } else if (data?.type === "load") {
     const { audio, sampleRate, length } = data;
     try {
-      handOver({ sampleRate, length, stems: await decodeAll(audio, sampleRate, length) }, false);
-      scope.postMessage({ type: "done", audio });
+      const decoded = await decodeAll(audio, sampleRate, length);
+      handOver({ sampleRate, length, stems: decoded });
+      const stems = Object.fromEntries(Object.entries(decoded).map(([id, stem]) => [id, stem.channels]));
+      scope.postMessage({ type: "done", audio, stems }, buffersOf(stems));
     } catch (error) {
-      scope.postMessage({ type: "error", message: String(error?.message ?? error) });
+      fail(error);
     }
   }
 });

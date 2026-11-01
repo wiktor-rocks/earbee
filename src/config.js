@@ -288,5 +288,12 @@ export const CONFIG = {
     // Samples per message to and from the stem process (4 MB), so no
     // message holds a whole song.
     chunk: 1 << 20,
+    // The stems are kept in 16 bits from -headroom to +headroom: one scale
+    // for every stem and song, known before any of it is separated (a stem
+    // can be louder than the song where others cancel it out).
+    headroom: 2,
+    // Separating starts with the loop; without one, with this much of the
+    // song around the playhead (seconds before and after it).
+    firstPart: { before: 5, after: 20 },
   },
 };
