@@ -14,8 +14,21 @@ const fs = require("fs");
 const path = require("path");
 
 module.exports = async function (h) {
-  const { js, openFile, setFiles, key, check, sleep, toasts, clearToasts, shot, projectDialogs, setStemDelay, memory } =
-    h;
+  const {
+    js,
+    openFile,
+    setFiles,
+    key,
+    check,
+    sleep,
+    toasts,
+    clearToasts,
+    shot,
+    projectDialogs,
+    setStemDelay,
+    setStemStartFails,
+    memory,
+  } = h;
   const { FIXTURES, OUTPUT } = h;
 
   const section = () =>
@@ -553,6 +566,23 @@ module.exports = async function (h) {
     JSON.stringify({ action: state.action, covered: reopened?.covered }),
   );
 
+  // The loop alone over them, stopped part way: Stop, not Cancel, so the
+  // page's copy comes back from the worker, and the rest can carry on.
+  await js(`${app}.then(([, { setLoopRegion }]) => setLoopRegion({ start: 10, end: 14, enabled: true }))`);
+  setStemDelay(1500);
+  await clearMessage();
+  await press(".stems-loop");
+  await waitFor((s) => /Separating the loop/.test(s.busy ?? ""), 10_000);
+  const stopLabel = await js(`document.querySelector("#stemsSection .stems-busy button").textContent`);
+  await press(".stems-busy button");
+  state = await waitFor((s) => s.busy === null, 5000);
+  check(
+    "stems: the loop alone over the whole song's stems stops, keeping them",
+    stopLabel === "Stop" && state.ready && state.action === "Separate the rest" && covers(await found(), 60, 64),
+    JSON.stringify({ stopLabel, action: state.action, busy: state.busy }),
+  );
+  setStemDelay(400);
+
   // Carrying on: the rest, until all of it is done.
   await press(".stems-whole");
   state = await waitFor((s) => s.busy !== null, 5000);
@@ -671,6 +701,41 @@ module.exports = async function (h) {
       state.action === "Separate the whole song",
     JSON.stringify({ found: aloneBack && { ...aloneBack, levels: undefined }, action: state.action }),
   );
+
+  // The whole song after the loop alone, failing to start: the stems are
+  // widened to all of it, but their copies for saving still hold the
+  // window, and a save says so.
+  setStemStartFails(true);
+  await clearMessage();
+  await press(".stems-whole");
+  state = await waitFor((s) => s.busy === null && s.ready, 10_000);
+  said = await message();
+  setStemStartFails(false);
+  check(
+    "stems: a whole song that can't start says so, the stems kept",
+    state.ready && (await found())?.start === 0 && /can't start/.test(said),
+    JSON.stringify({ said, start: (await found())?.start }),
+  );
+  const widenedFile = path.join(OUTPUT, "projects", "Widened.ebee");
+  fs.rmSync(widenedFile, { force: true });
+  projectDialogs.save = widenedFile;
+  key("S", ["control", "shift"]);
+  await sleep(200);
+  await js(`saveModeLink.click(); saveForm.requestSubmit()`);
+  for (let i = 0; i < 300 && !fs.existsSync(widenedFile); i++) await sleep(100);
+  await sleep(300);
+  const widenedSaved = headerOf(widenedFile)?.sections?.stems?.stems;
+  check(
+    "stems: …and saved then, they keep the window's place",
+    widenedSaved?.start === alone.start &&
+      widenedSaved?.span === alone.span &&
+      JSON.stringify(widenedSaved?.covered) === JSON.stringify(alone.covered),
+    JSON.stringify({ start: widenedSaved?.start, span: widenedSaved?.span, covered: widenedSaved?.covered }),
+  );
+  await openFile(path.join(FIXTURES, "bars.wav"));
+  await setFiles(widenedFile);
+  await waitFor((s) => s.ready, 30_000);
+  check("stems: …and come back there", (await found())?.start === alone.start, JSON.stringify((await found())?.start));
 
   // The whole song after the loop alone: it widens to all of it and carries on.
   await press(".stems-whole");

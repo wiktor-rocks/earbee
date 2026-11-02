@@ -132,16 +132,20 @@ async function createHarness() {
       ? path.join(PROJECT, "models", "htdemucs-6s.onnx")
       : path.join(TESTS, "unit", "fixtures", "stem-model-fake.onnx");
   // setStemDelay(ms): each segment takes that much longer (stem-process-slow.cjs).
+  // setStemStartFails(true): the stem process can't be started.
   let stemDelay = 0;
+  let stemStartFails = false;
   const stemsUtility = {
-    fork: (script, args, options) =>
-      stemDelay
+    fork(script, args, options) {
+      if (stemStartFails) throw new Error("the stem process can't start (a test)");
+      return stemDelay
         ? utilityProcess.fork(
             path.join(TESTS, "e2e", "stem-process-slow.cjs"),
             [String(stemDelay), script, ...args],
             options,
           )
-        : utilityProcess.fork(script, args, options),
+        : utilityProcess.fork(script, args, options);
+    },
   };
   require(path.join(PROJECT, "electron", "stems", "index.js")).handleStems(ipcMain, {
     utilityProcess: stemsUtility,
@@ -336,6 +340,7 @@ async function createHarness() {
     folderChoice,
     projectDialogs,
     setStemDelay: (ms) => (stemDelay = ms), // Stems: each segment this much slower
+    setStemStartFails: (yes) => (stemStartFails = yes), // Stems: the stem process can't start
     externalOpens, // the links Open on YouTube passed to the system browser
     projectState, // the page's unsaved state, as the main process hears it
     videoWin, // the video window (src/features/video-window/), or null

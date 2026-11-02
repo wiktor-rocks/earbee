@@ -119,6 +119,9 @@ let copies = null;
 let audio = null; // each stem as Opus, for the project (opus.js)
 /** @type {import("./spans.js").Spans} */
 let audioCovered = []; // the spans `audio` holds
+// The samples `audio` holds, from the track's `start` (found's may have
+// moved on since: widened to the whole song).
+let audioWindow = { start: 0, span: 0 };
 let revision = 0; // counts the stems separated (not those a project brings back), for unsaved changes
 let preparedRevision = 0; // the revision `audio` was made at
 let modelBytes = 0;
@@ -332,6 +335,7 @@ function dropFound() {
   copies = null;
   audio = null;
   audioCovered = [];
+  audioWindow = { start: 0, span: 0 };
 }
 
 // The page's copy of a window's stems, and the player's, widened to the
@@ -417,7 +421,8 @@ async function separate({ onlyLoop = false } = {}) {
     if (carryOn && !earlier) throw new AppError("The stems separated so far can't be added to.");
     copies = null;
     const port = nextPort();
-    const started = await bridge.start();
+    // (A start that throws is a failed one too: the page's copy comes back below.)
+    const started = await bridge.start().catch((error) => ({ ok: false, error: String(error?.message ?? error) }));
     if (!stillCurrent()) {
       if (earlier) copies = earlier;
       return;
@@ -515,10 +520,16 @@ async function separate({ onlyLoop = false } = {}) {
   }
 }
 
+// Whether the busy button stops (keeps what's done) rather than cancels:
+// once stems play, from the first part on, or carrying on from earlier
+// ones, whose page's copy the worker has then (the loop alone over the
+// whole song's too: cancelled, that copy would be lost).
+const stops = () => Boolean(found) && ["decode", "separate", "rest"].includes(stage);
+
 // Stop: what's separated stays (the worker hands it over and the separation
 // ends as if done). Before the first part is done, it's Cancel.
 function stopSeparating() {
-  if (!job?.worker || !found || !["rest", "decode"].includes(stage)) return cancel();
+  if (!job?.worker || !stops()) return cancel();
   bridge?.cancel();
   job.worker.postMessage({ type: "stop" });
 }
@@ -605,6 +616,7 @@ function prepare() {
       // The page's copy goes to the workers and comes back; a snapshot is theirs.
       const source = separating ? await snapshot() : copies && { stems: copies, covered: found.covered };
       if (!running.stillCurrent()) return;
+      const holds = found && { start: found.start, span: found.span }; // what the source holds
       if (!source) {
         if (separating) continue; // it ended meanwhile: from the page's copy
         return;
@@ -623,6 +635,7 @@ function prepare() {
         if (!running.stillCurrent()) return;
         audio = Object.assign({}, ...encoded.map((done) => done.audio));
         audioCovered = source.covered;
+        audioWindow = holds;
         preparedRevision = target;
       } catch (error) {
         if (error && running.stillCurrent()) reportError(error);
@@ -697,6 +710,7 @@ export async function loadStems({
     copies = Object.assign({}, ...results.map((result) => result.stems));
     audio = Object.assign({}, ...results.map((result) => result.audio));
     audioCovered = covered;
+    audioWindow = { start, span };
     preparedRevision = revision;
     render();
   } catch (error) {
@@ -789,8 +803,8 @@ function render() {
   ui.action.hidden = busy || all || Boolean(held);
   ui.held.hidden = !held || busy;
   ui.busy.hidden = !busy;
-  ui.stop.textContent = stage === "rest" ? "Stop" : "Cancel";
-  ui.stop.title = stage === "rest" ? "Stop separating; what's done stays" : "";
+  ui.stop.textContent = stops() ? "Stop" : "Cancel";
+  ui.stop.title = stops() ? "Stop separating; what's done stays" : "";
   ui.mixer.hidden = !found;
   ui.reset.hidden = !found;
   if (found) ui.mixerRows.render(mix);
@@ -922,6 +936,7 @@ export function resetStems(next, nextTrack = null) {
   copies = null;
   audio = null;
   audioCovered = [];
+  audioWindow = { start: 0, span: 0 };
   mix = defaultMix(CONFIG.stems.list);
   drawCovered();
   show("idle", 0);
@@ -937,7 +952,8 @@ export const stemsFound = () => found;
  * without stems.
  */
 export const stemsToSave = () =>
-  (found && audio && { ...found, covered: audioCovered, audio, mix, revision }) || (held && { ...held, revision });
+  (found && audio && { ...found, ...audioWindow, covered: audioCovered, audio, mix, revision }) ||
+  (held && { ...held, revision });
 
 /**
  * Resolves once the stems' copies for saving are made (at once if there's
