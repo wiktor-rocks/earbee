@@ -295,5 +295,11 @@ export const CONFIG = {
     // Separating starts with the loop; without one, with this much of the
     // song around the playhead (seconds before and after it).
     firstPart: { before: 5, after: 20 },
+    // A song is separated, or a project's stems brought back, only if what
+    // they'd take (stems/memory.js) fits in `share` of the memory available
+    // (as a track: CONFIG.audio.maxMemoryShare), or where that can't be
+    // told (macOS), in `totalShare` of all of it. `model`: the stem
+    // model's working memory for a segment (about 2 GB: electron/stems/process.js).
+    memory: { model: 2e9, share: 0.8, totalShare: 0.5 },
   },
 };

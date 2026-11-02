@@ -111,10 +111,14 @@ async function createHarness() {
     state: projectState,
   });
   // As main.js does, except that a test can pretend the system has only
-  // `memory.available` bytes left (null: the real figure).
-  const memory = { available: null };
-  const { availableMemory } = require(path.join(PROJECT, "electron", "system.js"));
-  ipcMain.handle("system:available-memory", () => memory.available ?? availableMemory());
+  // `memory.available` bytes left, or `memory.total` in all (null: the
+  // real figure; `memory.available` undefined: unknown, as on macOS).
+  const memory = { available: null, total: null };
+  const { availableMemory, totalMemory } = require(path.join(PROJECT, "electron", "system.js"));
+  ipcMain.handle("system:available-memory", () =>
+    memory.available === undefined ? null : (memory.available ?? availableMemory()),
+  );
+  ipcMain.handle("system:total-memory", () => memory.total ?? totalMemory());
   // The beat model as main.js runs it.
   require(path.join(PROJECT, "electron", "beat-model.js")).handleBeatModel(ipcMain, { utilityProcess });
   // Stems (src/features/stems/): as main.js runs it from the source, but

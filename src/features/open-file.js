@@ -193,7 +193,7 @@ export async function loadMediaFile(media, signal) {
   setLoopRegion(null);
   resetMarks(decoded.duration);
   resetBeats(media);
-  resetStems(media); // Stems (src/features/stems/)
+  resetStems(media, { duration: decoded.duration, sampleRate: decoded.sampleRate }); // Stems (src/features/stems/)
   resetSoundSettings();
   resetTimelineShare(); // Stage split (src/features/stage-split.js)
   dom.fileName.textContent = media.name;

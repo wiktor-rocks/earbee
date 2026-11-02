@@ -4,6 +4,8 @@
  * piano, and the rest), by the stem model in the main process
  * (electron/stems/), on demand: the Stems section's button.
  *
+ *   0. First, whether it fits in memory (memory.js): if this computer
+ *      hasn't enough for the song's stems, it says so and nothing starts.
  *   1. The first time, the model is downloaded (116 MB, once; the main
  *      process checks it).
  *   2. A worker (worker.js) decodes the song again at 44.1 kHz and streams
@@ -28,6 +30,10 @@
  * Opening another file stops it: the worker ends, and the main process
  * stops the stem process.
  *
+ * A project's stems are brought back the same way, if they fit in memory;
+ * if not, they're kept as they are in the project (`held`), unplayed, so
+ * saving it again keeps them.
+ *
  * The section is then a mixer (dock.js): each stem's volume, solo and
  * mute, turned into gains (mix.js) for the player. With every stem at full
  * volume it plays the song itself, exactly; any other mix is the sum of
@@ -39,7 +45,9 @@
  * section is removed and nothing else happens.
  *
  *   bindStems()        builds the section (once, at startup)
- *   resetStems(media)  a new file is open: what was found is forgotten
+ *   resetStems(media, track)
+ *                      a new file is open ({ duration, sampleRate }): what
+ *                      was found is forgotten
  *   stemsFound()       what was found for the open song (else null)
  *   stemsToSave(), stemsRevision(), whenPrepared(), loadStems(saved)
  *                      for the project (project.js)
@@ -48,9 +56,11 @@
 import { CONFIG } from "../../config.js";
 import { player } from "../../context.js";
 import { AppError } from "../../core/errors.js";
+import { formatMemory } from "../../core/format.js";
 import { $, element, onClick, reportError } from "../../ui/dom.js";
 import { notify } from "../../ui/toast.js";
 import { buildMixer } from "./dock.js";
+import { loadingBytes, memoryLimit, separationBytes } from "./memory.js";
 import { defaultMix, isUnchanged, stemMixes } from "./mix.js";
 import { coveredLength, coversAll } from "./spans.js";
 
@@ -87,6 +97,8 @@ const IDS = CONFIG.stems.list.map(({ id }) => id); // the player's order
 
 /** @type {import("../../core/media.js").Media | null} */
 let media = null; // the open song's, to read again
+/** @type {{ duration: number, sampleRate: number } | null} */
+let track = null; // its length and rate, for the memory it needs
 /** @type {Stems | null} */
 let found = null;
 // The page's copy of the stems' samples, to carry on separating from and to
@@ -117,7 +129,40 @@ let mix = defaultMix(CONFIG.stems.list);
 /** @type {{ cancelled: boolean, stops: Set<() => void>, worker?: Worker } | null} */
 let job = null;
 
+// A project's stems that didn't fit in memory: as the project has them
+// (their Opus bytes), unplayed, for saving it again.
+/** @type {(Omit<Stems, "levels"> & { audio: Record<string, Uint8Array>, mix: typeof mix }) | null} */
+let held = null;
+
 let ui = null; // the section's parts, once built
+
+/* ---------- Memory ---------- */
+
+// The system's memory, from the main process: { available, total }, each
+// null where unknown (or outside Electron).
+async function systemMemory() {
+  const ask = async (/** @type {string} */ name) => {
+    try {
+      return (await /** @type {any} */ (window).earbee?.[name]?.()) ?? null;
+    } catch {
+      return null;
+    }
+  };
+  const [available, total] = await Promise.all([ask("availableMemory"), ask("totalMemory")]);
+  return { available, total };
+}
+
+// Why `needed` bytes don't fit, as the end of a message ("it needs …"), or
+// null if they do (or that can't be told).
+async function shortOfMemory(needed) {
+  const memory = await systemMemory();
+  const limit = memoryLimit(memory);
+  if (!limit || needed <= limit.bytes) return null;
+  const needs = `it needs about ${formatMemory(needed)} of memory`;
+  return limit.of === "available"
+    ? `${needs}, and ${formatMemory(memory.available)} is available. Closing other programs may help.`
+    : `${needs}, more than half of this computer's ${formatMemory(memory.total)}.`;
+}
 
 /* ---------- Separating and loading ---------- */
 
@@ -265,6 +310,14 @@ async function separate() {
   /** @type {AppError | null} */
   let stoppedEarly = null;
   try {
+    // Before anything is downloaded or started.
+    if (track) {
+      const short = await shortOfMemory(
+        separationBytes({ seconds: track.duration, sampleRate: track.sampleRate, carryOn }),
+      );
+      if (!stillCurrent()) return;
+      if (short) throw new AppError(`Not enough memory to separate the stems of “${media.name}”: ${short}`);
+    }
     if (!modelReady) {
       show("download", 0);
       const stopProgress = bridge.onProgress((progress) => stillCurrent() && show("download", progress.fraction));
@@ -497,7 +550,8 @@ function prepare() {
  * A project's stems, back in the player and the mixer (project.js): their
  * Opus bytes fetched from the project (`urls`), decoded by a few workers
  * at once, each a share of the stems; the player gets them all together.
- * `covered`: the parts separated, if not all of it.
+ * `covered`: the parts separated, if not all of it. If they wouldn't fit
+ * in memory, only their bytes are kept (`held`), and it says so.
  * @param {{
  *   sampleRate: number, length: number, urls: Record<string, string>, mix: Record<string, any>,
  *   covered: import("./spans.js").Spans,
@@ -510,6 +564,8 @@ export async function loadStems({ sampleRate, length, urls, mix: savedMix, cover
   mix = savedMix;
   try {
     show("load", 0);
+    const short = await shortOfMemory(loadingBytes({ seconds: length / sampleRate, sampleRate }));
+    if (!stillCurrent()) return;
     const fetched = await Promise.all(
       Object.entries(urls).map(async ([id, url]) => {
         const response = await fetch(url);
@@ -518,6 +574,13 @@ export async function loadStems({ sampleRate, length, urls, mix: savedMix, cover
       }),
     );
     if (!stillCurrent()) return;
+    if (short) {
+      job = null;
+      held = { sampleRate, length, ids: IDS, covered, audio: Object.fromEntries(fetched), mix: savedMix };
+      show("idle", 0);
+      reportError(new AppError(`The project's stems weren't brought back: ${short}`));
+      return;
+    }
     const decoded = { sampleRate, length, stems: {} };
     const results = await inWorkers(running, fetched, {
       message: (share) => [{ type: "load", audio: share, sampleRate, length }, []],
@@ -612,7 +675,8 @@ function render() {
   ui.section.hidden = !media;
   const busy = ["download", "decode", "separate", "rest", "load"].includes(stage);
   const partly = Boolean(found) && !coversAll(found.covered, found.length);
-  ui.action.hidden = busy || (stage === "ready" && !partly);
+  ui.action.hidden = busy || (stage === "ready" && !partly) || Boolean(held);
+  ui.held.hidden = !held || busy;
   ui.busy.hidden = !busy;
   ui.stop.textContent = stage === "rest" ? "Stop" : "Cancel";
   ui.stop.title = stage === "rest" ? "Stop separating; what's done stays" : "";
@@ -647,6 +711,10 @@ function build(section) {
   const stop = element("button", { type: "button", className: "small", textContent: "Cancel" });
   const busy = element("div", { className: "stems-busy" }, status, stop);
   const preparing = element("p", { className: "stems-note stems-preparing" });
+  const heldNote = element("p", {
+    className: "stems-note stems-held",
+    textContent: "This project's stems weren't loaded: not enough memory. Saving keeps them.",
+  });
   const reset = element("button", {
     type: "button",
     className: "icon-button small",
@@ -671,11 +739,12 @@ function build(section) {
     action,
     busy,
     preparing,
+    heldNote,
   );
   onClick(action, separate);
   onClick(stop, stopSeparating);
   onClick(reset, resetMix);
-  return { section, action, busy, status, stop, mixer, mixerRows, preparing, reset };
+  return { section, action, busy, status, stop, mixer, mixerRows, preparing, held: heldNote, reset };
 }
 
 /* ---------- Wiring ---------- */
@@ -709,14 +778,19 @@ export function bindStems() {
     .catch((error) => console.warn("The stem model's status is unknown:", error));
 }
 
-/** @param {import("../../core/media.js").Media | null} next */
-export function resetStems(next) {
+/**
+ * @param {import("../../core/media.js").Media | null} next
+ * @param {{ duration: number, sampleRate: number } | null} [nextTrack] its length and rate
+ */
+export function resetStems(next, nextTrack = null) {
   cancel();
   preparationJob.cancelled = true;
   for (const stop of preparationJob.stops) stop();
   preparation = null;
   preparing = null;
   media = next;
+  track = nextTrack;
+  held = null;
   // The player dropped them with the old track; this is for a load that
   // was on its way.
   if (found) player.engine.dropStems();
@@ -735,9 +809,11 @@ export const stemsFound = () => found;
 /**
  * What a project saves (project.js): the stems' Opus bytes and the spans
  * they cover, the mix, and `revision`, which changes whenever the stems
- * do. Null without stems.
+ * do; or a project's stems that didn't fit in memory, as they came. Null
+ * without stems.
  */
-export const stemsToSave = () => found && audio && { ...found, covered: audioCovered, audio, mix, revision };
+export const stemsToSave = () =>
+  (found && audio && { ...found, covered: audioCovered, audio, mix, revision }) || (held && { ...held, revision });
 
 /**
  * Resolves once the stems' copies for saving are made (at once if there's
@@ -747,4 +823,4 @@ export const stemsToSave = () => found && audio && { ...found, covered: audioCov
 export const whenPrepared = () => prepare();
 // While a project's stems load, their mix already counts: the project was
 // saved with it.
-export const stemsRevision = () => ({ revision, mix: found || stage === "load" ? mix : null });
+export const stemsRevision = () => ({ revision, mix: found || held || stage === "load" ? mix : null });

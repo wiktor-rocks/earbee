@@ -1,7 +1,7 @@
 // The page's only ways out of its sandbox, exposed as window.earbee:
 //   - downloading a link, or searching by keywords (see downloader.js); the page hides its download
 //     buttons when this is missing (e.g. opened in a plain browser);
-//   - the memory available for a track (see system.js);
+//   - the memory available for a track, and all of it (see system.js);
 //   - running the beat model on one window of a spectrogram (see beat-model.js);
 //   - separating the open song's stems (see stems/index.js): the model's
 //     file, and a process the page's worker talks to over a port;
@@ -83,6 +83,8 @@ contextBridge.exposeInMainWorld("earbee", {
 
   // Bytes the system can still give programs, or null if unknown.
   availableMemory: () => ipcRenderer.invoke("system:available-memory"),
+  // All of the system's memory, in bytes.
+  totalMemory: () => ipcRenderer.invoke("system:total-memory"),
 
   // The beat model on one spectrogram window (a Float32Array of 1500 × 128):
   // resolves to { ok: true, beat, downbeat } (logits) or { ok: false, error }.

@@ -3,7 +3,8 @@
 // separating the open song with the stem model (electron/stems/), the
 // mixer (volume, solo, mute), saving them in a project and bringing them
 // back, the loop first and the rest after (Stop, saving part of a song,
-// Separate the rest), Cancel, and a new file forgetting them. The harness's stand-in
+// Separate the rest), not enough memory (separating, a project's stems),
+// Cancel, and a new file forgetting them. The harness's stand-in
 // model makes each stem the song ÷ 6 (TB_STEM_MODEL=real: the real one,
 // from models/); the model's download is checked by
 // tests/unit/stems-model-file.test.mjs.
@@ -12,7 +13,8 @@ const fs = require("fs");
 const path = require("path");
 
 module.exports = async function (h) {
-  const { js, openFile, setFiles, key, check, sleep, toasts, clearToasts, shot, projectDialogs, setStemDelay } = h;
+  const { js, openFile, setFiles, key, check, sleep, toasts, clearToasts, shot, projectDialogs, setStemDelay, memory } =
+    h;
   const { FIXTURES, OUTPUT } = h;
 
   const section = () =>
@@ -25,6 +27,7 @@ module.exports = async function (h) {
         busy: part(".stems-busy").hidden ? null : part(".stems-status").textContent,
         ready: !part(".stems-mixer").hidden,
         preparing: part(".stems-preparing").hidden ? null : part(".stems-preparing").textContent,
+        held: !part(".stems-held").hidden,
         folded: part(".stems-folded").hidden ? null : part(".stems-folded").textContent,
         // Calm rows: one knob each, nothing else to turn.
         knobsPerRow: [...s.querySelectorAll(".stems-row")].map((row) => row.querySelectorAll("input").length),
@@ -387,6 +390,87 @@ module.exports = async function (h) {
     !row(state, "piano").hidden && row(state, "other").name === "Other" && state.folded === null,
     JSON.stringify({ folded: state.folded, piano: row(state, "piano"), other: row(state, "other") }),
   );
+
+  // A project's stems without memory enough for them: it opens without
+  // them and says so, and saving it again keeps them. Enough for the song
+  // (8 bytes a sample in stereo), not for its stems (48: memory.js).
+  const headerOf = (file) => {
+    const bytes = fs.existsSync(file) ? fs.readFileSync(file) : Buffer.alloc(0);
+    return bytes.indexOf(0) > 0 ? JSON.parse(bytes.subarray(0, bytes.indexOf(0)).toString()) : null;
+  };
+  // The error line (reportError), emptied first.
+  const message = () => js(`message.textContent`);
+  const clearMessage = () => js(`message.textContent = ""`);
+  await openFile(path.join(FIXTURES, "bars.wav"));
+  await clearMessage();
+  memory.available = stems.length * 30;
+  await setFiles(projectFile);
+  state = await waitFor((s) => s.held, 30_000);
+  let said = await message();
+  check(
+    "stems: a project's stems without memory enough aren't brought back, and it says so",
+    state.held &&
+      !state.ready &&
+      state.action === null &&
+      /stems weren't brought back: it needs about .* of memory/.test(said),
+    JSON.stringify({ state, said }),
+  );
+  check("stems: …and that isn't an unsaved change", !(await title()).endsWith(" •"), await title());
+  memory.available = null;
+  const heldFile = path.join(OUTPUT, "projects", "Held.ebee");
+  fs.rmSync(heldFile, { force: true });
+  projectDialogs.save = heldFile;
+  key("S", ["control", "shift"]);
+  await sleep(200);
+  await js(`saveModeEmbed.click(); saveForm.requestSubmit()`);
+  for (let i = 0; i < 100 && !fs.existsSync(heldFile); i++) await sleep(100);
+  await sleep(300);
+  const heldHeader = headerOf(heldFile);
+  check(
+    "stems: …saving it again keeps them as they were, and their mix",
+    JSON.stringify(heldHeader?.blobs) === JSON.stringify(header?.blobs) &&
+      JSON.stringify(heldHeader?.sections?.stems?.stems?.mix) === JSON.stringify(saved?.mix),
+    JSON.stringify({ blobs: heldHeader?.blobs, before: header?.blobs }),
+  );
+  await openFile(path.join(FIXTURES, "bars.wav"));
+  await setFiles(heldFile);
+  state = await waitFor((s) => s.ready, 30_000);
+  check(
+    "stems: …and with memory enough, they come back from it",
+    state.ready && !state.held && JSON.stringify(state.rows) === JSON.stringify(mixed),
+    JSON.stringify(state),
+  );
+
+  // Without memory enough to separate: it says so, and nothing starts.
+  await openFile(path.join(FIXTURES, "bars.wav"));
+  await clearMessage();
+  memory.available = 1000;
+  await press(".stems-action");
+  await sleep(300);
+  state = await section();
+  said = await message();
+  check(
+    "stems: without memory enough, separating says so, and nothing starts",
+    state.busy === null &&
+      state.action === "Separate the stems" &&
+      /Not enough memory to separate the stems of “bars\.wav”: .* is available/.test(said),
+    JSON.stringify({ state, said }),
+  );
+  // Where what's available can't be told (macOS): by all of it.
+  await clearMessage();
+  memory.available = undefined;
+  memory.total = 1e6;
+  await press(".stems-action");
+  await sleep(300);
+  state = await section();
+  said = await message();
+  check(
+    "stems: …and where what's available is unknown, by the computer's memory in all",
+    state.busy === null && /more than half of this computer's/.test(said),
+    JSON.stringify({ state, said }),
+  );
+  memory.available = null;
+  memory.total = null;
 
   // The loop first, then the rest, nearest it first. Each segment slowed
   // down, so the separation can be seen in the middle.
