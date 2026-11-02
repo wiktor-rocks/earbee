@@ -300,6 +300,10 @@ export const CONFIG = {
     // (as a track: CONFIG.audio.maxMemoryShare), or where that can't be
     // told (macOS), in `totalShare` of all of it. `model`: the stem
     // model's working memory for a segment (about 2 GB: electron/stems/process.js).
-    memory: { model: 2e9, share: 0.8, totalShare: 0.5 },
+    // `blend`: the stem process's blend around the segments still to do
+    // (electron/stems/separate.js, keepFor): about 3.4 MB a block, a few
+    // blocks at each edge of what's done, a little more if the loop moved
+    // to another part meanwhile.
+    memory: { model: 2e9, blend: 100e6, share: 0.8, totalShare: 0.5 },
   },
 };

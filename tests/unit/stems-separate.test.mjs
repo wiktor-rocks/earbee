@@ -131,6 +131,58 @@ describe("createSeparator", () => {
     assert.equal(guitar[0][changed.from - 1], 0);
     assert.equal(guitar[0][changed.to], 0);
   });
+
+  // As the stem process reads each segment's piece: its span, with this
+  // much either side (process.js).
+  const MARGIN = 1024;
+  const pieceOf = (separator, index) => {
+    const { from, to } = segmentSpan(separator.starts, separator.length, index);
+    return separator.read(Math.max(0, from - MARGIN), Math.min(separator.length, to + MARGIN));
+  };
+
+  test("letting go of the blend behind the work changes no piece", async () => {
+    const longer = Math.round(4.6 * SEGMENT);
+    const [l, r] = [song(longer, 3), song(longer, 4)];
+    const starts = segmentStarts(longer);
+    const all = [...starts.keys()];
+    const outwardFrom = (from, to, left) => orderOutward(starts, longer, { from, to }, left);
+    // Outward from a loop; backwards; and outward, then from elsewhere
+    // halfway through (the loop moved).
+    const first = outwardFrom(3.1 * SEGMENT, 3.3 * SEGMENT, all);
+    const moved = [...first.slice(0, 3), ...outwardFrom(0.2 * SEGMENT, 0.4 * SEGMENT, first.slice(3))];
+    for (const order of [first, [...all].reverse(), moved]) {
+      const options = { left: l, right: r, runModel: varied, keep: ["guitar", "bass"] };
+      const whole = createSeparator(options);
+      const forgetting = createSeparator(options);
+      for (const [n, index] of order.entries()) {
+        await whole.runSegment(index);
+        await forgetting.runSegment(index);
+        assert.deepEqual(pieceOf(forgetting, index), pieceOf(whole, index), `segment ${index}, order ${order}`);
+        forgetting.keepFor(order.slice(n + 1), MARGIN);
+      }
+      assert.equal(forgetting.held(), 0, "nothing is kept once every segment is done");
+    }
+  });
+
+  test("working outward, only a few segments' worth of the blend is kept", async () => {
+    const long = 15 * SEGMENT;
+    const [l, r] = [song(long, 5), song(long, 6)];
+    const separator = createSeparator({ left: l, right: r, runModel: echo, keep: ["guitar"] });
+    const order = orderOutward(
+      separator.starts,
+      long,
+      { from: 6 * SEGMENT, to: 6.5 * SEGMENT },
+      separator.starts.keys(),
+    );
+    let most = 0;
+    for (const [n, index] of order.entries()) {
+      await separator.runSegment(index);
+      most = Math.max(most, separator.held());
+      separator.keepFor(order.slice(n + 1), MARGIN);
+    }
+    assert.ok(most <= 4 * SEGMENT, `at most ${most} samples, ${(most / SEGMENT).toFixed(1)} segments`);
+    assert.ok(most < long / 3);
+  });
 });
 
 test("the segments a span touches, and the order to do them in: those first, then outward", () => {

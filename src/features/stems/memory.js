@@ -7,15 +7,16 @@
 //   - the page: each stem's two channels in 16 bits at the track's rate,
 //     twice (the player's, in the audio thread, and the page's copy, or
 //     the worker's while it runs: index.js, worker.js);
-//   - the stem process (electron/stems/process.js, separate.js): at the
-//     model's 44.1 kHz in 32-bit floats, the song's two channels, each
-//     stem's two as they're blended, and the blend's weights;
+//   - the stem process (electron/stems/process.js, separate.js): the
+//     song's two channels at the model's 44.1 kHz in 32-bit floats, and
+//     the blend around the segments still to do (a few segments' worth,
+//     whatever the length: it lets go of what it has sent);
 //   - and the model's working memory for one segment, whatever the length.
 import { CONFIG } from "../../config.js";
 
 const STEMS = CONFIG.stems.list.length;
 const PAGE_BYTES = STEMS * 2 * 2 * 2; // per sample at the track's rate
-const PROCESS_BYTES = (2 + STEMS * 2 + 1) * 4; // per sample at 44.1 kHz
+const PROCESS_BYTES = 2 * 4; // per sample at 44.1 kHz: the song
 
 const samples = (seconds, rate) => Math.ceil(seconds * rate);
 
@@ -31,7 +32,8 @@ const pageBytes = ({ seconds, sampleRate }) => samples(seconds, sampleRate) * PA
  * @param {{ seconds: number, sampleRate: number, carryOn?: boolean }} track
  */
 export function separationBytes({ seconds, sampleRate, carryOn = false }) {
-  const process = samples(seconds, CONFIG.stems.sampleRate) * PROCESS_BYTES + CONFIG.stems.memory.model;
+  const { model, blend } = CONFIG.stems.memory;
+  const process = samples(seconds, CONFIG.stems.sampleRate) * PROCESS_BYTES + blend + model;
   return (carryOn ? 0 : pageBytes({ seconds, sampleRate })) + process;
 }
 

@@ -6,23 +6,25 @@ import { CONFIG } from "../../src/config.js";
 import { loadingBytes, memoryLimit, separationBytes } from "../../src/features/stems/memory.js";
 
 const GB = 1e9;
-const { model, share, totalShare } = CONFIG.stems.memory;
+const { model, blend, share, totalShare } = CONFIG.stems.memory;
 
-test("a separation: the page's stems twice, the process's song and stems, and the model", () => {
+test("a separation: the page's stems twice, the process's song and blend, and the model", () => {
   const seconds = 240;
   // Page: 6 stems × 2 channels × 2 bytes × 2 copies, at the track's rate.
   const page = seconds * 48000 * 48;
-  // Process: 2 + 12 + 1 floats of 4 bytes, at 44.1 kHz.
-  const process = seconds * 44100 * 60;
-  assert.equal(separationBytes({ seconds, sampleRate: 48000 }), page + process + model);
-  // A 4-minute song at 44.1 kHz: about 3.1 GB.
+  // Process: the song's 2 floats of 4 bytes, at 44.1 kHz.
+  const process = seconds * 44100 * 8;
+  assert.equal(separationBytes({ seconds, sampleRate: 48000 }), page + process + blend + model);
+  // A 4-minute song at 44.1 kHz: about 2.7 GB; an hour, about 11 GB.
   const song = separationBytes({ seconds, sampleRate: 44100 });
-  assert.ok(song > 3 * GB && song < 3.3 * GB, String(song));
+  assert.ok(song > 2.6 * GB && song < 2.8 * GB, String(song));
+  const hour = separationBytes({ seconds: 3600, sampleRate: 44100 });
+  assert.ok(hour > 10.5 * GB && hour < 11.5 * GB, String(hour));
 });
 
 test("carrying on: only the process's share, the page has its stems already", () => {
   const track = { seconds: 600, sampleRate: 48000 };
-  assert.equal(separationBytes({ ...track, carryOn: true }), 600 * 44100 * 60 + model);
+  assert.equal(separationBytes({ ...track, carryOn: true }), 600 * 44100 * 8 + blend + model);
   assert.ok(separationBytes({ ...track, carryOn: true }) < separationBytes(track));
 });
 

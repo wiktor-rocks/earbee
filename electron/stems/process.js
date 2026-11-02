@@ -26,7 +26,9 @@
 //                                                       (index.js stops it if the page goes away)
 //
 // The song comes in chunks, so no message holds a whole song (its six
-// stems are hundreds of MB). Cancelling kills the process (index.js).
+// stems are hundreds of MB), and only the blend around the segments still
+// to do is kept here (separate.js, keepFor). Cancelling kills the process
+// (index.js).
 const fs = require("fs");
 const os = require("os");
 const { createSeparator, orderOutward, segmentSpan, segmentsFor, SEGMENT, STEMS } = require("./separate");
@@ -144,6 +146,10 @@ function serve(port) {
         const stems = separator.read(start, Math.min(length, to + MARGIN));
         send({ type: "piece", from, to, start, names: KEEP, samples: KEEP.flatMap((name) => stems[name]) });
       }
+      // What's sent is the page's: only the blend the segments still to do
+      // add to or read (their pieces' margins) stays here, so a long song
+      // doesn't hold a second copy of its stems. The pieces are the same.
+      separator.keepFor(pending, MARGIN);
       progress();
     }
     aim = null;
