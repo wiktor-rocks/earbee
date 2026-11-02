@@ -7,7 +7,11 @@
 //   - the page: each stem's two channels in 16 bits at the track's rate
 //     (over the whole song, or the loop alone's window),
 //     twice (the player's, in the audio thread, and the page's copy, or
-//     the worker's while it runs: index.js, worker.js);
+//     the worker's while it runs: index.js, worker.js), and a third time
+//     while separating, for a save then (the worker's snapshot of the
+//     stems so far, for their copies for saving); making those copies,
+//     or decoding a project's, needs little more (opus.js: a block at a
+//     time);
 //   - the stem process (electron/stems/process.js, separate.js): the
 //     song's two channels at the model's 44.1 kHz in 32-bit floats (only
 //     around the part, for the loop alone: partBytes), and
@@ -17,26 +21,28 @@
 import { CONFIG } from "../../config.js";
 
 const STEMS = CONFIG.stems.list.length;
-const PAGE_BYTES = STEMS * 2 * 2 * 2; // per sample at the track's rate
+const COPY_BYTES = STEMS * 2 * 2; // per sample at the track's rate, one copy of the stems
 const PROCESS_BYTES = 2 * 4; // per sample at 44.1 kHz: the song
 
 const samples = (seconds, rate) => Math.ceil(seconds * rate);
 
 /**
- * The page's share: the stems, twice.
+ * The page's share: the stems, `copies` times (3 while separating, 2 after).
  * @param {{ seconds: number, sampleRate: number }} track
+ * @param {number} copies
  */
-const pageBytes = ({ seconds, sampleRate }) => samples(seconds, sampleRate) * PAGE_BYTES;
+const pageBytes = ({ seconds, sampleRate }, copies) => samples(seconds, sampleRate) * COPY_BYTES * copies;
 
 /**
  * Separating a track of `seconds` at `sampleRate`. Carrying on ("Separate
- * the rest"), the page has its stems already: only the process's share.
+ * the rest"), the page has its stems already: only the process's share,
+ * and the snapshot's copy.
  * @param {{ seconds: number, sampleRate: number, carryOn?: boolean }} track
  */
 export function separationBytes({ seconds, sampleRate, carryOn = false }) {
   const { model, blend } = CONFIG.stems.memory;
   const process = samples(seconds, CONFIG.stems.sampleRate) * PROCESS_BYTES + blend + model;
-  return (carryOn ? 0 : pageBytes({ seconds, sampleRate })) + process;
+  return pageBytes({ seconds, sampleRate }, carryOn ? 1 : 3) + process;
 }
 
 /**
@@ -49,7 +55,7 @@ export function separationBytes({ seconds, sampleRate, carryOn = false }) {
 export function partBytes({ seconds, sampleRate }) {
   const { model, blend } = CONFIG.stems.memory;
   const song = samples(seconds + 2 * 15.6, CONFIG.stems.sampleRate) * PROCESS_BYTES;
-  return pageBytes({ seconds, sampleRate }) + song + blend + model;
+  return pageBytes({ seconds, sampleRate }, 3) + song + blend + model;
 }
 
 /**
@@ -57,7 +63,8 @@ export function partBytes({ seconds, sampleRate }) {
  * (read whole before they're decoded).
  * @param {{ seconds: number, sampleRate: number }} track
  */
-export const loadingBytes = (track) => pageBytes(track) + Math.ceil((track.seconds * CONFIG.stems.bitrate * STEMS) / 8);
+export const loadingBytes = (track) =>
+  pageBytes(track, 2) + Math.ceil((track.seconds * CONFIG.stems.bitrate * STEMS) / 8);
 
 /**
  * The most the stems may take: a share of the memory available, or where

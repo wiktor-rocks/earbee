@@ -143,10 +143,13 @@ let mix = defaultMix(CONFIG.stems.list);
 /** @type {{ cancelled: boolean, stops: Set<() => void>, worker?: Worker, onlyPart?: boolean } | null} */
 let job = null;
 
-// A project's stems that didn't fit in memory: as the project has them
+// A project's stems that didn't fit in memory, or don't match the file: as the project has them
 // (their Opus bytes), unplayed, for saving it again.
-/** @type {(Omit<Stems, "levels"> & { audio: Record<string, Uint8Array>, mix: typeof mix }) | null} */
+/** @type {(Omit<Stems, "levels"> & { audio: Record<string, Uint8Array>, mix: typeof mix, mismatched: boolean }) | null} */
 let held = null;
+// A project's stems match the open file if their rate is its rate, and
+// their length its length, within this (seconds; decoders differ a little).
+const MATCH_SECONDS = 0.1;
 
 let ui = null; // the section's parts, once built
 
@@ -236,7 +239,9 @@ async function runWorker(
     worker.addEventListener("message", ({ data }) => {
       if (data.type === "progress") stillCurrent() && onProgress(data.stage, data.fraction, data);
       else if (data.type === "done") resolve(data);
-      else if (data.type === "error") reject(failure(data.message));
+      // (An encode's error brings its stems back: the page's copy.)
+      else if (data.type === "error")
+        reject(Object.assign(failure(data.message), data.stems ? { stems: data.stems } : {}));
       else Promise.resolve(onMessage?.(data)).catch(reject);
     });
     worker.addEventListener("error", (event) => {
@@ -429,6 +434,11 @@ async function separate({ onlyLoop = false } = {}) {
     }
     if (!started.ok) {
       if (earlier) copies = earlier;
+      // Perhaps the model's file has gone since it was checked: then the next try downloads it.
+      bridge
+        .model()
+        .then((model) => ((modelReady = model.ready), render()))
+        .catch(() => {});
       throw new AppError(started.error);
     }
 
@@ -558,7 +568,9 @@ const workerCount = () =>
  * Runs a few workers at once (runWorker), each on a share of `entries`
  * ([id, value] pairs, dealt out in turn): `message(share)` is what each is
  * sent, and what it transfers. Their progress goes to `onProgress` as one,
- * the average; resolves to each worker's `done`.
+ * the average; resolves to each worker's `done`. If one fails, the rest
+ * finish first, and its error carries every stem the workers gave back
+ * (`stems`: the page's copy, while encoding).
  * @param {{ current: { stops: Set<() => void> }, stillCurrent: () => boolean }} running
  * @param {[string, any][]} entries
  * @param {{
@@ -568,10 +580,10 @@ const workerCount = () =>
  *   onStems?: (part: any) => Promise<unknown>,
  * }} options
  */
-function inWorkers(running, entries, { message, failure, onProgress, onStems = async () => {} }) {
+async function inWorkers(running, entries, { message, failure, onProgress, onStems = async () => {} }) {
   const count = Math.min(workerCount(), entries.length);
   const progress = new Array(count).fill(0);
-  return Promise.all(
+  const settled = await Promise.allSettled(
     Array.from({ length: count }, (_, w) => {
       const share = Object.fromEntries(entries.filter((_, i) => i % count === w));
       return runWorker(running, {
@@ -585,6 +597,14 @@ function inWorkers(running, entries, { message, failure, onProgress, onStems = a
       });
     }),
   );
+  const failed = settled.find((result) => result.status === "rejected");
+  if (!failed) return settled.map((result) => /** @type {PromiseFulfilledResult<any>} */ (result).value);
+  const error = failed.reason; // null: cancelled
+  if (error) {
+    const back = settled.map((result) => (result.status === "fulfilled" ? result.value.stems : result.reason?.stems));
+    error.stems = Object.assign({}, ...back);
+  }
+  throw error;
 }
 
 /* ---------- Copies for saving ---------- */
@@ -594,6 +614,9 @@ function inWorkers(running, entries, { message, failure, onProgress, onStems = a
 let preparation = null;
 // Its workers' waits, ended when the song changes.
 let preparationJob = { cancelled: false, stops: new Set() };
+// Called each time a round of copies is made (whenPrepared).
+/** @type {Set<() => void>} */
+const roundsMade = new Set();
 
 // Whether the Opus copies are older than the stems.
 const stale = () =>
@@ -637,7 +660,12 @@ function prepare() {
         audioCovered = source.covered;
         audioWindow = holds;
         preparedRevision = target;
+        roundsMade.forEach((made) => made());
       } catch (error) {
+        // The page's copy back, if every stem came back with the error.
+        if (!separating && error?.stems && Object.keys(source.stems).every((id) => error.stems[id])) {
+          copies = error.stems;
+        }
         if (error && running.stillCurrent()) reportError(error);
         return;
       }
@@ -658,8 +686,9 @@ function prepare() {
  * at once, each a share of the stems; the player gets them all together.
  * `covered`: the parts separated, if not all of it; `start` and `span`,
  * the samples they hold (the loop alone's window), if not all of them. If
- * they wouldn't fit in memory, only their bytes are kept (`held`), and it
- * says so.
+ * they wouldn't fit in memory, or don't match the open file (the project's
+ * media relinked to another: another rate or length), only their bytes are
+ * kept (`held`), and it says so.
  * @param {{
  *   sampleRate: number, length: number, start?: number, span?: number,
  *   urls: Record<string, string>, mix: Record<string, any>, covered: import("./spans.js").Spans,
@@ -680,7 +709,11 @@ export async function loadStems({
   mix = savedMix;
   try {
     show("load", 0);
-    const short = await shortOfMemory(loadingBytes({ seconds: span / sampleRate, sampleRate }));
+    const mismatched =
+      track && (track.sampleRate !== sampleRate || Math.abs(length / sampleRate - track.duration) > MATCH_SECONDS);
+    const short = mismatched
+      ? "they don't match this file."
+      : await shortOfMemory(loadingBytes({ seconds: span / sampleRate, sampleRate }));
     if (!stillCurrent()) return;
     const fetched = await Promise.all(
       Object.entries(urls).map(async ([id, url]) => {
@@ -692,7 +725,18 @@ export async function loadStems({
     if (!stillCurrent()) return;
     if (short) {
       job = null;
-      held = { sampleRate, length, start, span, ids: IDS, covered, audio: Object.fromEntries(fetched), mix: savedMix };
+      const audio = Object.fromEntries(fetched);
+      held = {
+        sampleRate,
+        length,
+        start,
+        span,
+        ids: IDS,
+        covered,
+        audio,
+        mix: savedMix,
+        mismatched: Boolean(mismatched),
+      };
       show("idle", 0);
       reportError(new AppError(`The project's stems weren't brought back: ${short}`));
       return;
@@ -802,6 +846,7 @@ function render() {
   ui.loopAction.hidden = busy || all || loopDone || Boolean(held);
   ui.action.hidden = busy || all || Boolean(held);
   ui.held.hidden = !held || busy;
+  ui.held.textContent = `This project's stems weren't loaded: ${held?.mismatched ? "they don't match this file" : "not enough memory"}. Saving keeps them.`;
   ui.busy.hidden = !busy;
   ui.stop.textContent = stops() ? "Stop" : "Cancel";
   ui.stop.title = stops() ? "Stop separating; what's done stays" : "";
@@ -845,10 +890,7 @@ function build(section) {
   const stop = element("button", { type: "button", className: "small", textContent: "Cancel" });
   const busy = element("div", { className: "stems-busy" }, status, stop);
   const preparing = element("p", { className: "stems-note stems-preparing" });
-  const heldNote = element("p", {
-    className: "stems-note stems-held",
-    textContent: "This project's stems weren't loaded: not enough memory. Saving keeps them.",
-  });
+  const heldNote = element("p", { className: "stems-note stems-held" });
   const reset = element("button", {
     type: "button",
     className: "icon-button small",
@@ -958,9 +1000,31 @@ export const stemsToSave = () =>
 /**
  * Resolves once the stems' copies for saving are made (at once if there's
  * nothing to wait for), so a save started meanwhile keeps the stems; while
- * separating, the stems so far.
+ * separating, the stems so far. Rejects if they couldn't be made: the save
+ * stops (features/project/index.js says why).
  */
-export const whenPrepared = () => prepare();
+export async function whenPrepared() {
+  if (!found) return;
+  // Copies as new as the stems are now: while separating, more come all
+  // the time, and the save doesn't wait for those.
+  const wanted = { revision, covered: coveredLength(found.covered) };
+  const caughtUp = () => preparedRevision >= wanted.revision && coveredLength(audioCovered) >= wanted.covered;
+  await new Promise((resolve) => {
+    const settle = () => {
+      if (!caughtUp() && preparation) return;
+      roundsMade.delete(settle);
+      resolve(undefined);
+    };
+    roundsMade.add(settle);
+    prepare().finally(settle);
+    settle();
+  });
+  // Stems that play but whose copies couldn't be made: the save stops, so
+  // it never leaves them out (or keeps older ones) without saying so.
+  if (found && (!audio || !caughtUp())) {
+    throw new AppError("The stems couldn't be prepared for saving, so the project wasn't saved. Try again.");
+  }
+}
 // While a project's stems load, their mix already counts: the project was
 // saved with it.
 export const stemsRevision = () => ({ revision, mix: found || held || stage === "load" ? mix : null });

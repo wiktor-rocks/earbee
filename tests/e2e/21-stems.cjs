@@ -27,6 +27,7 @@ module.exports = async function (h) {
     projectDialogs,
     setStemDelay,
     setStemStartFails,
+    setStemModelGone,
     memory,
   } = h;
   const { FIXTURES, OUTPUT } = h;
@@ -526,6 +527,18 @@ module.exports = async function (h) {
     around(partly) && partly.covered[0][1] - partly.covered[0][0] > first[0][1] - first[0][0] && !covers(partly, 0, 10),
     JSON.stringify({ first, then: partly?.covered }),
   );
+  // Their copies for saving will fail to be made, until this is turned off
+  // again: each encode gets a rate whose resampling filter would be too
+  // long to allocate, so it fails at once.
+  await js(`(() => {
+    const post = Worker.prototype.postMessage;
+    window.failStemEncodes = true;
+    Worker.prototype.postMessage = function (data, transfer) {
+      const failing = window.failStemEncodes && data?.type === "encode";
+      return post.call(this, failing ? { ...data, sampleRate: 1e13 } : data, transfer);
+    };
+  })()`);
+  await clearMessage();
   await press(".stems-busy button");
   state = await waitFor((s) => s.busy === null, 5000);
   partly = await found();
@@ -536,7 +549,30 @@ module.exports = async function (h) {
   );
   await shot("stems-partly.png");
 
-  // Saved part done, and brought back so.
+  // Copies that couldn't be made: a save stops and says so, writing nothing.
+  await waitFor((s) => s.preparing === null, 30_000);
+  const failedPrepare = await message();
+  const unpreparedFile = path.join(OUTPUT, "projects", "Unprepared.ebee");
+  fs.rmSync(unpreparedFile, { force: true });
+  projectDialogs.save = unpreparedFile;
+  await clearMessage();
+  key("S", ["control", "shift"]);
+  for (let i = 0; i < 50 && !(await js(`saveDialog.open`)); i++) await sleep(100);
+  await js(`saveModeLink.click(); saveForm.requestSubmit()`);
+  for (let i = 0; i < 100 && !/wasn't saved/.test(await message()); i++) await sleep(100);
+  said = await message();
+  check(
+    "stems: copies for saving that can't be made: a save stops, saying so",
+    /couldn't be prepared for saving/.test(failedPrepare) &&
+      /wasn't saved/.test(said) &&
+      !fs.existsSync(unpreparedFile),
+    JSON.stringify({ failedPrepare, said, written: fs.existsSync(unpreparedFile) }),
+  );
+  await js(`window.failStemEncodes = false`);
+  await clearMessage();
+
+  // Saved part done (the stems' copy came back from the failed encodes:
+  // the save tries again), and brought back so.
   const partlyFile = path.join(OUTPUT, "projects", "Partly.ebee");
   fs.rmSync(partlyFile, { force: true });
   projectDialogs.save = partlyFile;
@@ -689,6 +725,34 @@ module.exports = async function (h) {
     aloneSaved?.start === alone.start && aloneSaved?.span === alone.span,
     JSON.stringify({ start: aloneSaved?.start, span: aloneSaved?.span }),
   );
+  // Its media moved, and another file picked in its place: the stems
+  // don't match it, so they're kept as the project has them, unplayed.
+  const aloneBytes = fs.readFileSync(aloneFile);
+  const aloneEnd = aloneBytes.indexOf(0);
+  const relinkedHeader = JSON.parse(aloneBytes.subarray(0, aloneEnd).toString());
+  relinkedHeader.media = {
+    ...relinkedHeader.media,
+    path: "/nowhere/long-chirp.m4a",
+    relativePath: "nowhere/long-chirp.m4a",
+  };
+  const relinkedFile = path.join(OUTPUT, "projects", "Relinked.ebee");
+  fs.writeFileSync(
+    relinkedFile,
+    Buffer.concat([Buffer.from(JSON.stringify(relinkedHeader)), aloneBytes.subarray(aloneEnd)]),
+  );
+  projectDialogs.locate = path.join(FIXTURES, "bars.wav");
+  await clearMessage();
+  await setFiles(relinkedFile);
+  state = await waitFor((s) => s.held, 30_000);
+  said = await message();
+  projectDialogs.locate = null;
+  const heldNote = await js(`document.querySelector("#stemsSection .stems-held").textContent`);
+  check(
+    "stems: a project relinked to another file keeps its stems unplayed: they don't match it",
+    state.held && !state.ready && /don't match this file/.test(said) && /don't match this file/.test(heldNote),
+    JSON.stringify({ held: state.held, ready: state.ready, said, heldNote }),
+  );
+
   await openFile(path.join(FIXTURES, "bars.wav"));
   await setFiles(aloneFile);
   state = await waitFor((s) => s.ready, 30_000);
@@ -765,4 +829,22 @@ module.exports = async function (h) {
   await sleep(500);
   state = await section();
   check("stems: …and nothing comes back later", !state.ready && state.busy === null, JSON.stringify(state));
+
+  // The model's file gone while EarBee runs: a start fails, and the next
+  // try downloads it again (here it can't be: the test's server has none).
+  setStemModelGone(true);
+  await clearMessage();
+  await press(".stems-whole");
+  for (let i = 0; i < 100 && !(await message()); i++) await sleep(100);
+  const gone = await message();
+  await clearMessage();
+  await press(".stems-whole");
+  for (let i = 0; i < 100 && !(await message()); i++) await sleep(100);
+  said = await message();
+  setStemModelGone(false);
+  check(
+    "stems: the model's file gone: a start fails, and the next try downloads it again",
+    /isn't there yet/.test(gone) && /Couldn't download the stem model/.test(said),
+    JSON.stringify({ gone, said }),
+  );
 };

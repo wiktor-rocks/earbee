@@ -131,6 +131,19 @@ async function createHarness() {
     process.env.TB_STEM_MODEL === "real"
       ? path.join(PROJECT, "models", "htdemucs-6s.onnx")
       : path.join(TESTS, "unit", "fixtures", "stem-model-fake.onnx");
+  // The app sees the model through a link here, so setStemModelGone(true)
+  // can take it away (as if its file were deleted) and false bring it back.
+  const stemModelSeen = path.join(OUTPUT, "stem-model.onnx");
+  const showStemModel = (shown) => {
+    fs.rmSync(stemModelSeen, { force: true });
+    if (!shown) return;
+    try {
+      fs.symlinkSync(stemModel, stemModelSeen);
+    } catch {
+      fs.copyFileSync(stemModel, stemModelSeen);
+    }
+  };
+  showStemModel(true);
   // setStemDelay(ms): each segment takes that much longer (stem-process-slow.cjs).
   // setStemStartFails(true): the stem process can't be started.
   let stemDelay = 0;
@@ -151,7 +164,7 @@ async function createHarness() {
     utilityProcess: stemsUtility,
     MessageChannelMain: require("electron").MessageChannelMain,
     userData: stemsUserData,
-    devCopy: stemModel,
+    devCopy: stemModelSeen,
     fetch: fakeFetch,
   });
   // Video window (src/features/video-window/): as main.js allows it, but
@@ -341,6 +354,7 @@ async function createHarness() {
     projectDialogs,
     setStemDelay: (ms) => (stemDelay = ms), // Stems: each segment this much slower
     setStemStartFails: (yes) => (stemStartFails = yes), // Stems: the stem process can't start
+    setStemModelGone: (gone) => showStemModel(!gone), // Stems: the model's file deleted, or back
     externalOpens, // the links Open on YouTube passed to the system browser
     projectState, // the page's unsaved state, as the main process hears it
     videoWin, // the video window (src/features/video-window/), or null

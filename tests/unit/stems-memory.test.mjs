@@ -8,34 +8,35 @@ import { loadingBytes, memoryLimit, partBytes, separationBytes } from "../../src
 const GB = 1e9;
 const { model, blend, share, totalShare } = CONFIG.stems.memory;
 
-test("a separation: the page's stems twice, the process's song and blend, and the model", () => {
+test("a separation: the page's stems three times, the process's song and blend, and the model", () => {
   const seconds = 240;
-  // Page: 6 stems × 2 channels × 2 bytes × 2 copies, at the track's rate.
-  const page = seconds * 48000 * 48;
+  // Page: 6 stems × 2 channels × 2 bytes × 3 copies (the player's, the
+  // page's or worker's, and a save's snapshot), at the track's rate.
+  const page = seconds * 48000 * 72;
   // Process: the song's 2 floats of 4 bytes, at 44.1 kHz.
   const process = seconds * 44100 * 8;
   assert.equal(separationBytes({ seconds, sampleRate: 48000 }), page + process + blend + model);
-  // A 4-minute song at 44.1 kHz: about 2.7 GB; an hour, about 11 GB.
+  // A 4-minute song at 44.1 kHz: about 3 GB; an hour, about 15 GB.
   const song = separationBytes({ seconds, sampleRate: 44100 });
-  assert.ok(song > 2.6 * GB && song < 2.8 * GB, String(song));
+  assert.ok(song > 2.9 * GB && song < 3.1 * GB, String(song));
   const hour = separationBytes({ seconds: 3600, sampleRate: 44100 });
-  assert.ok(hour > 10.5 * GB && hour < 11.5 * GB, String(hour));
+  assert.ok(hour > 14.5 * GB && hour < 15.5 * GB, String(hour));
 });
 
-test("carrying on: only the process's share, the page has its stems already", () => {
+test("carrying on: the process's share and the snapshot's copy, the page has its stems already", () => {
   const track = { seconds: 600, sampleRate: 48000 };
-  assert.equal(separationBytes({ ...track, carryOn: true }), 600 * 44100 * 8 + blend + model);
+  assert.equal(separationBytes({ ...track, carryOn: true }), 600 * 48000 * 24 + 600 * 44100 * 8 + blend + model);
   assert.ok(separationBytes({ ...track, carryOn: true }) < separationBytes(track));
 });
 
 test("the loop alone: its window's stems, the song around it, the blend and the model, however long the song", () => {
   const part = partBytes({ seconds: 20, sampleRate: 44100 });
-  assert.equal(part, 20 * 44100 * 48 + Math.ceil((20 + 31.2) * 44100) * 8 + blend + model);
-  // About 2.1 GB, where an hour's whole song needs about 11.
+  assert.equal(part, 20 * 44100 * 72 + Math.ceil((20 + 31.2) * 44100) * 8 + blend + model);
+  // About 2.2 GB, where an hour's whole song needs about 15.
   assert.ok(part < 2.2 * GB && part < separationBytes({ seconds: 3600, sampleRate: 44100 }) / 5);
 });
 
-test("bringing back a project's stems: the page's share and their Opus bytes, no model", () => {
+test("bringing back a project's stems: the page's two copies and their Opus bytes, no model", () => {
   const seconds = 3600;
   const opus = (seconds * CONFIG.stems.bitrate * 6) / 8;
   assert.equal(loadingBytes({ seconds, sampleRate: 44100 }), seconds * 44100 * 48 + opus);

@@ -40,7 +40,7 @@
 //          error: why the process stopped early, if it did
 //   page → { type: "encode", stems, sampleRate }    some stems (transferred)
 //   ←      { type: "progress", stage: "encode", fraction } …, then { type: "done", audio, stems }
-//          their Opus bytes, and the stems back
+//          their Opus bytes, and the stems back (or { type: "error", message, stems }: back all the same)
 //   page → { type: "load", audio: { [id]: bytes }, sampleRate, length }   length: the samples they hold
 //   ←      { type: "progress", stage: "load", fraction } …
 //   ←      { type: "stems", sampleRate, length, stems: { [id]: { scale, channels, level } } }
@@ -51,7 +51,7 @@ import { AudioSampleSink } from "../../../node_modules/mediabunny/dist/bundles/m
 import { CONFIG } from "../../config.js";
 import { createResampler, resampleRatio } from "../../core/resample.js";
 import { openTrack } from "../../audio/open-track.js";
-import { decodeStem, encodeStem } from "./opus.js";
+import { decodeStem, encodeStem, writeInt16 } from "./opus.js";
 import { addSpan, scaleSpans } from "./spans.js";
 
 const scope = /** @type {any} */ (self);
@@ -161,10 +161,7 @@ function resamplePiece(samples, start, from, to, rate) {
 }
 
 // Writes float samples into a stem's channel from `at`, in 16 bits.
-function write(channel, at, samples) {
-  const end = Math.min(channel.length, at + samples.length);
-  for (let i = at; i < end; i++) channel[i] = Math.max(-32768, Math.min(32767, Math.round(samples[i - at] / SCALE)));
-}
+const write = (channel, at, samples) => writeInt16(channel, at, samples, SCALE);
 
 // What this worker is separating: its copy of the stems, what's covered,
 // and the process's port.
@@ -256,37 +253,13 @@ function level({ scale, channels }) {
   }, 0);
 }
 
-// A stem in 16 bits (SCALE). A plain loop: from() with a function takes
-// seconds over a song's samples (measured: 3 s a stem).
-/** @param {Float32Array[]} channels */
-function quantize(channels) {
-  return {
-    scale: SCALE,
-    channels: channels.map((channel) => {
-      const out = new Int16Array(channel.length);
-      write(out, 0, channel);
-      return out;
-    }),
-  };
-}
-
-// A stem's samples back from its 16 bits.
-/** @param {Int16Array[]} channels */
-function unquantize(channels) {
-  return channels.map((channel) => {
-    const out = new Float32Array(channel.length);
-    for (let i = 0; i < channel.length; i++) out[i] = channel[i] * SCALE;
-    return out;
-  });
-}
-
 // Each stem as Opus, from its 16 bits.
 async function encodeAll(stems, rate) {
   const progress = progressReporter("encode");
   const audio = {};
   const ids = Object.keys(stems);
   for (const [index, id] of ids.entries()) {
-    audio[id] = await encodeStem(unquantize(stems[id]), rate, CONFIG.stems.bitrate);
+    audio[id] = await encodeStem({ scale: SCALE, channels: stems[id] }, rate, CONFIG.stems.bitrate);
     progress((index + 1) / ids.length);
   }
   return audio;
@@ -298,7 +271,7 @@ async function decodeAll(audio, rate, length) {
   const stems = {};
   const ids = Object.keys(audio);
   for (const [index, id] of ids.entries()) {
-    stems[id] = quantize(await decodeStem(audio[id], rate, length));
+    stems[id] = await decodeStem(audio[id], rate, length, SCALE);
     progress((index + 1) / ids.length);
   }
   return stems;
@@ -342,7 +315,11 @@ scope.addEventListener("message", async ({ data }) => {
       const audio = await encodeAll(data.stems, data.sampleRate);
       scope.postMessage({ type: "done", audio, stems: data.stems }, buffersOf(data.stems));
     } catch (error) {
-      fail(error);
+      // The stems go back too: they're the page's copy.
+      scope.postMessage(
+        { type: "error", message: String(error?.message ?? error), stems: data.stems },
+        buffersOf(data.stems),
+      );
     }
   } else if (data?.type === "load") {
     const { audio, sampleRate, length } = data;
