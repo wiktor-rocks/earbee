@@ -2,7 +2,7 @@
 // spans that are joined as pieces come, in any order.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { addSpan, coveredLength, coveredParts, coversAll, scaleSpans } from "../../src/features/stems/spans.js";
+import { addSpan, coveredLength, coveredParts, covers, coversAll, scaleSpans } from "../../src/features/stems/spans.js";
 
 test("pieces added in any order end up as sorted spans, touching ones joined", () => {
   let spans = [];
@@ -48,6 +48,8 @@ test("how much they cover, and whether it's all of it", () => {
   assert.equal(coversAll(spans, 200), false);
   assert.equal(coversAll([[0, 200]], 200), true);
   assert.equal(coversAll([], 200), false);
+  assert.equal(covers(spans, 110, 190), true);
+  assert.equal(covers(spans, 40, 110), false, "across a gap");
 });
 
 test("moved to another sample rate", () => {

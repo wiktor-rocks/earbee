@@ -4,11 +4,13 @@
 // Pure.
 //
 // What a separation holds, from the code:
-//   - the page: each stem's two channels in 16 bits at the track's rate,
+//   - the page: each stem's two channels in 16 bits at the track's rate
+//     (over the whole song, or the loop alone's window),
 //     twice (the player's, in the audio thread, and the page's copy, or
 //     the worker's while it runs: index.js, worker.js);
 //   - the stem process (electron/stems/process.js, separate.js): the
-//     song's two channels at the model's 44.1 kHz in 32-bit floats, and
+//     song's two channels at the model's 44.1 kHz in 32-bit floats (only
+//     around the part, for the loop alone: partBytes), and
 //     the blend around the segments still to do (a few segments' worth,
 //     whatever the length: it lets go of what it has sent);
 //   - and the model's working memory for one segment, whatever the length.
@@ -35,6 +37,19 @@ export function separationBytes({ seconds, sampleRate, carryOn = false }) {
   const { model, blend } = CONFIG.stems.memory;
   const process = samples(seconds, CONFIG.stems.sampleRate) * PROCESS_BYTES + blend + model;
   return (carryOn ? 0 : pageBytes({ seconds, sampleRate })) + process;
+}
+
+/**
+ * Separating only a part (the loop alone), `seconds` long with its window
+ * (CONFIG.stems.window): the page's share over that, and the process's,
+ * which keeps only the song around it (two segments, 15.6 s, either side):
+ * the same whatever the song's length.
+ * @param {{ seconds: number, sampleRate: number }} part
+ */
+export function partBytes({ seconds, sampleRate }) {
+  const { model, blend } = CONFIG.stems.memory;
+  const song = samples(seconds + 2 * 15.6, CONFIG.stems.sampleRate) * PROCESS_BYTES;
+  return pageBytes({ seconds, sampleRate }) + song + blend + model;
 }
 
 /**

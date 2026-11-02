@@ -21,6 +21,8 @@
 //     says how many samples' worth is kept
 //   segmentsFor(starts, length, from, to), orderOutward(starts, length, want, left)
 //     which segments touch a span, and the order to do them in
+//   songStats() → { add(left, right), result() → { mean, spread } }: the
+//     normalising, added up as the song comes
 const { createIspec } = require("./stft");
 
 const RATE = 44100;
@@ -57,18 +59,36 @@ function triangle(length) {
 }
 
 // The mono mix's mean and standard deviation (unbiased, as torch.std), by
-// which api.py's separate_tensor normalises the song before splitting it.
-function meanAndSpread(left, right) {
-  const n = left.length;
+// which api.py's separate_tensor normalises the song before splitting it:
+// added up a part at a time as the song comes (add(left, right), the same
+// stretch of both channels), so the stem process needn't keep all of it.
+// One pass, in doubles: as exact as two for a song's range.
+function songStats() {
+  let n = 0;
   let sum = 0;
-  for (let i = 0; i < n; i++) sum += (left[i] + right[i]) / 2;
-  const mean = sum / n;
   let squares = 0;
-  for (let i = 0; i < n; i++) {
-    const d = (left[i] + right[i]) / 2 - mean;
-    squares += d * d;
-  }
-  return { mean, spread: Math.sqrt(squares / Math.max(1, n - 1)) + 1e-8 };
+  return {
+    add(left, right) {
+      const count = Math.min(left.length, right.length);
+      for (let i = 0; i < count; i++) {
+        const m = (left[i] + right[i]) / 2;
+        sum += m;
+        squares += m * m;
+      }
+      n += count;
+    },
+    result() {
+      const mean = n ? sum / n : 0;
+      const variance = Math.max(0, squares - n * mean * mean) / Math.max(1, n - 1);
+      return { mean, spread: Math.sqrt(variance) + 1e-8 };
+    },
+  };
+}
+
+function meanAndSpread(left, right) {
+  const stats = songStats();
+  stats.add(left, right);
+  return stats.result();
 }
 
 /**
@@ -80,15 +100,22 @@ function meanAndSpread(left, right) {
  * keepFor(indices, margin) keeps only the blend that the segments
  * `indices` (those still to do) add to or read, each its span ± `margin`:
  * reading anywhere else gives silence from then on.
+ *
+ * The song may be only a part of it (the loop alone): `left` and `right`
+ * from sample `offset` of a song `length` long, with the whole song's
+ * `stats` (songStats), and only the segments it reaches can be run (their
+ * padding included: segmentsFor a span, with SEGMENT more either side).
  * @param {{
  *   left: Float32Array, right: Float32Array,
  *   runModel: (mix: Float32Array) => Promise<{ spec: Float32Array, wave: Float32Array }>,
  *   keep?: string[],
+ *   offset?: number, length?: number, stats?: { mean: number, spread: number },
  * }} options
  */
-function createSeparator({ left, right, runModel, keep = STEMS }) {
-  const length = left.length;
-  const { mean, spread } = meanAndSpread(left, right);
+function createSeparator({ left, right, runModel, keep = STEMS, offset: songOffset = 0, length, stats }) {
+  length ??= songOffset + left.length;
+  const { mean, spread } = stats ?? meanAndSpread(left, right);
+  const songEnd = songOffset + Math.min(left.length, right.length);
   const starts = segmentStarts(length);
   const weight = triangle(SEGMENT);
   const ispec = createIspec({ hop: HOP, frames: FRAMES, length: SEGMENT });
@@ -136,9 +163,9 @@ function createSeparator({ left, right, runModel, keep = STEMS }) {
     const from = offset - lead;
     for (let i = 0; i < SEGMENT; i++) {
       const at = from + i;
-      const inside = at >= 0 && at < length;
-      mix[i] = inside ? (left[at] - mean) / spread : 0;
-      mix[SEGMENT + i] = inside ? (right[at] - mean) / spread : 0;
+      const inside = at >= songOffset && at < songEnd && at < length;
+      mix[i] = inside ? (left[at - songOffset] - mean) / spread : 0;
+      mix[SEGMENT + i] = inside ? (right[at - songOffset] - mean) / spread : 0;
     }
 
     const { spec, wave } = await runModel(mix);
@@ -272,6 +299,7 @@ module.exports = {
   createSeparator,
   segmentStarts,
   segmentSpan,
+  songStats,
   segmentsFor,
   orderOutward,
   triangle,

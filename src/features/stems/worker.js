@@ -17,26 +17,31 @@
 // Loading: a project's Opus stems decoded back to the same form.
 //
 // Stems here are { id: [left, right] } Int16Arrays at the track's rate,
-// from its first sample, each sample × SCALE (CONFIG.stems.headroom); the
-// parts separated, `covered`, are spans of those samples (spans.js).
+// from its sample `start` (0: the whole track; the loop alone: a window
+// around it, CONFIG.stems.window), each sample × SCALE
+// (CONFIG.stems.headroom); the parts separated, `covered`, are spans of
+// the track's samples (spans.js).
 //
-//   page → { type: "separate", media, port, want: { from, to }, covered, stems? }
+//   page → { type: "separate", media, port, want: { from, to }, part?, covered, stems? }
 //          media: a File, or { name, url } (core/media.js); want: seconds;
-//          stems and covered: an earlier run's, to carry on from (transferred)
+//          part: { from, to }, seconds: only that part (the loop alone);
+//          stems and covered: an earlier run's, to carry on from (transferred,
+//          the whole track's)
 //   ←      { type: "progress", stage: "decode" | "separate", fraction, part?, wanted? } …
 //          fraction: of the whole song; part: of the part wanted; wanted: that's done
-//   ←      { type: "begin", sampleRate, length }   the stems' rate and length
+//   ←      { type: "begin", sampleRate, length, start, span }
+//          the stems' rate, the track's length, and the samples the stems hold
 //   ←      { type: "piece", from, stems, covered } stems from sample `from` (transferred)
 //   page → { type: "want", from, to }               seconds: the loop moved
 //   page → { type: "snapshot" }
 //   ←      { type: "snapshot", stems, covered }     copies of the stems so far
 //   page → { type: "stop" }                         no more: ends with what's done
-//   ←      { type: "done", stems, covered, levels, error } the stems (transferred);
+//   ←      { type: "done", stems, start, covered, levels, error } the stems (transferred);
 //          error: why the process stopped early, if it did
 //   page → { type: "encode", stems, sampleRate }    some stems (transferred)
 //   ←      { type: "progress", stage: "encode", fraction } …, then { type: "done", audio, stems }
 //          their Opus bytes, and the stems back
-//   page → { type: "load", audio: { [id]: bytes }, sampleRate, length }
+//   page → { type: "load", audio: { [id]: bytes }, sampleRate, length }   length: the samples they hold
 //   ←      { type: "progress", stage: "load", fraction } …
 //   ←      { type: "stems", sampleRate, length, stems: { [id]: { scale, channels, level } } }
 //          to play: each channel an Int16Array (× scale: the samples), level its loudness
@@ -170,20 +175,23 @@ let stopSoon = false; // Stop came while the song was still being read
 // failed (`error`, its message: what was done until then still plays).
 function finish(error = null) {
   if (!separating) return;
-  const { port, stems, covered } = separating;
+  const { port, stems, start, covered } = separating;
   separating = null;
   port.postMessage({ type: "close" });
   port.close();
   const levels = Object.fromEntries(
     Object.entries(stems).map(([id, channels]) => [id, level({ scale: SCALE, channels })]),
   );
-  scope.postMessage({ type: "done", stems, covered, levels, error }, buffersOf(stems));
+  scope.postMessage({ type: "done", stems, start, covered, levels, error }, buffersOf(stems));
 }
 
 // Separates `media`: sends it to the process, then takes its pieces as they
 // come, until it's all done (finish) or stopped. `previous`: an earlier
-// run's stems and covered, to carry on from.
-async function separateTrack({ media, port, want, covered = [], stems: previous }) {
+// run's stems and covered, to carry on from. `part` (seconds): only that,
+// its stems held in a window around it.
+async function separateTrack({ media, port, want, part = null, covered = [], stems: previous }) {
+  // The process keeps only the song around a part: it hears of it first.
+  if (part) port.postMessage({ type: "part", from: Math.round(part.from * RATE), to: Math.round(part.to * RATE) });
   const { length, sampleRate: rate } = await sendTrack(media, port);
   const { up, down } = resampleRatio(RATE, rate, CONFIG.stems.resampleZeroCrossings);
   const trackLength = Math.ceil((length * up) / down);
@@ -191,10 +199,14 @@ async function separateTrack({ media, port, want, covered = [], stems: previous 
   const toRate = (from, to) => ({ from: Math.round(from * RATE), to: Math.round(to * RATE) });
   const toTrack = (sample) => Math.min(trackLength, Math.ceil((sample * up) / down));
   const ids = CONFIG.stems.list.map(({ id }) => id);
-  const stems =
-    previous ?? Object.fromEntries(ids.map((id) => [id, [new Int16Array(trackLength), new Int16Array(trackLength)]]));
-  separating = { port, stems, covered, toRate };
-  scope.postMessage({ type: "begin", sampleRate: rate, length: trackLength });
+  // The samples held: all of them, or a window around the part (every
+  // segment touching it ends within a segment of it).
+  const reach = CONFIG.stems.window * rate;
+  const start = part && !previous ? Math.max(0, Math.floor(part.from * rate - reach)) : 0;
+  const span = part && !previous ? Math.min(trackLength, Math.ceil(part.to * rate + reach)) - start : trackLength;
+  const stems = previous ?? Object.fromEntries(ids.map((id) => [id, [new Int16Array(span), new Int16Array(span)]]));
+  separating = { port, stems, start, covered, toRate };
+  scope.postMessage({ type: "begin", sampleRate: rate, length: trackLength, start, span });
   if (stopSoon) return finish();
 
   const progress = progressReporter("separate");
@@ -210,15 +222,16 @@ async function separateTrack({ media, port, want, covered = [], stems: previous 
       wanted = data.wanted;
       progress(fraction, { part: data.part, wanted });
     } else if (data.type === "piece") {
-      const from = toTrack(data.from);
-      const to = data.to >= length ? trackLength : toTrack(data.to);
+      // (Within the samples held.)
+      const from = Math.max(start, toTrack(data.from));
+      const to = Math.min(start + span, data.to >= length ? trackLength : toTrack(data.to));
       if (!(from < to)) return;
       const piece = {};
       for (const [s, id] of data.names.entries()) {
         if (!stems[id]) continue;
         piece[id] = [0, 1].map((c) => {
-          write(stems[id][c], from, resamplePiece(data.samples[s * 2 + c], data.start, from, to, rate));
-          return stems[id][c].slice(from, to);
+          write(stems[id][c], from - start, resamplePiece(data.samples[s * 2 + c], data.start, from, to, rate));
+          return stems[id][c].slice(from - start, to - start);
         });
       }
       separating.covered = addSpan(separating.covered, from, to);

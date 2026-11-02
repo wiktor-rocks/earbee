@@ -2,7 +2,9 @@
 // section (features/project/sections.js says what a section is): the six
 // stems as Opus, the mix, the rate and length they line up with, and the
 // parts separated if not all of it (`covered`, spans of samples: silence
-// elsewhere, where the song plays as it is; none saved means all of it).
+// elsewhere, where the song plays as it is; none saved means all of it),
+// and for the loop alone, the samples its stems hold (`start`, `span`; none
+// saved means all of the track).
 //
 // The Opus bytes are in the section's saved form as Uint8Arrays; the
 // project file stores them after its header (src/project/format.js, its
@@ -58,11 +60,12 @@ export const stemsSection = {
   capture() {
     const saved = stemsToSave();
     if (!saved) return { stems: null };
-    const { sampleRate, length, ids, audio, mix, covered } = saved;
+    const { sampleRate, length, start, span, ids, audio, mix, covered } = saved;
     return {
       stems: {
         sampleRate,
         length,
+        ...(span < length ? { start, span } : {}),
         codec: "opus",
         audio: Object.fromEntries(ids.map((id) => [id, audio[id]])),
         mix,
@@ -82,12 +85,24 @@ export const stemsSection = {
     const length = Number(stems.length);
     if (!(sampleRate > 0 && Number.isInteger(length) && length > 0))
       throw new Error("the stems' rate or length is wrong");
+    const start = stems.start ?? 0;
+    const span = stems.span ?? length - start;
+    if (!(Number.isInteger(start) && Number.isInteger(span) && start >= 0 && span > 0 && start + span <= length))
+      throw new Error("the part the stems hold is wrong");
     const urls = {};
     for (const { id } of CONFIG.stems.list) {
       const url = stems.audio?.[id]?.url;
       if (typeof url !== "string") throw new Error(`the ${id} stem is missing`);
       urls[id] = url;
     }
-    loadStems({ sampleRate, length, urls, mix: mixFrom(stems.mix), covered: coveredFrom(stems.covered, length) });
+    loadStems({
+      sampleRate,
+      length,
+      start,
+      span,
+      urls,
+      mix: mixFrom(stems.mix),
+      covered: coveredFrom(stems.covered, length),
+    });
   },
 };

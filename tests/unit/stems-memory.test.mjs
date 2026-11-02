@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { CONFIG } from "../../src/config.js";
-import { loadingBytes, memoryLimit, separationBytes } from "../../src/features/stems/memory.js";
+import { loadingBytes, memoryLimit, partBytes, separationBytes } from "../../src/features/stems/memory.js";
 
 const GB = 1e9;
 const { model, blend, share, totalShare } = CONFIG.stems.memory;
@@ -26,6 +26,13 @@ test("carrying on: only the process's share, the page has its stems already", ()
   const track = { seconds: 600, sampleRate: 48000 };
   assert.equal(separationBytes({ ...track, carryOn: true }), 600 * 44100 * 8 + blend + model);
   assert.ok(separationBytes({ ...track, carryOn: true }) < separationBytes(track));
+});
+
+test("the loop alone: its window's stems, the song around it, the blend and the model, however long the song", () => {
+  const part = partBytes({ seconds: 20, sampleRate: 44100 });
+  assert.equal(part, 20 * 44100 * 48 + Math.ceil((20 + 31.2) * 44100) * 8 + blend + model);
+  // About 2.1 GB, where an hour's whole song needs about 11.
+  assert.ok(part < 2.2 * GB && part < separationBytes({ seconds: 3600, sampleRate: 44100 }) / 5);
 });
 
 test("bringing back a project's stems: the page's share and their Opus bytes, no model", () => {

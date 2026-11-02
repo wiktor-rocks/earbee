@@ -3,7 +3,8 @@
 // separating the open song with the stem model (electron/stems/), the
 // mixer (volume, solo, mute), saving them in a project and bringing them
 // back, the loop first and the rest after (Stop, saving part of a song,
-// Separate the rest), not enough memory (separating, a project's stems),
+// Separate the rest), the loop alone (in a window, replaced by the next,
+// widened by the whole song), not enough memory (separating, a project's stems),
 // Cancel, and a new file forgetting them. The harness's stand-in
 // model makes each stem the song ÷ 6 (TB_STEM_MODEL=real: the real one,
 // from models/); the model's download is checked by
@@ -23,7 +24,8 @@ module.exports = async function (h) {
       const part = (selector) => s?.querySelector(selector);
       return s && {
         hidden: s.hidden,
-        action: part(".stems-action").hidden ? null : part(".stems-action").textContent,
+        action: part(".stems-whole").hidden ? null : part(".stems-whole").textContent,
+        loop: part(".stems-loop").hidden ? null : part(".stems-loop").textContent,
         busy: part(".stems-busy").hidden ? null : part(".stems-status").textContent,
         ready: !part(".stems-mixer").hidden,
         preparing: part(".stems-preparing").hidden ? null : part(".stems-preparing").textContent,
@@ -191,11 +193,15 @@ module.exports = async function (h) {
   await openFile(path.join(FIXTURES, "verse-chorus.wav"));
   let state = await section();
   check("stems: the section shows once a file is open", state && !state.hidden, JSON.stringify(state));
-  check("stems: with the model there, the button separates", state?.action === "Separate the stems", state?.action);
+  check(
+    "stems: with the model there, the button separates",
+    state?.action === "Separate the whole song",
+    state?.action,
+  );
 
   // Separating: progress, then the stems.
   await clearToasts();
-  await press(".stems-action");
+  await press(".stems-whole");
   state = await waitFor((s) => s.busy !== null, 5000);
   check("stems: separating shows what it's doing", /Reading the song|Separating/.test(state.busy ?? ""), state.busy);
   await waitFor((s) => /Separating/.test(s.busy ?? "") || s.ready, 30_000);
@@ -445,14 +451,14 @@ module.exports = async function (h) {
   await openFile(path.join(FIXTURES, "bars.wav"));
   await clearMessage();
   memory.available = 1000;
-  await press(".stems-action");
+  await press(".stems-whole");
   await sleep(300);
   state = await section();
   said = await message();
   check(
     "stems: without memory enough, separating says so, and nothing starts",
     state.busy === null &&
-      state.action === "Separate the stems" &&
+      state.action === "Separate the whole song" &&
       /Not enough memory to separate the stems of “bars\.wav”: .* is available/.test(said),
     JSON.stringify({ state, said }),
   );
@@ -460,7 +466,7 @@ module.exports = async function (h) {
   await clearMessage();
   memory.available = undefined;
   memory.total = 1e6;
-  await press(".stems-action");
+  await press(".stems-whole");
   await sleep(300);
   state = await section();
   said = await message();
@@ -484,7 +490,7 @@ module.exports = async function (h) {
   const strip = () =>
     js(`document.querySelector("#waveform > div").shadowRoot.querySelectorAll('[part~="stems-covered-part"]').length`);
   await clearToasts();
-  await press(".stems-action");
+  await press(".stems-whole");
   state = await waitFor((s) => s.ready, 60_000);
   let partly = await found();
   check(
@@ -548,7 +554,7 @@ module.exports = async function (h) {
   );
 
   // Carrying on: the rest, until all of it is done.
-  await press(".stems-action");
+  await press(".stems-whole");
   state = await waitFor((s) => s.busy !== null, 5000);
   check("stems: Separate the rest carries on, the mixer still there", state.ready, JSON.stringify(state));
   setStemDelay(0);
@@ -567,16 +573,130 @@ module.exports = async function (h) {
   check("stems: …which is an unsaved change", (await title()).endsWith(" •"), await title());
   await waitFor((s) => s.preparing === null, 60_000);
 
+  // The loop alone: only its part, its stems in a window around it, and
+  // it ends there. With memory enough for that but not the whole song, the
+  // whole song is refused and the loop alone goes ahead.
+  await openFile(path.join(FIXTURES, "long-chirp.m4a"));
+  await js(`${app}.then(([, { setLoopRegion }]) => setLoopRegion({ start: 60, end: 64, enabled: true }))`);
+  state = await section();
+  check(
+    "stems: two buttons, the loop alone and the whole song",
+    state.loop === "Separate the loop" && state.action === "Separate the whole song",
+    JSON.stringify({ loop: state.loop, action: state.action }),
+  );
+  // What each would need (the loop with its window: 4 + 16 s), and memory between the two.
+  const needs = await js(`Promise.all([import("./src/features/stems/memory.js"), import("./src/context.js")])
+    .then(([m, { player }]) => {
+      const seconds = player.transport.duration;
+      return { part: m.partBytes({ seconds: 4 + 16, sampleRate: 48000 }), whole: m.separationBytes({ seconds, sampleRate: 48000 }) };
+    })`);
+  memory.available = (needs.part + needs.whole) / 2 / 0.8;
+  await clearMessage();
+  await press(".stems-whole");
+  await sleep(300);
+  said = await message();
+  check(
+    "stems: without memory enough for the whole song, it suggests the loop",
+    (await section()).busy === null && /separating the loop only, may help/.test(said),
+    JSON.stringify({ needs, said }),
+  );
+  await clearToasts();
+  await press(".stems-loop");
+  memory.available = null;
+  state = await waitFor((s) => s.ready && s.busy === null, 60_000);
+  let alone = await found();
+  check(
+    "stems: …and the loop alone goes ahead: its part, nothing far from it",
+    state.ready && covers(alone, 60, 64) && !covers(alone, 40, 64) && !covers(alone, 60, 80),
+    JSON.stringify({ busy: state.busy, covered: alone?.covered }),
+  );
+  check(
+    "stems: …held in a window around it",
+    alone?.start > 45 * alone.sampleRate && alone.span < 25 * alone.sampleRate && alone.length > 89 * alone.sampleRate,
+    JSON.stringify({ start: alone?.start, span: alone?.span, length: alone?.length, rate: alone?.sampleRate }),
+  );
+  check(
+    "stems: …with a notification",
+    (await toasts()).some((t) => /loop's stems are ready/.test(t.text)),
+  );
+  await sleep(1000);
+  state = await section();
+  check(
+    "stems: …and it ends there, offering the whole song, not the loop again",
+    JSON.stringify((await found())?.covered) === JSON.stringify(alone.covered) &&
+      state.busy === null &&
+      state.loop === null &&
+      state.action === "Separate the whole song",
+    JSON.stringify({ covered: (await found())?.covered, loop: state.loop, action: state.action }),
+  );
+
+  // Another loop, alone: it replaces the first.
+  await js(`${app}.then(([, { setLoopRegion }]) => setLoopRegion({ start: 20, end: 24, enabled: true }))`);
+  state = await section();
+  check("stems: a loop not separated offers itself again", state.loop === "Separate the loop", state.loop);
+  await press(".stems-loop");
+  await waitFor((s) => s.ready && s.busy === null && s.loop === null, 60_000);
+  alone = await found();
+  check(
+    "stems: …and replaces the part before",
+    covers(alone, 20, 24) && !covers(alone, 60, 64) && alone.start < 20 * alone.sampleRate,
+    JSON.stringify({ start: alone?.start, covered: alone?.covered }),
+  );
+
+  // Saved, and brought back as it was.
+  await waitFor((s) => s.preparing === null, 60_000);
+  const aloneFile = path.join(OUTPUT, "projects", "Alone.ebee");
+  fs.rmSync(aloneFile, { force: true });
+  projectDialogs.save = aloneFile;
+  key("S", ["control", "shift"]);
+  await sleep(200);
+  await js(`saveModeLink.click(); saveForm.requestSubmit()`);
+  for (let i = 0; i < 300 && !fs.existsSync(aloneFile); i++) await sleep(100);
+  await sleep(300);
+  const aloneSaved = headerOf(aloneFile)?.sections?.stems?.stems;
+  check(
+    "stems: a project keeps the loop alone's part",
+    aloneSaved?.start === alone.start && aloneSaved?.span === alone.span,
+    JSON.stringify({ start: aloneSaved?.start, span: aloneSaved?.span }),
+  );
+  await openFile(path.join(FIXTURES, "bars.wav"));
+  await setFiles(aloneFile);
+  state = await waitFor((s) => s.ready, 30_000);
+  const aloneBack = await found();
+  check(
+    "stems: …and brings it back so",
+    aloneBack?.start === alone.start &&
+      aloneBack.span === alone.span &&
+      JSON.stringify(aloneBack.covered) === JSON.stringify(alone.covered) &&
+      state.action === "Separate the whole song",
+    JSON.stringify({ found: aloneBack && { ...aloneBack, levels: undefined }, action: state.action }),
+  );
+
+  // The whole song after the loop alone: it widens to all of it and carries on.
+  await press(".stems-whole");
+  state = await waitFor((s) => s.busy === null && s.action === null, 60_000);
+  const widened = await found();
+  check(
+    "stems: the whole song after the loop alone carries on to all of it",
+    state.ready && widened?.start === 0 && widened.span === widened.length && covers(widened, 0, 89.9),
+    JSON.stringify({ start: widened?.start, span: widened?.span, covered: widened?.covered }),
+  );
+  await waitFor((s) => s.preparing === null, 60_000);
+
   // A new file forgets them; Cancel stops a separation.
   await openFile(path.join(FIXTURES, "bars.wav"));
   state = await section();
-  check("stems: a new file forgets them", !state.ready && state.action === "Separate the stems", JSON.stringify(state));
+  check(
+    "stems: a new file forgets them",
+    !state.ready && state.action === "Separate the whole song",
+    JSON.stringify(state),
+  );
   check("stems: …and what was found", (await found()) === null);
-  await press(".stems-action");
+  await press(".stems-whole");
   await waitFor((s) => s.busy !== null, 5000);
   await press(".stems-busy button");
   state = await waitFor((s) => s.busy === null, 2000);
-  check("stems: Cancel stops it", state.action === "Separate the stems" && !state.ready, JSON.stringify(state));
+  check("stems: Cancel stops it", state.action === "Separate the whole song" && !state.ready, JSON.stringify(state));
   await sleep(500);
   state = await section();
   check("stems: …and nothing comes back later", !state.ready && state.busy === null, JSON.stringify(state));

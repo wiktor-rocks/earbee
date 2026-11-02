@@ -169,19 +169,22 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 					this.audioBuffersEnd += length;
 					return this.audioBuffersEnd/sampleRate;
 				},
-				// patched: the track's stems, { tracks: [stem][channel] Int16Array, scales: [stem], covered? }, from
-				// sample 0; covered: the spans of samples separated so far, [[from, to], …] (all of it if not given)
+				// patched: the track's stems, { tracks: [stem][channel] Int16Array, scales: [stem], covered?, start? }, from
+				// the track's sample `start` (0 if not given); covered: the spans of the track's samples separated so
+				// far, [[from, to], …] (all of it if not given)
 				addStems: stems => {
-					this.stems = {tracks: stems.tracks, scales: stems.scales, covered: stems.covered || null, gains: stems.tracks.map(() => 1), other: 1, active: false};
+					this.stems = {tracks: stems.tracks, scales: stems.scales, covered: stems.covered || null, start: stems.start || 0, gains: stems.tracks.map(() => 1), other: 1, active: false};
 					return true;
 				},
 				// patched: more of the stems, separated since: pieces [stem][channel] Int16Array from sample
 				// `from`, and the spans covered now
 				writeStems: (from, pieces, covered) => {
 					if (!this.stems) return false;
+					let at = from - this.stems.start;
 					pieces.forEach((channels, s) => channels.forEach((piece, c) => {
 						let samples = this.stems.tracks[s][c];
-						samples.set(piece.subarray(0, Math.max(0, samples.length - from)), from);
+						let skip = Math.max(0, -at);
+						samples.set(piece.subarray(skip, Math.max(skip, samples.length - at)), at + skip);
 					}));
 					this.stems.covered = covered;
 					return true;
@@ -274,7 +277,7 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 		// other·δck) × stem[k]. Only while a gain isn't 1: otherwise the track
 		// is left exactly as it was.
 		mixStemsPart(buffer, at, count, channel, from) {
-			let {tracks, scales, gains, other} = this.stems;
+			let {tracks, scales, gains, other, start} = this.stems;
 			for (let i = 0; i < count; ++i) buffer[at + i] *= other;
 			let c = channel%2;
 			for (let s = 0; s < tracks.length; ++s) {
@@ -285,8 +288,8 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 					let weight = ((matrix ? gain[c*2 + k] : gain) - (k === c ? other : 0))*scales[s];
 					if (weight === 0) continue;
 					let samples = tracks[s][(matrix ? k : channel)%tracks[s].length];
-					let end = Math.min(count, samples.length - from);
-					for (let i = 0; i < end; ++i) buffer[at + i] += weight*samples[from + i];
+					let first = Math.max(0, start - from), end = Math.min(count, samples.length + start - from);
+					for (let i = first; i < end; ++i) buffer[at + i] += weight*samples[from - start + i];
 				}
 			}
 		}

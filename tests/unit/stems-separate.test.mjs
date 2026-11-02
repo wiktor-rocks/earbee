@@ -14,6 +14,7 @@ const {
   segmentSpan,
   segmentsFor,
   orderOutward,
+  songStats,
   triangle,
   SEGMENT,
   STEMS,
@@ -35,6 +36,24 @@ function song(length, seed) {
   const next = () => ((x = (x * 1103515245 + 12345) % 2 ** 31) / 2 ** 31) * 2 - 1;
   return Float32Array.from({ length }, () => 0.1 + 0.5 * next());
 }
+
+// The normalising, a chunk at a time or all at once, and as two passes.
+test("the song's mean and spread, added up as it comes", () => {
+  const [l, r] = [song(100_000, 1), song(100_000, 2)];
+  const once = songStats();
+  once.add(l, r);
+  const inChunks = songStats();
+  for (let at = 0; at < l.length; at += 30_000) inChunks.add(l.subarray(at, at + 30_000), r.subarray(at, at + 30_000));
+  assert.deepEqual(inChunks.result(), once.result());
+  let sum = 0;
+  for (let i = 0; i < l.length; i++) sum += (l[i] + r[i]) / 2;
+  const mean = sum / l.length;
+  let squares = 0;
+  for (let i = 0; i < l.length; i++) squares += ((l[i] + r[i]) / 2 - mean) ** 2;
+  const spread = Math.sqrt(squares / (l.length - 1)) + 1e-8;
+  assert.ok(Math.abs(once.result().mean - mean) < 1e-12);
+  assert.ok(Math.abs(once.result().spread - spread) < 1e-9);
+});
 
 const largestDifference = (a, b) => a.reduce((most, value, i) => Math.max(most, Math.abs(value - b[i])), 0);
 
@@ -161,6 +180,34 @@ describe("createSeparator", () => {
         forgetting.keepFor(order.slice(n + 1), MARGIN);
       }
       assert.equal(forgetting.held(), 0, "nothing is kept once every segment is done");
+    }
+  });
+
+  test("a part of the song, with the whole song's normalising, gives the same pieces as all of it", async () => {
+    const longer = Math.round(6.2 * SEGMENT);
+    const [l, r] = [song(longer, 9), song(longer, 10)];
+    const stats = songStats();
+    stats.add(l, r);
+    const part = { from: Math.round(3.1 * SEGMENT), to: Math.round(3.3 * SEGMENT) };
+    // As the stem process keeps it: the song within two segments of the part.
+    const from = Math.max(0, part.from - 2 * SEGMENT);
+    const to = Math.min(longer, part.to + 2 * SEGMENT);
+    const options = { runModel: varied, keep: ["guitar"] };
+    const whole = createSeparator({ left: l, right: r, ...options });
+    const windowed = createSeparator({
+      left: l.slice(from, to),
+      right: r.slice(from, to),
+      offset: from,
+      length: longer,
+      stats: stats.result(),
+      ...options,
+    });
+    const indices = segmentsFor(whole.starts, longer, part.from, part.to);
+    assert.ok(indices.length >= 2);
+    for (const index of indices) {
+      await whole.runSegment(index);
+      await windowed.runSegment(index);
+      assert.deepEqual(pieceOf(windowed, index), pieceOf(whole, index), `segment ${index}`);
     }
   });
 

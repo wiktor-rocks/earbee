@@ -295,6 +295,9 @@ export const CONFIG = {
     // Separating starts with the loop; without one, with this much of the
     // song around the playhead (seconds before and after it).
     firstPart: { before: 5, after: 20 },
+    // The loop alone holds its stems in a window this many seconds wider
+    // on each side (every segment touching it, 7.8 s, ends within it).
+    window: 8,
     // A song is separated, or a project's stems brought back, only if what
     // they'd take (stems/memory.js) fits in `share` of the memory available
     // (as a track: CONFIG.audio.maxMemoryShare), or where that can't be

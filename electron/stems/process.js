@@ -6,21 +6,24 @@
 //
 // The part wanted (the loop) is separated first, then the rest, nearest it
 // first; each segment's stems go back as soon as it's done, so they play
-// there at once. All positions are samples at 44.1 kHz.
+// there at once. Or only a part (the loop alone): then only the song
+// around it is kept, and only the segments touching it are separated. All
+// positions are samples at 44.1 kHz.
 //
 //   main → { type: "port" } with the port
+//   page → { type: "part", from, to }                   (before the song) only this part
 //   page → { type: "audio", channel, offset, samples }  the song at 44.1 kHz, in chunks
 //   page → { type: "separate", length, want: { from, to }, covered }
 //          all of it has come; `covered`: [[from, to], …] already separated
 //          (an earlier run's), skipped where it can be
-//   page → { type: "want", from, to }                   the loop moved: that next
+//   page → { type: "want", from, to }                   the loop moved: that next (not with a part)
 //   ←      { type: "piece", from, to, start, names, samples }
 //          the stems over [from, to): `samples` is each stem's left and
 //          right, in `names` order, from `start`, with up to MARGIN samples
 //          either side (to resample the piece on its own)
 //   ←      { type: "progress", done, total, part, wanted }
 //          segments done; part: how much of the part wanted is, wanted: all of it
-//   ←      { type: "done" }                             every segment is
+//   ←      { type: "done" }                             every segment is (of the part)
 //   ←      { type: "error", message }
 //   page → { type: "close" }                            no more wanted: the process exits
 //                                                       (index.js stops it if the page goes away)
@@ -31,7 +34,7 @@
 // (index.js).
 const fs = require("fs");
 const os = require("os");
-const { createSeparator, orderOutward, segmentSpan, segmentsFor, SEGMENT, STEMS } = require("./separate");
+const { createSeparator, orderOutward, segmentSpan, segmentsFor, songStats, SEGMENT, STEMS } = require("./separate");
 
 // Samples either side of a piece, beyond what it changed: enough for the
 // page's resampler to make the piece's own samples exactly (its filter
@@ -45,6 +48,9 @@ const SLACK = 4;
 const THREADS = Math.max(1, Math.min(4, Math.floor(os.cpus().length / 2)));
 // All six, "other" too: a changed mix plays their sum (src/features/stems/).
 const KEEP = STEMS;
+// With a part, the song kept around it: a segment touching it reaches a
+// segment beyond it, and its padding up to half a segment more.
+const REACH = 2 * SEGMENT;
 
 // Below normal priority, so separating gives way to playback, the video
 // and drawing. Set before ONNX Runtime starts its threads, which take it
@@ -81,23 +87,54 @@ const within = (covered, { from, to }) => covered.some(([start, end]) => start -
 
 // `port`: the MessagePortMain the main process handed over.
 function serve(port) {
-  const chunks = [[], []]; // per channel: { offset, samples }
+  const chunks = [[], []]; // per channel: { offset, samples }, what's kept of the song
   const send = (message) => port.postMessage(message);
   let aim = null; // while running: points it at the part wanted next
+  let only = null; // { from, to }: only this part, and the song kept from `keep.from` to `keep.to`
+  // The normalising, added up as the song comes (both channels' chunks at
+  // an offset, once both are here: they're cut alike).
+  const stats = songStats();
+  const unpaired = [new Map(), new Map()]; // per channel: offset → samples
 
-  // A channel's chunks, put together.
-  const join = (list, length) => {
-    const channel = new Float32Array(length);
-    for (const { offset, samples } of list) channel.set(samples.subarray(0, length - offset), offset);
+  function take({ channel, offset, samples }) {
+    const other = unpaired[1 - channel].get(offset);
+    if (other) {
+      unpaired[1 - channel].delete(offset);
+      stats.add(channel === 0 ? samples : other, channel === 0 ? other : samples);
+    } else unpaired[channel].set(offset, samples);
+    if (!only) return chunks[channel].push({ offset, samples });
+    // Only what's within reach of the part, copied (the chunk itself goes).
+    const from = Math.max(offset, only.keep.from);
+    const to = Math.min(offset + samples.length, only.keep.to);
+    if (from < to) chunks[channel].push({ offset: from, samples: samples.slice(from - offset, to - offset) });
+  }
+
+  // A channel's chunks, put together from `from` to `to`.
+  const join = (list, from, to) => {
+    const channel = new Float32Array(Math.max(0, to - from));
+    for (const { offset, samples } of list) {
+      if (offset < to) channel.set(samples.subarray(0, to - offset), offset - from);
+    }
     return channel;
   };
 
   async function run(length, want, covered) {
-    const left = join(chunks[0], length);
-    const right = join(chunks[1], length);
+    const from = only ? only.keep.from : 0;
+    const to = only ? Math.min(length, only.keep.to) : length;
+    const left = join(chunks[0], from, to);
+    const right = join(chunks[1], from, to);
     chunks[0] = chunks[1] = [];
+    unpaired.forEach((map) => map.clear());
     const runModel = await createSession();
-    const separator = createSeparator({ left, right, runModel, keep: KEEP });
+    const separator = createSeparator({
+      left,
+      right,
+      runModel,
+      keep: KEEP,
+      offset: from,
+      length,
+      stats: stats.result(),
+    });
     const { starts } = separator;
     const span = (i) => segmentSpan(starts, length, i);
     const total = starts.length;
@@ -107,13 +144,16 @@ function serve(port) {
     const separated = (i) => i < 0 || i >= total || within(covered, span(i));
     const skipped = new Set([...starts.keys()].filter((i) => separated(i - 1) && separated(i) && separated(i + 1)));
     const done = new Set(); // this run's
-    let pending = [...starts.keys()].filter((i) => !skipped.has(i));
+    // With a part, only the segments touching it.
+    const todo = only ? segmentsFor(starts, length, only.from, only.to) : [...starts.keys()];
+    let pending = todo.filter((i) => !skipped.has(i));
     let wanted = new Set();
     aim = (next) => {
       pending = orderOutward(starts, length, next, pending);
       wanted = new Set(segmentsFor(starts, length, next.from, next.to).filter((i) => !skipped.has(i)));
     };
-    aim(want);
+    aim(only ?? want);
+    if (only) aim = null; // the part is fixed
     const progress = () => {
       const wantedDone = [...wanted].filter((i) => done.has(i)).length;
       send({
@@ -158,8 +198,10 @@ function serve(port) {
 
   let want = null; // a "want" that came before the run began
   port.on("message", ({ data }) => {
-    if (data?.type === "audio") chunks[data.channel].push({ offset: data.offset, samples: data.samples });
-    else if (data?.type === "separate") {
+    if (data?.type === "audio") take(data);
+    else if (data?.type === "part") {
+      only = { from: data.from, to: data.to, keep: { from: Math.max(0, data.from - REACH), to: data.to + REACH } };
+    } else if (data?.type === "separate") {
       run(data.length, want ?? data.want, data.covered ?? []).catch((error) =>
         send({ type: "error", message: String(error?.message ?? error) }),
       );

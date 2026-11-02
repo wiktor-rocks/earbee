@@ -2,10 +2,14 @@
  * STEMS
  * The open song split into its instruments (vocals, drums, bass, guitar,
  * piano, and the rest), by the stem model in the main process
- * (electron/stems/), on demand: the Stems section's button.
+ * (electron/stems/), on demand: the Stems section's two buttons, the loop
+ * alone or the whole song.
  *
  *   0. First, whether it fits in memory (memory.js): if this computer
  *      hasn't enough for the song's stems, it says so and nothing starts.
+ *      The loop alone needs little, however long the song: its stems are
+ *      held only in a window around it (CONFIG.stems.window), and the stem
+ *      process keeps only the song around it.
  *   1. The first time, the model is downloaded (116 MB, once; the main
  *      process checks it).
  *   2. A worker (worker.js) decodes the song again at 44.1 kHz and streams
@@ -21,7 +25,11 @@
  *      (spans.js), and a strip on the waveform shows what's done.
  *   4. Once the loop's part is done the mixer shows ("The loop's stems are
  *      ready") while the rest goes on in the background; Stop ends it,
- *      keeping what's done, and "Separate the rest" carries on later.
+ *      keeping what's done, and "Separate the rest" carries on later. The
+ *      loop alone ends there. Separating another loop alone then replaces
+ *      it; over the whole song's stems (stopped part way), it adds to them;
+ *      the whole song after the loop alone widens the window to all of it
+ *      and carries on.
  *   5. When it ends, a few workers encode a copy of each stem as Opus for
  *      the project ("Preparing them for saving"). They're an unsaved change
  *      as soon as they play; a save started before their copies are made
@@ -60,9 +68,9 @@ import { formatMemory } from "../../core/format.js";
 import { $, element, onClick, reportError } from "../../ui/dom.js";
 import { notify } from "../../ui/toast.js";
 import { buildMixer } from "./dock.js";
-import { loadingBytes, memoryLimit, separationBytes } from "./memory.js";
+import { loadingBytes, memoryLimit, partBytes, separationBytes } from "./memory.js";
 import { defaultMix, isUnchanged, stemMixes } from "./mix.js";
-import { coveredLength, coversAll } from "./spans.js";
+import { coveredLength, covers, coversAll } from "./spans.js";
 
 /**
  * The part of window.earbee (electron/preload.js) used here; missing
@@ -84,12 +92,14 @@ const IDS = CONFIG.stems.list.map(({ id }) => id); // the player's order
 
 /**
  * What was found for the open song (the samples themselves went to the
- * player): the stems' ids in the player's order, at `sampleRate`,
- * `length` samples long, each one's loudness (once all of it is done), and
- * the spans of samples separated so far (spans.js).
+ * player): the stems' ids in the player's order, at `sampleRate`, for a
+ * track `length` samples long, holding `span` samples from its sample
+ * `start` (0 and `length` for the whole song; less for the loop alone),
+ * each one's loudness (once all of it is done), and the spans of the
+ * track's samples separated so far (spans.js).
  * @typedef {{
- *   sampleRate: number, length: number, ids: string[], levels: Record<string, number>,
- *   covered: import("./spans.js").Spans,
+ *   sampleRate: number, length: number, start: number, span: number, ids: string[],
+ *   levels: Record<string, number>, covered: import("./spans.js").Spans,
  * }} Stems
  */
 
@@ -125,8 +135,9 @@ let preparing = null;
 // Each stem's volume, solo and mute (mix.js).
 let mix = defaultMix(CONFIG.stems.list);
 // The separation or load going on: `stops` end its workers' waits (cancel);
-// `worker`, a separation's, to tell it where the loop moved, or to stop.
-/** @type {{ cancelled: boolean, stops: Set<() => void>, worker?: Worker } | null} */
+// `worker`, a separation's, to tell it where the loop moved, or to stop;
+// `onlyPart`, the loop alone's (fixed to its part).
+/** @type {{ cancelled: boolean, stops: Set<() => void>, worker?: Worker, onlyPart?: boolean } | null} */
 let job = null;
 
 // A project's stems that didn't fit in memory: as the project has them
@@ -153,15 +164,18 @@ async function systemMemory() {
 }
 
 // Why `needed` bytes don't fit, as the end of a message ("it needs …"), or
-// null if they do (or that can't be told).
-async function shortOfMemory(needed) {
+// null if they do (or that can't be told). `orLoop`: the loop alone would
+// need less, so it says so.
+async function shortOfMemory(needed, orLoop = false) {
   const memory = await systemMemory();
   const limit = memoryLimit(memory);
   if (!limit || needed <= limit.bytes) return null;
   const needs = `it needs about ${formatMemory(needed)} of memory`;
   return limit.of === "available"
-    ? `${needs}, and ${formatMemory(memory.available)} is available. Closing other programs may help.`
-    : `${needs}, more than half of this computer's ${formatMemory(memory.total)}.`;
+    ? `${needs}, and ${formatMemory(memory.available)} is available. ` +
+        (orLoop ? "Closing other programs, or separating the loop only, may help." : "Closing other programs may help.")
+    : `${needs}, more than half of this computer's ${formatMemory(memory.total)}.` +
+        (orLoop ? " Separating the loop only may help." : "");
 }
 
 /* ---------- Separating and loading ---------- */
@@ -264,13 +278,15 @@ let pending = null;
 // meanwhile.
 async function takeStems(result, covered, stillCurrent) {
   const ids = IDS.filter((id) => result.stems[id]);
+  const { start = 0, span = result.length } = result;
   await player.engine.loadStems(
     ids.map((id) => result.stems[id]),
     covered,
+    start,
   );
   if (!stillCurrent()) return false;
   const levels = Object.fromEntries(ids.map((id) => [id, result.stems[id].level]));
-  found = { sampleRate: result.sampleRate, length: result.length, ids, levels, covered };
+  found = { sampleRate: result.sampleRate, length: result.length, start, span, ids, levels, covered };
   applyMix();
   drawCovered();
   show("ready", 1);
@@ -301,22 +317,86 @@ function failJob(error, what) {
   if (error) reportError(error instanceof AppError ? error : new AppError(`${what}: ${error.message ?? error}`, error));
 }
 
-async function separate() {
+// Whether the stems hold only a window of the track (the loop alone's).
+const windowed = (/** @type {Stems | null} */ stems) => Boolean(stems) && stems.span < stems.length;
+
+// Forgets the stems found (for the loop alone's next part): the player
+// drops them, their copies go; the mix stays.
+function dropFound() {
+  preparationJob.cancelled = true;
+  for (const stop of preparationJob.stops) stop();
+  preparation = null;
+  preparing = null;
+  player.engine.dropStems();
+  found = null;
+  copies = null;
+  audio = null;
+  audioCovered = [];
+}
+
+// The page's copy of a window's stems, and the player's, widened to the
+// whole track (the window in its place), so the whole song can carry on
+// from them.
+async function widen() {
+  const stems = /** @type {Stems} */ (found);
+  const full = /** @type {Samples} */ (
+    Object.fromEntries(
+      Object.entries(/** @type {Samples} */ (copies)).map(([id, channels]) => [
+        id,
+        channels.map((channel) => {
+          const whole = new Int16Array(stems.length);
+          whole.set(channel, stems.start);
+          return whole;
+        }),
+      ]),
+    )
+  );
+  await player.engine.loadStems(
+    stems.ids.map((id) => ({ scale: SCALE, channels: full[id].map((channel) => channel.slice()) })),
+    stems.covered,
+  );
+  copies = full;
+  stems.start = 0;
+  stems.span = stems.length;
+  applyMix();
+}
+
+/**
+ * Separates the whole song (the loop first, then the rest), or with
+ * `onlyLoop`, the loop alone (or the part around the playhead).
+ * @param {{ onlyLoop?: boolean }} [options]
+ */
+async function separate({ onlyLoop = false } = {}) {
   if (!bridge || !media || job) return;
   const running = startJob();
   const { current, stillCurrent } = running;
-  // "Separate the rest": an earlier run's stems play already.
-  const carryOn = Boolean(found);
+  const part = onlyLoop ? firstPart() : null;
+  current.onlyPart = Boolean(part);
+  // The loop alone over the loop alone's stems replaces them (below); the
+  // whole song over them widens them first.
+  const replacing = Boolean(part) && windowed(found);
+  const widening = !part && windowed(found);
+  // "Separate the rest", or the loop alone over the whole song's: an earlier run's stems play already.
+  const carryOn = Boolean(found) && !replacing;
   /** @type {AppError | null} */
   let stoppedEarly = null;
   try {
     // Before anything is downloaded or started.
     if (track) {
-      const short = await shortOfMemory(
-        separationBytes({ seconds: track.duration, sampleRate: track.sampleRate, carryOn }),
-      );
+      const { duration, sampleRate } = track;
+      const needed = part
+        ? partBytes({ seconds: part.to - part.from + 2 * CONFIG.stems.window, sampleRate })
+        : separationBytes({ seconds: duration, sampleRate, carryOn: carryOn && !widening });
+      const short = await shortOfMemory(needed, !part);
       if (!stillCurrent()) return;
-      if (short) throw new AppError(`Not enough memory to separate the stems of “${media.name}”: ${short}`);
+      if (short) {
+        const what = part ? (fromLoop ? "the loop" : "the part around the playhead") : `“${media.name}”`;
+        throw new AppError(`Not enough memory to separate the stems of ${what}: ${short}`);
+      }
+    }
+    if (replacing) {
+      dropFound();
+      drawCovered();
     }
     if (!modelReady) {
       show("download", 0);
@@ -330,6 +410,8 @@ async function separate() {
     show("decode", 0);
     // Their copy is the worker's while it runs (made for saving first, if it's on its way).
     await preparation;
+    if (!stillCurrent()) return;
+    if (widening && copies) await widen();
     if (!stillCurrent()) return;
     const earlier = carryOn ? copies : null;
     if (carryOn && !earlier) throw new AppError("The stems separated so far can't be added to.");
@@ -348,7 +430,15 @@ async function separate() {
     let loaded = Promise.resolve();
     const result = await runWorker(running, {
       message: port.then((received) => [
-        { type: "separate", media, port: received, want: firstPart(), covered: found?.covered ?? [], stems: earlier },
+        {
+          type: "separate",
+          media,
+          port: received,
+          want: part ?? firstPart(),
+          part,
+          covered: found?.covered ?? [],
+          stems: earlier,
+        },
         [received, ...(earlier ? buffersOf(earlier) : [])],
       ]),
       failure: (message) => new AppError(`The stems couldn't be separated: ${message}`),
@@ -368,19 +458,22 @@ async function separate() {
           markNew();
           notify(fromLoop ? "The loop's stems are ready" : "The first stems are ready");
         }
-        if (found) show("rest", value);
+        // (The loop alone ends with its part.)
+        if (found && !current.onlyPart) show("rest", value);
         else show("separate", data.part ?? 0);
       },
       onMessage: (data) => {
         if (!stillCurrent()) return;
         if (data.type === "begin" && !carryOn) {
-          // Silent stems to begin with; the pieces fill them in.
-          const empty = () => new Int16Array(data.length);
+          // Silent stems to begin with (over the samples they'll hold); the pieces fill them in.
+          const empty = () => new Int16Array(data.span);
           loaded = player.engine.loadStems(
             IDS.map(() => ({ scale: SCALE, channels: [empty(), empty()] })),
             [],
+            data.start,
           );
-          pending = { sampleRate: data.sampleRate, length: data.length, ids: IDS, levels: {}, covered: [] };
+          const { sampleRate, length, start, span } = data;
+          pending = { sampleRate, length, start, span, ids: IDS, levels: {}, covered: [] };
         } else if (data.type === "piece") {
           const stems = found ?? pending;
           if (!stems) return;
@@ -550,21 +643,31 @@ function prepare() {
  * A project's stems, back in the player and the mixer (project.js): their
  * Opus bytes fetched from the project (`urls`), decoded by a few workers
  * at once, each a share of the stems; the player gets them all together.
- * `covered`: the parts separated, if not all of it. If they wouldn't fit
- * in memory, only their bytes are kept (`held`), and it says so.
+ * `covered`: the parts separated, if not all of it; `start` and `span`,
+ * the samples they hold (the loop alone's window), if not all of them. If
+ * they wouldn't fit in memory, only their bytes are kept (`held`), and it
+ * says so.
  * @param {{
- *   sampleRate: number, length: number, urls: Record<string, string>, mix: Record<string, any>,
- *   covered: import("./spans.js").Spans,
+ *   sampleRate: number, length: number, start?: number, span?: number,
+ *   urls: Record<string, string>, mix: Record<string, any>, covered: import("./spans.js").Spans,
  * }} saved
  */
-export async function loadStems({ sampleRate, length, urls, mix: savedMix, covered }) {
+export async function loadStems({
+  sampleRate,
+  length,
+  start = 0,
+  span = length - start,
+  urls,
+  mix: savedMix,
+  covered,
+}) {
   cancel();
   const running = startJob();
   const { current, stillCurrent } = running;
   mix = savedMix;
   try {
     show("load", 0);
-    const short = await shortOfMemory(loadingBytes({ seconds: length / sampleRate, sampleRate }));
+    const short = await shortOfMemory(loadingBytes({ seconds: span / sampleRate, sampleRate }));
     if (!stillCurrent()) return;
     const fetched = await Promise.all(
       Object.entries(urls).map(async ([id, url]) => {
@@ -576,14 +679,14 @@ export async function loadStems({ sampleRate, length, urls, mix: savedMix, cover
     if (!stillCurrent()) return;
     if (short) {
       job = null;
-      held = { sampleRate, length, ids: IDS, covered, audio: Object.fromEntries(fetched), mix: savedMix };
+      held = { sampleRate, length, start, span, ids: IDS, covered, audio: Object.fromEntries(fetched), mix: savedMix };
       show("idle", 0);
       reportError(new AppError(`The project's stems weren't brought back: ${short}`));
       return;
     }
-    const decoded = { sampleRate, length, stems: {} };
+    const decoded = { sampleRate, length, start, span, stems: {} };
     const results = await inWorkers(running, fetched, {
-      message: (share) => [{ type: "load", audio: share, sampleRate, length }, []],
+      message: (share) => [{ type: "load", audio: share, sampleRate, length: span }, []],
       failure: (message) => new AppError(`The project's stems couldn't be brought back: ${message}`),
       onProgress: show,
       onStems: async (part) => Object.assign(decoded.stems, part.stems),
@@ -675,7 +778,15 @@ function render() {
   ui.section.hidden = !media;
   const busy = ["download", "decode", "separate", "rest", "load"].includes(stage);
   const partly = Boolean(found) && !coversAll(found.covered, found.length);
-  ui.action.hidden = busy || (stage === "ready" && !partly) || Boolean(held);
+  const all = Boolean(found) && !partly;
+  // The loop alone: offered unless the loop is separated already (around
+  // the playhead, always: it moves).
+  const loop = player.transport.loop;
+  const loopDone =
+    Boolean(found && loop) &&
+    covers(found.covered, Math.ceil(loop.start * found.sampleRate), Math.floor(loop.end * found.sampleRate));
+  ui.loopAction.hidden = busy || all || loopDone || Boolean(held);
+  ui.action.hidden = busy || all || Boolean(held);
   ui.held.hidden = !held || busy;
   ui.busy.hidden = !busy;
   ui.stop.textContent = stage === "rest" ? "Stop" : "Cancel";
@@ -685,13 +796,21 @@ function render() {
   if (found) ui.mixerRows.render(mix);
   // Short: what the model is and its licence are on EarBee/models and in
   // THIRD_PARTY_NOTICES.md; the first time's download size, in the tooltip.
-  ui.action.textContent = partly ? "Separate the rest" : "Separate the stems";
+  const rest = partly && !windowed(found);
+  const download = modelReady ? "" : ` The first time, the stem model is downloaded (${megabytes(modelBytes)}).`;
+  ui.action.textContent = rest ? "Separate the rest" : "Separate the whole song";
   ui.action.title =
-    (partly
+    (rest
       ? "Separate the rest of the song, in the background."
-      : "Split the song into vocals, drums, bass, guitar, piano and the rest, the loop first " +
-        "(or from the playhead), then the rest in the background.") +
-    (modelReady ? "" : ` The first time, the stem model is downloaded (${megabytes(modelBytes)}).`);
+      : "Split the whole song into vocals, drums, bass, guitar, piano and the rest, the loop first " +
+        "(or from the playhead), then the rest in the background.") + download;
+  ui.loopAction.textContent = loop ? "Separate the loop" : "Separate from the playhead";
+  ui.loopAction.title =
+    (loop
+      ? "Split only the loop into its stems: quick, and little memory however long the song."
+      : "Split only the part around the playhead into its stems: quick, and little memory however long the song.") +
+    (windowed(found) ? " The part separated before goes." : "") +
+    download;
   const label = {
     download: `Downloading the stem model ${percent(fraction)}`,
     decode: `Reading the song ${percent(fraction)}`,
@@ -706,7 +825,8 @@ function render() {
 }
 
 function build(section) {
-  const action = element("button", { type: "button", className: "stems-action" });
+  const loopAction = element("button", { type: "button", className: "stems-action stems-loop" });
+  const action = element("button", { type: "button", className: "stems-action stems-whole" });
   const status = element("span", { className: "stems-status" });
   const stop = element("button", { type: "button", className: "small", textContent: "Cancel" });
   const busy = element("div", { className: "stems-busy" }, status, stop);
@@ -732,19 +852,21 @@ function build(section) {
   });
   // A part of the Mixer (index.html): its own small heading, the reset
   // beside it. While the rest is separated, the mixer shows above its
-  // progress.
+  // progress. The two buttons: the loop alone, the whole song.
   section.append(
     element("div", { className: "stems-head" }, element("h3", { textContent: "Stems" }), reset),
     mixer,
+    loopAction,
     action,
     busy,
     preparing,
     heldNote,
   );
-  onClick(action, separate);
+  onClick(loopAction, () => separate({ onlyLoop: true }));
+  onClick(action, () => separate());
   onClick(stop, stopSeparating);
   onClick(reset, resetMix);
-  return { section, action, busy, status, stop, mixer, mixerRows, preparing, held: heldNote, reset };
+  return { section, loopAction, action, busy, status, stop, mixer, mixerRows, preparing, held: heldNote, reset };
 }
 
 /* ---------- Wiring ---------- */
@@ -764,9 +886,11 @@ export function bindStems() {
     if (waiter) waiter(event.ports[0]);
     else event.ports[0]?.close(); // nobody's waiting: the process exits
   });
-  // The loop moved while separating: that part next.
+  // The loop moved while separating the whole song: that part next (the
+  // loop alone stays with its part). And the loop button follows it.
   player.transport.on("loop", (loop) => {
-    if (loop && job?.worker) job.worker.postMessage({ type: "want", from: loop.start, to: loop.end });
+    if (loop && job?.worker && !job.onlyPart) job.worker.postMessage({ type: "want", from: loop.start, to: loop.end });
+    render();
   });
   bridge
     .model()

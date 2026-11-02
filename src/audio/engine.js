@@ -176,17 +176,18 @@ export function createAudioEngine({ onError }) {
   // Stems (src/features/stems/): the track's stems, mixed into
   // Signalsmith's input by its worklet (see src/vendor/signalsmith-stretch).
   // Each is { scale, channels } (Int16Arrays at the track's rate, from its
-  // first sample, transferred); `covered`, the spans of samples separated
-  // so far (all of it if not given: elsewhere the track plays as it is).
+  // sample `start`, transferred); `covered`, the spans of the track's
+  // samples separated so far (all of it if not given: elsewhere the track
+  // plays as it is).
   // writeStems adds pieces as they're separated ([stem][channel], from
   // sample `from`, transferred), with the spans covered now. setStemGains
   // gives each stem's gain, in the same order, and the rest's. A new track
   // drops them by itself.
-  async function loadStems(stems, covered = null) {
+  async function loadStems(stems, covered = null, start = 0) {
     await init();
     const tracks = stems.map((stem) => stem.channels);
     await stretch.addStems(
-      { tracks, scales: stems.map((stem) => stem.scale), covered },
+      { tracks, scales: stems.map((stem) => stem.scale), covered, start },
       tracks.flat().map((c) => c.buffer),
     );
   }

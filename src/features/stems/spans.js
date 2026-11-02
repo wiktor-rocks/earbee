@@ -49,11 +49,19 @@ export function coveredParts(spans, from, count) {
 export const coveredLength = (spans) => spans.reduce((sum, [from, to]) => sum + to - from, 0);
 
 /**
+ * Whether the spans cover all of [from, to).
+ * @param {Spans} spans
+ * @param {number} from
+ * @param {number} to
+ */
+export const covers = (spans, from, to) => spans.some(([start, end]) => start <= from && end >= to);
+
+/**
  * Whether the spans cover all of [0, length).
  * @param {Spans} spans
  * @param {number} length
  */
-export const coversAll = (spans, length) => spans.some(([from, to]) => from <= 0 && to >= length);
+export const coversAll = (spans, length) => covers(spans, 0, length);
 
 /**
  * The spans moved to another sample rate: each sample `ratio` times as far.
