@@ -171,7 +171,10 @@ export const waveformSection = defineSection({
 // the top bar slides away and comes back when the pointer reaches the top
 // edge (features/topbar-autohide.js). `videoButtons`: the video's buttons
 // (the zoom, its own window, big video) always shown, or only while the
-// pointer is on the picture (features/video-buttons.js).
+// pointer is on the picture (features/video-buttons.js). `hiddenSections`:
+// the side panel's sections put away (features/panel-sections.js), by
+// their keys in features/panel-order.js; kept as the hidden ones, so a
+// section added later shows.
 const layoutSection = defineSection({
   id: "layout",
   title: "Layout",
@@ -193,6 +196,23 @@ const layoutSection = defineSection({
       options: [
         { value: "always", label: "Always" },
         { value: "hover", label: "On hover", detail: "while the pointer is on the picture" },
+      ],
+    },
+    {
+      key: "hiddenSections",
+      type: "set",
+      label: "Hide in the side panel",
+      help: "The sections ticked here are put away. Their shortcuts still work.",
+      default: [],
+      options: [
+        { value: "speed", label: "Speed" },
+        { value: "pitch", label: "Pitch" },
+        { value: "mixer", label: "Mixer" },
+        { value: "eq", label: "EQ" },
+        { value: "beats", label: "Beats" },
+        { value: "points", label: "Points" },
+        { value: "loop", label: "Loop" },
+        { value: "marks", label: "Marks" },
       ],
     },
   ],
@@ -297,4 +317,4 @@ export const getSection = (id) => SECTIONS.find((section) => section.id === id);
 /** Every section's values from what was stored (anything; invalid parts become defaults). */
 export const normalizePrefsFile = (stored) => normalizeAll(SECTIONS, stored);
 
-export { PrefsError, defaultsOf, isVisible, resetValue, setValue } from "./fields.js";
+export { PrefsError, defaultsOf, isDefault, isVisible, resetValue, setValue } from "./fields.js";

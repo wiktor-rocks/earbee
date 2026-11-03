@@ -3104,8 +3104,8 @@ button.beat-info.disabled {
    Each section of the side panel has a grip on its left edge, in its
    padding, always shown: faint, full while it's pointed at or focused. Dragging it dims the section and
    shows a line where it would land. The sound sections below the marks
-   are in a second dock (.dock-below); a dock with no sections takes no
-   room. */
+   are in a second dock (.dock-below); a dock with no sections shown
+   (some hidden in Settings › Layout, panel-sections.js) takes no room. */
 
 .panel,
 .dock-group,
@@ -3117,11 +3117,11 @@ button.beat-info.disabled {
   border-top: 1px solid var(--hairline);
 }
 
-.dock:not(:has(> .dock-group)) {
+.dock:not(:has(> .dock-group:not([hidden]))) {
   display: none;
 }
 
-.dock:not(:has(> .dock-group)) + .sidebar {
+.dock:not(:has(> .dock-group:not([hidden]))) + .sidebar {
   border-top: 0;
 }
 

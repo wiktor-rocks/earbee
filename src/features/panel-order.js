@@ -16,6 +16,8 @@
  *   Saved      On this computer (browser storage), not in projects. A
  *              section the saved order doesn't know goes back to its
  *              place in the default order.
+ *   Hidden     A section hidden in Settings › Layout (panel-sections.js)
+ *              keeps its place in the order; dropping and ↑ / ↓ skip it.
  *
  * Removing it means deleting this file, its part in style.css ("Panel
  * order") and the lines marked "Panel order (".
@@ -128,7 +130,7 @@ function dropAt(y) {
     const after = y > box.top + box.height / 2;
     return { gap: order.indexOf(MARKS) + (after ? 1 : 0), y: after ? box.bottom : box.top };
   }
-  const groups = /** @type {HTMLElement[]} */ ([...part.children]);
+  const groups = /** @type {HTMLElement[]} */ ([...part.children]).filter(isShown);
   for (const group of groups) {
     const rect = group.getBoundingClientRect();
     if (y < rect.top + rect.height / 2) return { gap: order.indexOf(keyOf(group)), y: within(rect.top) };
@@ -219,8 +221,14 @@ function bindDrag(key, grip) {
     event.preventDefault();
     event.stopPropagation();
     if (event.type !== "keydown") return;
+    // One shown section up or down: past the hidden ones next to it.
     const at = order.indexOf(key);
-    if (moveTo(key, event.key === "ArrowUp" ? Math.max(at - 1, 0) : Math.min(at + 2, order.length))) grip.focus();
+    const up = event.key === "ArrowUp";
+    let other = at;
+    do other += up ? -1 : 1;
+    while (other >= 0 && other < order.length && !isShown(sections.get(order[other])));
+    if (other < 0 || other >= order.length) return;
+    if (moveTo(key, up ? other : other + 1)) grip.focus();
   };
   grip.addEventListener("keydown", onArrow);
   grip.addEventListener("keyup", onArrow);

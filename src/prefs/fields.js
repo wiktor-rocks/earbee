@@ -18,6 +18,8 @@
 // Field types (TYPES below; a new type is one entry there and a renderer in
 // ui/pref-fields.js):
 //   choice   one of `options` [{ value, label, detail?, swatch? }]
+//   set      any number of `options`, as an array of their values (in
+//            the options' order, each once)
 //   boolean  true or false
 //   number   `min` … `max`, rounded to `step`; `unit` is shown after it
 //   folder   an absolute path, or null for the default. Only the main
@@ -38,11 +40,11 @@ import { clamp } from "../core/format.js";
  *
  * @typedef {object} Field
  * @property {string} key
- * @property {"choice" | "boolean" | "number" | "folder"} type
+ * @property {"choice" | "set" | "boolean" | "number" | "folder"} type
  * @property {string} label
  * @property {string} [help]
  * @property {any} default
- * @property {Option[]} [options] choice
+ * @property {Option[]} [options] choice, set
  * @property {number} [min] number
  * @property {number} [max] number
  * @property {number} [step] number
@@ -67,6 +69,15 @@ const INVALID = Symbol("invalid");
 const TYPES = {
   choice: {
     normalize: (value, field) => (field.options.some((option) => option.value === value) ? value : INVALID),
+  },
+  // The same array back when it's already clean (in the options' order,
+  // each once), so a default checks against itself.
+  set: {
+    normalize(value, field) {
+      if (!Array.isArray(value)) return INVALID;
+      const known = field.options.map((option) => option.value).filter((option) => value.includes(option));
+      return known.length === value.length ? (known.every((v, i) => v === value[i]) ? value : known) : INVALID;
+    },
   },
   boolean: {
     normalize: (value) => (typeof value === "boolean" ? value : INVALID),
@@ -174,6 +185,9 @@ export function resetValue(section, values, key) {
   if (!field) throw new PrefsError(`Unknown setting: ${section.id}.${key}`);
   return setValue(section, values, key, field.default);
 }
+
+/** Whether `value` is `field`'s default (a set's by its items). @param {Field} field */
+export const isDefault = (field, value) => JSON.stringify(value) === JSON.stringify(field.default);
 
 /** Whether `field` is shown, given its section's current values. */
 export const isVisible = (field, values) => !field.visibleWhen || field.visibleWhen(values);

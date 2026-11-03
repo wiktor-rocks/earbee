@@ -147,6 +147,9 @@
  *                  controls; wiring marked "Video zoom ("),
  *                  panel-order.js (the side panel's sections dragged
  *                  into any order; wiring marked "Panel order ("),
+ *                  panel-sections.js (Settings › Layout: the side
+ *                  panel's sections hidden; wiring marked "Panel
+ *                  sections ("),
  *                  video-buttons.js (Settings › Layout: the video's
  *                  buttons always shown or on hover; wiring marked
  *                  "Video buttons ("), topbar-autohide.js (Settings ›
@@ -294,6 +297,7 @@ import { bigVideoPictureChanged, bindBigVideo, leaveBigVideo, toggleBigVideo } f
 import { bindLayout, openShortcuts } from "./features/layout.js";
 import { bindStageSplit } from "./features/stage-split.js"; // Stage split (src/features/stage-split.js)
 import { bindPanelOrder } from "./features/panel-order.js"; // Panel order (src/features/panel-order.js)
+import { bindPanelSections } from "./features/panel-sections.js"; // Panel sections (src/features/panel-sections.js)
 import { bindVideoButtons } from "./features/video-buttons.js"; // Video buttons (src/features/video-buttons.js)
 import { bindTopbarAutohide } from "./features/topbar-autohide.js"; // Top bar autohide (src/features/topbar-autohide.js)
 import { bindVideoZoom, resetVideoZoom, videoZoomChanged, zoomVideoIn, zoomVideoOut } from "./features/video-zoom.js"; // Video zoom (src/features/video-zoom.js)
@@ -722,6 +726,7 @@ function start() {
   bindStageSplit(); // Stage split (src/features/stage-split.js)
   bindStems(); // Stems (src/features/stems/): before the panel order, which finds its section
   bindPanelOrder(); // Panel order (src/features/panel-order.js)
+  bindPanelSections(); // Panel sections (src/features/panel-sections.js)
   bindVideoZoom($("videoPane")); // Video zoom (src/features/video-zoom.js)
   bindVideoButtons(); // Video buttons (src/features/video-buttons.js)
   bindTopbarAutohide(); // Top bar autohide (src/features/topbar-autohide.js)

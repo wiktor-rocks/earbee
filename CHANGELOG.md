@@ -43,6 +43,21 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-03: Hide sections of the side panel (Settings › Layout)
+
+- **What:** Settings › Layout › **Hide in the side panel**: tick any of Speed, Pitch, Mixer, EQ, Beats, Points, Loop and Marks to put it away; untick it to bring it back. Their shortcuts still work. A hidden section keeps its place in the panel's order.
+- **Why:** the owner's 0.3.0 line: "Settings for hiding the sidebar sections. I might want to hide the loop section for example."
+- **How:**
+  - **A new kind of setting, `set`** (`src/prefs/fields.js`): any number of a field's options, kept as an array of their values in the options' order, each once; anything else falls back to the default. The Settings dialog shows it as a row of tiles like a choice's, with checkboxes (`src/ui/pref-fields.js`). `isDefault()` compares a set by its items, for the Reset button.
+  - **The setting** `layout.hiddenSections` (`src/prefs/index.js`) keeps the hidden ones, so a section added later shows.
+  - **`src/features/panel-sections.js`** (new) sets `hidden` on each `.<key>-group` and on `#sidebar` (the marks), and follows the setting.
+  - **Panel order** (`src/features/panel-order.js`): dropping skips hidden sections, and ↑ / ↓ on a grip moves past them, so each press visibly moves the section. A dock whose sections are all hidden takes no room (style.css, "Panel order").
+- **Where:** `src/prefs/fields.js`, `src/prefs/index.js`, `src/ui/pref-fields.js`, `src/features/panel-sections.js` (new), `src/features/panel-order.js`, `src/app.js` (wiring marked "Panel sections ("; the header), `style.css` ("Panel order"). Tests: `tests/unit/prefs.test.mjs`, `tests/e2e/13-settings.cjs`, `tests/e2e/14-marks.cjs`.
+- **Verified by:**
+  - Unit: a set keeps known items in order and refuses unknown or repeated ones, a bad default fails at once, `isDefault` compares items; the layout section's defaults; `hiddenSections` normalising (405 pass).
+  - e2e 13: ticking Loop hides its section, saved, Reset shown; Marks too; unticking both brings them back and Reset goes (a screenshot of the tiles). e2e 14: ↓ on Speed's grip moves it past a hidden Pitch, below the Mixer. The same run as "Shift for the loop" (149 pass).
+  - Not checked: dragging a section with others hidden (the drop code skips them; not tested).
+
 ## 2026-11-03: Ctrl+wheel on the waveform scrolls
 
 - **What:** the wheel with Ctrl (⌘ on a Mac) over the waveform or the lanes above it scrolls the view, as the wheel on the minimap does, without going down to the minimap. The plain wheel still zooms.

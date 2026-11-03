@@ -5,6 +5,7 @@ import {
   PrefsError,
   defaultsOf,
   defineSection,
+  isDefault,
   isVisible,
   normalizeSection,
   resetValue,
@@ -49,6 +50,35 @@ describe("declaring a section", () => {
       /Unknown field type/,
     );
     assert.throws(() => defineSection({ id: "s", title: "", fields: [{ ...field, default: "no" }] }), /Bad default/);
+  });
+});
+
+describe("a set field", () => {
+  const field = {
+    key: "picked",
+    type: "set",
+    label: "Picked",
+    default: [],
+    options: [
+      { value: "a", label: "A" },
+      { value: "b", label: "B" },
+      { value: "c", label: "C" },
+    ],
+  };
+  const section = defineSection({ id: "withSet", title: "", fields: [field] });
+
+  test("keeps known items, in the options' order; refuses unknown or repeated ones", () => {
+    assert.deepEqual(normalizeSection(section, { picked: ["c", "a"] }).picked, ["a", "c"]);
+    assert.deepEqual(normalizeSection(section, { picked: ["a", "x"] }).picked, []);
+    assert.deepEqual(normalizeSection(section, { picked: ["a", "a"] }).picked, []);
+    assert.deepEqual(normalizeSection(section, { picked: "a" }).picked, []);
+    assert.throws(() => setValue(section, { picked: [] }, "picked", ["z"]), /Invalid value/);
+  });
+
+  test("its default checks against itself; isDefault compares the items", () => {
+    assert.throws(() => defineSection({ id: "s", title: "", fields: [{ ...field, default: ["z"] }] }), /Bad default/);
+    assert.equal(isDefault(field, []), true);
+    assert.equal(isDefault(field, ["b"]), false);
   });
 });
 
@@ -160,8 +190,16 @@ describe("the general section", () => {
 describe("the layout section", () => {
   const layout = getSection("layout");
 
-  test("defaults: the top bar stays, the video's buttons always show", () => {
-    assert.deepEqual(defaultsOf(layout), { autohideTopBar: false, videoButtons: "always" });
+  test("defaults: the top bar stays, the video's buttons always show, no section hidden", () => {
+    assert.deepEqual(defaultsOf(layout), { autohideTopBar: false, videoButtons: "always", hiddenSections: [] });
+  });
+
+  test("hidden sections: the known ones kept, anything else back to none", () => {
+    assert.deepEqual(normalizePrefsFile({ layout: { hiddenSections: ["marks", "loop"] } }).layout.hiddenSections, [
+      "loop",
+      "marks",
+    ]);
+    assert.deepEqual(normalizePrefsFile({ layout: { hiddenSections: ["sidebar"] } }).layout.hiddenSections, []);
   });
 
   test("anything but its choices falls back to always; anything but true or false to a bar that stays", () => {

@@ -273,6 +273,49 @@ module.exports = async function (h) {
   await sleep(300);
   check("turned off, the bar is back in the layout", JSON.stringify(await bars()) === JSON.stringify(inLayout));
 
+  // Hide in the side panel (features/panel-sections.js): a ticked section
+  // is put away, and comes back when unticked.
+  {
+    const tick = async (value) => {
+      await js(`${row("layout", "hiddenSections")}.querySelector('input[value="${value}"]').click()`);
+      await sleep(300);
+    };
+    const shown = () =>
+      js(
+        `({ loop: !document.querySelector(".loop-group").hidden, marks: !document.getElementById("sidebar").hidden })`,
+      );
+    await js(`document.getElementById("settingsButton").click()`);
+    await sleep(200);
+    await tab("layout");
+    await tick("loop");
+    check(
+      "Hide in the side panel: Loop ticked puts its section away; saved, Reset shown",
+      JSON.stringify(await shown()) === JSON.stringify({ loop: false, marks: true }) &&
+        JSON.stringify(saved().layout?.hiddenSections) === '["loop"]' &&
+        (await resetShown("layout", "hiddenSections")),
+      JSON.stringify({ shown: await shown(), saved: saved().layout }),
+    );
+    await tick("marks");
+    check(
+      "…Marks too: the marks are put away",
+      JSON.stringify(await shown()) === JSON.stringify({ loop: false, marks: false }) &&
+        JSON.stringify(saved().layout?.hiddenSections) === '["loop","marks"]',
+      JSON.stringify(saved().layout),
+    );
+    await shot("panel-sections-hidden.png");
+    await tick("loop");
+    await tick("marks");
+    check(
+      "…unticked, both come back, and Reset goes",
+      JSON.stringify(await shown()) === JSON.stringify({ loop: true, marks: true }) &&
+        JSON.stringify(saved().layout?.hiddenSections) === "[]" &&
+        !(await resetShown("layout", "hiddenSections")),
+      JSON.stringify(saved().layout),
+    );
+    await js(`document.getElementById("settingsDialog").close()`);
+    await sleep(200);
+  }
+
   // Kept over a reload (the preload reads them before the page starts).
   await h.wc.reload();
   await sleep(1500);

@@ -432,6 +432,22 @@ module.exports = async function (h) {
     (await panelOrder()).join() === defaultOrder.join() &&
       !(await js(`document.querySelector(".dock-below").checkVisibility()`)),
   );
+  // A section hidden in Settings › Layout (features/panel-sections.js)
+  // keeps its place; ↓ on the grip above it skips it.
+  await js(`earbee.prefs.set("layout", "hiddenSections", ["pitch"])`);
+  await sleep(300);
+  await js(`document.querySelector(".speed-group > .panel-grip").focus()`);
+  key("Down");
+  await sleep(100);
+  const skipped = await panelOrder();
+  check(
+    "panel order: ↓ moves past a hidden section to the next one shown",
+    (await js(`document.querySelector(".pitch-group").hidden`)) && skipped.slice(0, 3).join() === "pitch,mixer,speed",
+    JSON.stringify(skipped),
+  );
+  await js(`earbee.prefs.set("layout", "hiddenSections", [])`);
+  await js(`import("./src/features/panel-order.js").then(({ resetPanelOrder }) => resetPanelOrder())`);
+  await sleep(300);
 
   // Another file: no marks.
   await openFile(path.join(FIXTURES, "long-chirp.m4a"));

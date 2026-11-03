@@ -5,7 +5,7 @@
 // without rebuilding anything, and focus stays put.
 //
 // A new field type: an entry in TYPES (src/prefs/fields.js) and one here.
-import { isVisible } from "../prefs/index.js";
+import { isDefault, isVisible } from "../prefs/index.js";
 import { element, guarded } from "./dom.js";
 
 /**
@@ -61,6 +61,35 @@ const RENDERERS = {
       element: group,
       update(values) {
         for (const { input, value } of inputs) input.checked = value === values[field.key];
+      },
+    };
+  },
+
+  // Checkboxes in a row of tiles, like choice's, one per option; the
+  // value is the ticked ones.
+  set(field, actions, id) {
+    const group = element("div", { className: "pref-options pref-options-row", role: "group" });
+    group.setAttribute("aria-labelledby", `${id}-label`);
+    const inputs = field.options.map((option) => {
+      const input = element("input", { type: "checkbox", value: String(option.value) });
+      group.append(
+        element(
+          "label",
+          { className: "pref-option" },
+          input,
+          element("span", { className: "pref-option-text" }, option.label),
+        ),
+      );
+      return { input, value: option.value };
+    });
+    group.addEventListener(
+      "change",
+      guarded(() => actions.set(inputs.filter(({ input }) => input.checked).map(({ value }) => value))),
+    );
+    return {
+      element: group,
+      update(values) {
+        for (const { input, value } of inputs) input.checked = values[field.key].includes(value);
       },
     };
   },
@@ -152,7 +181,7 @@ export function renderField(field, actions) {
     element: row,
     update(values) {
       row.hidden = !isVisible(field, values);
-      reset.hidden = values[field.key] === field.default;
+      reset.hidden = isDefault(field, values[field.key]);
       control.update(values);
     },
   };
