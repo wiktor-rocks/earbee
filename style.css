@@ -107,6 +107,10 @@
   --shadow-lifted: 0 2px 6px rgb(0 0 0 / 0.25), 0 18px 48px rgb(0 0 0 / 0.3);
   --sidebar-width: 300px;
   --marks-min-height: 180px; /* the marks under the sound, however short the window */
+  /* The scrollbars' thumb (section 2, "Scrollbars"): made from the text
+     colour, so every theme, light or dark, gets its own. */
+  --scrollbar: color-mix(in srgb, var(--text) 20%, transparent);
+  --scrollbar-hover: color-mix(in srgb, var(--text) 38%, transparent);
 
   color-scheme: dark;
   accent-color: var(--accent);
@@ -161,6 +165,34 @@ textarea {
 /* Images (the bee) can't be dragged out either. */
 img {
   -webkit-user-drag: none;
+}
+
+/* ---------- Scrollbars ----------
+   Everywhere in the app: a slim rounded thumb in the theme's colours on
+   no track, brighter while pointed at or dragged. The thumb is inset by
+   a transparent border, so it looks thinner than the 10px it can be
+   grabbed by. A standard scrollbar-width or scrollbar-color on an element
+   turns these off for it in Chromium, so neither is used. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-track,
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  min-height: 32px;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background: var(--scrollbar) padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover,
+::-webkit-scrollbar-thumb:active {
+  background-color: var(--scrollbar-hover);
 }
 
 h2 {
@@ -2680,7 +2712,6 @@ button.chip-button:hover {
   margin: 0;
   padding: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
   list-style: none;
   background: color-mix(in srgb, var(--inset) 45%, transparent);
 }
@@ -2803,7 +2834,6 @@ button.mark-remove {
   flex-direction: column;
   min-height: 0;
   overflow-y: auto;
-  scrollbar-width: thin;
 }
 
 .dock-group {

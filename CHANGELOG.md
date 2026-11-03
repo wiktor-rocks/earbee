@@ -43,6 +43,21 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-03: Custom scrollbars
+
+- **What:** every scrollbar in the app (the side panel, the marks, the dialogs, the welcome screen) is a slim rounded thumb in the theme's colours on no track, brighter while pointed at or dragged, instead of the system's.
+- **Why:** the owner's 0.3.0 line "custom scrollbars for the app".
+- **How:**
+  - `::-webkit-scrollbar` rules for the whole page: 10 px to grab, the thumb inset by a 3 px transparent border so it looks thinner.
+  - Its colours are two new tokens, `--scrollbar` and `--scrollbar-hover`, mixed from `--text`, so every theme, light or dark, gets its own without a change to the palettes.
+  - The two `scrollbar-width: thin` (the dock, the marks list) are gone: in Chromium a standard `scrollbar-width` or `scrollbar-color` turns the `::-webkit-scrollbar` styles off for that element.
+  - The video window has nothing that scrolls, so nothing changed there.
+- **Where:** `style.css` (the tokens; "Scrollbars", new, in section 2; "Marks sidebar", "Sound dock").
+- **Verified by:**
+  - By eye, in the e2e screenshot of the side panel scrolled (`tests/output/panel-order.png`, the default theme): a slim thumb, no track.
+  - `npm run check`.
+  - Not checked: a light theme, and the hover colour, by eye.
+
 ## 2026-11-03: Hide sections of the side panel (Settings › Layout)
 
 - **What:** Settings › Layout › **Hide in the side panel**: tick any of Speed, Pitch, Mixer, EQ, Beats, Points, Loop and Marks to put it away; untick it to bring it back. Their shortcuts still work. A hidden section keeps its place in the panel's order.
