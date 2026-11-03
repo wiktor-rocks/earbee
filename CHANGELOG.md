@@ -43,6 +43,53 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-03: AI stem separation: six stems in the Mixer
+
+- **What:**
+  - **The Mixer.** The Volume section is now the Mixer: Volume, a new Balance knob (left and right), then the stems.
+  - **Separating.** "Separate the loop" (without a loop: "Separate from the playhead") separates only that part. "Separate the whole song" separates the loop first, then the rest in the background, nearest the loop first. It splits the open song into six stems: vocals, drums, bass, guitar, piano and the rest ("Other"). The mixer shows as soon as the first part is done ("The loop's stems are ready"). A strip on the waveform shows what's separated so far. Stop keeps what's done, and "Separate the rest" carries on later. Cancel drops it.
+  - **Each stem's row:** its name, a volume knob, solo and mute. A click on the name opens its panel: volume up to 200 %, pan, and Fold into Other (its row goes, its sound stays in Other; Show brings it back). With every stem at 100 % and centred, it plays the song itself.
+  - **The model** (116 MB) is downloaded on first use. If the computer hasn't enough memory for a song's stems, separating says so and doesn't start, and suggests the loop alone, which needs little however long the song.
+  - **Projects** keep the stems and the mix. New stems are an unsaved change as soon as they play. Closing EarBee mid-separation asks first.
+- **Why:** the owner's 0.3.0 item, "AI stem separation". Along the way, the owner chose:
+  - the guitar stem as a must, so the six-stem model;
+  - any mix other than the song itself as the sum of the six stems (song minus stems left a ghost of a muted stem);
+  - the loop alone as well as the whole song, another loop alone replacing the first;
+  - that a save stops if the stems can't be prepared for it, rather than leaving them out;
+  - the weights' licence (unclear, likely CC BY-NC) stated in the EarBee/models repository and THIRD_PARTY_NOTICES, not in the app.
+
+  "One mixer section" and "left/right channel volume" were the owner's notes for the release too.
+
+- **How:**
+  - **The model:** Demucs `htdemucs_6s` exported to ONNX (`scripts/export-stem-model.py`, attention in slices so a segment needs less memory), with its inverse STFT and segment blending in JS (`electron/stems/stft.js`, `separate.js`, matching Demucs's `apply.py`, checked against a golden file). It's downloaded from github.com/EarBee/models (release `stem-model-1`) and checked (`model-file.js`). 8-bit models were tried and dropped (1.07× faster at best).
+  - **The stem process** (`electron/stems/process.js`): a utility process at low priority, separating one 7.8 s segment at a time, about as long as the song plays (Ryzen 7 3750H). It keeps only the blend still needed (`keepFor`), and for the loop alone only the song within two segments of it, its normalising added up as the song comes (`songStats`).
+  - **The page's worker** (`src/features/stems/worker.js`): decodes the song again at 44.1 kHz (mono to both sides), streams it to the process, and turns each piece back into the track's rate in 16 bits (`core/resample.js`, a shorter filter: `resampleZeroCrossings`).
+  - **Playing:** the stems play through the same stretcher as the track, mixed into its input (the patch in `src/vendor/signalsmith-stretch`, see its README), so they keep in step at any speed, pitch or loop. Where they aren't separated yet, the track plays as it is (`spans.js`).
+  - **Projects:** the stems are six Opus files after the header (project format version 2), made by a few workers a block at a time (`opus.js`). A project's stems that don't fit in memory, or don't match a relinked file, are kept as they are (`held`) and saved again unchanged.
+  - **The memory check** (`memory.js`): what the stems would take against 80 % of the memory available (on macOS, 50 % of all of it). About 3 GB for a 4-minute song, 15 GB for an hour; about 2.1 GB for the loop alone.
+  - **Learned:**
+    - A message that transfers an ArrayBuffer to a utility process is silently dropped, so it's copied.
+    - A utility process's port "close" doesn't come when the page reloads, so the main process stops it.
+    - `Int16Array.from` with a function takes seconds over a song, so it's plain loops.
+- **Where:**
+  - **Stems:** `src/features/stems/` (new: `index.js`, `dock.js`, `mix.js`, `spans.js`, `memory.js`, `opus.js`, `project.js`, `worker.js`, `stems.css`) and `electron/stems/` (new: `index.js`, `process.js`, `separate.js`, `stft.js`, `model-file.js`). The wiring is marked "Stems (" in `src/app.js`, `src/features/open-file.js`, `index.html`, `src/config.js` (`stems`), `electron/main.js`, `electron/preload.js` and `src/waveform.js`.
+  - **The Mixer:** `src/core/balance.js` (new), `src/ui/controls.js`, `src/config.js` (`balance`).
+  - **Elsewhere:** `src/audio/engine.js` (`loadStems`, `writeStems`, `setStemGains`, `dropStems`), `src/vendor/signalsmith-stretch/`, `src/core/resample.js`, `src/project/format.js` (version 2), `src/features/project/`, `electron/project-files.js`, `electron/system.js` (memory), `style.css`, `docs/glossary.md`, `README.md`, `THIRD_PARTY_NOTICES.md`, `scripts/make-fake-stem-model.py`.
+  - **Tests:** `tests/e2e/21-stems.cjs` (new), `tests/e2e/stem-process-slow.cjs`, harness hooks (a stand-in model whose stems are the song ÷ 6, `setStemDelay`, `setStemStartFails`, `setStemModelGone`, `memory`), `tests/unit/stems-*.test.mjs`, `balance.test.mjs`, `close-guard.test.mjs`, `project.test.mjs`.
+- **Verified by:**
+  - `npm test` after the merge: 402 unit, 661 e2e, 28 smoke. A first try failed only because the computer had 2.6 GB free and the memory check refused a test song: topic 21 now pretends there's plenty of memory, except where a check sets less (it passes with the real figure set to 2.6 GB).
+  - Before the merge, a throwaway probe, not kept, with 47 checks comparing the six stems' sum with the track's own samples. No bugs found. It covered:
+    - songs from 0.5 s to two segments; mono; 22.05 and 48 kHz; silence; a video; MP3, AAC and Vorbis (the stems line up with the song: lag 0);
+    - the loop alone at the song's ends, tiny and nearly all of it;
+    - speed, pitch, seeking and the loop changed while separating;
+    - another file or a project opened mid-separation.
+  - The probe's small differences (all inaudible): at rates other than 44.1 kHz, a loop-alone window's edges until the whole song is separated, and the song's last few samples.
+  - The owner used the AppImage test build.
+  - **Not verified:**
+    - Windows and macOS (separation has never run there);
+    - the real model's memory since the memory work (the 2 GB for a segment is an earlier measurement);
+    - FLAC files, which didn't open in the probe (not the stems: the app's decoding, not checked on `testing`).
+
 ## 2026-11-01: The post ideas say which have become posts (docs)
 
 - **What:** in `docs/blog.md`, "Post ideas", ideas 1, 3, 5, 8 and 17 end with **Written:** and a link to their post; the list's introduction says so.
