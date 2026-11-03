@@ -31,6 +31,12 @@ module.exports = async function (h) {
     memory,
   } = h;
   const { FIXTURES, OUTPUT } = h;
+  // What's free on the computer changes with what else runs (a busy day
+  // refused long-chirp.m4a: 2.3 GB needed, 2.6 GB free), so this topic
+  // pretends there's plenty, except where a check sets less; the real
+  // figure comes back at its end.
+  const PLENTY = 16e9;
+  memory.available = PLENTY;
 
   const section = () =>
     js(`(() => {
@@ -436,7 +442,7 @@ module.exports = async function (h) {
     JSON.stringify({ state, said }),
   );
   check("stems: …and that isn't an unsaved change", !(await title()).endsWith(" •"), await title());
-  memory.available = null;
+  memory.available = PLENTY;
   const heldFile = path.join(OUTPUT, "projects", "Held.ebee");
   fs.rmSync(heldFile, { force: true });
   projectDialogs.save = heldFile;
@@ -489,7 +495,7 @@ module.exports = async function (h) {
     state.busy === null && /more than half of this computer's/.test(said),
     JSON.stringify({ state, said }),
   );
-  memory.available = null;
+  memory.available = PLENTY;
   memory.total = null;
 
   // The loop first, then the rest, nearest it first. Each segment slowed
@@ -668,7 +674,7 @@ module.exports = async function (h) {
   );
   await clearToasts();
   await press(".stems-loop");
-  memory.available = null;
+  memory.available = PLENTY;
   state = await waitFor((s) => s.ready && s.busy === null, 60_000);
   let alone = await found();
   check(
@@ -847,4 +853,5 @@ module.exports = async function (h) {
     /isn't there yet/.test(gone) && /Couldn't download the stem model/.test(said),
     JSON.stringify({ gone, said }),
   );
+  memory.available = null;
 };
