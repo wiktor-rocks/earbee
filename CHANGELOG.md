@@ -43,6 +43,23 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-04: The side panel scrolls as one
+
+- **What:** when the side panel's sections don't fit, the whole panel scrolls, the sound sections and the marks alike. Before, the sound sections scrolled on their own above the marks (and below them, when some were moved under the marks). The marks section still keeps at least 180 px, with its list scrolling inside it.
+- **Why:** the owner's 0.3.0 item: the marks were "not a part of the sidebar when it comes to scrolling… as if section in section… sections should be equal". On the first try the marks' own scroll went too; the owner wants it kept, inside the section.
+- **How:**
+  - style.css: `.panel` is `overflow-y: auto`, and the docks (`.dock`, `.dock-below`) are `flex: none`, without their own scroll. `.sidebar` is `flex: 1 0 var(--marks-min-height)` with that minimum, so it fills the rest of the panel and never gets shorter; `#marksList` scrolls inside it as before.
+  - `src/features/panel-order.js`: moving a section keeps the panel's and the marks list's scroll, a drag near the panel's top or bottom edge scrolls the panel, and the drop line is placed in the panel's scrolled content.
+  - Selecting a mark scrolls it into view as before (`scrollIntoView`), which may now scroll the panel too.
+- **Where:** `style.css` ("Layout" in section 5, "Marks sidebar", "Sound dock", "Smaller windows"), `src/features/panel-order.js`. Tests: `tests/e2e/14-marks.cjs`.
+- **Verified by:**
+  - e2e 14:
+    - many marks scroll inside their section, the page doesn't grow, the selected mark is in view;
+    - a short window (960 × 560): the panel scrolls, the dock doesn't on its own, the marks right under the sound and 180 px tall, their list scrolling, all of them in view at the bottom;
+    - the panel order checks, the drag now with the panel scrolled.
+  - `TB_TOPICS=03,14 npm test`: 94 pass, with 405 unit and 28 smoke (a first run, with the marks' scroll gone, failed one panel-order check: the drag started near the panel's top edge, which scrolled it; the test now starts away from the edges). A screenshot, looked at.
+  - Not checked: dragging a section in a real window with the panel scrolled.
+
 ## 2026-11-04: The side panel on the left or the right (Settings › Layout)
 
 - **What:** Settings › Layout › **The side panel**: **On the left** or **On the right** (the default, as before), each button on the side it stands for. On the left, the panel sits beside the picture, the waveform and the transport on their left. The top bar's side-panel button still puts it away, and its icon draws the panel's bar on that side.

@@ -10,9 +10,9 @@
  *              marks (#sidebar, "marks"); nothing in index.html knows
  *              about this. The sound sections above the marks stay in
  *              the dock; those below go into a second dock made here
- *              (.dock-below), so each part keeps scrolling on its own
- *              and the marks keep their least height. Moving a section
- *              moves its element, so every listener stays with it.
+ *              (.dock-below). The whole panel scrolls as one, and the
+ *              marks' list inside its section. Moving a section moves
+ *              its element, so every listener stays with it.
  *   Saved      On this computer (browser storage), not in projects. A
  *              section the saved order doesn't know goes back to its
  *              place in the default order.
@@ -30,7 +30,7 @@ const ORDER_KEY = "earbee.panelOrder";
 const MARKS = "marks";
 // A press that moves less than this is a click, not a drag.
 const DRAG_THRESHOLD = 4;
-// Near a dock's top or bottom edge (px), a drag scrolls it, up to
+// Near the panel's top or bottom edge (px), a drag scrolls it, up to
 // SCROLL_SPEED px a frame.
 const SCROLL_EDGE = 32;
 const SCROLL_SPEED = 10;
@@ -79,16 +79,16 @@ function readOrder() {
 }
 
 // Puts the sections in `next`'s order: the sound sections before the
-// marks in the dock, those after them in the dock below. The scrolled
-// parts keep where they were.
+// marks in the dock, those after them in the dock below. The panel and
+// the marks' list keep where they were scrolled to.
 function layout(next) {
   const marksList = $("marksList");
-  const scrolled = [upper, lower, marksList].map((part) => part.scrollTop);
+  const scrolled = [panel, marksList].map((part) => part.scrollTop);
   const at = next.indexOf(MARKS);
   upper.append(...next.slice(0, at).map((key) => sections.get(key)));
   upper.after(sidebar);
   lower.append(...next.slice(at + 1).map((key) => sections.get(key)));
-  [upper, lower, marksList].forEach((part, i) => (part.scrollTop = scrolled[i]));
+  [panel, marksList].forEach((part, i) => (part.scrollTop = scrolled[i]));
   order = next;
 }
 
@@ -139,15 +139,13 @@ function dropAt(y) {
   return { gap: order.indexOf(keyOf(groups.at(-1))) + 1, y: within(end.bottom) };
 }
 
-/** A dock scrolls while the pointer is near its edge. @param {number} y */
+/** The panel scrolls while the pointer is near its edge. @param {number} y */
 function scrollNear(y) {
-  for (const dock of [upper, lower]) {
-    if (!isShown(dock) || dock.scrollHeight <= dock.clientHeight) continue;
-    const box = dock.getBoundingClientRect();
-    if (y < box.top || y > box.bottom) continue;
-    if (y < box.top + SCROLL_EDGE) dock.scrollTop -= SCROLL_SPEED * (1 - (y - box.top) / SCROLL_EDGE);
-    else if (y > box.bottom - SCROLL_EDGE) dock.scrollTop += SCROLL_SPEED * (1 - (box.bottom - y) / SCROLL_EDGE);
-  }
+  if (panel.scrollHeight <= panel.clientHeight) return;
+  const box = panel.getBoundingClientRect();
+  if (y < box.top + SCROLL_EDGE) panel.scrollTop -= SCROLL_SPEED * Math.min(1 - (y - box.top) / SCROLL_EDGE, 1);
+  else if (y > box.bottom - SCROLL_EDGE)
+    panel.scrollTop += SCROLL_SPEED * Math.min(1 - (box.bottom - y) / SCROLL_EDGE, 1);
 }
 
 /** @param {string} key @param {HTMLButtonElement} grip */
@@ -165,8 +163,11 @@ function bindDrag(key, grip) {
   function tick() {
     scrollNear(pointerY);
     drop = dropAt(pointerY);
-    const top = drop.y - panel.getBoundingClientRect().top - 1;
-    line.style.top = `${Math.min(Math.max(top, 0), panel.clientHeight - 2)}px`;
+    // The line is placed in the panel's scrolled content; it stays within
+    // the part in view.
+    const top = drop.y - panel.getBoundingClientRect().top + panel.scrollTop - 1;
+    const shownTop = panel.scrollTop;
+    line.style.top = `${Math.min(Math.max(top, shownTop), shownTop + panel.clientHeight - 2)}px`;
     frame = requestAnimationFrame(tick);
   }
 

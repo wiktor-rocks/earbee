@@ -253,7 +253,8 @@ module.exports = async function (h) {
     `${flagX} vs ${await xAt(remaining.start)}`,
   );
 
-  // Many marks: the list scrolls inside the sidebar; the page never grows.
+  // Many marks: the list scrolls inside its section; the page never grows;
+  // the newest mark (selected) is scrolled into view.
   wc.sendInputEvent({ type: "mouseWheel", x: await xAt(7), y: Math.round((await rect()).y), deltaX: 0, deltaY: -6000 });
   await sleep(300); // back to the whole track (zoomed in above)
   for (let i = 0; i < 24; i++) {
@@ -261,18 +262,17 @@ module.exports = async function (h) {
     key("M");
   }
   await sleep(200);
+  const many = await js(`(() => {
+    const p = panel.getBoundingClientRect(), row = marksList.querySelector(".selected")?.getBoundingClientRect();
+    return { listScrolls: marksList.scrollHeight > marksList.clientHeight + 1,
+      noGrow: document.scrollingElement.scrollHeight <= innerHeight, selectedShown: !!row && row.top >= p.top - 1 && row.bottom <= p.bottom + 1 };
+  })()`);
   check(
-    "many marks scroll in the sidebar, and the page doesn't grow",
-    (await listed()).length >= 24 &&
-      (await js(`marksList.scrollHeight > marksList.clientHeight`)) &&
-      (await js(`document.scrollingElement.scrollHeight <= window.innerHeight`)),
-    [
-      (await listed()).length,
-      ...(await js(
-        `[marksList.scrollHeight, marksList.clientHeight, document.scrollingElement.scrollHeight, innerHeight]`,
-      )),
-    ],
+    "many marks scroll inside their section, the page doesn't grow, the selected mark is in view",
+    (await listed()).length >= 24 && many.listScrolls && many.noGrow && many.selectedShown,
+    JSON.stringify(many),
   );
+  await shot("panel-one-scroll.png");
   const countBefore = (await listed()).length;
   await js(`addPoint.click()`);
   await sleep(100);
@@ -336,30 +336,32 @@ module.exports = async function (h) {
     JSON.stringify(half),
   );
 
-  // A short window too: the sound scrolls on its own above the marks,
-  // which keep their height and their own scrolling; the page never grows.
+  // A short window too: the whole panel scrolls, the sound with the
+  // marks right under it, their list still scrolling inside their section,
+  // which keeps its height; the page never grows.
   h.win.setSize(960, 560);
   await sleep(400);
   const short = await js(`(() => {
     const dock = document.querySelector(".dock"), d = dock.getBoundingClientRect(), side = sidebar.getBoundingClientRect();
-    const before = { dockScrolls: dock.scrollHeight > dock.clientHeight, marksHeight: Math.round(side.height),
-      below: side.top >= d.bottom - 1, listScrolls: marksList.scrollHeight > marksList.clientHeight,
-      noGrow: document.scrollingElement.scrollHeight <= innerHeight };
-    dock.scrollTop = dock.scrollHeight;
-    const loop = document.querySelector(".loop-group").getBoundingClientRect();
-    return { ...before, loopShown: loop.top >= d.top - 1 && loop.bottom <= d.bottom + 1 };
+    const before = { panelScrolls: panel.scrollHeight > panel.clientHeight, dockOwnScroll: dock.scrollHeight > dock.clientHeight + 1,
+      below: Math.abs(side.top - d.bottom) <= 1, marksHeight: Math.round(side.height),
+      listScrolls: marksList.scrollHeight > marksList.clientHeight + 1, noGrow: document.scrollingElement.scrollHeight <= innerHeight };
+    panel.scrollTop = panel.scrollHeight;
+    const p = panel.getBoundingClientRect(), s = sidebar.getBoundingClientRect();
+    return { ...before, marksShown: s.top >= p.top - 1 && s.bottom <= p.bottom + 1 };
   })()`);
   check(
-    "a short window: the sound scrolls above the marks, which stay in view",
-    short.dockScrolls &&
-      short.marksHeight >= 180 &&
+    "a short window: the panel scrolls as one, down to the marks, which keep their height and their own scroll",
+    short.panelScrolls &&
+      !short.dockOwnScroll &&
       short.below &&
+      short.marksHeight >= 180 &&
       short.listScrolls &&
       short.noGrow &&
-      short.loopShown,
+      short.marksShown,
     JSON.stringify(short),
   );
-  await js(`document.querySelector(".dock").scrollTop = 0`);
+  await js(`panel.scrollTop = 0`);
   h.win.setSize(width, height);
   await sleep(400);
 
@@ -396,7 +398,9 @@ module.exports = async function (h) {
     mixerFirst.join() === ["mixer", "speed", ...defaultOrder.filter((k) => !["mixer", "speed"].includes(k))].join(),
     JSON.stringify(mixerFirst),
   );
-  await js(`document.querySelector(".dock").scrollTop = document.querySelector(".dock").scrollHeight`);
+  // Loop in view, away from the panel's edges (a drag near one scrolls
+  // it), the marks' header (its grip) right under it.
+  await js(`document.querySelector(".loop-group").scrollIntoView({ block: "center" })`);
   await dragGrip(".sidebar-head > .panel-grip", await middle(".loop-group", "top"), () => shot("panel-order.png"));
   const marksUp = await js(`(() => {
     const below = document.querySelector(".dock-below");

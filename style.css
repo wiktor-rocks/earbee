@@ -106,7 +106,7 @@
   --shadow: 0 1px 2px rgb(0 0 0 / 0.18), 0 8px 24px rgb(0 0 0 / 0.14);
   --shadow-lifted: 0 2px 6px rgb(0 0 0 / 0.25), 0 18px 48px rgb(0 0 0 / 0.3);
   --sidebar-width: 300px;
-  --marks-min-height: 180px; /* the marks under the sound, however short the window */
+  --marks-min-height: 180px; /* the marks section, however short the window */
   /* The scrollbars' thumb (section 2, "Scrollbars"): made from the text
      colour, so every theme, light or dark, gets its own. */
   --scrollbar: color-mix(in srgb, var(--text) 20%, transparent);
@@ -1837,12 +1837,15 @@ body.dragging .drop-card {
   grid-area: transport;
 }
 
+/* The side panel scrolls as one, when its sections don't fit: the sound
+   sections and the marks alike. Only the marks' list scrolls on its own,
+   inside its section. */
 .panel {
   grid-area: panel;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
   border-left: 1px solid var(--hairline);
 }
 
@@ -2674,13 +2677,13 @@ button.chip-button:hover {
 }
 
 /* ---------- Marks sidebar ----------
-   In the side panel, under the sound: it takes the rest of the height,
-   never less than --marks-min-height (the sound scrolls instead), so the
-   marks stay in view in a short window. */
+   In the side panel, a section like the others: it takes the rest of the
+   panel's height, never less than --marks-min-height (the whole panel
+   scrolls then), and its list scrolls inside it. */
 
 .sidebar {
   display: flex;
-  flex: 1;
+  flex: 1 0 var(--marks-min-height);
   flex-direction: column;
   min-height: var(--marks-min-height);
   overflow: hidden;
@@ -2730,8 +2733,9 @@ button.chip-button:hover {
   opacity: 0.5;
 }
 
-/* Fills the sidebar and scrolls; the page never grows with it. A little
-   sunk, its rows edge to edge with hairlines between them. */
+/* Fills the rest of the sidebar and scrolls inside it; the panel never
+   grows with it. A little sunk, its rows edge to edge with hairlines
+   between them. */
 .marks-list {
   display: flex;
   flex: 1;
@@ -2849,19 +2853,16 @@ button.mark-remove {
 
 /* ---------- Sound dock: speed, pitch, volume, EQ ----------
    At the top of the side panel: a section per group, one under the
-   other, a hairline between them. Its full height when there's room;
-   when the panel is short it scrolls on its own, above the marks, so
-   more groups can come without pushing anything else. (The wheel over a
+   other, a hairline between them. Always its full height: when the panel
+   is short, the whole panel scrolls, down to the marks. (The wheel over a
    knob still turns the knob.) */
 
 .dock {
   --knob-size: 40px;
 
   display: flex;
-  flex: 0 1 auto;
+  flex: none;
   flex-direction: column;
-  min-height: 0;
-  overflow-y: auto;
 }
 
 .dock-group {
@@ -3756,12 +3757,12 @@ body.panel-order-dragging * {
 }
 
 /* ---------- Smaller windows ----------
-   The marks sidebar always stays in view, so half a screen (about 960 px
+   The side panel always stays in view, so half a screen (about 960 px
    wide) still shows the whole player: under 1100 px it gets narrower, its
    buttons show only their icons, and the dock's knobs get smaller; the
    transport stays one row, its chips cut off when they don't fit.
-   Short windows: the dock and the minimap get more compact, and the dock
-   scrolls above the marks when it still doesn't fit. */
+   Short windows: the dock and the minimap get more compact, and the side
+   panel scrolls when it still doesn't fit. */
 
 @media (max-width: 1099px) {
   :root {
