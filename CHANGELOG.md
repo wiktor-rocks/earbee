@@ -90,6 +90,14 @@ The architecture overview, the file map and a list of where to make common chang
     - the real model's memory since the memory work (the 2 GB for a segment is an earlier measurement);
     - FLAC files, which didn't open in the probe (not the stems: the app's decoding, not checked on `testing`).
 
+## 2026-11-03: Blog post "How to hear the bass in a song (and learn the bass line)" (the website)
+
+- **What:** a ninth post, "How to hear the bass in a song (and learn the bass line)", at `/blog/hear-the-bass-in-a-song/`. Why the bass is hard to hear (small speakers, our ears at low notes, the kick drum, the mix), then six steps: something that can play it, an EQ (the lows up, the rest down, a little of the upper middle kept for the pluck), an octave up, the drums for the rhythm, the chords' roots for the notes, a loop of one bar slowed down. Then from hearing it to learning it, isolated bass tracks, and Try EarBee.
+- **Why:** post idea 4 in `docs/blog.md`, aimed at "how to hear the bass in a song" (more searched than "how to learn bass lines by ear"; the owner's choice). An assistant wrote it in the owner's voice; the owner read it and published it as it was.
+- **How:** `keyword: "how to hear the bass in a song"`, in the title, the address and the first sentence. True for 0.2.0: the EQ, an octave up, loops, slowing down, the beats; no stems or Focus (after 0.3.0, a stems section and `updated:`). Idea 4 now ends with **Written:** and the link.
+- **Where:** `site/blog/hear-the-bass-in-a-song.md`, `docs/blog.md` (idea 4).
+- **Verified by:** `npm --prefix site run build`, `node scripts/seo/check.cjs` (no errors or warnings for the post), `npm run check`; the page answers at earbee.org after the push. Not checked by the owner: the general facts the assistant added (small speakers, our ears at low volume, the genres where the bass is up front, the bass playing the chord's root on the first beat).
+
 ## 2026-11-01: The post ideas say which have become posts (docs)
 
 - **What:** in `docs/blog.md`, "Post ideas", ideas 1, 3, 5, 8 and 17 end with **Written:** and a link to their post; the list's introduction says so.
