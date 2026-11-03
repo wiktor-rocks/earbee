@@ -2083,6 +2083,15 @@ body.stage-split-dragging * {
   cursor: ew-resize;
 }
 
+/* Shift held inside the loop: a press picks it up (waveform.js). */
+.waveform.over-loop {
+  cursor: grab;
+}
+
+.waveform.moving-loop {
+  cursor: grabbing;
+}
+
 /* The A–B loop, drawn inside WaveSurfer's shadow DOM (see createWaveform),
    so it is styled through ::part. Positioned in percent (--loop-start, and
    --loop-after, B's distance from the end; waveform.js), so it follows

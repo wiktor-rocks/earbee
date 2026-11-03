@@ -43,6 +43,17 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-03: Shift+drag inside the loop moves the whole loop
+
+- **What:** with Shift held, a drag inside the loop (away from its edges) picks the loop up and moves it, as long as it was. It stops at the track's start and end, and its start snaps to the beats (unless Alt is held). With Shift held, the pointer is a hand inside the loop. A Shift+click there without moving seeks, as before. Shift+drag outside the loop still draws a new one.
+- **Why:** the owner, right after "Shift for the loop": "Shift and mouse can also just move the loop altogether".
+- **How:** a fourth kind of drag in `bindPointerSeek()` (`src/waveform.js`), `move`: the loop's start plus how far the pointer has gone since the press, snapped, then kept within the track. Until the pointer moves it stays exactly where it was, so a Shift+click doesn't snap it or send it again. `.over-loop` and `.moving-loop` on the waveform give the `grab` and `grabbing` cursors (style.css, beside `.near-loop-edge`).
+- **Where:** `src/waveform.js`, `style.css`, `README.md`, `docs/glossary.md` (Loop). Tests: `tests/e2e/03-audio-and-loop.cjs`.
+- **Verified by:**
+  - e2e 03: Shift+drag inside the loop moves it by the drag; dragged past the end, it stops there, as long as before; dragged back; a Shift+click inside seeks and leaves the loop.
+  - `TB_TOPICS=03 npm test`: 53 pass, with 405 unit and 28 smoke; `npm run check`.
+  - Not checked: the hand cursor and the feel in a real window.
+
 ## 2026-11-03: Custom scrollbars
 
 - **What:** every scrollbar in the app (the side panel, the marks, the dialogs, the welcome screen) is a slim rounded thumb in the theme's colours on no track, brighter while pointed at or dragged, instead of the system's.

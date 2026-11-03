@@ -31,9 +31,9 @@ import { drawWaveform } from "./waveform-draw.js";
  *
  * The A–B loop is drawn as a <div part="loop-region"> inside WaveSurfer's
  * wrapper (styled from style.css with ::part), positioned in percent so it
- * follows zoom and scrolling. Shift+drag draws a loop and Shift+drag near
- * an edge moves that edge (both snap to beats close by, through the `snap`
- * option, unless Alt is held). The loop goes to onLoopChange as the drag
+ * follows zoom and scrolling. Shift+drag draws a loop; near an edge it
+ * moves that edge, and inside the loop the whole loop (all snap to beats
+ * close by, through the `snap` option, unless Alt is held). The loop goes to onLoopChange as the drag
  * goes (once per frame), so playback follows the pointer live; the region
  * only changes for good when setLoop() is called with it.
  *
@@ -303,10 +303,18 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     return toStart <= toEnd ? "start" : "end";
   }
 
+  // Whether `x` is inside the loop, away from its edges: where Shift+drag
+  // picks the loop up and moves it.
+  function insideLoopAt(x) {
+    return Boolean(loop && duration) && x > clientXAt(loop.start) && x < clientXAt(loop.end) && !loopEdgeAt(x);
+  }
+
   // One drag at a time: { mode: "seek" } | { mode: "draw", anchor }
-  // | { mode: "edge", fixed } (`fixed` is the loop end that stays put),
-  // plus `draft`, the loop described so far, while drawing or adjusting,
-  // and `sent`, the last of those passed to onLoopChange.
+  // | { mode: "edge", fixed } (`fixed` is the loop end that stays put)
+  // | { mode: "move", grab, from, moved } (the whole loop, as long as it
+  // was, picked up at `grab` from where it started, `from`), plus `draft`,
+  // the loop described so far, while drawing or adjusting, and `sent`, the
+  // last of those passed to onLoopChange.
   function bindPointerSeek() {
     const { minSeconds } = CONFIG.loop;
     let pointerId = null;
@@ -320,6 +328,15 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
 
     // The loop described by the current drag, or null if it is too short.
     function draftLoop(time) {
+      if (drag.mode === "move") {
+        // Its start snaps (to the beats); it stays inside the track. Until
+        // the pointer moves, it stays exactly where it was.
+        const length = drag.from.end - drag.from.start;
+        const start = drag.moved
+          ? clamp(snapped(drag.from.start + time - drag.grab), 0, duration - length)
+          : drag.from.start;
+        return { start, end: start + length, enabled: true };
+      }
       const other = drag.mode === "draw" ? drag.anchor : drag.fixed;
       const start = Math.min(time, other);
       const end = Math.max(time, other);
@@ -338,7 +355,8 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       // A press near a loop edge seeks exactly to it; dragging on scrubs.
       if (drag.mode === "seek") onSeek(x === drag.pressX && drag.edgeTime !== null ? drag.edgeTime : time);
       else {
-        drag.draft = draftLoop(snapped(time));
+        if (drag.mode === "move") drag.moved ||= x !== drag.pressX;
+        drag.draft = draftLoop(drag.mode === "move" ? time : snapped(time));
         // Playback follows at once: the loop is where the pointer is now,
         // not only once the mouse is released.
         const { draft, sent } = drag;
@@ -354,13 +372,25 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       if (event.button !== 0 || !duration) return;
       event.preventDefault();
 
-      // Shift is for the loop: near an edge it moves that edge, anywhere
-      // else it draws a new loop. Without Shift a press seeks, so the loop's
-      // edges never stand in the way of putting the cursor on them.
+      // Shift is for the loop: near an edge it moves that edge, inside the
+      // loop it moves the whole loop, anywhere else it draws a new one.
+      // Without Shift a press seeks, so the loop's edges never stand in the
+      // way of putting the cursor on them.
       const edge = loopEdgeAt(event.clientX);
       free = event.altKey;
       if (event.shiftKey && edge) drag = { mode: "edge", fixed: edge === "start" ? loop.end : loop.start };
-      else if (event.shiftKey) drag = { mode: "draw", anchor: snapped(timeAtClientX(event.clientX)) };
+      else if (event.shiftKey && insideLoopAt(event.clientX)) {
+        const grab = timeAtClientX(event.clientX);
+        drag = {
+          mode: "move",
+          grab,
+          from: { start: loop.start, end: loop.end },
+          pressX: event.clientX,
+          moved: false,
+          sent: { start: loop.start, end: loop.end, enabled: true },
+        };
+        container.classList.add("moving-loop");
+      } else if (event.shiftKey) drag = { mode: "draw", anchor: snapped(timeAtClientX(event.clientX)) };
       else {
         const edgeTime = edge === null ? null : edge === "start" ? loop.start : loop.end;
         drag = { mode: "seek", pressX: event.clientX, edgeTime };
@@ -419,10 +449,12 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
         refreshHover();
       }
 
+      container.classList.remove("moving-loop");
       if (finished.mode === "seek") return;
       // The loop was sent as the drag went (applyPointer). A Shift+click
-      // that never made a loop is a plain click.
+      // that never made or moved a loop is a plain click.
       if (!finished.sent && finished.mode === "draw") onSeek(finished.anchor);
+      if (!finished.moved && finished.mode === "move") onSeek(finished.grab);
       renderLoop(); // the loop as last set
     };
     container.addEventListener("pointerup", endDrag);
@@ -558,11 +590,13 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     }
   }
 
-  // Places the hover line at the mouse again, and shows the resize cursor
-  // when it is near a loop edge with Shift held (which grabs it).
+  // Places the hover line at the mouse again, and with Shift held shows
+  // what a press would grab: the resize cursor near a loop edge, a hand
+  // inside the loop.
   function refreshHover() {
     renderHoverLine(hoverX);
     container.classList.toggle("near-loop-edge", shiftHeld && hoverX !== null && loopEdgeAt(hoverX) !== null);
+    container.classList.toggle("over-loop", shiftHeld && hoverX !== null && insideLoopAt(hoverX));
   }
 
   /* ---------- Zoom / scroll ---------- */

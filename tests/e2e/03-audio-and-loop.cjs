@@ -191,6 +191,33 @@ module.exports = async function (h) {
     `${await pos()} ${JSON.stringify(await loopRange())}`,
   );
 
+  // Shift+drag inside the loop moves the whole loop, as long as it was,
+  // and never past the track's end; Shift+click there without moving
+  // seeks, and leaves the loop alone.
+  {
+    const same = (a, b) => a && b && Math.abs(a.start - b.start) < 0.06 && Math.abs(a.end - b.end) < 0.06;
+    const length = loop.end - loop.start;
+    await drag(2, 3, ["shift"]);
+    const moved = await loopRange();
+    check("shift+drag inside the loop moves it", same(moved, { start: 1.5, end: 5 }), JSON.stringify(moved));
+    const end = await duration();
+    await drag(3, end - 0.1, ["shift"]);
+    const atEnd = await loopRange();
+    check(
+      "…it stops at the track's end, as long as before",
+      atEnd && Math.abs(atEnd.end - end) < 0.01 && Math.abs(atEnd.end - atEnd.start - length) < 0.01,
+      JSON.stringify(atEnd),
+    );
+    await drag(end - 1, end - 1 - (atEnd.start - loop.start), ["shift"]);
+    check("…and back", same(await loopRange(), loop), JSON.stringify(await loopRange()));
+    await click(3, ["shift"]);
+    check(
+      "a Shift+click inside the loop seeks there, the loop stays",
+      Math.abs((await pos()) - 3) < 0.05 && same(await loopRange(), loop),
+      `${await pos()} ${JSON.stringify(await loopRange())}`,
+    );
+  }
+
   // A drag takes effect as it goes: while playing, Shift+drag B in from 4 to 2
   // with the mouse still held, and playback already wraps at 2.
   key("Space");
