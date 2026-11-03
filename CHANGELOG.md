@@ -45,7 +45,7 @@ The architecture overview, the file map and a list of where to make common chang
 
 ## 2026-11-04: The side panel on the left or the right (Settings › Layout)
 
-- **What:** Settings › Layout › **The side panel**: **On the right** (the default, as before) or **On the left**. On the left, the panel sits beside the picture, the waveform and the transport on their left. The top bar's side-panel button still puts it away, and its icon draws the panel's bar on that side.
+- **What:** Settings › Layout › **The side panel**: **On the left** or **On the right** (the default, as before), each button on the side it stands for. On the left, the panel sits beside the picture, the waveform and the transport on their left. The top bar's side-panel button still puts it away, and its icon draws the panel's bar on that side.
 - **Why:** the owner's 0.3.0 item "The side panel on the left or the right, as a setting".
 - **How:**
   - A `choice` field, `layout.panelSide` (`src/prefs/index.js`), first in Layout.

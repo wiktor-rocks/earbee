@@ -189,8 +189,9 @@ const layoutSection = defineSection({
       help: "The sound and the marks, beside the picture and the waveform.",
       default: "right",
       options: [
-        { value: "right", label: "On the right" },
+        // Left first, so each button sits on the side it stands for.
         { value: "left", label: "On the left" },
+        { value: "right", label: "On the right" },
       ],
     },
     {
