@@ -148,32 +148,65 @@ module.exports = async function (h) {
   );
   await js(`document.querySelector('#speedChips [data-speed="1"]').click()`);
 
-  // Edge drag: B from 2 to 4
-  await drag(null, 4, [], await xAt(loop.end), undefined);
+  // Edge drag, with Shift: B from 2 to 4
+  await drag(null, 4, ["shift"], await xAt(loop.end), undefined);
   loop = await loopRange();
   check(
-    "drag edge moves B",
+    "shift+drag edge moves B",
     loop && Math.abs(loop.end - 4) < 0.06 && Math.abs(loop.start - 1) < 0.05,
     JSON.stringify(loop),
   );
-  await drag(null, 0.5, [], await xAt(loop.start), undefined);
+  await drag(null, 0.5, ["shift"], await xAt(loop.start), undefined);
   loop = await loopRange();
   check(
-    "drag edge moves A",
+    "shift+drag edge moves A",
     loop && Math.abs(loop.start - 0.5) < 0.06 && Math.abs(loop.end - 4) < 0.06,
     JSON.stringify(loop),
   );
 
-  // A drag takes effect as it goes: while playing, pull B in from 4 to 2
+  // Without Shift the edges don't get in the way: a click a few pixels
+  // from one puts the cursor exactly on it, and the loop stays.
+  {
+    const y = Math.round((await rect()).y);
+    const clickAt = async (x) => {
+      wc.sendInputEvent({ type: "mouseDown", x, y, button: "left", clickCount: 1 });
+      wc.sendInputEvent({ type: "mouseUp", x, y, button: "left", clickCount: 1 });
+      await sleep(120);
+    };
+    await clickAt((await xAt(loop.start)) + 4);
+    const onA = await pos();
+    await clickAt((await xAt(loop.end)) - 4);
+    const onB = await pos();
+    check(
+      "a plain click near an edge seeks exactly to it",
+      Math.abs(onA - loop.start) < 0.002 && Math.abs(onB - loop.end) < 0.002,
+      `A ${loop.start} → ${onA}, B ${loop.end} → ${onB}`,
+    );
+    check("…and leaves the loop as it was", JSON.stringify(await loopRange()) === JSON.stringify(loop));
+  }
+  await drag(null, 3, [], await xAt(loop.end), undefined);
+  check(
+    "a plain drag from an edge scrubs, the edge stays",
+    Math.abs((await pos()) - 3) < 0.06 && JSON.stringify(await loopRange()) === JSON.stringify(loop),
+    `${await pos()} ${JSON.stringify(await loopRange())}`,
+  );
+
+  // A drag takes effect as it goes: while playing, Shift+drag B in from 4 to 2
   // with the mouse still held, and playback already wraps at 2.
   key("Space");
   await sleep(300);
   {
     const y = Math.round((await rect()).y);
     const [from, to] = [await xAt(4), await xAt(2)];
-    wc.sendInputEvent({ type: "mouseDown", x: from, y, button: "left", clickCount: 1 });
+    wc.sendInputEvent({ type: "mouseDown", x: from, y, button: "left", clickCount: 1, modifiers: ["shift"] });
     for (let i = 1; i <= 6; i++) {
-      wc.sendInputEvent({ type: "mouseMove", x: Math.round(from + ((to - from) * i) / 6), y, button: "left" });
+      wc.sendInputEvent({
+        type: "mouseMove",
+        x: Math.round(from + ((to - from) * i) / 6),
+        y,
+        button: "left",
+        modifiers: ["shift"],
+      });
       await sleep(20);
     }
     await sleep(150);
@@ -191,12 +224,12 @@ module.exports = async function (h) {
       wraps >= 1 && during.every((p) => p.pos <= held.end + 0.01),
       `wraps=${wraps}, max ${Math.max(...during.map((p) => p.pos)).toFixed(3)}`,
     );
-    wc.sendInputEvent({ type: "mouseUp", x: to, y, button: "left", clickCount: 1 });
+    wc.sendInputEvent({ type: "mouseUp", x: to, y, button: "left", clickCount: 1, modifiers: ["shift"] });
     await sleep(150);
     check("releasing keeps it", Math.abs((await loopRange()).end - 2) < 0.06, JSON.stringify(await loopRange()));
   }
   await ensurePaused();
-  await drag(null, 4, [], await xAt(2), undefined); // back to 0.5–4 for what follows
+  await drag(null, 4, ["shift"], await xAt(2), undefined); // back to 0.5–4 for what follows
   loop = await loopRange();
 
   // Short shift+drag acts as a click

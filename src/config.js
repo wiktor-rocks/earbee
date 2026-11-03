@@ -68,7 +68,8 @@ export const CONFIG = {
   loop: {
     // Shortest A–B loop; a Shift+drag shorter than this is a plain click.
     minSeconds: 0.05,
-    // Pointer distance (CSS px) from a loop edge that grabs the edge.
+    // Pointer distance (CSS px) from a loop edge that grabs the edge (with
+    // Shift); without Shift, a click this close seeks exactly to it.
     edgeGrabPx: 6,
   },
 

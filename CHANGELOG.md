@@ -43,6 +43,29 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-03: Ctrl+wheel on the waveform scrolls
+
+- **What:** the wheel with Ctrl (⌘ on a Mac) over the waveform or the lanes above it scrolls the view, as the wheel on the minimap does, without going down to the minimap. The plain wheel still zooms.
+- **Why:** the owner's 0.3.0 line "Shift or Control scroll should allow you to move the waveform while on it… let's do Control". A touchpad pinch arrives as Ctrl+wheel too, so it now scrolls instead of zooming: the owner doesn't pinch, and chose Ctrl.
+- **How:** in `wheel()` (`src/waveform.js`), with `ctrlKey` or `metaKey` the delta (up and down, or sideways) moves the scroll, and following the cursor pauses, as on the minimap. The lanes use the same handler. Its `preventDefault()` already keeps Electron from zooming the page.
+- **Where:** `src/waveform.js`, `docs/glossary.md` (Minimap). Tests: `tests/e2e/06-zoom.cjs`.
+- **Verified by:**
+  - e2e 06: Ctrl+wheel over the waveform scrolls the view back (2864 → 2064 px) and doesn't zoom. The same run as "Shift for the loop" (149 pass).
+  - Not checked: a touchpad, ⌘ on a Mac, the feel of the speed in a real window.
+
+## 2026-11-03: Shift for the loop; a click near a loop edge puts the cursor on it
+
+- **What:**
+  - **A click on the waveform always seeks,** even on a loop edge. A click within 6 px of one puts the cursor exactly on the loop's start or end. Dragging from there scrubs.
+  - **Shift is for the loop:** Shift+drag near an edge moves that edge; Shift+drag anywhere else draws a new loop, as before. The resize cursor shows near an edge only while Shift is held.
+- **Why:** the owner: "loop handles don't allow me to put the playhead at the beginning or the end of the loop, it's obstructed", and "let's use Shift for when you want to do something with the loop". Added to 0.3.0's scope that day; the owner chose the exact landing on the edge.
+- **How:** `bindPointerSeek()` in `src/waveform.js`: a press grabs an edge only with Shift. Without it, a seek that starts near an edge seeks to that edge's time while the pointer is still where it was pressed. The hover keeps whether Shift is down, and a window `keydown` / `keyup` for Shift updates the cursor without the mouse moving.
+- **Where:** `src/waveform.js`, `src/config.js` (the `edgeGrabPx` comment), `README.md`, `docs/glossary.md` (Loop). Tests: `tests/e2e/03-audio-and-loop.cjs`.
+- **Verified by:**
+  - e2e 03: Shift+drag moves B, then A; a plain click 4 px inside either edge puts the cursor exactly on it and leaves the loop as it was; a plain drag from an edge scrubs and leaves the edge; a Shift+drag while playing changes the loop as it goes.
+  - `TB_TOPICS=03,06,13,14 npm test`: 149 pass, 3 fail, all in topic 03's live drag, which still pressed without Shift (the test fixed); then `TB_TOPICS=03 npm test`: 49 pass, with 405 unit and 28 smoke.
+  - Not checked: the Shift cursor in a real window (left for the owner, `npm start`).
+
 ## 2026-11-03: AI stem separation: six stems in the Mixer
 
 - **What:**

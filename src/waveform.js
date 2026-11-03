@@ -31,7 +31,7 @@ import { drawWaveform } from "./waveform-draw.js";
  *
  * The A–B loop is drawn as a <div part="loop-region"> inside WaveSurfer's
  * wrapper (styled from style.css with ::part), positioned in percent so it
- * follows zoom and scrolling. Shift+drag draws a loop and dragging near
+ * follows zoom and scrolling. Shift+drag draws a loop and Shift+drag near
  * an edge moves that edge (both snap to beats close by, through the `snap`
  * option, unless Alt is held). The loop goes to onLoopChange as the drag
  * goes (once per frame), so playback follows the pointer live; the region
@@ -49,7 +49,7 @@ import { drawWaveform } from "./waveform-draw.js";
  * beneath it (paging, zoom, scrolling), its time changing instead.
  *
  * The wheel on the waveform zooms, keeping the spot under the mouse in
- * place; the wheel on the minimap scrolls the view. After the view is
+ * place; with Ctrl, and on the minimap, it scrolls the view. After the view is
  * moved by hand (zoom, wheel, minimap),
  * following the playback cursor pauses until the cursor comes back into
  * view or resumeFollow() is called (on every seek), so you can look ahead
@@ -111,6 +111,7 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   let stemsElement = null;
   let hoverLine = null; // { line, label, text, flip }
   let hoverX = null; // pointer x of the mouse hovering the waveform (no drag), or null
+  let shiftHeld = false; // Shift is down: a press near a loop edge would grab it
   const viewEvents = createEmitter(); // "view", after the view changed
   /** @type {Appearance} */
   let appearance = /** @type {Appearance} */ (defaultsOf(waveformPrefs));
@@ -334,7 +335,8 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       if (pointerId !== null) scrollNearEdge(x);
 
       const time = timeAtClientX(x);
-      if (drag.mode === "seek") onSeek(time);
+      // A press near a loop edge seeks exactly to it; dragging on scrubs.
+      if (drag.mode === "seek") onSeek(x === drag.pressX && drag.edgeTime !== null ? drag.edgeTime : time);
       else {
         drag.draft = draftLoop(snapped(time));
         // Playback follows at once: the loop is where the pointer is now,
@@ -352,13 +354,17 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
       if (event.button !== 0 || !duration) return;
       event.preventDefault();
 
-      // Shift draws a loop anywhere; otherwise a loop edge is moved, and
-      // anywhere else seeks.
-      const edge = event.shiftKey ? null : loopEdgeAt(event.clientX);
+      // Shift is for the loop: near an edge it moves that edge, anywhere
+      // else it draws a new loop. Without Shift a press seeks, so the loop's
+      // edges never stand in the way of putting the cursor on them.
+      const edge = loopEdgeAt(event.clientX);
       free = event.altKey;
-      if (edge) drag = { mode: "edge", fixed: edge === "start" ? loop.end : loop.start };
+      if (event.shiftKey && edge) drag = { mode: "edge", fixed: edge === "start" ? loop.end : loop.start };
       else if (event.shiftKey) drag = { mode: "draw", anchor: snapped(timeAtClientX(event.clientX)) };
-      else drag = { mode: "seek" };
+      else {
+        const edgeTime = edge === null ? null : edge === "start" ? loop.start : loop.end;
+        drag = { mode: "seek", pressX: event.clientX, edgeTime };
+      }
 
       pointerId = event.pointerId;
       container.setPointerCapture(pointerId);
@@ -376,8 +382,19 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     container.addEventListener(hoverEvent, (/** @type {PointerEvent} */ event) => {
       if (pointerId !== null) return;
       hoverX = event.clientX;
+      shiftHeld = event.shiftKey;
       refreshHover();
     });
+
+    // Pressing or letting go of Shift over the waveform changes the cursor
+    // at once, without waiting for the mouse to move.
+    for (const type of ["keydown", "keyup"])
+      window.addEventListener(type, (/** @type {KeyboardEvent} */ event) => {
+        if (event.key !== "Shift") return;
+        shiftHeld = type === "keydown";
+        if (hoverX !== null) refreshHover();
+      });
+    window.addEventListener("blur", () => (shiftHeld = false));
 
     // Drag moves are applied once per frame.
     container.addEventListener("pointermove", (event) => {
@@ -542,10 +559,10 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
   }
 
   // Places the hover line at the mouse again, and shows the resize cursor
-  // when it is near a loop edge.
+  // when it is near a loop edge with Shift held (which grabs it).
   function refreshHover() {
     renderHoverLine(hoverX);
-    container.classList.toggle("near-loop-edge", hoverX !== null && loopEdgeAt(hoverX) !== null);
+    container.classList.toggle("near-loop-edge", shiftHeld && hoverX !== null && loopEdgeAt(hoverX) !== null);
   }
 
   /* ---------- Zoom / scroll ---------- */
@@ -576,9 +593,10 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     setScroll(waveSurfer.getScroll() + (clientXAt(anchorTime) - clientX));
   }
 
-  // The wheel zooms at the pointer (a touchpad pinch arrives as a wheel
-  // with ctrlKey, and zooms the same way); a touchpad's sideways swipe
-  // scrolls.
+  // The wheel zooms at the pointer; with Ctrl (⌘ on a Mac) it scrolls the
+  // view instead, as on the minimap, either direction. A touchpad's
+  // sideways swipe scrolls. A touchpad pinch arrives as a wheel with
+  // ctrlKey too, so it scrolls: the owner chose Ctrl over the pinch.
   // The lanes above the waveform use the same handler.
   /** @param {WheelEvent} event */
   function wheel(event) {
@@ -587,7 +605,8 @@ export function createWaveform({ container, minimapContainer, onSeek, onLoopChan
     if (fitLocked) return;
 
     followPaused = true;
-    if (Math.abs(event.deltaY) >= Math.abs(event.deltaX)) zoomBy(Math.exp(-event.deltaY * 0.001), event.clientX);
+    if (event.ctrlKey || event.metaKey) setScroll(waveSurfer.getScroll() + (event.deltaY || event.deltaX));
+    else if (Math.abs(event.deltaY) >= Math.abs(event.deltaX)) zoomBy(Math.exp(-event.deltaY * 0.001), event.clientX);
     else setScroll(waveSurfer.getScroll() + event.deltaX);
   }
 

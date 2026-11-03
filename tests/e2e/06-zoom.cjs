@@ -169,6 +169,21 @@ module.exports = async function (h) {
     const c1 = await scroll();
     await ensurePaused();
     check("minimap wheel pauses following", c0 === c1, `${c0} → ${c1}`);
+    // Ctrl+wheel on the waveform scrolls as the minimap does (back, here).
+    wc.sendInputEvent({
+      type: "mouseWheel",
+      x: ax,
+      y: ay,
+      deltaX: 0,
+      deltaY: -800 * zoomSign,
+      modifiers: ["control"],
+    });
+    await sleep(100);
+    check(
+      "ctrl+wheel on the waveform scrolls, doesn't zoom",
+      (await scroll()) < c1 && Math.abs((await view()).ww - widthBefore) < 1,
+      `${c1} → ${await scroll()}`,
+    );
     for (let i = 0; i < 20; i++) wheel(ax, ay, -300 * zoomSign);
     await sleep(200);
   }
