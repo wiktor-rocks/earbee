@@ -69,9 +69,13 @@
      src/themes/index.js) */
   --mark-rose: #ff7aa2;
   --mark-orange: #ff9f43;
+  --mark-yellow: #f0e04a;
+  --mark-lime: #a6e05a;
   --mark-green: #5fd38d;
+  --mark-teal: #36d6c8;
   --mark-blue: #6ea8ff;
   --mark-violet: #b88cff;
+  --mark-magenta: #f07ae0;
   --mark-grey: #aab2c0;
 
   /* Play (green) and Stop (red) in the transport: the same in every theme,

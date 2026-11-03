@@ -43,6 +43,30 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-04: More mark colours, picked at random
+
+- **What:**
+  - **Ten mark colours instead of six:** yellow, lime, teal and magenta join rose, orange, green, blue, violet and grey.
+  - **A new mark's colour is picked at random** among the least used so far, but never that of the two marks before it or the two after it in time, nor of the mark made just before. So marks side by side always differ, and the colours spread over the song. A downloaded video's chapters are picked the same way (they went through the colours in order).
+  - A click on a mark's colour still steps through all of them in order.
+- **Why:** the owner: "The mark colours should be distinct… 8 is not enough, make it semi random". Six colours in a fixed order repeated every sixth mark.
+- **How:**
+  - `MARK_COLORS` (`src/themes/index.js`) has the new colours, each with a shade for dark themes and one for light ones, and their `--mark-*` defaults in style.css.
+  - Two more were tried and dropped, because they couldn't be told apart in light themes' shades:
+    - indigo, too close to blue and violet;
+    - a brown or clay, which on a light theme is either too pale or too close to orange and the yellow's olive.
+  - `nextColor()` in the marks store (`src/marks/index.js`) picks the colour; `createMarks` takes a `random` the tests can fix. `importChapters` (`src/features/marks.js`) no longer gives a colour.
+  - Projects keep a mark's colour by its id, as before: the old six are all still there.
+- **Where:** `src/themes/index.js`, `style.css` (the `--mark-*` tokens), `src/marks/index.js`, `src/features/marks.js`, `src/app.js` (COMMON CHANGES). Tests: `tests/unit/marks.test.mjs`, `tests/unit/themes.test.mjs`, `tests/e2e/09-downloads.cjs`.
+- **Verified by:**
+  - Unit (407 pass):
+    - every colour readable (3:1) on every theme's background and panels, in its shade;
+    - every pair apart (RGB distance ≥ 60) in both shades;
+    - ten marks use all ten colours once;
+    - after 60 more at random times, no two neighbours share a colour, and the counts stay within 3 of each other.
+  - e2e: `TB_TOPICS=03,09,14 npm test` (141 pass), then `TB_TOPICS=03,09` after the chapters change (100 pass, the chapters magenta, violet, blue).
+  - Not checked: the new colours by eye on the waveform, in dark and light themes.
+
 ## 2026-11-04: The side panel scrolls as one
 
 - **What:** when the side panel's sections don't fit, the whole panel scrolls, the sound sections and the marks alike. Before, the sound sections scrolled on their own above the marks (and below them, when some were moved under the marks). The marks section still keeps at least 180 px, with its list scrolling inside it.

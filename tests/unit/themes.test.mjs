@@ -91,6 +91,18 @@ describe("every theme", () => {
   }
 });
 
+describe("the marks' colours", () => {
+  test("are all apart from one another, in both shades", () => {
+    assert.equal(new Set(MARK_COLORS.map((color) => color.id)).size, MARK_COLORS.length);
+    for (const shade of ["dark", "light"])
+      for (const [i, a] of MARK_COLORS.entries())
+        for (const b of MARK_COLORS.slice(i + 1)) {
+          const away = distance(a[shade], b[shade]);
+          assert.ok(away >= 60, `${a.id} and ${b.id} (${shade}) too alike (${away.toFixed(0)})`);
+        }
+  });
+});
+
 describe("cssVariables", () => {
   test("sets every variable, deriving the optional ones", () => {
     const nord = getTheme("nord");

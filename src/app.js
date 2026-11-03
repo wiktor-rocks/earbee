@@ -237,7 +237,9 @@
  *                             percent of it; a .timeline row in index.html.
  *   Mark colours              MARK_COLORS (src/themes/index.js), and the
  *                             --mark-* defaults in style.css; the unit tests
- *                             check each is visible on every theme.
+ *                             check each is visible on every theme and
+ *                             apart from the others. A new mark's colour
+ *                             is picked in nextColor() (src/marks).
  *   Saving something new in   Add a section to SECTIONS (features/project/
  *   project files (.ebee)     sections.js): capture() and restore(), its own
  *                             version, and whether changing it is an unsaved

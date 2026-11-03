@@ -10,10 +10,12 @@ import { THEMES } from "./palettes.js";
 
 export { THEMES };
 
-// The colours a mark on the waveform can have (see src/marks). Unlike a
-// theme's roles they're the same in every theme, with one shade for dark
-// themes and one for light ones; cssVariables() sets them as --mark-<id>.
-// The unit tests check each is visible on every theme.
+// The colours a mark on the waveform can have (see src/marks), in the
+// order a click on a mark's colour steps through them. Unlike a theme's
+// roles they're the same in every theme, with one shade for dark themes
+// and one for light ones; cssVariables() sets them as --mark-<id>. The
+// unit tests check each is visible on every theme, and that they're all
+// apart from one another.
 
 /** @typedef {{ id: string, name: string, dark: string, light: string }} MarkColor */
 
@@ -21,9 +23,13 @@ export { THEMES };
 export const MARK_COLORS = [
   { id: "rose", name: "Rose", dark: "#ff7aa2", light: "#c2185b" },
   { id: "orange", name: "Orange", dark: "#ff9f43", light: "#b35400" },
+  { id: "yellow", name: "Yellow", dark: "#f0e04a", light: "#7e7432" },
+  { id: "lime", name: "Lime", dark: "#a6e05a", light: "#557f00" },
   { id: "green", name: "Green", dark: "#5fd38d", light: "#2e7d32" },
+  { id: "teal", name: "Teal", dark: "#36d6c8", light: "#00796b" },
   { id: "blue", name: "Blue", dark: "#6ea8ff", light: "#1f5fbf" },
   { id: "violet", name: "Violet", dark: "#b88cff", light: "#7b3fbf" },
+  { id: "magenta", name: "Magenta", dark: "#f07ae0", light: "#a3209a" },
   { id: "grey", name: "Grey", dark: "#aab2c0", light: "#5f6673" },
 ];
 

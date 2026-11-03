@@ -4,8 +4,9 @@ import { describe, test } from "node:test";
 import { MARKS_VERSION, MarksFormatError, createMarks, parseMarks } from "../../src/marks/index.js";
 import { DEFAULT_MARK_COLOR, MARK_COLORS } from "../../src/themes/index.js";
 
-const track = (duration = 60) => {
-  const marks = createMarks({ minSeconds: 0.05 });
+// random() always 0: a new mark takes the first colour it may have.
+const track = (duration = 60, random = () => 0) => {
+  const marks = createMarks({ minSeconds: 0.05, random });
   marks.reset(duration);
   return marks;
 };
@@ -19,7 +20,7 @@ describe("the marks store", () => {
     assert.deepEqual(a, { id: "m1", start: 10, end: null, label: "Mark 1", color: DEFAULT_MARK_COLOR });
     assert.deepEqual([b.start, b.end, b.label], [4, 8, "Region 1"]);
     assert.equal(c.label, "Mark 2");
-    // Each new mark takes the colour after the newest one's.
+    // With random() at 0, each takes the first colour not used close by.
     assert.deepEqual(
       [a, b, c].map((mark) => mark.color),
       MARK_COLORS.slice(0, 3).map((color) => color.id),
@@ -28,6 +29,18 @@ describe("the marks store", () => {
       marks.list().map((mark) => mark.id),
       ["m3", "m2", "m1"],
     );
+  });
+
+  test("new marks' colours: never a neighbour's or the newest's, the least used first", () => {
+    const marks = track(600, Math.random);
+    for (let i = 0; i < MARK_COLORS.length; i++) marks.addPoint(i * 10);
+    assert.equal(new Set(marks.list().map((mark) => mark.color)).size, MARK_COLORS.length, "all used once");
+    // More, in between and anywhere: marks close in time always differ.
+    for (let i = 0; i < 60; i++) marks.addPoint(Math.random() * 600);
+    const list = marks.list();
+    for (let i = 1; i < list.length; i++) assert.notEqual(list[i].color, list[i - 1].color, `marks ${i - 1} and ${i}`);
+    const counts = MARK_COLORS.map((color) => list.filter((mark) => mark.color === color.id).length);
+    assert.ok(Math.max(...counts) - Math.min(...counts) <= 3, `spread: ${counts}`);
   });
 
   test("a point sorts before a region starting at the same time", () => {

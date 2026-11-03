@@ -59,17 +59,16 @@ export function resetMarks(duration, saved) {
 }
 
 /**
- * A downloaded video's chapters, as regions named after them, in turn
- * through the mark colours so neighbours (which meet end to start) are
- * told apart. The store keeps them inside the track and drops ones too
- * short. Returns how many were added.
+ * A downloaded video's chapters, as regions named after them, each in a
+ * colour the store picks (never a neighbour's, so chapters that meet end
+ * to start are told apart). The store keeps them inside the track and
+ * drops ones too short. Returns how many were added.
  * @param {{ start: number, end: number, title: string }[]} chapters
  */
 export function importChapters(chapters) {
   let added = 0;
   for (const { start, end, title } of chapters) {
-    const color = MARK_COLORS[added % MARK_COLORS.length].id;
-    if (marks.addRegion(start, end, { label: title, color })) added++;
+    if (marks.addRegion(start, end, { label: title })) added++;
   }
   return added;
 }

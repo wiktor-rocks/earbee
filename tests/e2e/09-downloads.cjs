@@ -242,7 +242,11 @@ module.exports = async function (h) {
         JSON.stringify(["Intro 0:00.000 – 0:02.000", "Verse 0:02.000 – 0:04.500", "Outro 0:04.500 – 0:06.000"]),
       JSON.stringify(chapters),
     );
-    check("…each in the next colour", new Set(chapters.map((mark) => mark.color)).size === 3, JSON.stringify(chapters));
+    check(
+      "…each in a colour of its own",
+      new Set(chapters.map((mark) => mark.color)).size === 3,
+      JSON.stringify(chapters),
+    );
     check(
       "…a notification says so, and they aren't an unsaved change",
       (await toasts()).some((t) => t.text === "Added 3 chapters as marks") &&

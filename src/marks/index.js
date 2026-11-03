@@ -116,14 +116,18 @@ export function parseMarks(data, limits) {
 /* ---------- The store ---------- */
 
 const DEFAULT_LABELS = { point: "Mark", region: "Region" };
+// A new mark's colour differs from this many marks on either side of it.
+const NEIGHBOURS = 2;
 // "Previous" and "next" skip a mark this close to the time (rounding).
 const SAME_TIME = 1e-3;
 
 /**
  * @param {object} [options]
  * @param {number} [options.minSeconds] The shortest region.
+ * @param {() => number} [options.random] Picks new marks' colours (the
+ *   tests pass their own).
  */
-export function createMarks({ minSeconds = 0.05 } = {}) {
+export function createMarks({ minSeconds = 0.05, random = Math.random } = {}) {
   const events = createEmitter();
   let duration = 0;
   /** @type {Mark[]} */
@@ -147,20 +151,35 @@ export function createMarks({ minSeconds = 0.05 } = {}) {
     return `${prefix} ${Math.max(0, ...numbers.map((match) => Number(match[1]))) + 1}`;
   }
 
-  // The colour after the newest mark's, in MARK_COLORS' order (the first
-  // once there are none), so marks made one after another differ.
-  function nextColor() {
+  // A new mark's colour, at `start`: one at random among those the least
+  // used so far, but never that of a mark close by in time (NEIGHBOURS on
+  // either side) or of the newest mark. So marks side by side, or made one
+  // after another, always differ, and the colours spread over the track.
+  function nextColor(start) {
+    const after = marks.findIndex((mark) => mark.start > start);
+    const at = after < 0 ? marks.length : after;
     const newest = marks.reduce((a, b) => (idNumber(b) > idNumber(a) ? b : a), marks[0]);
-    if (!newest) return DEFAULT_MARK_COLOR;
-    const index = MARK_COLORS.findIndex((color) => color.id === newest.color);
-    return MARK_COLORS[(index + 1) % MARK_COLORS.length].id;
+    const avoid = new Set(
+      [...marks.slice(Math.max(0, at - NEIGHBOURS), at + NEIGHBOURS), newest].filter(Boolean).map((mark) => mark.color),
+    );
+    const ids = MARK_COLORS.map((color) => color.id);
+    const allowed = ids.filter((id) => !avoid.has(id));
+    const uses = (id) => marks.filter((mark) => mark.color === id).length;
+    const fewest = Math.min(...allowed.map(uses));
+    const choices = allowed.filter((id) => uses(id) === fewest);
+    return choices[Math.min(Math.floor(random() * choices.length), choices.length - 1)];
   }
 
   /** @param {{ start: number, end: number | null, label?: string, color?: string }} fields */
   function add(fields) {
     const shape = fields.end === null ? "point" : "region";
     const mark = normalizeMark(
-      { label: nextLabel(shape), color: nextColor(), ...fields, id: `m${lastId + 1}` },
+      {
+        label: nextLabel(shape),
+        color: nextColor(Math.min(fields.start, fields.end ?? fields.start)),
+        ...fields,
+        id: `m${lastId + 1}`,
+      },
       limits(),
     );
     if (!mark || isRegion(mark) !== (shape === "region")) return null; // a region too short
