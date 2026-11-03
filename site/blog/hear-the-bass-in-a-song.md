@@ -3,7 +3,6 @@ title: "How to hear the bass in a song (and learn the bass line)"
 description: "Can't hear the bass in a song? Why it hides, and how to bring it out: the right headphones, an EQ, an octave up, the drums and the chords' roots."
 keyword: "how to hear the bass in a song"
 date: 2026-11-03
-draft: true
 ---
 
 To hear the bass in a song, first give it a chance to be heard: listen on headphones or speakers that can play low notes, turn the low end up and the rest down, and shift the recording up an octave so the bass moves to where your ear hears detail. Then follow the kick drum for the rhythm and the chords for the notes, one short loop at a time. Below: why the bass is so hard to hear, each of these in turn, and how to go from hearing the bass line to playing it.
