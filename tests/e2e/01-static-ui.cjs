@@ -9,7 +9,7 @@ module.exports = async function (h) {
   check(
     "every slider has a knob",
     await js(
-      `["speed", "volume", "semitoneShift", "centShift", "eqLow", "eqLowMid", "eqMid", "eqHighMid", "eqHigh", "eqFocusLow", "eqFocusHigh"].every((id) => document.getElementById(id).parentElement.matches(".knob"))`,
+      `["speed", "volume", "balance", "semitoneShift", "centShift", "eqLow", "eqLowMid", "eqMid", "eqHighMid", "eqHigh", "eqFocusLow", "eqFocusHigh"].every((id) => document.getElementById(id).parentElement.matches(".knob"))`,
     ),
   );
   check(

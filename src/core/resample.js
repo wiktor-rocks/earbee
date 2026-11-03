@@ -42,17 +42,22 @@ function bessel0(x) {
  * samples have come in (before that, the resampler assumes silence where
  * the whole stream had samples). That's how a part of a track is
  * resampled on its own (audio/beat-worker.js).
+ *
+ * `zeroCrossings` sets the filter's length: the default is tuned for the
+ * beat model (above); fewer is faster, with a wider transition just under
+ * the cut-off (the stems use fewer: CONFIG.stems.resampleZeroCrossings).
  * @param {number} fromRate
  * @param {number} toRate
+ * @param {number} [zeroCrossings]
  */
-export function resampleRatio(fromRate, toRate) {
+export function resampleRatio(fromRate, toRate, zeroCrossings = ZERO_CROSSINGS) {
   const divisor = gcd(fromRate, toRate);
   const up = toRate / divisor; // L
   const down = fromRate / divisor; // M
   if (up === down) return { up, down, reach: 0 };
   // Cycles per input sample.
   const cutoff = 0.5 * Math.min(1, up / down) * ROLLOFF;
-  const reach = 2 * Math.ceil(ZERO_CROSSINGS / (4 * cutoff)); // input samples either side (even)
+  const reach = 2 * Math.ceil(zeroCrossings / (4 * cutoff)); // input samples either side (even)
   return { up, down, reach, cutoff };
 }
 
@@ -60,8 +65,9 @@ export function resampleRatio(fromRate, toRate) {
  * A streaming resampler from `fromRate` to `toRate` (whole numbers of Hz).
  * @param {number} fromRate
  * @param {number} toRate
+ * @param {number} [zeroCrossings] The filter's length (see resampleRatio).
  */
-export function createResampler(fromRate, toRate) {
+export function createResampler(fromRate, toRate, zeroCrossings = ZERO_CROSSINGS) {
   if (fromRate === toRate) {
     const chunks = [];
     return {
@@ -73,7 +79,7 @@ export function createResampler(fromRate, toRate) {
     };
   }
 
-  const { up, down, reach, cutoff } = resampleRatio(fromRate, toRate);
+  const { up, down, reach, cutoff } = resampleRatio(fromRate, toRate, zeroCrossings);
   const taps = 2 * reach; // a multiple of 4
   const norm = bessel0(KAISER_BETA);
   // weights[phase · taps + k] multiplies input sample base − reach + 1 + k.

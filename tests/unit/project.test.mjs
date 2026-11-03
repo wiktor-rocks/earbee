@@ -10,6 +10,8 @@ import { after, describe, test } from "node:test";
 import {
   PROJECT_VERSION,
   ProjectFormatError,
+  attachBlobs,
+  extractBlobs,
   findHeaderEnd,
   isProjectName,
   parseProject,
@@ -28,9 +30,9 @@ describe("the format", () => {
     const text = serializeProject({ media: { ...MEDIA, embedded: false }, sections, appVersion: "1.2.3" });
     const data = JSON.parse(text);
     assert.equal(data.format, "earbee-project");
-    assert.equal(data.version, PROJECT_VERSION);
+    assert.equal(data.version, 1, "without blobs, version 1: any EarBee reads it");
     assert.equal(data.savedWith, "1.2.3");
-    assert.deepEqual(parseProject(text), { media: { ...MEDIA, embedded: false }, sections });
+    assert.deepEqual(parseProject(text), { media: { ...MEDIA, embedded: false }, sections, blobs: {} });
   });
 
   test("a newer project, something else, or no media: refused", () => {
@@ -51,7 +53,42 @@ describe("the format", () => {
     assert.deepEqual(parseProject(text), {
       media: { name: "a.wav", path: null, relativePath: null, size: 0, duration: 0, embedded: false },
       sections: {},
+      blobs: {},
     });
+  });
+
+  test("blobs: binary data in a section comes out as references, and goes back", () => {
+    const audio = new Uint8Array([1, 2, 3]);
+    const sections = { stems: { version: 1, stems: { audio: { guitar: audio }, list: [new Int16Array([5])] } } };
+    const { sections: plain, blobs } = extractBlobs(sections);
+    assert.deepEqual(plain.stems.stems.audio.guitar, { blob: "stems/stems/audio/guitar" });
+    assert.deepEqual(plain.stems.stems.list, [{ blob: "stems/stems/list/0" }]);
+    assert.deepEqual(
+      blobs.map((blob) => [blob.id, [...blob.bytes]]),
+      [
+        ["stems/stems/audio/guitar", [1, 2, 3]],
+        ["stems/stems/list/0", [5, 0]],
+      ],
+    );
+    assert.equal(sections.stems.stems.audio.guitar, audio, "the sections given are left as they were");
+    const back = attachBlobs(plain, (id) => (id.endsWith("guitar") ? { url: "u" } : null));
+    assert.deepEqual(back.stems.stems.audio.guitar, { url: "u" });
+    assert.deepEqual(back.stems.stems.list, [{ blob: "stems/stems/list/0" }], "unknown: left as it is");
+  });
+
+  test("blobs: a header with them is version 2, and says where each is", () => {
+    const blobs = { "stems/a": { offset: 300, size: 7 } };
+    const text = serializeProject({ media: { ...MEDIA, embedded: true }, sections: {}, blobs });
+    assert.equal(JSON.parse(text).version, 2);
+    assert.equal(PROJECT_VERSION, 2);
+    assert.deepEqual(parseProject(text).blobs, blobs);
+    const odd = JSON.stringify({
+      format: "earbee-project",
+      version: 2,
+      media: MEDIA,
+      blobs: { a: { offset: -1, size: 2 }, b: 5 },
+    });
+    assert.deepEqual(parseProject(odd).blobs, {}, "places that aren't whole numbers from 0 are dropped");
   });
 
   test("the header ends at the first NUL", () => {
@@ -150,6 +187,32 @@ describe("main process", () => {
       projects.save(null, { file: target, mediaUrl: opened.media.url, embed: false, duration: 2, sections }),
       /inside its project/,
     );
+  });
+
+  test("with blobs: stored after the media, each served by URL; the media still ends where it did", async () => {
+    const audio = {
+      vocals: new Uint8Array([9, 8, 7, 6]),
+      guitar: new Uint8Array(Array.from({ length: 50 }, (_, i) => i)),
+    };
+    const withStems = { ...sections, stems: { version: 1, stems: { codec: "opus", audio } } };
+    for (const embed of [false, true]) {
+      const mediaUrl = mediaFiles.share(mediaFile);
+      const target = path.join(folder, `blobs-${embed}.ebee`);
+      await projects.save(null, { file: target, mediaUrl, embed, duration: 2, sections: withStems });
+      const header = await readHeader(target);
+      const parsed = parseProject(header.text);
+      assert.equal(JSON.parse(header.text).version, 2, `version 2 (${embed ? "inside" : "linked"})`);
+      assert.deepEqual(parsed.sections.stems.stems.audio.guitar, { blob: "stems/stems/audio/guitar" });
+      assert.equal(header.fileSize - header.mediaOffset, (embed ? 300 : 0) + 54, "the media, then the blobs");
+
+      const opened = await projects.open(null, target);
+      const back = opened.sections.stems.stems.audio;
+      assert.deepEqual(await body(back.vocals.url), Buffer.from(audio.vocals));
+      assert.deepEqual(await body(back.guitar.url), Buffer.from(audio.guitar));
+      assert.equal(back.guitar.size, 50);
+      assert.deepEqual(opened.sections.marks, sections.marks);
+      assert.deepEqual(await body(opened.media.url), bytes, "the media alone, not the blobs after it");
+    }
   });
 
   test("moved together with its media: found by the relative path", async () => {

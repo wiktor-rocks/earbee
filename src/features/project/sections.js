@@ -11,6 +11,8 @@
 //   dirtyKey()  (optional) something smaller than capture() that changes
 //             whenever it does, for checking for unsaved changes (which
 //             happens after every click)
+//   prepare() (optional) a Promise a save waits for before capture(), for
+//             what is still being made (the stems' copies for saving)
 //   restore(data, track)
 //             brings it back after the project's media has loaded (so it
 //             starts from a new file's defaults). `data` comes from a file,
@@ -28,6 +30,7 @@ import { restoreBeats, savedBeats } from "../beats.js";
 import { resetMarks } from "../marks.js";
 import { getLoopRegion, getStartPoint, setLoopRegion, setStartPoint } from "../playback.js";
 import { getTimelineShare, setTimelineShare } from "../stage-split.js"; // Stage split (src/features/stage-split.js)
+import { stemsSection } from "../stems/project.js"; // Stems (src/features/stems/)
 
 /**
  * @typedef {object} Section
@@ -37,10 +40,12 @@ import { getTimelineShare, setTimelineShare } from "../stage-split.js"; // Stage
  * @property {boolean} dirties
  * @property {() => object} capture
  * @property {() => any} [dirtyKey]
+ * @property {() => Promise<unknown>} [prepare]
  * @property {(data: any, track: { duration: number }) => void} restore
  */
 
-const SOUND_SLIDERS = ["speed", "volume", "semitones", "cents"];
+// (A project from before the Balance has none: it stays centred.)
+const SOUND_SLIDERS = ["speed", "volume", "balance", "semitones", "cents"];
 const finite = (value) => Number.isFinite(value);
 const timeIn = (value, duration) => (finite(value) ? clamp(value, 0, duration) : null);
 // Times to the millisecond, enough for a beat, and a much shorter file.
@@ -187,4 +192,7 @@ export const SECTIONS = [
       if (finite(data.timelineShare)) setTimelineShare(data.timelineShare);
     },
   },
+  // Stems (src/features/stems/): the stems as Opus, in the file after its
+  // header, and their mix; not with the feature off.
+  ...(CONFIG.stems.enabled ? [stemsSection] : []),
 ];

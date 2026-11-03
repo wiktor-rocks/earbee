@@ -12,6 +12,8 @@ export const CONFIG = {
     dockPresets: [0.5, 0.75, 1],
   },
   volume: { min: 0, max: 200, step: 1, initial: 100 }, // percent
+  // The Mixer's Balance: percent, -100 (only the left) … 100 (only the right).
+  balance: { min: -100, max: 100, step: 1, initial: 0 },
   semitones: { min: -12, max: 12, step: 1, initial: 0 },
   cents: { min: -50, max: 50, step: 1, initial: 0 },
 
@@ -249,4 +251,62 @@ export const CONFIG = {
   // The notifications (ui/toast.js): how long one shows, and how many at
   // once (a new one pushes out the oldest).
   notifications: { showMs: 4000, max: 3 },
+
+  // Stems (src/features/stems/): the open song split into its instruments
+  // by the stem model (electron/stems/). Off, none of it loads: no section
+  // in the panel, nothing asked of the main process.
+  stems: {
+    enabled: true,
+    // In the panel's order; `id` is the model's name for it. "other" is
+    // whatever the model didn't put in the rest.
+    list: [
+      { id: "vocals", label: "Vocals" },
+      { id: "drums", label: "Drums" },
+      { id: "bass", label: "Bass" },
+      { id: "guitar", label: "Guitar" },
+      { id: "piano", label: "Piano" },
+      { id: "other", label: "Other" },
+    ],
+    // Each stem's volume knob: 1 is the stem as separated, 2 twice as loud
+    // (as the Mixer's own Volume goes to 200 %).
+    volume: { min: 0, max: 2, step: 0.01, initial: 1 },
+    // Each stem's pan knob: percent, -100 (all left) … 100 (all right).
+    pan: { min: -100, max: 100, step: 1, initial: 0 },
+    // A project keeps the stems as Opus at this bitrate (stems/opus.js):
+    // about 6 MB a stem for a 4-minute song.
+    bitrate: 192_000,
+    // The model hears 44.1 kHz; a song at another rate is resampled for it.
+    sampleRate: 44100,
+    // The stems' resampling (to and from Opus's 48 kHz, and to the song's
+    // rate) uses a shorter filter than the beat model's (core/resample.js):
+    // as accurate up to 19 kHz, 2.2× faster (measured: 48.3 dB against
+    // 48.6 for a round trip; 16 lost the top, at 41 dB).
+    resampleZeroCrossings: 24,
+    // This many workers encode new stems for saving, or decode a project's,
+    // at once (at most half the cores), so playback keeps its share of the CPU.
+    workers: 3,
+    // Samples per message to and from the stem process (4 MB), so no
+    // message holds a whole song.
+    chunk: 1 << 20,
+    // The stems are kept in 16 bits from -headroom to +headroom: one scale
+    // for every stem and song, known before any of it is separated (a stem
+    // can be louder than the song where others cancel it out).
+    headroom: 2,
+    // Separating starts with the loop; without one, with this much of the
+    // song around the playhead (seconds before and after it).
+    firstPart: { before: 5, after: 20 },
+    // The loop alone holds its stems in a window this many seconds wider
+    // on each side (every segment touching it, 7.8 s, ends within it).
+    window: 8,
+    // A song is separated, or a project's stems brought back, only if what
+    // they'd take (stems/memory.js) fits in `share` of the memory available
+    // (as a track: CONFIG.audio.maxMemoryShare), or where that can't be
+    // told (macOS), in `totalShare` of all of it. `model`: the stem
+    // model's working memory for a segment (about 2 GB: electron/stems/process.js).
+    // `blend`: the stem process's blend around the segments still to do
+    // (electron/stems/separate.js, keepFor): about 3.4 MB a block, a few
+    // blocks at each edge of what's done, a little more if the loop moved
+    // to another part meanwhile.
+    memory: { model: 2e9, blend: 100e6, share: 0.8, totalShare: 0.5 },
+  },
 };

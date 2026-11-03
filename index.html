@@ -26,6 +26,8 @@
     <link rel="stylesheet" href="style.css" />
     <!-- Video window (src/features/video-window/) -->
     <link rel="stylesheet" href="src/features/video-window/video-window.css" />
+    <link rel="stylesheet" href="src/features/stems/stems.css" />
+    <!-- Stems (src/features/stems/) -->
   </head>
 
   <body>
@@ -537,14 +539,28 @@
               </div>
             </div>
 
-            <div class="dock-group volume-group">
+            <!-- The Mixer: the volume and balance, then the stems. -->
+            <div class="dock-group mixer-group">
+              <div class="dock-title">
+                <h2>Mixer</h2>
+              </div>
               <div class="knob-cell">
-                <input id="volume" type="range" aria-labelledby="volumeTitle" />
+                <input id="volume" type="range" />
                 <div class="knob-text">
-                  <h2 id="volumeTitle">Volume</h2>
+                  <label for="volume">Volume</label>
                   <output id="volumeValue" class="knob-value">100%</output>
                 </div>
               </div>
+              <div class="knob-cell">
+                <input id="balance" type="range" />
+                <div class="knob-text">
+                  <label for="balance">Balance</label>
+                  <output id="balanceValue" class="knob-value">Centre</output>
+                </div>
+              </div>
+              <!-- Stems (src/features/stems/): the song split into its
+                   instruments; filled in by the feature (removed when it's off). -->
+              <div id="stemsSection" class="stems-part" hidden></div>
             </div>
 
             <div id="eqSection" class="dock-group eq-group bypassed">

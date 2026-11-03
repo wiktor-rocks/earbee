@@ -9,6 +9,7 @@ import { createMarks } from "./marks/index.js";
 export const settings = {
   speed: CONFIG.speed.initial,
   volume: CONFIG.volume.initial, // percent
+  balance: CONFIG.balance.initial, // percent, -100 (left) … 100 (right)
   semitones: CONFIG.semitones.initial,
   cents: CONFIG.cents.initial,
   eqEnabled: CONFIG.eq.enabledInitially,

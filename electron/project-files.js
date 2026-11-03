@@ -14,9 +14,11 @@
 //                   it), then where it was; if it's in neither, the user is
 //                   asked where it is.
 //   save            the header the page sends, plus the media's bytes when
-//                   it goes inside, written to a temporary file then renamed
-//                   over the target, so a crash never leaves half a file.
-//                   With no path yet, the native Save dialog asks for one.
+//                   it goes inside, then the sections' binary data (blobs:
+//                   src/project/format.js), written to a temporary file then
+//                   renamed over the target, so a crash never leaves half a
+//                   file. With no path yet, the native Save dialog asks for one.
+//                   Opening, each blob is served by URL, as the media is.
 //   confirm         Save / Don't save / Cancel, before unsaved changes are lost.
 //   dirty, close    whether the page has unsaved changes, for guardClose().
 //
@@ -136,13 +138,25 @@ function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
     async open(sender, file) {
       if (!project.isProjectName(file)) throw new project.ProjectFormatError("This isn't a EarBee project.");
       const header = await readHeader(file);
-      const { media, sections } = project.parseProject(header.text);
+      const { media, sections: saved, blobs } = project.parseProject(header.text);
+      const payload = header.mediaOffset; // where the media and blobs start
+      // Each blob, as a slice of the project to read it from.
+      const sections = project.attachBlobs(saved, (id) => {
+        const place = blobs[id];
+        if (!place || payload === null || payload + place.offset + place.size > header.fileSize) return null;
+        return {
+          url: mediaFiles.share(file, { offset: payload + place.offset, size: place.size, name: id }),
+          size: place.size,
+        };
+      });
       const opened = { ok: true, path: file, name: path.basename(file), sections, embedded: media.embedded };
       // The media inside is served as a slice of the project; a linked file whole.
       if (media.embedded) {
-        if (header.mediaOffset === null)
+        if (payload === null)
           throw new project.ProjectFormatError("This project should have its song or video inside, but it's missing.");
-        const slice = { offset: header.mediaOffset, size: header.fileSize - header.mediaOffset, name: media.name };
+        // With blobs after it, the media ends at its size; before blobs, at the end of the file.
+        const size = Object.keys(blobs).length ? media.size : header.fileSize - payload;
+        const slice = { offset: payload, size, name: media.name };
         const url = mediaFiles.share(file, slice);
         return { ...opened, media: { name: media.name, url }, linkable: false, relinked: false };
       }
@@ -190,20 +204,30 @@ function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
         duration,
         embedded: embed,
       };
-      const headerBytes = Buffer.from(project.serializeProject({ media, sections, appVersion }), "utf8");
+      // The sections' binary data goes after the media, each at its place.
+      const { sections: plain, blobs } = project.extractBlobs(sections);
+      let at = embed ? size : 0;
+      const places = Object.fromEntries(
+        blobs.map(({ id, bytes }) => {
+          const place = { offset: at, size: bytes.byteLength };
+          at += bytes.byteLength;
+          return [id, place];
+        }),
+      );
+      const header = project.serializeProject({ media, sections: plain, blobs: places, appVersion });
+      const headerBytes = Buffer.from(header, "utf8");
 
       const temporary = `${target}.${process.pid}-${Date.now()}.tmp`;
       try {
         await fs.promises.writeFile(temporary, headerBytes);
-        if (embed) {
-          await fs.promises.appendFile(temporary, Buffer.from([project.MEDIA_SEPARATOR]));
-          if (size > 0) {
-            await pipeline(
-              fs.createReadStream(source.path, { start: source.offset, end: source.offset + size - 1 }),
-              fs.createWriteStream(temporary, { flags: "a" }),
-            );
-          }
+        if (embed || blobs.length) await fs.promises.appendFile(temporary, Buffer.from([project.MEDIA_SEPARATOR]));
+        if (embed && size > 0) {
+          await pipeline(
+            fs.createReadStream(source.path, { start: source.offset, end: source.offset + size - 1 }),
+            fs.createWriteStream(temporary, { flags: "a" }),
+          );
         }
+        for (const { bytes } of blobs) await fs.promises.appendFile(temporary, bytes);
         await replaceFile(temporary, target);
       } catch (error) {
         await fs.promises.rm(temporary, { force: true });
@@ -274,33 +298,48 @@ function handleProjects(ipcMain, projectFiles, { mediaFiles, dialogs, state }) {
  * Before `win` closes with unsaved changes: Save / Don't save / Cancel.
  * Save asks the page to save, which closes the window once it has
  * ("project:close"); Cancel keeps it open.
+ *
+ * And first, while something that closing would stop is still running
+ * (`busy`: Stems (src/features/stems/), a separation or the model's
+ * download): close anyway, or keep it running. Closing anyway goes on to
+ * the unsaved changes; the window closing is what stops it.
  * @param {import("electron").BrowserWindow} win
  * @param {object} options
  * @param {import("electron").IpcMain} options.ipcMain
- * @param {ProjectDialogs} options.dialogs
+ * @param {ProjectDialogs & { confirmBusy?: (sender: any, what: string) => Promise<boolean> }} options.dialogs
  * @param {Map<number, { dirty: boolean, name: string }>} options.state
+ * @param {(contents: any) => string | null} [options.busy] What is running for this page, or null.
  */
-function guardClose(win, { ipcMain, dialogs, state }) {
+function guardClose(win, { ipcMain, dialogs, state, busy = () => null }) {
   const contents = win.webContents;
   const id = contents.id;
   let asking = false;
+  let leaving = false; // everything asked: the next close goes through
   // A reload starts the page afresh: nothing unsaved.
   contents.on("did-start-navigation", (details) => {
     if (details.isMainFrame && !details.isSameDocument) state.delete(id);
   });
   win.on("closed", () => state.delete(id));
+  const leave = () => {
+    leaving = true;
+    win.close();
+  };
   win.on("close", async (event) => {
+    if (leaving) return;
+    const running = busy(contents);
     const page = state.get(id);
-    if (!page?.dirty) return;
+    if (!running && !page?.dirty) return;
     event.preventDefault();
     if (asking) return;
     asking = true;
     try {
+      if (running && !(await dialogs.confirmBusy?.(contents, running))) return;
+      if (!page?.dirty) return leave();
       const choice = await dialogs.confirm(contents, page.name);
       if (choice === "save") contents.send("project:save-then-close");
       else if (choice === "discard") {
         state.delete(id);
-        win.close();
+        leave();
       }
     } finally {
       asking = false;
@@ -309,7 +348,7 @@ function guardClose(win, { ipcMain, dialogs, state }) {
   const close = (event) => {
     if (event.sender !== contents) return;
     state.delete(id);
-    win.close();
+    leave();
   };
   ipcMain.on("project:close", close);
   win.on("closed", () => ipcMain.removeListener("project:close", close));

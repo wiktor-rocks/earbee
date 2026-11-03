@@ -12,11 +12,12 @@ module.exports = async function (h) {
   // What the sound settings show, and changing them as a user would.
   const settings = () =>
     js(
-      `({ speed: speedValue.textContent, volume: volumeValue.textContent, semitones: semitoneValue.textContent, cents: centValue.textContent, eqLow: eqLowValue.textContent, eq: eqToggle.textContent, focus: eqFocusSummary.hidden ? null : eqFocusSummary.textContent, step: stepSize.textContent })`,
+      `({ speed: speedValue.textContent, volume: volumeValue.textContent, balance: balanceValue.textContent, semitones: semitoneValue.textContent, cents: centValue.textContent, eqLow: eqLowValue.textContent, eq: eqToggle.textContent, focus: eqFocusSummary.hidden ? null : eqFocusSummary.textContent, step: stepSize.textContent })`,
     );
   const defaults = await settings();
   await slide("speed", 0.5);
   await slide("volume", 150);
+  await slide("balance", -60);
   await slide("semitoneShift", -3);
   await slide("centShift", 20);
   await slide("eqLow", 6);
@@ -48,8 +49,8 @@ module.exports = async function (h) {
   await openFile(path.join(FIXTURES, "tone.wav"));
   const after = await settings();
   check(
-    "a new file resets speed, pitch, volume and EQ",
-    ["speed", "volume", "semitones", "cents", "eqLow", "eq"].every((name) => after[name] === defaults[name]),
+    "a new file resets speed, pitch, volume, balance and EQ",
+    ["speed", "volume", "balance", "semitones", "cents", "eqLow", "eq"].every((name) => after[name] === defaults[name]),
     JSON.stringify(after),
   );
   check("a new file keeps the step size", after.step === changed.step && after.step !== defaults.step, after.step);

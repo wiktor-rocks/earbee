@@ -60,6 +60,7 @@ const TOPICS = [
   "18-video-window.cjs", // Video window (src/features/video-window/)
   "19-big-video.cjs", // Big video (src/features/big-video.js)
   "20-beats.cjs",
+  "21-stems.cjs", // Stems (src/features/stems/)
 ];
 
 prepare();

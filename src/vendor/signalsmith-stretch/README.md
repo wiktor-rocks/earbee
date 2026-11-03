@@ -1,6 +1,6 @@
 # Signalsmith Stretch, patched
 
-`SignalsmithStretch.mjs` is version 1.3.2 of [Signalsmith Stretch](https://signalsmith-audio.co.uk/code/stretch/) by Signalsmith Audio (MIT licence), as published on npm as `signalsmith-stretch`, with a header comment and one fix.
+`SignalsmithStretch.mjs` is version 1.3.2 of [Signalsmith Stretch](https://signalsmith-audio.co.uk/code/stretch/) by Signalsmith Audio (MIT licence), as published on npm as `signalsmith-stretch`, with a header comment, one fix, and one addition: mixing stems into its input.
 
 ## The fix
 
@@ -24,10 +24,23 @@ audioSamples = bufferEnd; // replaces the else branch that skipped a buffer
 - **an offline render:** rendering a signal from one buffer and from three buffers split at odd places gives identical output with the fix, and garbage plus a `RangeError` without it;
 - **`tests/e2e/13-parallel.cjs`**, which checks this on every run.
 
+## The addition: mixing stems
+
+Stems (`src/features/stems/`) play through the same stretcher as the track, so they stay in step at any speed and pitch, at the cost of one stretcher. The worklet keeps the track's stems beside its buffers and mixes them in where it copies its input:
+
+- four remote methods: `addStems({ tracks, scales, covered?, start? })` (each stem's channels as `Int16Array`s at the track's rate, from its sample `start`, 0 if not given: a stem may hold only a part of the track, the loop alone; the factor that turns them back into samples; and the spans of the track's samples separated so far, `[[from, to], …]`, all of it if not given), `writeStems(from, pieces, covered)` (more of them, as they're separated: the loop first, then the rest), `setStemGains(gains, other)` and `dropStems()`; `dropBuffers()` with no time (a new track) drops them too. A stem's gain is a number (the same for both channels) or a 2×2 mix, `[left from left, left from right, right from left, right from right]`, which can move it from one side to the other (a pan);
+- one line in the input loop, after a piece of the track is copied: `if (this.stems?.active) this.mixStems(…)`;
+- `mixStems`, which turns those samples into `other × track + Σ (gain − other) × stem` (`mixStemsPart`), only where the stems are covered: "other" is the track minus the stems, so it needs no array of its own, and with every gain at 1 the result is the track. Where they aren't separated yet, the track plays as it is.
+
+**Opt-in:** without stems, or with every gain at 1 (or the identity mix) and `other` at 1 (`active` false), the line does nothing and the input is the track exactly as before. Search for `patched` to find each part.
+
+**Verified by `tests/e2e/21-stems.cjs`:** an offline render with stems loaded at full volume is identical, sample for sample, to one without; a muted stem and a soloed one come out as expected.
+
 ## Upgrading
 
 Version 1.3.2 was the latest on npm on 2026-10-09. When a new version comes out:
 
-1. Check whether its input loop (in `process`, after "Fill the buffer with previous input") is fixed.
-2. If it's fixed, drop this folder and import from `node_modules` again (`src/audio/engine.js`).
-3. If it isn't, copy the new file here, re-apply the two lines and the header, and run `npm test`.
+1. Copy the new file here, with the header.
+2. Check whether its input loop (in `process`, after "Fill the buffer with previous input") is fixed. If it isn't, re-apply the fix's two lines.
+3. Re-apply the stems addition, which isn't upstream: each part marked `patched` above.
+4. Run `npm test` (the pieces: topic 11; the stems: topic 21).

@@ -1,0 +1,212 @@
+/* Stems (src/features/stems/): their part of the Mixer in the side panel's
+   dock (the Mixer itself, .mixer-group, is style.css's): across its width,
+   under the volume and balance, as a column of its own. */
+.stems-part {
+  display: flex;
+  flex-wrap: wrap;
+  grid-column: 1 / -1;
+  align-items: center;
+  gap: 10px 12px;
+  min-width: 0;
+  padding-top: 6px;
+}
+
+.stems-part[hidden] {
+  display: none;
+}
+
+/* "Stems", and the reset beside it (once separated). */
+.stems-head {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+/* As a section's title (.dock-title h2 in style.css), a sub-section's. */
+.stems-head h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+/* The button that separates them, across the part, like the ♩ button. */
+.stems-part .stems-action {
+  flex: 1 1 100%;
+  justify-content: flex-start;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A quiet line ("Preparing them for saving"). */
+.stems-note {
+  flex: 1 1 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.stems-note[hidden] {
+  display: none;
+}
+
+/* While it works: what it's doing, and Cancel. */
+.stems-busy {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  gap: 8px;
+}
+
+.stems-busy[hidden] {
+  display: none;
+}
+
+.stems-status {
+  flex: 1 1 auto;
+  overflow: hidden;
+  font: 800 13px var(--num);
+  font-variant-numeric: tabular-nums;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Once separated: a row per stem (dock.js), kept calm: its name (which
+   opens the stem's panel), a small volume knob, S and M. */
+.stems-mixer {
+  --knob-size: 28px;
+
+  display: grid;
+  flex: 1 1 100%;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 2px 6px;
+}
+
+.stems-mixer[hidden] {
+  display: none;
+}
+
+/* Each row's parts sit in the mixer's columns. */
+.stems-row {
+  display: contents;
+}
+
+/* A stem folded into Other (display: contents would show it anyway). */
+.stems-row[hidden] {
+  display: none;
+}
+
+/* The name: plain text that opens the stem's panel (an underline on hover
+   says so); one line. A block, so a name too long ends in "…"; padded
+   (and pulled back by as much, to stay in line), so the clipping never
+   shaves a letter's edge: a "V" or "D" reaches past the text's start. */
+.stems-name {
+  display: block;
+  overflow: hidden;
+  min-width: 0;
+  height: auto;
+  margin: 0 -4px;
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stems-name:hover,
+.stems-name[aria-expanded="true"] {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.stems-row .toggle {
+  min-width: 26px;
+  padding: 2px 6px;
+  font-weight: 800;
+}
+
+/* A stem that isn't heard (muted, or another one soloed): dimmed, its
+   buttons still bright. */
+.stems-row.silent :is(.stems-name, .knob-cell) {
+  opacity: 0.4;
+}
+
+/* "Piano is in Other · Show", across the rows. */
+.stems-folded {
+  grid-column: 1 / -1;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.stems-folded[hidden] {
+  display: none;
+}
+
+.stems-show {
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font-size: 12px;
+  text-decoration: underline;
+}
+
+/* A stem's panel (a .menu, style.css): left of the side panel, against the
+   name that opened it, as the beats menu is; its name, its volume and pan
+   side by side (as the EQ popover's knobs), then "Fold into Other". */
+.stems-menu {
+  --knob-size: 42px;
+
+  position-anchor: --stem-menu;
+  position-area: left span-bottom;
+  margin: 0 10px 0 0;
+  padding: 10px 12px;
+}
+
+.stems-menu h3 {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+
+.stems-menu-knobs {
+  display: grid;
+  grid-template-columns: repeat(2, 64px);
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.stems-menu .knob-cell {
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stems-menu .knob-text {
+  align-items: center;
+  text-align: center;
+}
+
+.stems-menu .knob-text span {
+  color: var(--muted);
+  font-size: 10.5px;
+  text-transform: uppercase;
+}
+
+.stems-menu .knob-value {
+  font-size: 12px;
+}

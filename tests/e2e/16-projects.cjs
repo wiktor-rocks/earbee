@@ -48,7 +48,8 @@ module.exports = async function (h) {
     js(`(() => {
       const view = document.querySelector("#waveform > div").shadowRoot.querySelector(".scroll");
       return {
-        speed: speedValue.textContent, volume: volumeValue.textContent, semitones: semitoneValue.textContent,
+        speed: speedValue.textContent, volume: volumeValue.textContent, balance: balanceValue.textContent,
+        semitones: semitoneValue.textContent,
         cents: centValue.textContent, eqLow: eqLowValue.textContent, eqHigh: eqHighValue.textContent,
         eq: eqToggle.textContent, focus: eqFocusSummary.hidden ? null : eqFocusSummary.textContent,
         step: stepSize.textContent, loop: loopInfo.hidden ? null : loopInfo.textContent,
@@ -176,6 +177,7 @@ module.exports = async function (h) {
   await sleep(100);
   check("changing the speed is an unsaved change (• in the title)", await unsaved(), await title());
   await slide("volume", 140);
+  await slide("balance", 35);
   await slide("semitoneShift", 2);
   await slide("centShift", -15);
   await slide("eqLow", 4.5);

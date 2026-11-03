@@ -389,12 +389,12 @@ module.exports = async function (h) {
     await sleep(150);
   }
   const defaultOrder = await panelOrder();
-  await dragGrip(".volume-group > .panel-grip", await middle(".speed-group", "top"));
-  const volumeFirst = await panelOrder();
+  await dragGrip(".mixer-group > .panel-grip", await middle(".speed-group", "top"));
+  const mixerFirst = await panelOrder();
   check(
-    "panel order: Volume dragged above Speed",
-    volumeFirst.join() === ["volume", "speed", ...defaultOrder.filter((k) => !["volume", "speed"].includes(k))].join(),
-    JSON.stringify(volumeFirst),
+    "panel order: the Mixer dragged above Speed",
+    mixerFirst.join() === ["mixer", "speed", ...defaultOrder.filter((k) => !["mixer", "speed"].includes(k))].join(),
+    JSON.stringify(mixerFirst),
   );
   await js(`document.querySelector(".dock").scrollTop = document.querySelector(".dock").scrollHeight`);
   await dragGrip(".sidebar-head > .panel-grip", await middle(".loop-group", "top"), () => shot("panel-order.png"));
@@ -410,7 +410,7 @@ module.exports = async function (h) {
     JSON.stringify(marksUp),
   );
   const stepBefore = await js(`stepSize.textContent.trim()`);
-  await js(`document.querySelector(".volume-group > .panel-grip").focus()`);
+  await js(`document.querySelector(".mixer-group > .panel-grip").focus()`);
   key("Down");
   await sleep(100);
   const keyed = await panelOrder();
@@ -418,11 +418,11 @@ module.exports = async function (h) {
   check(
     "panel order: ↓ on a focused grip moves its section, not the step size; the order is remembered",
     keyed[0] === "speed" &&
-      keyed[1] === "volume" &&
+      keyed[1] === "mixer" &&
       keyed.at(-2) === "marks" &&
       keyed.at(-1) === "loop" &&
       (await js(`stepSize.textContent.trim()`)) === stepBefore &&
-      (await js(`document.activeElement?.closest(".volume-group") !== null`)) &&
+      (await js(`document.activeElement?.closest(".mixer-group") !== null`)) &&
       stored === JSON.stringify(keyed),
     JSON.stringify({ keyed, stored }),
   );

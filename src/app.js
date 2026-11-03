@@ -14,7 +14,7 @@
  *   transport.on("position" | "state" | "jump") ─► waveform, video, UI
  *
  *   engine     Web Audio graph: Signalsmith (speed + pitch) → EQ (the
- *              Focus's high- and low-pass, then the bands) → volume
+ *              Focus's high- and low-pass, then the bands) → volume → balance
  *              → limiter, in a context at the open track's sample rate; it
  *              plays the track from several pieces, one after the other.
  *              Knows nothing about the UI or `settings`.
@@ -36,7 +36,7 @@
  *   video      Frame-exact picture for video files: decodes frames itself
  *              (Mediabunny + WebCodecs) and draws the frame at the transport
  *              position. No second clock, so it can't drift from the audio.
- *   settings   The player's controls (speed, pitch, volume, EQ, step):
+ *   settings   The player's controls (speed, pitch, volume, balance, EQ, step):
  *              plain values in context.js, saved in project files (the
  *              "sound" section).
  *   marks      Points and regions on the open track, with a label and a
@@ -50,6 +50,11 @@
  *              in src/project; reading and writing in the main process
  *              (electron/project-files.js). Unsaved changes show a • in the
  *              title and are asked about before they'd be lost.
+ *   stems      The song split into its instruments on demand, by the stem
+ *              model in the main process (electron/stems/), then mixed
+ *              into Signalsmith's input with a volume, solo and mute each
+ *              (features/stems/); a project keeps them (as Opus, after its
+ *              header). Off with CONFIG.stems.enabled.
  *   prefs      The user's Settings (general, theme, waveform, downloads),
  *              kept between runs by
  *              the main process (electron/prefs-store.js) and changed in the
@@ -146,7 +151,11 @@
  *                  buttons always shown or on hover; wiring marked
  *                  "Video buttons ("), topbar-autohide.js (Settings ›
  *                  Layout: the top bar hides until the pointer reaches
- *                  it; wiring marked "Top bar autohide (")
+ *                  it; wiring marked "Top bar autohide ("), stems/ (the
+ *                  song split into its instruments by the stem model in
+ *                  the main process, electron/stems/: index.js, its
+ *                  worker.js and stems.css; self-contained, its wiring
+ *                  marked "Stems (", off with CONFIG.stems.enabled)
  *   app.js         This file: creates and wires the components, the
  *                  SHORTCUTS table, start()
  *   vendor/        Signalsmith Stretch, patched to read across several
@@ -242,6 +251,14 @@
  *                             Measure long files with `npm run
  *                             diagnose:loading` (its "seams" runs compare a
  *                             parallel decode with a one-part one).
+ *   Stems                     Their names and order: CONFIG.stems.list (ids
+ *                             are the model's). The mixer: features/stems/
+ *                             dock.js; the gains: mix.js. A new model:
+ *                             scripts/export-stem-model.py, then upload it
+ *                             to a release and change SOURCE in
+ *                             electron/stems/model-file.js. Turn them off:
+ *                             CONFIG.stems.enabled (everything marked
+ *                             "Stems (" goes quiet).
  *   A new feature             A file in features/ with a bind…() function,
  *                             called from start() below.
  *   Any change                Run `npm run check` and `npm test` (unit tests
@@ -282,6 +299,7 @@ import { bindTopbarAutohide } from "./features/topbar-autohide.js"; // Top bar a
 import { bindVideoZoom, resetVideoZoom, videoZoomChanged, zoomVideoIn, zoomVideoOut } from "./features/video-zoom.js"; // Video zoom (src/features/video-zoom.js)
 import { beatsAction, bindBeats, isBeatMenuOpen, snapForDrag, toggleBeatClick } from "./features/beats.js";
 import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
+import { bindStems } from "./features/stems/index.js"; // Stems (src/features/stems/)
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
 import { bindProject, isSaveDialogOpen, openFile, saveProject, saveProjectAs } from "./features/project/index.js";
 import { bindSettings, isSettingsOpen } from "./features/settings.js";
@@ -702,6 +720,7 @@ function start() {
   bindLayout();
   bindBigVideo(); // Big video (src/features/big-video.js)
   bindStageSplit(); // Stage split (src/features/stage-split.js)
+  bindStems(); // Stems (src/features/stems/): before the panel order, which finds its section
   bindPanelOrder(); // Panel order (src/features/panel-order.js)
   bindVideoZoom($("videoPane")); // Video zoom (src/features/video-zoom.js)
   bindVideoButtons(); // Video buttons (src/features/video-buttons.js)

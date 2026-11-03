@@ -3,7 +3,11 @@
 //   availableMemory()   bytes the system can still give programs, or null
 //                       where that can't be told reliably; the page refuses
 //                       tracks that wouldn't fit (src/features/open-file.js)
-//   handleSystem(ipc)   answers the page's "system:available-memory"
+//   totalMemory()       all of the system's memory, in bytes (where what's
+//                       available is unknown, the stems go by it:
+//                       src/features/stems/memory.js)
+//   handleSystem(ipc)   answers the page's "system:available-memory" and
+//                       "system:total-memory"
 //   handleRendererCrash(win, dialog)
 //                       if the page's process dies (e.g. killed for lack of
 //                       memory), says so and reloads it, instead of leaving
@@ -28,8 +32,11 @@ function availableMemory() {
   return process.platform === "win32" ? os.freemem() : null;
 }
 
+const totalMemory = () => os.totalmem();
+
 function handleSystem(ipcMain) {
   ipcMain.handle("system:available-memory", () => availableMemory());
+  ipcMain.handle("system:total-memory", () => totalMemory());
 }
 
 function handleRendererCrash(win, dialog) {
@@ -49,4 +56,4 @@ function handleRendererCrash(win, dialog) {
   });
 }
 
-module.exports = { availableMemory, handleSystem, handleRendererCrash };
+module.exports = { availableMemory, totalMemory, handleSystem, handleRendererCrash };

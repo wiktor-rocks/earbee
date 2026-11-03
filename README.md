@@ -21,10 +21,11 @@ Get the latest version from the [releases page](https://github.com/wiktor-rocks/
 - **Mark it:** points and named regions on the track, with a list beside it.
 - **Step through it from the keyboard:** short steps back and forward, Space replays from where you started listening, and Enter from where it last stopped. Press **?** in the app for every key.
 - **Find the beats** (B): a beat-tracking model marks every beat and the first of each bar on the waveform, shows the tempo, and lets ← / → step by beat or by bar. A click on the tempo opens the beats menu: a click on each beat (also Shift+B) to check them by ear, and fixes for the song: a steady grid, half or double time, no strong first beat, bars starting a beat earlier or later, and lines between the beats (halves, triplets, quarters). Projects keep the beats and the edits.
+- **Split it into stems:** vocals, drums, bass, guitar, piano and the rest, on your own computer, in about as long as the song plays. Solo the guitar or mute it, at any speed, and a project keeps them. The model (Demucs, by Meta) is a separate download, and its licence is likely non-commercial: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - **Videos too,** in sync at any speed; in their own window if you like.
 - **Save your session** (marks, loop, speed and EQ) in a `.ebee` project file.
 - **Open from YouTube:** paste a link or search, and it opens once downloaded (only download what you have the rights to).
-- **EQ, volume up to 200 %, 17 colour themes,** and long files (an hour or two) open in seconds.
+- **EQ, volume up to 200 %, a balance between left and right** (for the old stereo recordings with an instrument on one side), **17 colour themes,** and long files (an hour or two) open in seconds.
 - **Works offline;** only downloading needs the internet.
 
 ## Build from source
@@ -39,7 +40,7 @@ npm run build:linux  # or build:win, build:mac: the app for your system, in dist
 
 ## Licence
 
-MIT: see [LICENSE](LICENSE). EarBee is built on Signalsmith Stretch, Mediabunny, wavesurfer.js, the Beat This! beat tracker, ONNX Runtime, Electron and the Righteous and Nunito fonts, each under its own licence: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+MIT: see [LICENSE](LICENSE). EarBee is built on Signalsmith Stretch, Mediabunny, wavesurfer.js, the Beat This! beat tracker, ONNX Runtime, Electron and the Righteous and Nunito fonts, each under its own licence, and downloads the Demucs stem model when it's first used: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 # Development
 
@@ -93,6 +94,9 @@ electron/          The main process (CommonJS, Node)
   system.js          available memory; recovering from a crashed page
   beat-model.js      runs the beat model for the page, in a utility process
                      (beat-model-process.js) on the native ONNX Runtime
+  stems/             separating a song into stems: the model's file (downloaded
+                     on first use), and a utility process per song that the
+                     page's stems worker talks to over a port
   preload.js         the page's bridge to the main process (window.earbee)
 src/               The page (ES modules, no build step), in layers:
   core/              pure helpers, no DOM (unit-tested); media.js: media files,
@@ -103,7 +107,7 @@ src/               The page (ES modules, no build step), in layers:
   search/            searching: the sites (sources.js) and what a result is
   prefs/             settings: the sections (index.js) and the field types
   marks/             marks: what one is, the saved form, the store
-  project/           project files: the header, its version, the media
+  project/           project files: the header, its version, the media, blobs
   config.js          every tunable number
   audio/             engine.js (Web Audio + Signalsmith), transport.js,
                      decoder.js + decode-worker.js (parallel decoding),
@@ -125,7 +129,9 @@ src/               The page (ES modules, no build step), in layers:
                      download.js (and search), settings.js (and the theme
                      menu), file-menu.js, layout.js, big-video.js,
                      project/ (index.js: save and open; sections.js: what is saved),
-                     video-window/ (the video in its own window; self-contained)
+                     video-window/ (the video in its own window; self-contained),
+                     stems/ (separating, the mixer, the stems in projects;
+                     self-contained)
   app.js             entry point: creates and wires everything
   vendor/            Signalsmith Stretch, patched (see its README.md)
   package.json       just "type": "module", so the main process can require()
@@ -134,9 +140,13 @@ index.html         The page: welcome screen, loading screen, player
 style.css          All styles; colour and font tokens at the top
 assets/            Logo and icons (generated from earbee-source.png
                    by scripts/make-images.py)
-models/            beat-this-small.onnx: the beat model (Beat This!, MIT)
+models/            beat-this-small.onnx: the beat model (Beat This!, MIT); the
+                   stem model, htdemucs-6s.onnx, is exported here but not in
+                   git (it's downloaded on first use)
 scripts/           make-images.py; export-beat-model.py (the beat model and
-                   its test data, from the Python original)
+                   its test data, from the Python original); export-stem-model.py
+                   (the stem model, from Demucs) and make-fake-stem-model.py
+                   (its stand-in for the tests)
 docs/              maintaining.md: day-to-day git, releases, CI;
                    blog.md: the website and its blog;
                    diagnostics/: how long files load, measured
