@@ -167,7 +167,9 @@ export const waveformSection = defineSection({
   ],
 });
 
-// Settings › Layout: how the player's window is laid out. `autohideTopBar`:
+// Settings › Layout: how the player's window is laid out. `panelSide`: the
+// side panel on the right or the left of the stage (features/panel-side.js).
+// `autohideTopBar`:
 // the top bar slides away and comes back when the pointer reaches the top
 // edge (features/topbar-autohide.js). `videoButtons`: the video's buttons
 // (the zoom, its own window, big video) always shown, or only while the
@@ -180,6 +182,17 @@ const layoutSection = defineSection({
   title: "Layout",
   icon: "sidebar",
   fields: [
+    {
+      key: "panelSide",
+      type: "choice",
+      label: "The side panel",
+      help: "The sound and the marks, beside the picture and the waveform.",
+      default: "right",
+      options: [
+        { value: "right", label: "On the right" },
+        { value: "left", label: "On the left" },
+      ],
+    },
     {
       key: "autohideTopBar",
       type: "boolean",

@@ -43,6 +43,21 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-04: The side panel on the left or the right (Settings › Layout)
+
+- **What:** Settings › Layout › **The side panel**: **On the right** (the default, as before) or **On the left**. On the left, the panel sits beside the picture, the waveform and the transport on their left. The top bar's side-panel button still puts it away, and its icon draws the panel's bar on that side.
+- **Why:** the owner's 0.3.0 item "The side panel on the left or the right, as a setting".
+- **How:**
+  - A `choice` field, `layout.panelSide` (`src/prefs/index.js`), first in Layout.
+  - `src/features/panel-side.js` (new) marks it on `<html>` as `data-panel-side`, like the video's buttons.
+  - In style.css, `:root[data-panel-side="left"] .workspace:not(.sidebar-hidden)` swaps the grid's areas and columns (put away and big video keep their one column). The panel's hairline moves to its right edge, and `#sidebarToggle`'s icon is mirrored.
+- **Where:** `src/prefs/index.js`, `src/features/panel-side.js` (new), `src/app.js` (wiring marked "Panel side ("; the header), `style.css` (section 5, the workspace), `docs/glossary.md` (Dock). Tests: `tests/unit/prefs.test.mjs`, `tests/e2e/13-settings.cjs`.
+- **Verified by:**
+  - Unit: the layout defaults; an unknown side falls back to the right.
+  - e2e 13: On the left is saved and puts the panel at the window's left edge, the stage right of it and as wide as before; put away, the stage takes the whole width; back on the right, every box is where it was. A screenshot, looked at.
+  - `TB_TOPICS=13 npm test`: 44 pass, with 405 unit and 28 smoke; `npm run check`.
+  - Not checked: big video and the narrow-window layout with the panel on the left, by eye.
+
 ## 2026-11-03: Shift+drag inside the loop moves the whole loop
 
 - **What:** with Shift held, a drag inside the loop (away from its edges) picks the loop up and moves it, as long as it was. It stops at the track's start and end, and its start snaps to the beats (unless Alt is held). With Shift held, the pointer is a hand inside the loop. A Shift+click there without moving seeks, as before. Shift+drag outside the loop still draws a new one.

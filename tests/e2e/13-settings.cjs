@@ -316,6 +316,43 @@ module.exports = async function (h) {
     await sleep(200);
   }
 
+  // The side panel on the left (features/panel-side.js): the stage and
+  // the transport keep their width; put away, the stage takes it all.
+  {
+    const boxes = () =>
+      js(`(() => { const box = (id) => { const r = document.getElementById(id).getBoundingClientRect(); return { left: Math.round(r.left), width: Math.round(r.width) }; };
+        return { panel: box("panel"), stage: box("stage"), workspace: box("workspace") }; })()`);
+    const before = await boxes();
+    await js(`document.getElementById("settingsButton").click()`);
+    await sleep(200);
+    await tab("layout");
+    await choose("layout", "panelSide", "left");
+    await js(`document.getElementById("settingsDialog").close()`);
+    await sleep(200);
+    const left = await boxes();
+    check(
+      "The side panel on the left: saved; the panel left of the stage, the stage as wide as before",
+      saved().layout?.panelSide === "left" &&
+        left.panel.left === left.workspace.left &&
+        left.stage.left >= left.panel.left + left.panel.width &&
+        left.stage.width === before.stage.width,
+      JSON.stringify({ before, left }),
+    );
+    await shot("panel-left.png");
+    await js(`document.getElementById("sidebarToggle").click()`);
+    await sleep(200);
+    const away = await boxes();
+    check(
+      "…put away, the stage takes the whole width",
+      away.stage.left === away.workspace.left && away.stage.width === away.workspace.width,
+      JSON.stringify(away),
+    );
+    await js(`document.getElementById("sidebarToggle").click()`);
+    await js(`earbee.prefs.set("layout", "panelSide", "right")`);
+    await sleep(300);
+    check("…back on the right, as it was", JSON.stringify(await boxes()) === JSON.stringify(before));
+  }
+
   // Kept over a reload (the preload reads them before the page starts).
   await h.wc.reload();
   await sleep(1500);

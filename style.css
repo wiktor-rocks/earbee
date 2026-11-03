@@ -1800,6 +1800,25 @@ body.dragging .drop-card {
   min-height: 0;
 }
 
+/* Settings › Layout › The side panel: on the left (features/panel-side.js),
+   unless it's put away. Its hairline moves to its other edge, and the top
+   bar's button for it draws its bar on that side too. */
+:root[data-panel-side="left"] .workspace:not(.sidebar-hidden) {
+  grid-template:
+    "panel stage" minmax(0, 1fr)
+    "panel transport" auto
+    / var(--sidebar-width) minmax(0, 1fr);
+}
+
+:root[data-panel-side="left"] .panel {
+  border-right: 1px solid var(--hairline);
+  border-left: 0;
+}
+
+:root[data-panel-side="left"] #sidebarToggle .icon {
+  transform: scaleX(-1);
+}
+
 /* The side panel put away (its button in the top bar): the stage and the
    transport take the whole width. */
 .workspace.sidebar-hidden {

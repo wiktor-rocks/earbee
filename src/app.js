@@ -149,7 +149,9 @@
  *                  into any order; wiring marked "Panel order ("),
  *                  panel-sections.js (Settings › Layout: the side
  *                  panel's sections hidden; wiring marked "Panel
- *                  sections ("),
+ *                  sections ("), panel-side.js (Settings › Layout: the
+ *                  side panel on the right or the left; wiring marked
+ *                  "Panel side ("),
  *                  video-buttons.js (Settings › Layout: the video's
  *                  buttons always shown or on hover; wiring marked
  *                  "Video buttons ("), topbar-autohide.js (Settings ›
@@ -299,6 +301,7 @@ import { bindStageSplit } from "./features/stage-split.js"; // Stage split (src/
 import { bindPanelOrder } from "./features/panel-order.js"; // Panel order (src/features/panel-order.js)
 import { bindPanelSections } from "./features/panel-sections.js"; // Panel sections (src/features/panel-sections.js)
 import { bindVideoButtons } from "./features/video-buttons.js"; // Video buttons (src/features/video-buttons.js)
+import { bindPanelSide } from "./features/panel-side.js"; // Panel side (src/features/panel-side.js)
 import { bindTopbarAutohide } from "./features/topbar-autohide.js"; // Top bar autohide (src/features/topbar-autohide.js)
 import { bindVideoZoom, resetVideoZoom, videoZoomChanged, zoomVideoIn, zoomVideoOut } from "./features/video-zoom.js"; // Video zoom (src/features/video-zoom.js)
 import { beatsAction, bindBeats, isBeatMenuOpen, snapForDrag, toggleBeatClick } from "./features/beats.js";
@@ -729,6 +732,7 @@ function start() {
   bindPanelSections(); // Panel sections (src/features/panel-sections.js)
   bindVideoZoom($("videoPane")); // Video zoom (src/features/video-zoom.js)
   bindVideoButtons(); // Video buttons (src/features/video-buttons.js)
+  bindPanelSide(); // Panel side (src/features/panel-side.js)
   bindTopbarAutohide(); // Top bar autohide (src/features/topbar-autohide.js)
   bindFocus();
   const keysBlocked = () =>

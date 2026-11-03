@@ -190,8 +190,15 @@ describe("the general section", () => {
 describe("the layout section", () => {
   const layout = getSection("layout");
 
-  test("defaults: the top bar stays, the video's buttons always show, no section hidden", () => {
-    assert.deepEqual(defaultsOf(layout), { autohideTopBar: false, videoButtons: "always", hiddenSections: [] });
+  test("defaults: the panel on the right, the top bar stays, the video's buttons always show, no section hidden", () => {
+    assert.deepEqual(defaultsOf(layout), {
+      panelSide: "right",
+      autohideTopBar: false,
+      videoButtons: "always",
+      hiddenSections: [],
+    });
+    assert.equal(normalizePrefsFile({ layout: { panelSide: "top" } }).layout.panelSide, "right");
+    assert.equal(normalizePrefsFile({ layout: { panelSide: "left" } }).layout.panelSide, "left");
   });
 
   test("hidden sections: the known ones kept, anything else back to none", () => {
