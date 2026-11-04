@@ -152,8 +152,14 @@ module.exports = async function (h) {
   await sleep(150);
   check("Shift+[ moves back", await loopIs(4.26, 5.26), JSON.stringify(await loopRange()));
 
+  // Each Shift+drag draws a new loop: the old one is cleared first (Shift+L),
+  // since a Shift+drag that starts inside a loop moves it instead.
+  key("L", ["shift"]);
+  await sleep(100);
   await drag(4.32, 6.18, ["shift"]);
   check("a Shift+drag near the beats snaps onto them", await loopIs(4.26, 6.26), JSON.stringify(await loopRange()));
+  key("L", ["shift"]);
+  await sleep(100);
   await drag(4.36, 6.14, ["shift", "alt"]);
   let loop = await loopRange();
   check(

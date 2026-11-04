@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-04: The beats test clears the loop before drawing one
+
+- **What:** e2e topic 20's two Shift+drag checks ("a Shift+drag near the beats snaps onto them", "…with Alt it doesn't") clear the loop first (Shift+L).
+- **Why:** since "Shift+drag inside the loop moves the whole loop" (2026-11-03), their drags, which started inside the loop left by the checks before them, moved that loop instead of drawing a new one. So the first failed in the full `npm test` before merging `exp/installer-updates` (that merge was undone, as procedure D says). Only topic 03 had been run for that change, not 20.
+- **How:** `key("L", ["shift"])` before each drag. The app is unchanged: inside a loop, Shift+drag moves it, as the owner chose.
+- **Where:** `tests/e2e/20-beats.cjs`.
+- **Verified by:** `TB_TOPICS=20 npm test`: 64 pass, with 410 unit and 28 smoke.
+
 ## 2026-11-04: More mark colours, picked at random
 
 - **What:**
