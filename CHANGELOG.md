@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-04: Post idea: "AnthemScore free alternative" (docs)
+
+- **What:** idea 20 in docs/blog.md's post ideas: an honest "alternative to" post for AnthemScore.
+- **Why:** the owner saw an impression for "anthemscore free alternative" in Search Console and wants a post about it.
+- **How:** the idea says what makes it different from the other "alternative to" posts. AnthemScore transcribes automatically and EarBee doesn't, so the post says so plainly and compares only the two. AnthemScore's features and price are to be checked on its site before writing.
+- **Where:** `docs/blog.md` ("Post ideas").
+- **Verified by:** `npm run format:check`.
+
 ## 2026-11-04: A Windows installer, and EarBee updates itself
 
 - **What:**
