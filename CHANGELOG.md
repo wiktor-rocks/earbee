@@ -43,6 +43,45 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-04: A Windows installer, and EarBee updates itself
+
+- **What:**
+  - **Windows gets an installer**, `EarBee-…-win-x64-setup.exe`, instead of the portable `.exe`. It installs for the user alone (no admin rights, no wizard), adds a Start-menu entry and an uninstaller, and opens EarBee when done. Settings stay when it's uninstalled. It isn't signed yet, so Windows still warns the first time.
+  - **Automatic updates.** About 30 seconds after it starts, and then every six hours, EarBee looks at the latest published release on GitHub:
+    - **Windows (the installer) and Linux (the AppImage):** a newer version is downloaded in the background and installed when EarBee quits. A pill in the top bar (and in the welcome screen's corner) says **Update ready**; its menu has **Restart and update now**, which first asks about unsaved work, as quitting does.
+    - **macOS**, which can't update itself without Apple's signing, and Linux run any other way than as the AppImage: the pill says **EarBee 0.3.1 is out** and opens the release's page.
+  - **Settings › General › Check for updates** (on) turns the checking off.
+- **Why:** 0.3.0's two "Installing and updating" items: the Windows exe as an installer, and automatic updates for Windows and Linux with reminders on a Mac, so everyone on 0.3.0 can update easily. The owner chose:
+  - NSIS, unsigned for now;
+  - electron-updater on GitHub Releases;
+  - installing quietly on quit;
+  - dropping the portable exe;
+  - the pill.
+    Signing, the Microsoft Store and winget are for later.
+- **How:**
+  - **Building** (`package.json`):
+    - `win.target` is `nsis` (`oneClick`, per user, `artifactName` `…-win-x64-setup.exe`);
+    - `publish` is GitHub (`wiktor-rocks/earbee`), so electron-builder writes `latest.yml`, `latest-linux.yml` and `.blockmap` files and puts `app-update.yml` in the app;
+    - the build scripts pass `--publish never`: the release workflow still makes the draft release.
+  - **The release** (`.github/workflows/release.yml`) uploads the `latest*.yml` and `.blockmap` files too; its notes describe the installer and the updates. A draft is never seen by the updater, so publishing the draft is what sends an update to everyone.
+  - **`electron/updates.js`** (new):
+    - `updateMode` (install, notice, or off when not packaged, so `npm start` and the tests never check) and `isNewer`, both pure and unit-tested;
+    - "install" loads `electron-updater` (a new dependency, 6.8.11) only where it's used;
+    - "notice" reads GitHub's latest release (`EARBEE_UPDATES_URL` replaces it for testing);
+    - the checks follow the setting;
+    - "Restart and update now" closes every window through the close guard, and once they're all gone `main.js` calls `quitAndInstall`.
+  - **`src/features/updates.js`** (new): the pill, from `earbee.updates` (`electron/preload.js`), with its menu (`ui/menu.js`); style.css, "Update pill".
+  - **The website:** `site/download.js` offers `-setup.exe` (and still the old name), and the FAQ's "Does it need the internet?" now names the stem model and the update check. Both go live when `main` moves up.
+- **Where:** `package.json`, `package-lock.json`, `.github/workflows/release.yml`, `electron/updates.js` (new), `electron/main.js` and `electron/preload.js` (marked "Updates ("), `src/features/updates.js` (new), `src/app.js`, `src/prefs/index.js` (`general.checkUpdates`), `index.html`, `style.css`, `site/download.js`, `site/_data/faq.json`, `README.md`, `docs/maintaining.md` (a new "Updates" section, with how to try an update before a release), `docs/glossary.md` (Update pill), `THIRD_PARTY_NOTICES.md`. Tests: `tests/unit/updates.test.mjs` (new), `tests/unit/prefs.test.mjs`, `tests/e2e/13-settings.cjs` and `harness.cjs` (a stand-in for the update state).
+- **Verified by:**
+  - `npm test` after the merge: 410 unit, 680 e2e, 28 smoke. (The first attempt was undone: topic 20 failed one check, an older test broken by "Shift+drag inside the loop moves the whole loop", fixed on `testing` first: "The beats test clears the loop before drawing one".)
+  - **An AppImage update, end to end:** a 0.2.98 build pointed at a local server found 0.2.99 there, showed **Update ready**, and **Restart and update now** replaced the file and started 0.2.99. The owner did the same with the test builds: "great, it worked".
+  - e2e 13: the setting in General; the pill for both states, in the top bar and the welcome corner; its menu's restart; the page link; no pill without an update.
+  - **Not verified:**
+    - Windows: no installer has been built or installed yet (the owner's VM test is to come: the install, the icon, an update on quit, the restart asking about unsaved work, the uninstaller);
+    - the Mac notice in a packaged app;
+    - a real update from GitHub (the first will be 0.3.0 to 0.3.1; 0.2.0 has no updater, so its users download 0.3.0 by hand once).
+
 ## 2026-11-04: The beats test clears the loop before drawing one
 
 - **What:** e2e topic 20's two Shift+drag checks ("a Shift+drag near the beats snaps onto them", "…with Alt it doesn't") clear the loop first (Shift+L).
