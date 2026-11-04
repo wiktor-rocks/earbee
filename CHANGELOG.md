@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-04: No "write EPIPE" error dialog when started from a launcher
+
+- **What:** EarBee started from a launcher (Gear Lever, the desktop's app menu) no longer shows "A JavaScript error occurred in the main process … Error: write EPIPE" a while after it opens.
+- **Why:** the owner saw the dialog in the test build of `testing` installed with Gear Lever. Its stack ended in electron-updater's `checkForUpdates`, which logs each check to the console.
+- **How:** a launcher may close its end of the app's stdout. A log line written there then fails with EPIPE, emitted as an `error` on `process.stdout`, and with no listener it is an uncaught exception, which Electron shows as a dialog. The main process now listens for errors on stdout and stderr and drops EPIPE (the line had no reader anyway); any other error is thrown as before. This covers every log line in the main process, not only the updater's.
+- **Where:** `electron/main.js`, right after `registerMediaScheme`.
+- **Verified by:** a stand-in main process started with its stdout on a pipe whose reading end was already closed: logging two lines at once, as the updater does, gave the same uncaught `write EPIPE`. With the fix's lines loaded first, it ran to the end. Then `npm run check`, `npm run test:unit` and `TB_TOPICS=01 npm test` (with the smoke test).
+
 ## 2026-11-04: Post idea: "AnthemScore free alternative" (docs)
 
 - **What:** idea 20 in docs/blog.md's post ideas: an honest "alternative to" post for AnthemScore.

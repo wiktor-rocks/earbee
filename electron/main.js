@@ -67,6 +67,16 @@ const DEFAULT_BOUNDS = { width: 1200, height: 800 };
 
 registerMediaScheme(protocol); // must happen before the app is ready
 
+// Started from a launcher (Gear Lever, a desktop menu), stdout and stderr
+// may be pipes nobody reads any more. A log line written there then fails
+// with EPIPE, which Electron would show as an error dialog (the updater
+// logs every check). Such a line is dropped; any other error still shows.
+for (const stream of [process.stdout, process.stderr]) {
+  stream.on("error", (error) => {
+    if (/** @type {NodeJS.ErrnoException} */ (error).code !== "EPIPE") throw error;
+  });
+}
+
 // The app was called ScriBee until 0.1.1: once, on a start under its
 // new name, its settings folder (prefs.json, the window states, the
 // page's storage) comes along, over whatever a first start already made
