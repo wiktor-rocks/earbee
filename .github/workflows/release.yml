@@ -8,6 +8,12 @@
 # system). The macOS builds are signed ad hoc only (package.json: "-"),
 # not by Apple: enough for Apple Silicon to run them, after the user
 # allows it once.
+#
+# Updates: the Windows installer and the AppImage update themselves from
+# the latest published release (electron/updates.js), through the
+# latest.yml and latest-linux.yml files and the .blockmap files uploaded
+# with them. So publishing the draft is what sends an update to everyone:
+# try its files first. A Mac is only told there's a new version.
 name: Release
 
 on:
@@ -55,6 +61,8 @@ jobs:
             dist/*.AppImage
             dist/*.exe
             dist/*.dmg
+            dist/*.blockmap
+            dist/latest*.yml
           if-no-files-found: error
 
   release:
@@ -71,9 +79,9 @@ jobs:
           EarBee ${GITHUB_REF_NAME#v}: a player for transcribing music by ear.
 
           **Downloads:**
-          - **Windows:** the \`win-x64.exe\`, a portable app. Windows may warn about an unrecognised app the first time; choose *More info*, then *Run anyway*.
-          - **macOS:** the \`mac-arm64.dmg\` (Apple Silicon) or \`mac-x64.dmg\` (Intel). It isn't signed by Apple: the first time, right-click it and choose *Open*, or allow it in System Settings › Privacy & Security.
-          - **Linux:** the \`linux-x86_64.AppImage\`. Make it executable (\`chmod +x\`) and run it.
+          - **Windows:** the \`win-x64-setup.exe\`, an installer (no admin rights needed). Windows may warn about an unrecognised app the first time; choose *More info*, then *Run anyway*. EarBee then updates itself.
+          - **macOS:** the \`mac-arm64.dmg\` (Apple Silicon) or \`mac-x64.dmg\` (Intel). It isn't signed by Apple: the first time, right-click it and choose *Open*, or allow it in System Settings › Privacy & Security. EarBee tells you when there's a new version.
+          - **Linux:** the \`linux-x86_64.AppImage\`. Make it executable (\`chmod +x\`) and run it. It updates itself.
 
           What changed: see [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/CHANGELOG.md).
           NOTES

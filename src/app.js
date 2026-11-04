@@ -151,7 +151,9 @@
  *                  panel's sections hidden; wiring marked "Panel
  *                  sections ("), panel-side.js (Settings › Layout: the
  *                  side panel on the right or the left; wiring marked
- *                  "Panel side ("),
+ *                  "Panel side ("), updates.js (the pill that says an
+ *                  update is ready or out, from electron/updates.js;
+ *                  wiring marked "Updates ("),
  *                  video-buttons.js (Settings › Layout: the video's
  *                  buttons always shown or on hover; wiring marked
  *                  "Video buttons ("), topbar-autohide.js (Settings ›
@@ -304,6 +306,7 @@ import { bindPanelOrder } from "./features/panel-order.js"; // Panel order (src/
 import { bindPanelSections } from "./features/panel-sections.js"; // Panel sections (src/features/panel-sections.js)
 import { bindVideoButtons } from "./features/video-buttons.js"; // Video buttons (src/features/video-buttons.js)
 import { bindPanelSide } from "./features/panel-side.js"; // Panel side (src/features/panel-side.js)
+import { bindUpdates } from "./features/updates.js"; // Updates (src/features/updates.js)
 import { bindTopbarAutohide } from "./features/topbar-autohide.js"; // Top bar autohide (src/features/topbar-autohide.js)
 import { bindVideoZoom, resetVideoZoom, videoZoomChanged, zoomVideoIn, zoomVideoOut } from "./features/video-zoom.js"; // Video zoom (src/features/video-zoom.js)
 import { beatsAction, bindBeats, isBeatMenuOpen, snapForDrag, toggleBeatClick } from "./features/beats.js";
@@ -735,6 +738,7 @@ function start() {
   bindVideoZoom($("videoPane")); // Video zoom (src/features/video-zoom.js)
   bindVideoButtons(); // Video buttons (src/features/video-buttons.js)
   bindPanelSide(); // Panel side (src/features/panel-side.js)
+  bindUpdates(); // Updates (src/features/updates.js)
   bindTopbarAutohide(); // Top bar autohide (src/features/topbar-autohide.js)
   bindFocus();
   const keysBlocked = () =>

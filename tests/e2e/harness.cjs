@@ -119,6 +119,21 @@ async function createHarness() {
     memory.available === undefined ? null : (memory.available ?? availableMemory()),
   );
   ipcMain.handle("system:total-memory", () => memory.total ?? totalMemory());
+  // Updates (src/features/updates.js): main.js only checks when packaged,
+  // so nothing is checked here. A test shows the pill with
+  // `updates.set(state)` and counts what its clicks asked for.
+  const updates = {
+    state: null,
+    restarts: 0,
+    opens: 0,
+    set(state) {
+      updates.state = state;
+      wc.send("updates:state", state);
+    },
+  };
+  ipcMain.handle("updates:state", () => updates.state);
+  ipcMain.on("updates:restart", () => updates.restarts++);
+  ipcMain.on("updates:open", () => updates.opens++);
   // The beat model as main.js runs it.
   require(path.join(PROJECT, "electron", "beat-model.js")).handleBeatModel(ipcMain, { utilityProcess });
   // Stems (src/features/stems/): as main.js runs it from the source, but
@@ -359,6 +374,7 @@ async function createHarness() {
     projectState, // the page's unsaved state, as the main process hears it
     videoWin, // the video window (src/features/video-window/), or null
     memory,
+    updates,
     check,
     sleep,
     near, // a and b within `within` seconds of each other

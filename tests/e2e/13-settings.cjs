@@ -353,6 +353,56 @@ module.exports = async function (h) {
     check("…back on the right, as it was", JSON.stringify(await boxes()) === JSON.stringify(before));
   }
 
+  // Updates (src/features/updates.js): the switch in General; the pill from
+  // the main process's state (the harness stands in for electron/updates.js).
+  {
+    const { updates } = h;
+    const pill = () =>
+      js(`({ shown: !updatePill.hidden, text: updatePill.textContent, welcome: welcomeUpdatePill.textContent,
+        menu: updateMenu.matches(":popover-open"), note: updateMenuNote.textContent })`);
+    check(
+      "Check for updates: in General, on; no pill without an update",
+      (await js(`${row("general", "checkUpdates")}.querySelector("input").checked`)) && !(await pill()).shown,
+    );
+    updates.set({ kind: "ready", version: "9.9.9" });
+    await sleep(200);
+    const ready = await pill();
+    await js(`updatePill.click()`);
+    await sleep(150);
+    const opened = await pill();
+    await js(`updateRestart.click()`);
+    await sleep(150);
+    check(
+      "an update ready: the pill says so (top bar and welcome corner); its menu restarts to update",
+      ready.shown &&
+        ready.text === "Update ready" &&
+        ready.welcome === "Update ready" &&
+        opened.menu &&
+        opened.note.includes("9.9.9") &&
+        updates.restarts === 1 &&
+        !(await pill()).menu,
+      JSON.stringify({ ready, opened, restarts: updates.restarts }),
+    );
+    updates.set({
+      kind: "available",
+      version: "9.9.9",
+      url: "https://github.com/wiktor-rocks/earbee/releases/tag/v9.9.9",
+    });
+    await sleep(200);
+    const out = await pill();
+    await js(`updatePill.click()`);
+    await sleep(150);
+    check(
+      "a newer version out (a Mac): the pill names it, a click opens its page, no menu",
+      out.text === "EarBee 9.9.9 is out" && updates.opens === 1 && !(await pill()).menu,
+      JSON.stringify({ out, opens: updates.opens }),
+    );
+    await shot("update-pill.png");
+    updates.set(null);
+    await sleep(150);
+    check("no update: no pill", !(await pill()).shown);
+  }
+
   // Kept over a reload (the preload reads them before the page starts).
   await h.wc.reload();
   await sleep(1500);

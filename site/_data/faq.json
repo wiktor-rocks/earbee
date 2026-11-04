@@ -21,7 +21,7 @@
   },
   {
     "q": "Does it need the internet?",
-    "a": "No. Everything runs on your computer; the internet is only needed to download from YouTube."
+    "a": "No. Everything runs on your computer. The internet is only needed to download from YouTube, to download the stem model the first time you separate a song, and to check for updates (you can turn that off in Settings)."
   },
   {
     "q": "Can it find the tempo and the bars?",

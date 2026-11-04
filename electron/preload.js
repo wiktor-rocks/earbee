@@ -154,6 +154,21 @@ contextBridge.exposeInMainWorld("earbee", {
     },
   },
 
+  // Updates (src/features/updates.js, electron/updates.js): the state is
+  // null, { kind: "ready", version } (installs on quit) or
+  // { kind: "available", version, url } (a newer release to download).
+  updates: {
+    state: () => ipcRenderer.invoke("updates:state"),
+    // Calls `callback` with each new state; returns a function that stops it.
+    onState(callback) {
+      const listener = (_event, state) => callback(state);
+      ipcRenderer.on("updates:state", listener);
+      return () => ipcRenderer.removeListener("updates:state", listener);
+    },
+    restart: () => ipcRenderer.send("updates:restart"),
+    openRelease: () => ipcRenderer.send("updates:open"),
+  },
+
   // Video window (src/features/video-window/): its "always on top"; each
   // resolves to the state now (electron/windows.js).
   videoWindow: {
