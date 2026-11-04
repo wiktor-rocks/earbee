@@ -195,7 +195,7 @@ What goes into the next release, and only that, is kept in `local/NEXT-RELEASE-<
    ```
 
 5. **Wait for the build** (about 15 minutes; Mac machines can be queued a while). It makes a **draft** release, which only you can see, under [Releases](https://github.com/wiktor-rocks/earbee/releases).
-6. **Check the draft.** It should have four files: `win-x64.exe`, `mac-arm64.dmg`, `mac-x64.dmg` and `linux-x86_64.AppImage`. Download the one for your system and try it.
+6. **Check the draft.** It should have the four downloads, `win-x64-setup.exe`, `mac-arm64.dmg`, `mac-x64.dmg` and `linux-x86_64.AppImage`, and the files updates are made from: `latest.yml`, `latest-linux.yml` and a `.blockmap` for the installer and the AppImage. Download the one for your system and try it.
 7. **Publish it,** with **Edit › Publish release** on GitHub, or:
 
    ```sh
@@ -205,6 +205,31 @@ What goes into the next release, and only that, is kept in `local/NEXT-RELEASE-<
    The website offers the new files at once; nothing else needs updating.
 
 If a pushed tag doesn't start the build, start it by hand: `gh workflow run release.yml --ref v0.2.0`.
+
+### Updates
+
+The Windows installer and the AppImage update themselves; a Mac only shows a pill saying there's a new version (`electron/updates.js`, `src/features/updates.js`). Each copy of EarBee looks at the **latest published release** about 30 seconds after it starts and then every six hours, unless Settings › General › Check for updates is off. A draft is never seen, so **publishing the draft is what sends the update to everyone**: try its files before you publish.
+
+**Trying an update before a release,** with two test builds and a server on your computer (the AppImage; the same works for the Windows installer in a VM, with your computer's address instead of `localhost`):
+
+1. A build config that points at the local server instead of GitHub:
+
+   ```sh
+   node -e 'const b=require("./package.json").build; b.publish={provider:"generic",url:"http://localhost:8765/"}; require("fs").writeFileSync("/tmp/update-test.json", JSON.stringify(b))'
+   ```
+
+2. Build an older and a newer version (plain numbers like 0.2.98: a version with `-test` in it would look for its own `test-linux.yml`), and keep the newer one's files for the server:
+
+   ```sh
+   npx electron-builder --linux --publish never --config /tmp/update-test.json -c.extraMetadata.version=0.2.98
+   mv dist/EarBee-0.2.98-linux-x86_64.AppImage ~/update-test/EarBee.AppImage
+   npx electron-builder --linux --publish never --config /tmp/update-test.json -c.extraMetadata.version=0.2.99
+   mkdir -p ~/update-test/serve && mv dist/EarBee-0.2.99-linux-x86_64.AppImage dist/latest-linux.yml ~/update-test/serve/
+   ```
+
+3. Serve it (`cd ~/update-test/serve && python3 -m http.server 8765`) and run the older one. After about 30 seconds the top bar says **Update ready**; quit, or choose **Restart and update now**, and the newer one starts.
+
+Afterwards, delete `~/update-test` and `~/.cache/earbee-updater`, and `rm -rf dist/linux-unpacked dist/builder-debug.yml`.
 
 ## The website
 

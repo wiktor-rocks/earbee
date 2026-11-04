@@ -3242,6 +3242,38 @@ body.panel-order-dragging * {
   user-select: none;
 }
 
+/* ---------- Update pill (src/features/updates.js) ----------
+   In the top bar and the welcome corner once there's a newer EarBee:
+   small, in the accent's colour, outlined like a chip. Ready (Windows,
+   Linux): its menu, against the pill; out (a Mac): a link. */
+
+.update-pill {
+  height: 28px;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--accent) 60%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent-text);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.update-pill:hover {
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+
+.update-menu {
+  position-anchor: --update-pill;
+  position-area: bottom span-left;
+  max-width: 280px;
+}
+
+.update-menu-note {
+  margin: 4px 10px 8px;
+  color: var(--muted);
+}
+
 /* ---------- Knobs (ui/knob.js) ----------
    A knob, then its name over its value. The range input inside the
    knob holds the value, out of sight; the dial is an SVG: the track, the

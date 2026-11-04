@@ -58,6 +58,7 @@ const { createProjectFiles, guardClose, handleProjects } = require("./project-fi
 const { handleSplash, loadWindowState, rememberWindowState, showAfterSplash } = require("./windows");
 const { allowVideoWindow, handleVideoWindows } = require("./windows"); // Video window (src/features/video-window/)
 const { handleStems } = require("./stems"); // Stems (src/features/stems/)
+const { handleUpdates, updateMode } = require("./updates"); // Updates (src/features/updates.js)
 
 const ROOT = path.join(__dirname, ".."); // the app's files: index.html, src/, assets/
 
@@ -176,6 +177,8 @@ const projectDialogs = {
 };
 
 let stems = null; // Stems (src/features/stems/): what handleStems gives, once ready
+/** @type {ReturnType<typeof handleUpdates> | null} */
+let updates = null; // Updates (src/features/updates.js), once ready
 
 // The app's own windows (not the video window, which stays black).
 const mainWindows = new Set();
@@ -275,6 +278,20 @@ app.whenReady().then(() => {
     // A search result, in the browser (no browser: just a warning).
     openExternal: (url) => shell.openExternal(url).catch((error) => console.warn("Couldn't open the link:", error)),
   });
+  // Updates (src/features/updates.js)
+  updates = handleUpdates(ipcMain, {
+    prefs: prefsStore,
+    version: app.getVersion(),
+    mode: updateMode({
+      platform: process.platform,
+      isAppImage: Boolean(process.env.APPIMAGE),
+      packaged: app.isPackaged,
+    }),
+    pages: () => [...mainWindows].map((win) => win.webContents),
+    fetch: net.fetch,
+    openExternal: (url) => shell.openExternal(url).catch((error) => console.warn("Couldn't open the link:", error)),
+    windows: () => BrowserWindow.getAllWindows(),
+  });
   createWindow();
 
   if (app.commandLine.hasSwitch("gpu-info")) {
@@ -289,6 +306,8 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
+  // Updates: "Restart and update now" closed them; install and start again.
+  if (updates?.restartPending()) return updates.restart();
   if (process.platform !== "darwin") {
     app.quit();
   }

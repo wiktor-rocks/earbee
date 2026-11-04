@@ -12,6 +12,8 @@ import { defineSection, normalizeAll } from "./fields.js";
 // it's set in the beats menu (the ♩ chip) or with Shift+B, not here.
 // `knobSensitivity` is how far a drag turns the dock's knobs
 // (ui/knob.js): 100 % is CONFIG.knob.travel, 200 % twice as far.
+// `checkUpdates`: a packaged EarBee asks GitHub for a newer version now
+// and then (electron/updates.js; the pill: features/updates.js).
 const generalSection = defineSection({
   id: "general",
   title: "General",
@@ -42,6 +44,13 @@ const generalSection = defineSection({
       max: 400,
       step: 25,
       unit: "%",
+    },
+    {
+      key: "checkUpdates",
+      type: "boolean",
+      label: "Check for updates",
+      help: "EarBee asks GitHub once in a while whether there's a new version. On Windows and Linux it downloads it and installs it when you quit; on a Mac it tells you.",
+      default: true,
     },
   ],
 });
