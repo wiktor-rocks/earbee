@@ -43,6 +43,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-06: Blog post "Free Riffstation alternative for Windows, Mac and Linux" (the website)
+
+- **What:** a tenth post, at `/blog/free-riffstation-alternative/`. What happened to Riffstation, what it did, a table comparing it with EarBee, why EarBee doesn't detect chords, five steps to find the chords by ear, what EarBee adds, what Riffstation did better, and which to pick.
+- **Why:** next on 0.3.0's SEO list, and the highest-ranked phrase left in the keyword research (`local/seo/opportunities-2026-10-30.md`). An assistant wrote it in the owner's voice; the owner published it as it was.
+- **How:** `keyword: "riffstation alternative"`, in the title, the address and the first sentence. It compares only Riffstation and EarBee, with one sentence naming Chordify for readers who just want the chords. True for 0.2.0: no stems, so it says EarBee can't isolate a part (after 0.3.0, change that and set `updated:`). The year Fender bought Riffstation is left out, because no page that could be read gives it.
+- **Where:** `site/blog/free-riffstation-alternative.md`.
+- **Verified by:** `npm run check`, `npm --prefix site run build`, `node scripts/seo/check.cjs`; the page answers at earbee.org after the push. Not checked: the page in a browser; the Chordify link (its site refused an automated request); whether old copies of Riffstation still run; the desktop app's withdrawal in early 2019 has one source, AlternativeTo, and the post says so. Not checked by the owner: the assistant's five chord steps, its "answers at the back of the book" analogy and its caution about download sites.
+
+---
+
 ## 2026-11-04: No "write EPIPE" error dialog when started from a launcher
 
 - **What:** EarBee started from a launcher (Gear Lever, the desktop's app menu) no longer shows "A JavaScript error occurred in the main process … Error: write EPIPE" a while after it opens.
