@@ -692,6 +692,124 @@ body.dragging .welcome-hint {
   font-size: 14px;
 }
 
+/* The recent files (src/features/recent.js), under the card: two lists side
+   by side, or one under the other when they don't fit. A long list scrolls
+   the whole screen. */
+.welcome-recent {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.welcome-recent-lists {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 16px;
+  text-align: left;
+}
+
+.recent-list h2 {
+  margin: 0 0 6px 10px;
+  color: var(--muted);
+  font: 500 13px/1.4 var(--sans);
+}
+
+.recent-list ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recent-list li {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.recent-open {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 6px 10px;
+  border-color: transparent;
+  background: transparent;
+  font-weight: 400;
+  text-align: left;
+}
+
+.recent-list li:hover .recent-open,
+.recent-open:focus-visible {
+  border-color: var(--hairline);
+  background: var(--surface-2);
+}
+
+.recent-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--muted);
+}
+
+.recent-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.recent-name,
+.recent-folder {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-folder {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Shows on the row under the mouse, or when the keyboard reaches it. */
+.recent-remove {
+  flex: none;
+  padding: 6px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  opacity: 0;
+}
+
+.recent-list li:hover .recent-remove,
+.recent-remove:focus-visible {
+  opacity: 1;
+}
+
+.recent-remove:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+.welcome-recent-clear {
+  margin-top: 10px;
+  padding: 4px 10px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.welcome-recent-clear:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
+/* In a short window, a smaller bee leaves more room for the lists. */
+@media (max-height: 719px) {
+  .welcome-content:has(.welcome-recent:not([hidden])) .welcome-logo {
+    width: 96px;
+    height: 96px;
+  }
+}
+
 /* ---------- Loading screen (first file) ---------- */
 
 .loading-screen {
@@ -1593,6 +1711,25 @@ body.dragging .welcome-hint {
 
 .menu-label {
   flex: 1;
+}
+
+/* The recent files in the File menu (src/features/recent.js): a long name
+   is cut short, and the row's tooltip names its folder. */
+.menu-heading {
+  margin: 6px 10px 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.recent-item {
+  font-weight: 400;
+}
+
+.recent-item .menu-label {
+  overflow: hidden;
+  max-width: 320px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* The beats menu (features/beats.js), from the ♩ chip: what's on is

@@ -19,6 +19,10 @@ export const dom = {
   welcomeMessage: $("welcomeMessage"),
   welcomeDownload: $("welcomeDownload"),
   welcomeProjectFormat: $("welcomeProjectFormat"),
+  welcomeRecent: $("welcomeRecent"),
+  welcomeRecentLists: $("welcomeRecentLists"),
+  welcomeRecentClear: $("welcomeRecentClear"),
+  fileMenuRecent: $("fileMenuRecent"),
   welcomeDropText: $("welcomeDropText"),
   dropOverlayText: $("dropOverlayText"),
   loadingScreen: $("loadingScreen"),
@@ -115,6 +119,8 @@ function showMessage(text, kind) {
   const line = dom.app.hidden ? dom.welcomeMessage : dom.message;
   line.textContent = text;
   line.classList.toggle("notice", kind === "notice");
+  // A long recent list may have scrolled the welcome screen's line away.
+  if (text && line === dom.welcomeMessage) line.scrollIntoView({ block: "nearest" });
 }
 
 const showError = (text) => showMessage(text, "error");

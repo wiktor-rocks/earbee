@@ -84,7 +84,7 @@ module.exports = async function (h) {
   await js(`fileMenuButton.click()`);
   await sleep(150);
   const items = await js(
-    `[...fileMenu.querySelectorAll(".menu-item")].filter((item) => item.checkVisibility()).map((item) => item.querySelector(".menu-label").textContent)`,
+    `[...fileMenu.querySelectorAll(".menu-item:not(.recent-item)")].filter((item) => item.checkVisibility()).map((item) => item.querySelector(".menu-label").textContent)`,
   );
   check(
     "File opens a menu: Open…, Save, Save as…, From YouTube…, the first focused",
