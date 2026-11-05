@@ -28,12 +28,21 @@ const iconOf = (/** @type {RecentEntry} */ entry, /** @type {boolean} */ isProje
   return holder;
 };
 
+const separatorIn = (/** @type {string} */ folder) => (folder.includes("\\") ? "\\" : "/");
+
 // The folder as a row shows it: its last two names, the part you'd
-// recognise. The row's tooltip has all of it.
+// recognise. The row's tooltip has the full path (fullPath).
 function shortFolder(/** @type {string} */ folder) {
-  const separator = folder.includes("\\") ? "\\" : "/";
+  const separator = separatorIn(folder);
   const names = folder.split(separator).filter(Boolean);
   return names.length > 2 ? `…${separator}${names.slice(-2).join(separator)}` : folder;
+}
+
+// Where the entry is, to show when the pointer rests on its row. (A folder
+// that is the top of a drive already ends in the separator.)
+function fullPath(/** @type {RecentEntry} */ { folder, name }) {
+  const separator = separatorIn(folder);
+  return folder.endsWith(separator) ? `${folder}${name}` : `${folder}${separator}${name}`;
 }
 
 // Opening one that has gone takes it off the list, and says so: the focus
@@ -62,7 +71,7 @@ async function remove(/** @type {string} */ id, /** @type {Element} */ button) {
 function welcomeRow(/** @type {RecentEntry} */ entry, /** @type {boolean} */ isProject) {
   const choose = element(
     "button",
-    { type: "button", className: "recent-open", title: entry.folder },
+    { type: "button", className: "recent-open", title: fullPath(entry) },
     iconOf(entry, isProject),
     element(
       "span",
@@ -102,7 +111,7 @@ function welcomeList(
 function menuRow(/** @type {RecentEntry} */ entry, /** @type {boolean} */ isProject) {
   const row = element(
     "button",
-    { type: "button", className: "menu-item recent-item", role: "menuitem", title: entry.folder },
+    { type: "button", className: "menu-item recent-item", role: "menuitem", title: fullPath(entry) },
     iconOf(entry, isProject),
     element("span", { className: "menu-label" }, entry.name),
   );

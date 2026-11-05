@@ -1714,7 +1714,7 @@ body.dragging .welcome-hint {
 }
 
 /* The recent files in the File menu (src/features/recent.js): a long name
-   is cut short, and the row's tooltip names its folder. */
+   is cut short, and the row's tooltip has the full path. */
 .menu-heading {
   margin: 6px 10px 4px;
   color: var(--muted);

@@ -139,8 +139,8 @@ module.exports = async function (h) {
     return { text: row.querySelector(".recent-folder").textContent, tooltip: row.title };
   })()`);
   check(
-    "…each with the end of its folder, and all of it in the tooltip",
-    shownFolder.text === `…${path.sep}${path.basename(OUTPUT)}${path.sep}recent` && shownFolder.tooltip === folder,
+    "…each with the end of its folder, and its full path in the tooltip",
+    shownFolder.text === `…${path.sep}${path.basename(OUTPUT)}${path.sep}recent` && shownFolder.tooltip === workFile,
     JSON.stringify(shownFolder),
   );
   check(
@@ -171,6 +171,8 @@ module.exports = async function (h) {
     headings.join() === "Open a recent project,Open a recent file" && (await inMenu()).includes("work.ebee"),
     JSON.stringify({ headings, rows: await inMenu() }),
   );
+  const menuTooltip = await js(`fileMenuRecent.querySelector(".recent-item").title`);
+  check("…a row's tooltip has its full path", menuTooltip === workFile, menuTooltip);
   await shot("file-menu-recent.png");
   key("End");
   await sleep(50);
