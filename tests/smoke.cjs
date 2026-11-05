@@ -142,6 +142,7 @@ const near = (a, b) => Math.abs(a - b) <= 40; // window decorations differ betwe
     await session(profile, async (page) => {
       check("window title", (await page.evaluate("document.title")) === "EarBee");
       check("welcome screen shown", await page.evaluate(`!document.getElementById("welcome").hidden`));
+      check("no recent files on a first start", await page.evaluate(`!welcomeRecent.checkVisibility()`));
       check(
         "download bridge from preload.js, From YouTube shown",
         await page.evaluate(
@@ -241,6 +242,39 @@ const near = (a, b) => Math.abs(a - b) <= 40; // window decorations differ betwe
         applied?.theme === "nord" && applied?.bg === "rgb(46, 52, 64)",
         JSON.stringify(applied),
       );
+    });
+
+    // Recent files, through the real main.js: an entry from an earlier run
+    // shows on the welcome screen, and a click opens it. (A second of
+    // silence, made here: a packaged build's test has no fixtures to rely on.)
+    const song = path.join(profile, "recent song.wav");
+    const silence = Buffer.alloc(44 + 16000);
+    silence.write("RIFF", 0);
+    silence.writeUInt32LE(36 + 16000, 4);
+    silence.write("WAVEfmt ", 8);
+    silence.writeUInt32LE(16, 16);
+    silence.writeUInt16LE(1, 20); // PCM
+    silence.writeUInt16LE(1, 22); // mono
+    silence.writeUInt32LE(8000, 24);
+    silence.writeUInt32LE(16000, 28);
+    silence.writeUInt16LE(2, 32);
+    silence.writeUInt16LE(16, 34);
+    silence.write("data", 36);
+    silence.writeUInt32LE(16000, 40);
+    fs.writeFileSync(song, silence);
+    fs.writeFileSync(
+      path.join(profile, "recent-files.json"),
+      JSON.stringify({ version: 1, projects: [], files: [song] }),
+    );
+    await session(profile, async (page) => {
+      const listed = await page.evaluate(`document.querySelector(".recent-name")?.textContent`);
+      check("a recent file from an earlier run is listed", listed === "recent song.wav", String(listed));
+      await page.evaluate(`document.querySelector(".recent-open").click()`);
+      const opened = await waitFor(
+        async () => (await page.evaluate("document.title")) === "EarBee — recent song.wav",
+        10000,
+      );
+      check("a click on it opens it", opened, await page.evaluate("document.title"));
     });
   } catch (error) {
     check("smoke test ran", false, error.stack);
