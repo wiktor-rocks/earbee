@@ -71,7 +71,7 @@ function tokenOf(url) {
 }
 
 function createMediaFiles() {
-  const shared = new Map(); // token → { path, name, offset, size } (size null: to the end)
+  const shared = new Map(); // token → { path, name, offset, size, project } (size null: to the end)
 
   const headers = {
     "Accept-Ranges": "bytes",
@@ -118,13 +118,15 @@ function createMediaFiles() {
   return {
     /**
      * Serves `file` to the page, or `slice.size` bytes of it from
-     * `slice.offset`, under `slice.name`; returns its URL.
+     * `slice.offset`, under `slice.name`; returns its URL. `slice.project`
+     * says it's a project's song or video, opened with that project file
+     * (recent-files.js then lists the project, not the song).
      * @param {string} file
-     * @param {{ offset?: number, size?: number | null, name?: string }} [slice]
+     * @param {{ offset?: number, size?: number | null, name?: string, project?: string }} [slice]
      */
-    share(file, { offset = 0, size = null, name = path.basename(file) } = {}) {
+    share(file, { offset = 0, size = null, name = path.basename(file), project = null } = {}) {
       const token = crypto.randomUUID();
-      shared.set(token, { path: file, name, offset, size });
+      shared.set(token, { path: file, name, offset, size, project });
       return `${SCHEME}://${token}/${encodeURIComponent(name)}`;
     },
     /**
@@ -135,12 +137,12 @@ function createMediaFiles() {
      */
     update(url, { path: file, offset = 0, size = null, name = path.basename(file) }) {
       const token = tokenOf(url);
-      if (token && shared.has(token)) shared.set(token, { path: file, name, offset, size });
+      if (token && shared.has(token)) shared.set(token, { ...shared.get(token), path: file, name, offset, size });
     },
     /**
      * What a URL from share() serves, or null if it isn't one.
      * @param {string} url
-     * @returns {{ path: string, name: string, offset: number, size: number | null } | null}
+     * @returns {{ path: string, name: string, offset: number, size: number | null, project: string | null } | null}
      */
     lookup(url) {
       return shared.get(tokenOf(url)) ?? null;

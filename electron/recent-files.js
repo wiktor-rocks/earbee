@@ -16,6 +16,7 @@ const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
 const { CONFIG } = require("../src/config.js");
+const { answer, isFile } = require("./project-files");
 
 const VERSION = 1;
 const EMPTY = { projects: [], files: [] };
@@ -110,4 +111,59 @@ function createRecentFiles(file, { max = CONFIG.recent.max } = {}) {
   };
 }
 
-module.exports = { createRecentFiles };
+/**
+ * Answers the preload (see preload.js), and tells every page when a list changes.
+ * @param {import("electron").IpcMain} ipcMain
+ * @param {ReturnType<typeof createRecentFiles>} recentFiles
+ * @param {object} options
+ * @param {ReturnType<typeof import("./media-files").createMediaFiles>} options.mediaFiles
+ * @param {ReturnType<typeof import("./project-files").createProjectFiles>} options.projectFiles
+ * @param {() => import("electron").WebContents[]} options.pages
+ */
+function handleRecentFiles(ipcMain, recentFiles, { mediaFiles, projectFiles, pages }) {
+  recentFiles.onChange(() => {
+    const lists = recentFiles.list();
+    for (const page of pages()) if (!page.isDestroyed()) page.send("recent:changed", lists);
+  });
+
+  ipcMain.handle("recent:list", () => recentFiles.list());
+
+  // Opens an entry by its id: what project:open answers, for a project, or
+  // a URL to read a song or video by. Checked first, because a shared file
+  // that has gone only looks undecodable to the page. An entry whose file
+  // has gone comes off the list, or it would stay there for good.
+  ipcMain.handle("recent:open", (event, id) =>
+    answer(async () => {
+      const entry = recentFiles.find(String(id));
+      if (!entry) return { ok: false, error: "That file isn't on the list any more." };
+      if (!(await isFile(entry.path))) {
+        recentFiles.remove(String(id));
+        const error = `“${path.basename(entry.path)}” isn't in ${path.dirname(entry.path)} any more, so it's off the list.`;
+        return { ok: false, error };
+      }
+      if (entry.kind === "projects") return projectFiles.open(event.sender, entry.path);
+      return { ok: true, media: { name: path.basename(entry.path), url: mediaFiles.share(entry.path) } };
+    }),
+  );
+
+  // What has just loaded, named by its URL. Only what the app itself shared
+  // counts, so the page can't put a path of its own on the list: a project's
+  // song lists the project, a whole file lists itself, and anything else
+  // (one of a project's stems, say) isn't something to reopen.
+  ipcMain.handle("recent:note", (_event, url) => {
+    const source = mediaFiles.lookup(String(url));
+    if (source?.project) recentFiles.add("projects", source.project);
+    else if (source && source.offset === 0 && source.size === null) recentFiles.add("files", source.path);
+  });
+
+  ipcMain.handle("recent:remove", (_event, id) => {
+    recentFiles.remove(String(id));
+    return recentFiles.list();
+  });
+  ipcMain.handle("recent:clear", () => {
+    recentFiles.clear();
+    return recentFiles.list();
+  });
+}
+
+module.exports = { createRecentFiles, handleRecentFiles };
