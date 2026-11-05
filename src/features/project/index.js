@@ -45,6 +45,14 @@ import { SECTIONS } from "./sections.js";
  */
 const bridge = /** @type {ProjectBridge | undefined} */ (/** @type {any} */ (window).earbee?.project);
 
+/**
+ * Recent files (src/features/recent.js): only what opening needs.
+ * @typedef {object} RecentBridge
+ * @property {(id: string) => Promise<any>} open
+ * @property {(url: string) => Promise<void>} note
+ */
+const recent = /** @type {RecentBridge | undefined} */ (/** @type {any} */ (window).earbee?.recent);
+
 // The session: what is open, and what was last saved.
 const session = {
   mediaName: "",
@@ -151,6 +159,9 @@ async function startMediaSession(media) {
     session.mediaUrl = registered?.ok ? registered.url : null;
   }
   markSaved();
+  // It opened, and has a place on this computer (a file dropped from
+  // another program may not): it goes on the recent list.
+  if (session.mediaUrl) recent?.note(session.mediaUrl);
 }
 
 /**
@@ -188,6 +199,7 @@ async function loadProject(opened, signal) {
     checkDirty();
     notices.push(`Found “${opened.media.name}”; save the project to remember where it is now.`);
   }
+  recent?.note(opened.media.url);
   return notices;
 }
 
@@ -197,17 +209,32 @@ async function loadProject(opened, signal) {
  */
 export async function openFile(file) {
   if (!file || !(await confirmUnsaved())) return;
-  if (isProjectName(file.name)) return openProjectFile(file);
-  return withLoading(file.name, async (signal) => {
-    showNotice((await loadMedia(file, signal)).join(" "));
-    notify(`Opened “${file.name}”`);
-  });
+  if (!isProjectName(file.name)) return openMedia(file);
+  if (!bridge) throw new AppError("Projects can only be opened in the EarBee app.");
+  return showOpenedProject(await bridge.open(file));
 }
 
-/** @param {File} file */
-async function openProjectFile(file) {
-  if (!bridge) throw new AppError("Projects can only be opened in the EarBee app.");
-  const opened = await bridge.open(file);
+/**
+ * Opens an entry of the recent list (src/features/recent.js): the main
+ * process finds it by its id, and answers a project (with its sections) or a
+ * song or video to read by URL.
+ * @param {string} id
+ */
+export async function openRecent(id) {
+  if (!recent || !(await confirmUnsaved())) return;
+  const opened = await recent.open(id);
+  return opened.ok && !opened.sections ? openMedia(opened.media) : showOpenedProject(opened);
+}
+
+/** @param {import("../../core/media.js").Media} media */
+const openMedia = (media) =>
+  withLoading(media.name, async (signal) => {
+    showNotice((await loadMedia(media, signal)).join(" "));
+    notify(`Opened “${media.name}”`);
+  });
+
+/** What opening a project answered: loads it, or says why it couldn't be opened (nothing, if the user canceled). */
+async function showOpenedProject(opened) {
   if (!opened.ok) {
     if (opened.error) throw new AppError(opened.error);
     return;
