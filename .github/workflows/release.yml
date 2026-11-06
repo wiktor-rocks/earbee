@@ -80,7 +80,7 @@ jobs:
 
           **Downloads:**
           - **Windows:** the \`win-x64-setup.exe\`, an installer (no admin rights needed). Windows may warn about an unrecognised app the first time; choose *More info*, then *Run anyway*. EarBee then updates itself.
-          - **macOS:** the \`mac-arm64.dmg\` (Apple Silicon) or \`mac-x64.dmg\` (Intel). It isn't signed by Apple: the first time, right-click it and choose *Open*, or allow it in System Settings › Privacy & Security. EarBee tells you when there's a new version.
+          - **macOS:** the \`mac-arm64.dmg\`, for Apple Silicon (M1 or later). For Intel Macs, the last version is 0.2.0. It isn't signed by Apple: the first time, right-click it and choose *Open*, or allow it in System Settings › Privacy & Security. EarBee tells you when there's a new version.
           - **Linux:** the \`linux-x86_64.AppImage\`. Make it executable (\`chmod +x\`) and run it. It updates itself.
 
           What changed: see [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/CHANGELOG.md).

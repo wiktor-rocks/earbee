@@ -9,7 +9,7 @@
   },
   {
     "q": "Which computers does it run on?",
-    "a": "Windows, macOS (Apple Silicon and Intel) and Linux."
+    "a": "Windows, macOS on Apple Silicon (M1 or later) and Linux. For Intel Macs, the last version is 0.2.0."
   },
   {
     "q": "Can I learn from a YouTube video with it?",
@@ -25,7 +25,7 @@
   },
   {
     "q": "Can it find the tempo and the bars?",
-    "a": "Yes. A beat tracker that runs on your computer marks every beat and bar and shows the tempo, so you can loop one bar or step through it beat by beat. On Intel Macs, a simpler finder marks the beats, without the bars."
+    "a": "Yes. A beat tracker that runs on your computer marks every beat and bar and shows the tempo, so you can loop one bar or step through it beat by beat."
   },
   {
     "q": "Does it write out the notes for me?",

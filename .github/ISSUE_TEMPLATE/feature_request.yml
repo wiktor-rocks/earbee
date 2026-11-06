@@ -33,8 +33,7 @@ body:
       label: Your system
       options:
         - Windows
-        - macOS (Apple Silicon)
-        - macOS (Intel)
+        - macOS
         - Linux
         - Doesn't matter
   - type: checkboxes

@@ -43,6 +43,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-06: No more Intel Mac builds
+
+- **What:** from 0.3.0, the Mac download is for Apple Silicon only. The home page's Mac card has one Download button and says "for Apple Silicon (M1 or later)" and that 0.2.0 is the last version for Intel Macs; the FAQ, the release notes and the README say the same. The home page and the FAQ no longer mention beats without bars on Intel Macs. The Amazing Slow Downer post no longer says EarBee runs on Intel Macs (online as soon as this is pushed: a post goes online from `testing`). The issue forms offer one "macOS".
+- **Why:** the owner's decision. Nothing was tested on Intel Macs: they had no beat model (ONNX Runtime ships no Intel Mac build), and no memory guard for stems.
+- **How:** `build.mac.target` in `package.json` builds `arm64` only. `FILES.macIntel` and the second-button styles are gone from the site. The 0.2.0 Intel `.dmg` stays on its GitHub release. The simple beat finder stays: the page uses it outside Electron and when the beat model can't run. On the release workflow's Mac machine, which is Apple Silicon, nothing else changes.
+- **Where:** `package.json`, `.github/workflows/release.yml`, `.github/ISSUE_TEMPLATE/`, `site/index.html`, `site/style.css`, `site/download.js`, `site/_data/faq.json`, `site/blog/free-alternative-to-amazing-slow-downer.md`, `README.md`, `docs/maintaining.md`, `docs/glossary.md`, `electron/beat-model-process.js`.
+- **Verified by:** `npm run check`, `npm run test:unit` (434), `npm --prefix site run build`, `node scripts/seo/check.cjs`; no Intel mention is left in the repository but the "last version" lines; the built page in Electron has one Mac button, which the script points at the exact Apple Silicon file; the download section looked at in a screenshot. Not checked: the Mac build itself, which only a release build on a Mac can show: "Check the draft" in docs/maintaining.md (that `mac-arm64.dmg` is there and `mac-x64.dmg` isn't).
+
+---
+
 ## 2026-11-06: The site's links are real without JavaScript; the Windows card and the README's Mac line (the website, docs)
 
 - **What:** on earbee.org, the GitHub, Source code, MIT licence and All releases links carry their real addresses in the page itself, and the four download buttons start on the latest release, then become the exact file as before. The Windows card says "Installer, .exe: no admin rights needed" instead of "Portable .exe: nothing to install". The README no longer says the macOS builds haven't been tried on a Mac.

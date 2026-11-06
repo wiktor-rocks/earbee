@@ -97,7 +97,7 @@ If you're used to Amazing Slow Downer, here's the same routine in EarBee:
 
 ## Is there a free Amazing Slow Downer for Mac?
 
-Not the full version: the free Lite versions are for phones and tablets. EarBee runs on Macs with Apple Silicon and on Intel Macs, and it's free there as it is on Windows and Linux. Amazing Slow Downer's Mac version is also a separate purchase from its Windows one, so if you use both systems, EarBee saves you paying twice.
+Not the full version: the free Lite versions are for phones and tablets. EarBee runs on Macs with Apple Silicon, and it's free there as it is on Windows and Linux. Amazing Slow Downer's Mac version is also a separate purchase from its Windows one, so if you use both systems, EarBee saves you paying twice.
 
 ## What about Spotify?
 

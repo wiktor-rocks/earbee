@@ -195,7 +195,7 @@ What goes into the next release, and only that, is kept in `local/NEXT-RELEASE-<
    ```
 
 5. **Wait for the build** (about 15 minutes; Mac machines can be queued a while). It makes a **draft** release, which only you can see, under [Releases](https://github.com/wiktor-rocks/earbee/releases).
-6. **Check the draft.** It should have the four downloads, `win-x64-setup.exe`, `mac-arm64.dmg`, `mac-x64.dmg` and `linux-x86_64.AppImage`, and the files updates are made from: `latest.yml`, `latest-linux.yml` and a `.blockmap` for the installer and the AppImage. Download the one for your system and try it.
+6. **Check the draft.** It should have the three downloads, `win-x64-setup.exe`, `mac-arm64.dmg` and `linux-x86_64.AppImage`, and the files updates are made from: `latest.yml`, `latest-linux.yml` and a `.blockmap` for the installer and the AppImage. Download the one for your system and try it.
 7. **Publish it,** with **Edit › Publish release** on GitHub, or:
 
    ```sh

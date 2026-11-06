@@ -34,8 +34,7 @@ body:
       label: Your system
       options:
         - Windows
-        - macOS (Apple Silicon)
-        - macOS (Intel)
+        - macOS
         - Linux
     validations:
       required: true

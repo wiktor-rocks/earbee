@@ -26,7 +26,7 @@ let session = null;
 
 async function load() {
   // Required here, not at the top: on a system without an ONNX Runtime
-  // build (e.g. an Intel Mac) each answer says so instead of the process dying.
+  // build each answer says so instead of the process dying.
   const ort = require("onnxruntime-node");
   const created = await ort.InferenceSession.create(fs.readFileSync(process.argv.at(-1)), {
     intraOpNumThreads: THREADS,

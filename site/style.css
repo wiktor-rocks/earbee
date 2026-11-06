@@ -586,9 +586,6 @@ section h2 {
   border-radius: 2px;
   background: var(--accent);
 }
-.small-print {
-  font-size: 14px;
-}
 
 /* A clip's frame: the video at its own shape (--ratio, width / height),
    framed like the screenshot. */
@@ -807,23 +804,6 @@ section h2 {
   color: var(--muted);
   font-size: 15px;
 }
-.platform-buttons {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 10px 16px;
-}
-/* A second download beside the button (the Intel Mac's). */
-.platform .alt {
-  color: var(--muted);
-  font-size: 15px;
-  font-weight: 700;
-}
-.platform .alt small {
-  font-weight: 600;
-  opacity: 0.7;
-}
-
 .platform .hint {
   margin: 16px 0 0;
   color: var(--muted);
@@ -1122,31 +1102,14 @@ main > .post {
    wraps by itself, and the top bar drops GitHub, keeping the brand, Blog,
    Download and the theme switch. */
 
-/* Three narrow download cards: every download a full-width button, the
-   Mac's two one under the other, rather than wrapping as they fit. */
+/* Three narrow download cards: every download a full-width button. */
 @media (max-width: 1100px) {
-  .platform .button,
-  .platform .alt {
+  .platform .button {
     display: flex;
     align-items: baseline;
     justify-content: center;
     gap: 8px;
     width: 100%;
-  }
-  .platform-buttons {
-    flex-direction: column;
-    align-items: stretch;
-    gap: 8px;
-  }
-  .platform .alt {
-    padding: 10px 20px;
-    border: 1px solid var(--hairline);
-    border-radius: var(--radius-sm);
-    text-decoration: none;
-  }
-  .platform .alt:hover {
-    background: var(--surface-hover);
-    color: var(--text);
   }
 }
 
