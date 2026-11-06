@@ -310,4 +310,9 @@ export const CONFIG = {
     // to another part meanwhile.
     memory: { model: 2e9, blend: 100e6, share: 0.8, totalShare: 0.5 },
   },
+
+  // Recent files (electron/recent-files.js, src/features/recent.js): how
+  // many are kept per list (projects, files), all shown on the welcome
+  // screen, and how many of each the File menu shows.
+  recent: { max: 8, inMenu: 5 },
 };

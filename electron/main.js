@@ -27,7 +27,9 @@
 //              settings (project-files.js): opened and saved through the
 //              preload, with the native dialogs below. Closing the window
 //              with unsaved changes asks first (guardClose).
-//   Window     Remembers its size, position and maximised state between
+//   Recent     The projects and files opened lately (recent-files.js,
+//              recent-files.json), listed and opened through the preload.
+//   Window    Remembers its size, position and maximised state between
 //              runs (windows.js). The title follows the page's
 //              <title>, which names the open file. While the page loads,
 //              hidden, a splash shows the bee and a loader (windows.js).
@@ -55,6 +57,7 @@ const { createMediaFiles, registerMediaScheme } = require("./media-files");
 const { handleRendererCrash, handleSystem } = require("./system");
 const { createPrefsStore, createThemeView, handlePrefs } = require("./prefs-store");
 const { createProjectFiles, guardClose, handleProjects } = require("./project-files");
+const { createRecentFiles, handleRecentFiles } = require("./recent-files");
 const { handleSplash, loadWindowState, rememberWindowState, showAfterSplash } = require("./windows");
 const { allowVideoWindow, handleVideoWindows } = require("./windows"); // Video window (src/features/video-window/)
 const { handleStems } = require("./stems"); // Stems (src/features/stems/)
@@ -278,7 +281,13 @@ app.whenReady().then(() => {
   const mediaFiles = createMediaFiles();
   mediaFiles.handle(protocol);
   const projectFiles = createProjectFiles({ mediaFiles, dialogs: projectDialogs, appVersion: app.getVersion() });
-  handleProjects(ipcMain, projectFiles, { mediaFiles, dialogs: projectDialogs, state: projectState });
+  const recentFiles = createRecentFiles(path.join(userData, "recent-files.json"));
+  handleProjects(ipcMain, projectFiles, { mediaFiles, dialogs: projectDialogs, state: projectState, recentFiles });
+  handleRecentFiles(ipcMain, recentFiles, {
+    mediaFiles,
+    projectFiles,
+    pages: () => [...mainWindows].map((win) => win.webContents),
+  });
   handleDownloads(ipcMain, {
     binDir: path.join(userData, "bin"),
     saveDir: downloadsFolder,

@@ -105,10 +105,17 @@ async function createHarness() {
     confirm: answer("confirm"),
   };
   const projectState = new Map();
-  handleProjects(ipcMain, createProjectFiles({ mediaFiles, dialogs: stubDialogs, appVersion: "test" }), {
+  const projectFiles = createProjectFiles({ mediaFiles, dialogs: stubDialogs, appVersion: "test" });
+  // Recent files as main.js keeps them, in a fresh file each run.
+  const { createRecentFiles, handleRecentFiles } = require(path.join(PROJECT, "electron", "recent-files.js"));
+  const recentFilesPath = path.join(OUTPUT, "recent-files.json");
+  fs.rmSync(recentFilesPath, { force: true });
+  const recentFiles = createRecentFiles(recentFilesPath);
+  handleProjects(ipcMain, projectFiles, { mediaFiles, dialogs: stubDialogs, state: projectState, recentFiles });
+  handleRecentFiles(ipcMain, recentFiles, {
     mediaFiles,
-    dialogs: stubDialogs,
-    state: projectState,
+    projectFiles,
+    pages: () => BrowserWindow.getAllWindows().map((win) => win.webContents),
   });
   // As main.js does, except that a test can pretend the system has only
   // `memory.available` bytes left, or `memory.total` in all (null: the
@@ -367,6 +374,8 @@ async function createHarness() {
     prefsStore,
     folderChoice,
     projectDialogs,
+    recentFiles,
+    recentFilesPath,
     setStemDelay: (ms) => (stemDelay = ms), // Stems: each segment this much slower
     setStemStartFails: (yes) => (stemStartFails = yes), // Stems: the stem process can't start
     setStemModelGone: (gone) => showStemModel(!gone), // Stems: the model's file deleted, or back

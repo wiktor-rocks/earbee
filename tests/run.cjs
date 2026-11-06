@@ -61,6 +61,7 @@ const TOPICS = [
   "19-big-video.cjs", // Big video (src/features/big-video.js)
   "20-beats.cjs",
   "21-stems.cjs", // Stems (src/features/stems/)
+  "22-recent.cjs", // Recent files (src/features/recent.js)
 ];
 
 prepare();

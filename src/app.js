@@ -133,7 +133,8 @@
  *                  selection, the marks list), open-file.js, download.js
  *                  (and searching in the download dialog), settings.js
  *                  (the Settings dialog, where the theme is chosen), file-menu.js
- *                  (the File menu), layout.js (the shortcuts dialog, the
+ *                  (the File menu), recent.js (the recent files, on the
+ *                  welcome screen and in that menu), layout.js (the shortcuts dialog, the
  *                  sidebar toggle), project/ (saving and opening project
  *                  files: index.js; what they save: sections.js),
  *                  video-window/ (the video in a window of its own, with
@@ -316,6 +317,7 @@ import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./featur
 import { bindProject, isSaveDialogOpen, openFile, saveProject, saveProjectAs } from "./features/project/index.js";
 import { bindSettings, isSettingsOpen } from "./features/settings.js";
 import { bindFileMenu, isFileMenuOpen } from "./features/file-menu.js";
+import { bindRecent } from "./features/recent.js";
 import {
   bindPlayback,
   bindTransportButtons,
@@ -726,6 +728,7 @@ function start() {
   bindProject();
   bindDownloads();
   bindFileMenu();
+  const recentShown = bindRecent();
   bindSettings();
   bindMarks();
   bindBeats();
@@ -756,8 +759,9 @@ function start() {
   // The welcome screen's entrance plays once (style.css), not again when a
   // failed first file brings the screen back.
   setTimeout(() => dom.welcome.classList.add("settled"), 1000);
-  // The window stays hidden behind a splash until now (electron/windows.js).
-  /** @type {any} */ (window).earbee?.ready?.();
+  // The window stays hidden behind a splash until now (electron/windows.js),
+  // and until the recent files are in place, so the screen doesn't jump.
+  recentShown.finally(() => /** @type {any} */ (window).earbee?.ready?.());
 }
 
 start();

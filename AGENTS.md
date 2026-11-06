@@ -50,7 +50,7 @@ A desktop player for transcribing music (Electron). There's no build step: the p
 | The website: preview, build      | `npm --prefix site start` (http://localhost:8080), `npm --prefix site run build`; once: `npm --prefix site install`                        |
 | A packaged build, and testing it | `npm run build:dir`, then `TB_APP_PATH=$PWD/dist/linux-unpacked/resources/app.asar TB_APP_BINARY=$PWD/dist/linux-unpacked/earbee npm test` |
 
-The end-to-end topics are the files in `tests/e2e/`: 01 static UI, 02 welcome screen, 03 audio and the loop, 04 Space replay, 05 stepping, 06 zoom, 07 errors, 08 video, 09 downloads and search, 10 themes, 11 parallel decoding, 12 resources, 13 settings, 14 marks, 15 security, 16 projects, 17 waveform, 18 video window, 19 big video, 20 beats. A topic may rely on what an earlier one left open; if one fails only when run alone, run it with the topics before it. Known: 09 needs a file open (`TB_TOPICS=03,09`).
+The end-to-end topics are the files in `tests/e2e/`: 01 static UI, 02 welcome screen, 03 audio and the loop, 04 Space replay, 05 stepping, 06 zoom, 07 errors, 08 video, 09 downloads and search, 10 themes, 11 parallel decoding, 12 resources, 13 settings, 14 marks, 15 security, 16 projects, 17 waveform, 18 video window, 19 big video, 20 beats, 21 stems, 22 recent files. A topic may rely on what an earlier one left open; if one fails only when run alone, run it with the topics before it. Known: 09 needs a file open (`TB_TOPICS=03,09`).
 
 ## Test builds
 

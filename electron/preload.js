@@ -9,6 +9,7 @@
 //   - project files (.ebee; see project-files.js): opening, saving, and
 //     whether there are unsaved changes; a File's path is found here, so
 //     the page never names a path itself;
+//   - the recent files (see recent-files.js): listed and opened by id;
 //   - the settings (see prefs-store.js): read at startup, changed one at a
 //     time, and every change heard; the saved colour theme is applied here,
 //     before the page renders, so it never flashes the default colours.
@@ -136,6 +137,27 @@ contextBridge.exposeInMainWorld("earbee", {
       return () => ipcRenderer.removeListener("project:save-then-close", listener);
     },
     close: () => ipcRenderer.send("project:close"),
+  },
+
+  // Recent files (src/features/recent.js, electron/recent-files.js). The
+  // lists are { projects, files }, each a list of { id, name, folder },
+  // newest first; an entry is named by its id, never by a path.
+  recent: {
+    list: () => ipcRenderer.invoke("recent:list"),
+    // { ok: true, media: { name, url } } for a file, what project.open answers
+    // for a project (which has `sections` too), or { ok: false, canceled?, error? }.
+    open: (id) => ipcRenderer.invoke("recent:open", String(id)),
+    // What has just loaded, by the URL it's served under.
+    note: (url) => ipcRenderer.invoke("recent:note", String(url)),
+    // Each resolves to the lists after it.
+    remove: (id) => ipcRenderer.invoke("recent:remove", String(id)),
+    clear: () => ipcRenderer.invoke("recent:clear"),
+    // Calls `callback` with the lists after every change; returns a function that stops it.
+    onChanged(callback) {
+      const listener = (_event, lists) => callback(lists);
+      ipcRenderer.on("recent:changed", listener);
+      return () => ipcRenderer.removeListener("recent:changed", listener);
+    },
   },
 
   // See src/ui/prefs.js. set, reset and chooseFolder resolve to

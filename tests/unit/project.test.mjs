@@ -151,6 +151,7 @@ describe("main process", () => {
     assert.deepEqual(opened.sections, sections);
     assert.equal(opened.relinked, false);
     assert.deepEqual(await body(opened.media.url), bytes);
+    assert.equal(mediaFiles.lookup(opened.media.url).project, target, "the song says which project it came with");
   });
 
   test("saved with the media inside: served as a slice of the project, even after saving over it", async () => {
@@ -158,6 +159,8 @@ describe("main process", () => {
     const target = path.join(folder, "inside.ebee");
     const saved = await projects.save(null, { file: target, mediaUrl, embed: true, duration: 2, sections });
     assert.equal(saved.embedded, true);
+    const inside = await projects.open(null, target);
+    assert.equal(mediaFiles.lookup(inside.media.url).project, target, "the song inside says so too");
     assert.equal(saved.linkable, false, "the page's URL now names the media inside, which can't be linked");
     const header = await readHeader(target);
     assert.equal(header.fileSize - header.mediaOffset, 300);

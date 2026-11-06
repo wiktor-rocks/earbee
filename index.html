@@ -88,6 +88,12 @@
         </div>
 
         <div id="welcomeMessage" class="message welcome-message" role="status"></div>
+
+        <!-- The projects and files opened lately (src/features/recent.js). -->
+        <section id="welcomeRecent" class="welcome-recent" aria-label="Recent files" hidden>
+          <div id="welcomeRecentLists" class="welcome-recent-lists"></div>
+          <button id="welcomeRecentClear" class="welcome-recent-clear" type="button">Clear recent files</button>
+        </section>
       </div>
     </main>
 
@@ -749,6 +755,9 @@
         <svg class="icon" aria-hidden="true"><use href="#i-download" /></svg>
         <span class="menu-label">From YouTube…</span>
       </button>
+      <hr />
+      <!-- The projects and files opened lately (src/features/recent.js). -->
+      <div id="fileMenuRecent" role="none" hidden></div>
     </div>
 
     <!-- The beats menu (see features/beats.js), opened by the ♩ chip once

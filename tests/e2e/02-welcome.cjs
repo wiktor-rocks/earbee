@@ -121,6 +121,13 @@ module.exports = async function (h) {
     JSON.stringify(wm),
   );
   await shot("welcome-error.png");
+  // Recent files (src/features/recent.js): none yet, and a failed file isn't one.
+  check("no recent files on a first run", await js(`!welcomeRecent.checkVisibility()`));
+  check(
+    "a file that failed to open isn't a recent file",
+    h.recentFiles.list().files.length === 0,
+    JSON.stringify(h.recentFiles.list()),
+  );
   await js(
     `(() => { const dt = new DataTransfer(); dt.items.add(new File([""], "song.wav", { type: "audio/wav" })); window.dispatchEvent(new DragEvent("dragover", { dataTransfer: dt, cancelable: true })); })()`,
   );
@@ -170,6 +177,11 @@ module.exports = async function (h) {
     JSON.stringify(widths),
   );
   check("welcome error cleared from player", (await js(`document.getElementById("message").textContent`)) === "");
+  check(
+    "a dropped file with no place on this computer isn't a recent file",
+    h.recentFiles.list().files.length === 0,
+    JSON.stringify(h.recentFiles.list()),
+  );
 
   await js(`window.__slowDecode = 800`);
   await setFiles(path.join(FIXTURES, "tone.wav"));

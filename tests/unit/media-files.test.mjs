@@ -60,6 +60,15 @@ describe("createMediaFiles", () => {
     assert.deepEqual([...new Uint8Array(await part.arrayBuffer())], [10, 11, 12, 13, 14, 15, 16, 17, 18, 19]);
   });
 
+  test("a share says which project it was opened with, and keeps saying so when it moves", () => {
+    assert.equal(media.lookup(url).project, null);
+    const song = media.share(file, { project: "/work/song.ebee" });
+    assert.equal(media.lookup(song).project, "/work/song.ebee");
+    media.update(song, { path: "/work/other.ebee", offset: 10, size: 5 });
+    assert.equal(media.lookup(song).project, "/work/song.ebee");
+    assert.equal(media.lookup(song).path, "/work/other.ebee");
+  });
+
   test("the page (origin file://, i.e. null) may read the range headers", async () => {
     const response = await get(url, { headers: { Range: "bytes=0-0" } });
     assert.equal(response.headers.get("Access-Control-Allow-Origin"), "*");

@@ -156,7 +156,7 @@ function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
           throw new project.ProjectFormatError("This project should have its song or video inside, but it's missing.");
         // With blobs after it, the media ends at its size; before blobs, at the end of the file.
         const size = Object.keys(blobs).length ? media.size : header.fileSize - payload;
-        const slice = { offset: payload, size, name: media.name };
+        const slice = { offset: payload, size, name: media.name, project: file };
         const url = mediaFiles.share(file, slice);
         return { ...opened, media: { name: media.name, url }, linkable: false, relinked: false };
       }
@@ -165,7 +165,7 @@ function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
       const name = path.basename(found.file);
       return {
         ...opened,
-        media: { name, url: mediaFiles.share(found.file) },
+        media: { name, url: mediaFiles.share(found.file, { project: file }) },
         linkable: true,
         relinked: found.relinked,
       };
@@ -242,6 +242,23 @@ function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
   };
 }
 
+// Answers the page: { ok: true, … } or { ok: false, error }.
+async function answer(work) {
+  try {
+    return await work();
+  } catch (error) {
+    if (!(error instanceof project.ProjectFormatError) && error?.code !== "ENOENT")
+      console.error("Project file failed:", error);
+    const message =
+      error?.code === "ENOENT"
+        ? "That file isn't there any more."
+        : error?.code === "EACCES" || error?.code === "EPERM"
+          ? "EarBee isn't allowed to write there."
+          : String(error?.message ?? error);
+    return { ok: false, error: message };
+  }
+}
+
 /**
  * Answers the preload (see preload.js).
  * @param {import("electron").IpcMain} ipcMain
@@ -250,25 +267,9 @@ function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
  * @param {ReturnType<typeof import("./media-files").createMediaFiles>} options.mediaFiles
  * @param {ProjectDialogs} options.dialogs
  * @param {Map<number, { dirty: boolean, name: string }>} options.state Each page's unsaved state, by webContents id.
+ * @param {ReturnType<typeof import("./recent-files").createRecentFiles>} options.recentFiles A saved project goes on its list.
  */
-function handleProjects(ipcMain, projectFiles, { mediaFiles, dialogs, state }) {
-  // Answers { ok: true, … } or { ok: false, error }.
-  const answer = async (work) => {
-    try {
-      return await work();
-    } catch (error) {
-      if (!(error instanceof project.ProjectFormatError) && error?.code !== "ENOENT")
-        console.error("Project file failed:", error);
-      const message =
-        error?.code === "ENOENT"
-          ? "That file isn't there any more."
-          : error?.code === "EACCES" || error?.code === "EPERM"
-            ? "EarBee isn't allowed to write there."
-            : String(error?.message ?? error);
-      return { ok: false, error: message };
-    }
-  };
-
+function handleProjects(ipcMain, projectFiles, { mediaFiles, dialogs, state, recentFiles }) {
   ipcMain.handle("project:register-media", async (_event, file) =>
     answer(async () => {
       if (typeof file !== "string" || !path.isAbsolute(file) || !(await isFile(file)))
@@ -278,15 +279,17 @@ function handleProjects(ipcMain, projectFiles, { mediaFiles, dialogs, state }) {
   );
   ipcMain.handle("project:open", (event, file) => answer(() => projectFiles.open(event.sender, String(file ?? ""))));
   ipcMain.handle("project:save", (event, request) =>
-    answer(() =>
-      projectFiles.save(event.sender, {
+    answer(async () => {
+      const saved = await projectFiles.save(event.sender, {
         file: typeof request?.file === "string" && path.isAbsolute(request.file) ? request.file : null,
         mediaUrl: String(request?.mediaUrl ?? ""),
         embed: request?.embed === true,
         duration: Number(request?.duration) || 0,
         sections: request?.sections && typeof request.sections === "object" ? request.sections : {},
-      }),
-    ),
+      });
+      if (saved.ok) recentFiles.add("projects", saved.path);
+      return saved;
+    }),
   );
   ipcMain.handle("project:confirm", (event, name) => dialogs.confirm(event.sender, String(name ?? "")));
   ipcMain.on("project:dirty", (event, dirty, name) => {
@@ -354,4 +357,13 @@ function guardClose(win, { ipcMain, dialogs, state, busy = () => null }) {
   win.on("closed", () => ipcMain.removeListener("project:close", close));
 }
 
-module.exports = { createProjectFiles, handleProjects, guardClose, readHeader, mediaCandidates, projectNameFor };
+module.exports = {
+  createProjectFiles,
+  handleProjects,
+  guardClose,
+  readHeader,
+  mediaCandidates,
+  projectNameFor,
+  answer,
+  isFile,
+};
