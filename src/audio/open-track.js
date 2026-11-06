@@ -13,8 +13,8 @@ export class DecodeError extends Error {
 
 /**
  * The primary audio track of `media` (a File, or { name, url }: core/media.js),
- * with when it starts and how long it is. Throws a DecodeError
- * ("cannot-decode" or "no-audio") if it can't be read.
+ * with when it starts and how long it is. Throws a DecodeError if it can't
+ * be read ("cannot-decode" or "no-audio") or is FLAC ("failed").
  * @param {import("../core/media.js").Media} media
  */
 export async function openTrack(media) {
@@ -26,6 +26,11 @@ export async function openTrack(media) {
     throw new DecodeError("cannot-decode", String(error?.message ?? error));
   }
   if (!track) throw new DecodeError("no-audio", "no audio track");
+  // FLAC isn't supported, whatever the file is called or whatever holds it.
+  // "failed", because "cannot-decode" would make decoder.js try again with
+  // decodeAudioData. ALAC needs no check: neither Mediabunny nor Chromium
+  // reads it (e2e/07-errors.cjs).
+  if (track.codec === "flac") throw new DecodeError("failed", "FLAC isn't supported");
   if (!(await track.canDecode())) throw new DecodeError("cannot-decode", `can't decode ${track.codec ?? "its codec"}`);
 
   const [end, first] = await Promise.all([track.computeDuration(), track.getFirstTimestamp()]);

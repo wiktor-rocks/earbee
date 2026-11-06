@@ -22,6 +22,8 @@ const needed = [
   "tone.wav",
   "counter.webm",
   "bad.mp3",
+  "no-flac.flac",
+  "no-alac.m4a",
   "dl-audio.m4a",
   "dl-video.webm",
   "long-chirp.mp3",

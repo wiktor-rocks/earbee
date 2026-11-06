@@ -14,7 +14,7 @@
 //     decoded on its own from a little before it (the decoder warms up,
 //     the resampler too). Only for files whose timestamps say exactly
 //     where a decoder started in the middle is (`exact`: MP3, MP4/M4A,
-//     WAV, FLAC; measured);
+//     WAV; measured);
 //   - in a WebM, Matroska or Ogg file they can be a few samples off (1–3
 //     ms for Opus and Vorbis, enough to move some beats by a frame), so
 //     there the whole track is decoded once from the start, where the
@@ -41,7 +41,6 @@
 // or at any point ← { type: "error", kind, message }, kind as in decode-worker.js
 import {
   AudioSampleSink,
-  FlacInputFormat,
   IsobmffInputFormat,
   Mp3InputFormat,
   WaveInputFormat,
@@ -56,9 +55,9 @@ const scope = /** @type {any} */ (self);
 let opened = null; // the track (open-track.js), and its `frames`
 
 // Containers whose timestamps place a decoder started mid-stream exactly
-// (measured with MP3, AAC in MP4, WAV and FLAC; Opus in WebM and Vorbis in
-// Ogg were 1–3 ms off, AAC in Matroska up to 0.7 ms).
-const EXACT_FORMATS = [Mp3InputFormat, IsobmffInputFormat, WaveInputFormat, FlacInputFormat];
+// (measured with MP3, AAC in MP4 and WAV; Opus in WebM and Vorbis in Ogg
+// were 1–3 ms off, AAC in Matroska up to 0.7 ms).
+const EXACT_FORMATS = [Mp3InputFormat, IsobmffInputFormat, WaveInputFormat];
 
 // Calls `each(mono, at)` with the track's samples mixed to mono, in
 // chunks, from input sample `from` (by the timestamps; decoding starts

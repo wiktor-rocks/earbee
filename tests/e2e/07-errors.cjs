@@ -44,6 +44,24 @@ module.exports = async function (h) {
   );
   await shot("error.png");
 
+  // FLAC and ALAC aren't supported: each is refused like a bad file.
+  for (const name of ["no-flac.flac", "no-alac.m4a"]) {
+    await openFile(path.join(FIXTURES, name));
+    const refused = await js(
+      `(() => { const e = document.getElementById("message"); return { text: e.textContent, notice: e.classList.contains("notice") }; })()`,
+    );
+    check(
+      `${name} is refused with a red error`,
+      refused.text.includes(`Couldn't open “${name}”`) && !refused.notice,
+      JSON.stringify(refused),
+    );
+    check(
+      `${name} keeps the previous song's settings`,
+      JSON.stringify(await settings()) === JSON.stringify(changed),
+      JSON.stringify(await settings()),
+    );
+  }
+
   // A file that opens: speed, pitch, volume and EQ back to the defaults;
   // the step size stays.
   await openFile(path.join(FIXTURES, "tone.wav"));

@@ -43,6 +43,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-06: FLAC and ALAC aren't supported
+
+- **What:** a FLAC or ALAC file is refused with the usual message ("Couldn't open “x”. It isn't an audio file this app can decode."), and a video with a FLAC soundtrack with "Couldn't read the audio in “x”. Videos need a soundtrack this app can decode." The song already open stays open. The welcome screen and the FAQ no longer name FLAC.
+- **Why:** the owner's decision. Neither format opened on `testing`, though the welcome screen and the FAQ promised FLAC.
+- **How:** `openTrack` refuses a track whose codec is `flac`, so it goes by what's in the file, not its name. The kind is `"failed"`, because `"cannot-decode"` would make `decodeFile` try again with `decodeAudioData`. `ALL_FORMATS` stays for the same reason: without FLAC in the list, the file would reach that retry too. ALAC needs no code: Mediabunny doesn't know the codec, and `decodeAudioData` fails on it. The file picker still lists both (its `audio/*` is a wildcard), and choosing one gives the message. The cause of the earlier failure wasn't looked into.
+- **Where:** `src/audio/open-track.js`; `src/audio/beat-worker.js` (`EXACT_FORMATS`, its import and comments); `index.html`; `site/_data/faq.json`; `tests/e2e/07-errors.cjs`, `tests/make-fixtures.sh`, `tests/launch.cjs` (two new fixtures, `no-flac.flac` and `no-alac.m4a`).
+- **Verified by:** `npm run check`, `npm --prefix site run build`, `node scripts/seo/check.cjs`; `TB_TOPICS=03,04,05,06,07,20 npm test` (213 pass, 0 fail; smoke 33 pass; unit 434 pass). The new checks also passed before the change, with 16-bit files, so they hold the behaviour in place but don't show the refusal line runs; a throwaway script showed Mediabunny reads both the 16-bit and a 24-bit FLAC as `flac`, and ALAC as no codec. **Not verified:** a video with a FLAC soundtrack; Windows and Mac; the released 0.2.0.
+
+---
+
 ## 2026-11-06: The home page describes stem separation (the website)
 
 - **What:** a new section on earbee.org's home page, after the beats, "Play along with your favourite songs.": on guitar, bass or drums, EarBee splits a song into its instruments, so you can turn your part down and play it yourself. Four points: the six stems, the mixer, the whole song or only the loop, on your computer. "What it does" gets a Stems line.

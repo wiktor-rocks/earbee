@@ -6,7 +6,9 @@
 #                 4 min, the same with a keyframe only every 20 s: dragging far
 #                 in, before the proxy is built there (e2e/08-video.cjs)
 #   bad.mp3       not audio at all, to test error handling
-#   dl-audio.m4a  6 s AAC in a fragmented ("DASH") MP4, like YouTube's audio
+#   no-flac.flac  2 s, 16-bit FLAC: not supported, so it's refused
+#   no-alac.m4a   2 s, 16-bit ALAC in an M4A: the same (both e2e/07-errors.cjs)
+#   dl-audio.m4a 6 s AAC in a fragmented ("DASH") MP4, like YouTube's audio
 #   dl-video.webm 6 s VP9 picture without sound, like YouTube's video
 #                 (the last two are served by fake-yt-dlp.cjs)
 #   long-chirp.mp3/.m4a/.webm
@@ -49,6 +51,8 @@ ffmpeg -v error -y \
   -vf "drawtext=text='%{frame_num}':fontsize=80:fontcolor=white:x=20:y=20:box=1:boxcolor=black" \
   -c:v libvpx-vp9 -deadline realtime -b:v 150k -g 600 -c:a libopus -b:a 24k -shortest long-counter.webm
 printf 'not audio' > bad.mp3
+ffmpeg -v error -y -f lavfi -i "sine=frequency=440:duration=2" -ac 2 -ar 44100 -c:a flac -sample_fmt s16 no-flac.flac
+ffmpeg -v error -y -f lavfi -i "sine=frequency=440:duration=2" -ac 2 -ar 44100 -c:a alac -sample_fmt s16p no-alac.m4a
 ffmpeg -v error -y -f lavfi -i "sine=frequency=523:duration=6" -ac 2 -c:a aac -b:a 128k \
   -movflags +frag_keyframe+empty_moov+default_base_moof dl-audio.m4a
 ffmpeg -v error -y -f lavfi -i "testsrc2=size=640x360:rate=30:duration=6" \
