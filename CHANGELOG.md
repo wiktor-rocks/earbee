@@ -43,6 +43,17 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-06: The home page describes stem separation (the website)
+
+- **What:** a new section on earbee.org's home page, after the beats, "Play along with your favourite songs.": on guitar, bass or drums, EarBee splits a song into its instruments, so you can turn your part down and play it yourself. Four points: the six stems, the mixer, the whole song or only the loop, on your computer. "What it does" gets a Stems line.
+- **Why:** the owner's wording for the feature, asked for on 2026-11-06: "play along with your favorite songs, guitar, bass or drums". The home page didn't mention stems at all.
+- **How:** text only, in the Free section's list style (`.free-list`), so no new CSS. No clip yet: that belongs to "New screenshots and clips". Spelled "favourite", as the rest of the site is. Goes online when `main` moves up with 0.3.0, the release that has stems.
+- **Also fixed:** the phone's top bar found its GitHub link by `data-link="repo"`, which "The site's links are real without JavaScript" removed, so GitHub stayed in the bar and the page scrolled sideways on a phone. It's now `.nav-github`. Never online: it came up before `main` moved.
+- **Where:** `site/index.html`, `site/_includes/base.njk`, `site/style.css`.
+- **Verified by:** `npm run check`, `npm --prefix site run build`, `node scripts/seo/check.cjs`; the section looked at in screenshots, dark and light at 1300 px and dark at 420 px; in Electron with its cache cleared, the home page and a post at 420 and 360 px hide GitHub and don't scroll sideways, and show it at 1300 px. Not checked: a real phone. The owner hasn't read the new wording yet.
+
+---
+
 ## 2026-11-06: No more Intel Mac builds
 
 - **What:** from 0.3.0, the Mac download is for Apple Silicon only. The home page's Mac card has one Download button and says "for Apple Silicon (M1 or later)" and that 0.2.0 is the last version for Intel Macs; the FAQ, the release notes and the README say the same. The home page and the FAQ no longer mention beats without bars on Intel Macs. The Amazing Slow Downer post no longer says EarBee runs on Intel Macs (online as soon as this is pushed: a post goes online from `testing`). The issue forms offer one "macOS".

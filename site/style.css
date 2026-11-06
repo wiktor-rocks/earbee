@@ -1162,7 +1162,7 @@ main > .post {
   .top .wordmark {
     font-size: 23px;
   }
-  .top nav a[data-link="repo"] {
+  .top nav a.nav-github {
     display: none;
   }
   /* Button-sized targets for a thumb. */
