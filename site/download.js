@@ -4,6 +4,7 @@
 // ---- To point the page at your releases, edit these two: ----
 //
 // REPO: the GitHub repository ("user/name") whose releases are offered.
+// (The pages' HTML names it too: index.html and _includes/base.njk.)
 const REPO = "wiktor-rocks/earbee";
 // FILES: how to tell each download apart among a release's assets (the
 // first asset whose name matches is offered). They match the names in
@@ -23,8 +24,7 @@ const FILES = {
 // ---------------------------------------------------------------
 
 const NAMES = { windows: "Windows", mac: "macOS", linux: "Linux" };
-const repoUrl = `https://github.com/${REPO}`;
-const releasesUrl = `${repoUrl}/releases/latest`;
+const releasesUrl = `https://github.com/${REPO}/releases/latest`;
 
 // The visitor's system, if it's one of ours.
 function detectSystem() {
@@ -46,12 +46,8 @@ function setText(selector, text) {
 
 async function fillDownloads() {
   const mine = detectSystem();
-  setLinks("repo", repoUrl);
-  setLinks("releases", `${repoUrl}/releases`);
-  setLinks("issues", `${repoUrl}/issues`);
-  setLinks("licence", `${repoUrl}/blob/main/LICENSE`);
-  // Until the release is known, every button goes to the releases page.
-  for (const download of Object.keys(FILES)) setLinks(download, releasesUrl);
+  // Until the release is known, the buttons go to its page (the pages'
+  // HTML says so too, for whoever doesn't run this script).
   if (mine) {
     document.querySelector(`[data-platform="${mine}"]`)?.classList.add("mine");
     setText('[data-label="mine"]', `Download for ${NAMES[mine]}`);

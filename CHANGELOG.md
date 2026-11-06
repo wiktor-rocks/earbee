@@ -43,6 +43,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-06: The site's links are real without JavaScript; the Windows card and the README's Mac line (the website, docs)
+
+- **What:** on earbee.org, the GitHub, Source code, MIT licence and All releases links carry their real addresses in the page itself, and the four download buttons start on the latest release, then become the exact file as before. The Windows card says "Installer, .exe: no admin rights needed" instead of "Portable .exe: nothing to install". The README no longer says the macOS builds haven't been tried on a Mac.
+- **Why:** 0.3.0's SEO list: those links all said `#download` in the HTML and only got their addresses from the page's script, so without JavaScript, or for a crawler that doesn't run it, they led nowhere useful. The Windows card would have been wrong from the day 0.3.0 ships its installer. The owner has run the Mac builds.
+- **How:** links that always go to one place are plain links, without `data-link`, so `download.js` no longer fills them. The download buttons keep `data-link`, because the script still gives each its file and size. "Download for…", "Other systems" and "See the downloads" stay on `#download`: without knowing the visitor's system, that section is the right place. Goes online when `main` moves up, like the rest of the site but the posts. The Intel Mac mentions stay until the owner decides about them.
+- **Where:** `site/index.html`, `site/_includes/base.njk`, `site/download.js` (`fillDownloads`), `README.md`.
+- **Verified by:** `npm run check`, `npm --prefix site run build`, `node scripts/seo/check.cjs`; the built home page and a post read without running the script show the real addresses, and "Download for…" on `#download`; the four GitHub addresses answer 200; the built page in Electron gets every button's exact 0.2.0 file and size from the script. Not checked: the page by eye, and the installer's name on the Windows card with a real 0.3.0 release (0.2.0 has the portable file; `FILES.windows` matches both).
+
+---
+
 ## 2026-11-06: Recent files, on the welcome screen and in the File menu
 
 - **What:** the projects and the songs or videos opened lately, in two lists, newest first, the 8 newest of each on the welcome screen and the 5 newest of each in the File menu. One click opens an entry, asking about unsaved changes first as usual. A row shows the name and the last two folders; hovering shows the full path. On the welcome screen a row can be removed and the lists cleared. A file that has gone says where it was and comes off the list, and the open song stays open. A plain file reopens blank, as before: no autosave or memory per song.
