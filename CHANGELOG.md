@@ -94,6 +94,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-08: Blog post "AnthemScore free alternative: when to work it out by ear" (the website)
+
+- **What:** an eleventh post, at `/blog/anthemscore-free-alternative/`. What AnthemScore is and costs, whether there's a free version, whether it's safe, a table comparing it with EarBee, why EarBee doesn't transcribe for you, when working a song out by ear beats an automatic guess, six steps to do it, what EarBee adds, what AnthemScore does better, whether it's worth it, and which to pick.
+- **Why:** idea 20 in docs/blog.md, from an impression the owner saw in Search Console. An assistant wrote it in the owner's voice; the owner published it as it was. The owner also asked (2026-11-08) that "alternative to" posts link to the other project's own website, after checking that it's real.
+- **How:** `keyword: "anthemscore free alternative"` (the most seen phrasing in `local/seo/keywords-anthemscore-alternative.md`), in the title, the address and the first sentence; headings answer "is AnthemScore free / safe / worth it". It says plainly that EarBee doesn't transcribe automatically, and that AnthemScore Professional also slows down and loops. Every fact about AnthemScore comes from its maker's site, lunaverus.com (home, purchase, compareEditions, faq, download, documentation, all read on 2026-11-08), and every link to it goes there. Prices are dated "In November 2026". True for 0.2.0: no stems.
+- **Where:** `site/blog/anthemscore-free-alternative.md`; idea 20 marked Written in `docs/blog.md`.
+- **Verified by:** `npm run check`, `npm --prefix site run build`, `node scripts/seo/check.cjs`. Not checked: the page in a browser; AnthemScore's accuracy (not tested; the post doesn't grade it). Not checked by the owner: the assistant's translation-app analogy, "older recordings are often slightly off", and the "use both" suggestion.
+
+---
+
 ## 2026-11-06: Blog post "Free Riffstation alternative for Windows, Mac and Linux" (the website)
 
 - **What:** a tenth post, at `/blog/free-riffstation-alternative/`. What happened to Riffstation, what it did, a table comparing it with EarBee, why EarBee doesn't detect chords, five steps to find the chords by ear, what EarBee adds, what Riffstation did better, and which to pick.
