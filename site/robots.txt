@@ -1,5 +1,0 @@
-# Every page may be indexed. The list of pages, for search engines:
-User-agent: *
-Allow: /
-
-Sitemap: https://earbee.org/sitemap.xml

@@ -4,11 +4,11 @@
 
 A desktop player for transcribing music by ear. Open a song or a video, slow it down without changing the pitch (or shift the pitch without changing the speed), loop a passage, and step through it with the keyboard. For Windows, macOS and Linux; free and open source (MIT).
 
-![EarBee playing a live video at 0.6×, looping a marked part](site/img/screenshot.webp)
+![EarBee playing a live video at 0.6×, looping a marked part](assets/screenshot.webp)
 
 ## Download
 
-Get the latest version from the [releases page](https://github.com/wiktor-rocks/earbee/releases/latest), or from [the website](https://earbee.org/).
+Get the latest version from the [releases page](https://github.com/wiktor-rocks/earbee/releases/latest), or from [the website](https://earbee.org/) (its own repository: [EarBee/earbee.org](https://github.com/EarBee/earbee.org)).
 
 - **Windows:** `EarBee-…-win-x64-setup.exe`, an installer (no admin rights needed). Windows may warn about an unrecognised app the first time; choose **More info**, then **Run anyway**. After that, EarBee updates itself.
 - **macOS:** `EarBee-…-mac-arm64.dmg`, for Apple Silicon (M1 or later). For Intel Macs, the last version is 0.2.0. Drag it to Applications. It isn't signed by Apple, so the first time, right-click it and choose **Open**. On recent macOS: try to open it, then go to System Settings › Privacy & Security and choose **Open Anyway**.
@@ -150,11 +150,8 @@ scripts/           make-images.py; export-beat-model.py (the beat model and
                    (the stem model, from Demucs) and make-fake-stem-model.py
                    (its stand-in for the tests)
 docs/              maintaining.md: day-to-day git, releases, CI;
-                   blog.md: the website and its blog;
                    diagnostics/: how long files load, measured
-site/              The website, earbee.org: the landing page and the blog,
-                   built with Eleventy (its own package.json; see docs/blog.md)
-.github/           workflows/pages.yml: builds site/ and publishes it (main, with testing's posts)
+.github/           workflows/: CI, and the release builds
 tests/
   unit/              node:test unit tests (core, transport, decoding parts,
                      downloader, media files, system, themes, prefs, marks,

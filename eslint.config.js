@@ -125,7 +125,7 @@ const layering = [
 ];
 
 module.exports = [
-  { ignores: ["node_modules/", "dist/", "site/_site/", "src/vendor/", "tests/fixtures/", "tests/output/", "local/"] },
+  { ignores: ["node_modules/", "dist/", "src/vendor/", "tests/fixtures/", "tests/output/", "local/"] },
   js.configs.recommended,
   {
     // The page: ES modules running in Chromium.
@@ -161,16 +161,6 @@ module.exports = [
     // The splash window's script: a plain browser script.
     files: ["electron/splash.js"],
     languageOptions: { sourceType: "script", globals: globals.browser },
-  },
-  {
-    // The website (site/): download.js is a plain browser script.
-    files: ["site/**/*.js"],
-    languageOptions: { sourceType: "script", globals: globals.browser },
-  },
-  {
-    // ...and the Eleventy files that build it are ES modules in Node.
-    files: ["site/eleventy.config.js", "site/**/*.11tydata.js"],
-    languageOptions: { sourceType: "module", globals: globals.node },
   },
   {
     // Unit tests: ES modules in Node.

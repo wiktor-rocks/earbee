@@ -94,6 +94,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-08: The website moves to its own repository (EarBee/earbee.org)
+
+- **What:** earbee.org (the landing page, the blog, its small apps, the SEO tools and the blog guide) now lives in its own repository, [EarBee/earbee.org](https://github.com/EarBee/earbee.org), locally `../earbee.org`, with two branches: `draft` to work on and `main`, which publishes. The app repository no longer has `site/`, `scripts/seo/`, `docs/blog.md`, `pages.yml`, `seo.yml` or CI's `site` job. The site got new screenshots and clips in the app's new look, a share picture, and swatches for all nineteen themes (EarBee Graphite and Moss were missing; the EarBee swatch had the old colours). The README's picture, which pointed at a file that no longer existed, is now `assets/screenshot.webp`.
+- **Why:** the owner (2026-11-08): "The website needs to be completely separate from the app. I don't want to do weird pushes by mistake because I edit the site. I also publish small apps to the site." Until now posts went online from `testing` and the rest of the site from `main`, mixed with the app's branches.
+- **How:** the site's history was kept: a clone filtered to `site/` (`git filter-branch --subdirectory-filter site`, 48 commits) became the new repository. In it: `pages.yml` publishes on a push to `main` only; `ci.yml` checks formatting, the build and the SEO check on both branches; Eleventy ignores the repository's own files (`AGENTS.md`, `docs/`, `scripts/`, `local/`); the SEO scripts read the repository root. The owner's `local/seo/` and `local/GETTING-FOUND.md` moved to its `local/`. Here, `scripts/record-site-media.cjs` takes `--site=` (by default `../earbee.org`), waits for the video's low-res preview before a scene (its label showed in the clip, and the beats waited behind it), and scrolls the side panel back to the top before the screenshot. Until the switch at the 0.3.0 release, earbee.org keeps serving its last deploy from this repository; then the custom domain moves to the new one.
+- **Where:** removed `site/`, `scripts/seo/`, `docs/blog.md`, `.github/workflows/pages.yml`, `seo.yml`; `.github/workflows/ci.yml`, `eslint.config.js`, `.gitignore`, `.prettierignore`, `AGENTS.md`, `README.md`, `docs/maintaining.md` ("The website"), `scripts/record-site-media.cjs`, `assets/screenshot.webp`.
+- **Verified by:** in the new repository: `npm run check`, `npm run build` (17 files, as before), `node scripts/seo/check.cjs` (no errors), CI green on `draft`; every new screenshot, and contact sheets of every clip, looked at. Here: `npm run check`, `npm run test:unit`. Not checked: the new site in a browser.
+
+---
+
 ## 2026-11-08: Blog post "AnthemScore free alternative: when to work it out by ear" (the website)
 
 - **What:** an eleventh post, at `/blog/anthemscore-free-alternative/`. What AnthemScore is and costs, whether there's a free version, whether it's safe, a table comparing it with EarBee, why EarBee doesn't transcribe for you, when working a song out by ear beats an automatic guess, six steps to do it, what EarBee adds, what AnthemScore does better, whether it's worth it, and which to pick.

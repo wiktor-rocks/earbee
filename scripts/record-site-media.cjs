@@ -1,4 +1,5 @@
-// Records the landing page's demos (site/img) from the real app, each in
+// Records the landing page's demos (img/ in the website's repository,
+// EarBee/earbee.org) from the real app, each in
 // the EarBee theme (-dark) and EarBee Light (-light), for the page's dark
 // and light modes, with the Peak + loudness waveform:
 //   clip-beats-<mode>.mp4 / .webp   B finds the beats, then → / ← by beat
@@ -6,13 +7,14 @@
 //   screenshot-<mode>.webp          beats, a named section, a bar looping, 0.75×
 // and, once, the screenshot's scene playing while the theme changes:
 //   clip-themes.mp4 / .webp         every theme for THEME_SECONDS, in the
-//                                   order of the swatches in site/index.html
+//                                   order of the swatches in its index.html
 //
-//   npx electron scripts/record-site-media.cjs --media=<demo file> [--only=themes]
+//   npx electron scripts/record-site-media.cjs --media=<demo file> [--only=themes] [--site=<folder>]
 //
-// The demo file is a video with music under it (see site/README.md for
-// how the current one was made). The scenes click at fixed times chosen
-// for it (bars every ~1.33 s from 3.40 s), so a different file needs new
+// --site is the website's folder, by default earbee.org beside this one
+// (../earbee.org). The demo file is a video with music under it (see the
+// website's README.md, "The demos", for how the current one was made). The
+// scenes click at fixed times chosen for it (bars every ~1.33 s from 3.40 s), so a different file needs new
 // times below. Needs ffmpeg, a display (the window is offscreen), and the
 // test media (npm run test:fixtures), since it runs on the e2e harness.
 //
@@ -32,7 +34,8 @@ const { prepare, createHarness } = require("../tests/e2e/harness.cjs");
 const arg = (name) => process.argv.find((a) => a.startsWith(`--${name}=`))?.slice(name.length + 3);
 const MEDIA = path.resolve(arg("media") ?? "");
 const ONLY_THEMES = arg("only") === "themes"; // just the themes clip
-const SITE_IMG = path.join(__dirname, "..", "site", "img");
+const SITE = path.resolve(arg("site") ?? path.join(__dirname, "..", "..", "earbee.org"));
+const SITE_IMG = path.join(SITE, "img");
 const SIZE = { width: 1280, height: 800 }; // the whole window, in every clip and the screenshot
 const FPS = 30;
 // Each page mode, and the app's theme recorded for it.
@@ -41,12 +44,12 @@ const MODES = [
   ["light", "earbee-light"],
 ];
 // The themes clip shows each theme this long (data-seconds on the clip in
-// site/index.html, which lights its swatch meanwhile), in the order of the
+// the website's index.html, which lights its swatch meanwhile), in the order of the
 // swatches there: their data-id is the theme's id.
 const THEME_SECONDS = 1.5;
-const SWATCHES = [
-  ...fs.readFileSync(path.join(__dirname, "..", "site", "index.html"), "utf8").matchAll(/<li data-id="([\w-]+)"/g),
-].map((match) => match[1]);
+const SWATCHES = [...fs.readFileSync(path.join(SITE, "index.html"), "utf8").matchAll(/<li data-id="([\w-]+)"/g)].map(
+  (match) => match[1],
+);
 
 // Records the window from now until the returned function is called.
 function record(wc, file, { width, height }) {
@@ -157,6 +160,11 @@ app
       if ((await js(`sidebar.hidden`)) === sidebar) await js(`sidebarToggle.click()`);
       await js(`document.activeElement.blur()`);
       await sleep(1000);
+      // The video's low-res preview built first: while it's being built its
+      // label shows on the picture, and finding the beats waits behind it.
+      const previewDone = () =>
+        js(`(() => { const l = document.querySelector(".video-loading"); return !!l && l.hidden; })()`);
+      for (let i = 0; i < 600 && !(await previewDone()); i++) await sleep(100);
       await zoomTo(span, center);
       if (beats) {
         key("B");
@@ -182,6 +190,11 @@ app
       key("Return");
       await sleep(200);
       await js(`document.activeElement.blur()`);
+      // Naming the mark scrolled the side panel down to it; back to its top,
+      // so Speed shows whole.
+      await js(
+        `(() => { let e = sidebar.parentElement; while (e && e.scrollHeight <= e.clientHeight) e = e.parentElement; if (e) e.scrollTop = 0; })()`,
+      );
       await seek(6.5);
       key("\\");
       await sleep(200);
@@ -253,7 +266,8 @@ app
     // ---- The themes: the riff looping while the theme changes ----
     // Each change is due at its own time from the start, so the clip's
     // slots stay THEME_SECONDS long and match the page's swatches.
-    if (SWATCHES.length === 0) throw new Error("No swatches (<li data-id=…>) found in site/index.html");
+    if (SWATCHES.length === 0)
+      throw new Error(`No swatches (<li data-id=…>) found in ${path.join(SITE, "index.html")}`);
     h.prefsStore.set("theme", "choice", SWATCHES[0]);
     await riffScene();
     key("Space");
@@ -271,8 +285,8 @@ app
     fs.rmSync(work, { recursive: true, force: true });
     console.log(
       ONLY_THEMES
-        ? "Done: site/img/clip-themes"
-        : "Done: site/img/clip-beats-*, clip-loop-*, screenshot-* (dark and light), clip-themes",
+        ? `Done: ${SITE_IMG}/clip-themes`
+        : `Done: ${SITE_IMG}/clip-beats-*, clip-loop-*, screenshot-* (dark and light), clip-themes`,
     );
     app.exit(0);
   })
