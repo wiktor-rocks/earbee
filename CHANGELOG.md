@@ -94,6 +94,27 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-08: Version 0.3.0
+
+- **What:** EarBee 0.3.0. Details are in the entries below, back to "Fixes: no false “couldn't be decoded”…" (2026-10-18).
+  - **New:**
+    - **AI stem separation:** split the song, or only the loop, into vocals, drums, bass, guitar, piano and the rest, then turn each up or down, pan, solo or mute it. The model is downloaded the first time; projects keep the stems and the mix. One Mixer section: Volume, a new Balance knob and the stems.
+    - **A new look:** warm themes (plus EarBee Graphite and EarBee Moss), a flat layout with the sound and the marks in one side panel, whose sections you can drag into any order, hide, and put on the left or the right; a ring transport under the waveform; light themes that fit; slim scrollbars.
+    - **The sound dock's knobs:** drag up or down (Shift for fine), scroll, or double-click to type a value; their sensitivity is a setting.
+    - **The EQ's Focus:** keep one range of notes and cut the rest, with presets for the bass, the guitar, the four voices and the piano's two hands; it follows the pitch shift.
+    - **Editing the beats:** half or double time, bars, a steady grid, the bar's start; projects keep them.
+    - **Video:** zoom into the picture (scroll, drag, Ctrl+= / Ctrl+- / Ctrl+0), a handle between the video and the waveform, the picture sharp at once after a jump, and decoded off the page's thread so everything stays smooth.
+    - **Recent files** on the welcome screen and in the File menu.
+    - **A Windows installer, and EarBee updates itself:** on Windows and Linux (the AppImage) it installs a new version when you quit, or at once with Restart and update now; a Mac is told there's one. Settings › General › Check for updates. From 0.3.0 on: 0.2.0 has no updater, so its users download this one by hand.
+  - **Better:** slower speeds, down to 0.05×, and Shift+, / Shift+. to change the speed; finding the beats starts at once on any length of file and gives way to playback; Shift for the loop (Shift+drag moves an edge or the whole loop, a plain click near an edge puts the cursor on it); Ctrl+wheel scrolls the waveform; Esc leaves big video; the top bar can hide itself; the video's buttons can stay shown; ten mark colours; the start point holds still while a loop plays; themes are chosen in Settings › Theme (no theme button).
+  - **Good to know:** the Mac download is for Apple Silicon only; for Intel Macs, the last version is 0.2.0. FLAC and ALAC files aren't supported: they're refused with a message.
+- **Why:** the owner (2026-11-08): "I want to make 0.3.0, have it out already, other stuff will be out in minor versions." The scope was `local/NEXT-RELEASE-0.3.0.md`.
+- **How:** `npm version 0.3.0 --no-git-tag-version`, then `main` moved up to `testing` and tagged `v0.3.0`, which builds the release (docs/maintaining.md, "Putting out a new version"). The website moves to its own repository at the same time (the entry below).
+- **Where:** `package.json`, `package-lock.json`.
+- **Verified by:** the full `npm test` before `main` moved, and the smoke test against the draft release's AppImage. Windows and Mac builds published without being tried first (the owner's choice).
+
+---
+
 ## 2026-11-08: The website moves to its own repository (EarBee/earbee.org)
 
 - **What:** earbee.org (the landing page, the blog, its small apps, the SEO tools and the blog guide) now lives in its own repository, [EarBee/earbee.org](https://github.com/EarBee/earbee.org), locally `../earbee.org`, with two branches: `draft` to work on and `main`, which publishes. The app repository no longer has `site/`, `scripts/seo/`, `docs/blog.md`, `pages.yml`, `seo.yml` or CI's `site` job. The site got new screenshots and clips in the app's new look, a share picture, and swatches for all nineteen themes (EarBee Graphite and Moss were missing; the EarBee swatch had the old colours). The README's picture, which pointed at a file that no longer existed, is now `assets/screenshot.webp`.
