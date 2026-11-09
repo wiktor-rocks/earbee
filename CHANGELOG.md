@@ -43,6 +43,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-09: A `dev` branch between the experiments and `testing`
+
+- **What:** a new permanent branch, `dev`, where work happens now. The chain is `exp/<idea>` → `dev` → `testing` → `main`. Fixes, small changes and features that take days are committed on `dev`; experiments start from `dev` and are merged back into it; the CHANGELOG is written there. `testing` only fast-forwards to `dev` when the owner says `dev` is finished, after `npm test`, and nothing is committed to it directly; `main` still fast-forwards to `testing`.
+- **Why:** the owner's request: a feature that takes several sessions sat half-done on `testing`, which is also the build the owner uses to try the latest app. Now `testing` only ever holds finished work.
+- **How:** the owner chose each rule (2026-11-09): everyday work on `dev` (not only the long features); `testing` takes all of `dev` by fast-forward, never feature by feature, so half-done work on `dev` makes `testing` wait; CHANGELOG entries on `dev`; bugs found in the `testing` build fixed on `dev` too, so `testing` never gets commits of its own and a fast-forward always works. `dev` was made from `testing` at `ab15c8a` (Version 0.3.0).
+- **Where:** `docs/maintaining.md` ("How it's set up", "Each time you work on it": a new step 4 moves `testing` up to `dev`, the old step 4 is step 5; procedures A–F use `dev` instead of `testing`; "Putting out a new version"; "Other things that come up"); `AGENTS.md` ("Branches", "Which checks for which change", the CHANGELOG convention, "Ending a session"); `.github/workflows/ci.yml` (CI runs on pushes to `dev`).
+- **Verified by:** `npm run format:check`, `npm run check`; procedures A and D read through step by step for the new branch names.
+
+---
+
 ## 2026-11-09: The README describes the beats and stem separation
 
 - **What:** the README's introduction has a second paragraph: EarBee finds the beats and bars (a loop can be one bar, moving on goes bar by bar) and splits a song into its instruments, both on your computer with machine-learning models (Beat This! and Demucs), nothing uploaded, no account. The platforms and the licence get their own line, and the screenshot's caption matches the current screenshot (0.75×, the beats, one bar looping).

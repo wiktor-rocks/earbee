@@ -70,6 +70,7 @@ When the owner asks for a test build of a branch (to try it before deciding, e.g
 | Only docs (`*.md`)                           | `npm run format:check`                                                                                                                   |
 | The page (`src/`, `index.html`, `style.css`) | `npm run check`, `npm run test:unit`, and the e2e topic for that area (e.g. waveform → `TB_TOPICS=17`, beats → `20`, marks → `14`)       |
 | The main process (`electron/`)               | `npm run check`, `npm run test:unit`, and one e2e topic for that area, which also runs the smoke test (the real app, `main.js` included) |
+| Before `testing` moves up to `dev`           | `npm test`: everything must pass                                                                                                         |
 | Before `main` moves up to `testing`          | `npm test`: everything must pass                                                                                                         |
 
 A small change (a comment, a CSS value, a typo) needs `npm run check` only.
@@ -82,7 +83,7 @@ A small change (a comment, a CSS value, a typo) needs `npm run check` only.
 - **Numbers and lists come from data, not code:** speeds, step sizes, EQ bands and limits in `CONFIG` (`src/config.js`); settings in `src/prefs/index.js`; themes in `src/themes/palettes.js`. The UI for them is generated.
 - **Formatting** is Prettier's, and lint is ESLint's. Don't hand-format; run `npm run format`.
 - **`style.css`:** new rules go in the section they belong to (see its outline); a new part gets its own `/* ---------- Name ---------- */` marker.
-- **Every change gets a CHANGELOG.md entry**, at the top, newest first: what, why, how, where, verified by (the format is in its header). Not on an `exp/` branch: the entry is written when the experiment is merged into `testing`.
+- **Every change gets a CHANGELOG.md entry**, at the top, newest first: what, why, how, where, verified by (the format is in its header). It's written on `dev`, with the change. Not on an `exp/` branch: the entry is written when the experiment is merged into `dev`.
 - **Commit messages** are one short line saying what changed, and nothing else: no `Co-Authored-By` or other trailer lines, even if your tool adds them by default.
 
 ## Pitfalls
@@ -94,9 +95,12 @@ A small change (a comment, a CSS value, a typo) needs `npm run check` only.
 
 ## Branches
 
-- **`testing`** is where work happens. Commit there, unless the owner says otherwise.
+The chain: `exp/<idea>` → `dev` → `testing` → `main`. Details in docs/maintaining.md, "How it's set up" and "Each time you work on it".
+
+- **`dev`** is where work happens: fixes (also for bugs found in the `testing` build), small changes, and features that take several sessions, finished or not. Commit there, unless the owner says otherwise.
+- **`testing`** is the owner's build for trying the latest app: only finished work. It only moves forward to `dev` (`git merge --ff-only dev`), only when the owner asks, after `npm test` passes on `dev`. Never commit to it directly.
 - **`main`** is the stable version: releases are tagged on it. It only moves forward to `testing` (`git merge --ff-only testing`), and only when the owner asks. Never commit to it directly.
-- **An idea that might not work out** goes on its own experiment branch, `exp/<idea>`. Follow docs/maintaining.md, "Trying an idea: an experiment branch", exactly: procedures A to F, each step's command as written, then its check. When a command fails or a check doesn't give the expected result, stop and report; don't work around it. Ask the owner before merging an experiment into `testing` (D) or throwing it away (E).
+- **An idea that might not work out** goes on its own experiment branch, `exp/<idea>`, made from `dev` and merged back into `dev`. Follow docs/maintaining.md, "Trying an idea: an experiment branch", exactly: procedures A to F, each step's command as written, then its check. When a command fails or a check doesn't give the expected result, stop and report; don't work around it. Ask the owner before merging an experiment into `dev` (D) or throwing it away (E).
 - Never rebase or force-push pushed work.
 
 ## Ending a session
@@ -106,10 +110,10 @@ When the owner says they're done ("done for today", "let's stop", "wrap up"), le
 1. **Stop what's running:** background test runs, measurements, `npm start`.
 2. **Put back anything temporary:** debug or timing lines in tracked files, a setting changed for a measurement. `git status` shows only changes that are meant to stay.
 3. **Commit finished work** on its branch, after the checks its change needs (see "Which checks for which change"), with its CHANGELOG entry where the conventions ask for one. Unfinished work:
-   - on an `exp/` branch, commit it there if `npm run check` passes;
-   - on `testing`, ask the owner: move it to a new experiment branch (procedure A, then commit), or leave it uncommitted and say so in FOR-TOMORROW.md.
+   - on `dev` or an `exp/` branch, commit it there if `npm run check` passes, and say in FOR-TOMORROW.md that it's unfinished (so `testing` doesn't move up to it yet);
+   - if it fails `npm run check`, ask the owner: leave it uncommitted and say so in FOR-TOMORROW.md, or fix it first.
    - Don't `git stash` it: a stash is easy to forget.
-4. **Push** every branch with new commits (`testing`, `exp/*`), so GitHub has them; never `main`. Check: `git status -sb` on each shows nothing after `origin/…`.
+4. **Push** every branch with new commits (`dev`, `exp/*`, and `testing` if it moved up), so GitHub has them; `main` only when the owner asked for it to move up. Check: `git status -sb` on each shows nothing after `origin/…`.
 5. **Tidy what the session left behind:** a build's by-products in `dist/` (see "Test builds"), stray files in the repo outside `local/`. Ask before deleting anything the session didn't make.
 6. **Bring `local/FOR-TOMORROW.md` up to date:**
    - each thread still in flight: its branch and last commit, where it stands, and the next step;
@@ -118,7 +122,7 @@ When the owner says they're done ("done for today", "let's stop", "wrap up"), le
    - check that what it says still holds: branches, what's pushed, test results.
    - Loose ideas from the session go in the summary to the owner (step 8), with the exact lines you'd add to `local/SCRATCHPAD.md`. Add them only if the owner says yes.
    - In `local/NEXT-RELEASE-<version>.md`, tick what this session finished, and add what reached `testing` to its "Already in".
-7. **Leave the working copy on `testing`**, clean, unless the owner wants another branch open; FOR-TOMORROW.md says which.
+7. **Leave the working copy on `dev`**, clean, unless the owner wants another branch open; FOR-TOMORROW.md says which.
 8. **End with a short summary for the owner:**
    - what was done and pushed;
    - what's waiting for them;
