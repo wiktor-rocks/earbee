@@ -2,9 +2,13 @@
 
 # EarBee
 
-A desktop player for transcribing music by ear. Open a song or a video, slow it down without changing the pitch (or shift the pitch without changing the speed), loop a passage, and step through it with the keyboard. For Windows, macOS and Linux; free and open source (MIT).
+A desktop player for transcribing music by ear. Open a song or a video, slow it down without changing the pitch (or shift the pitch without changing the speed), loop a passage, and step through it with the keyboard.
 
-![EarBee playing a live video at 0.6×, looping a marked part](assets/screenshot.webp)
+EarBee finds the beats and bars for you, so a loop can be exactly one bar and moving on goes bar by bar. It can also split a song into its instruments (vocals, drums, bass, guitar, piano and the rest), so you can hear one part on its own, or turn one down and play it yourself. Both run on your computer, with machine-learning models (Beat This! and Demucs): nothing is uploaded, and there's no account.
+
+For Windows, macOS and Linux; free and open source (MIT).
+
+![EarBee playing a live video at 0.75×, with the beats on the waveform and one bar of a marked riff looping](assets/screenshot.webp)
 
 ## Download
 

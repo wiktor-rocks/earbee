@@ -43,6 +43,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-09: The README describes the beats and stem separation
+
+- **What:** the README's introduction has a second paragraph: EarBee finds the beats and bars (a loop can be one bar, moving on goes bar by bar) and splits a song into its instruments, both on your computer with machine-learning models (Beat This! and Demucs), nothing uploaded, no account. The platforms and the licence get their own line, and the screenshot's caption matches the current screenshot (0.75×, the beats, one bar looping).
+- **Why:** the owner's change, written before this session: the README still described EarBee as it was before 0.3.0.
+- **How:** text only.
+- **Where:** `README.md`.
+- **Verified by:** `npm run format:check`.
+
+---
+
 ## 2026-11-06: FLAC and ALAC aren't supported
 
 - **What:** a FLAC or ALAC file is refused with the usual message ("Couldn't open “x”. It isn't an audio file this app can decode."), and a video with a FLAC soundtrack with "Couldn't read the audio in “x”. Videos need a soundtrack this app can decode." The song already open stays open. The welcome screen and the FAQ no longer name FLAC.
