@@ -3,3 +3,6 @@ contact_links:
   - name: Download EarBee
     url: https://earbee.org/
     about: The latest version for Windows, macOS and Linux.
+  - name: Email
+    url: mailto:contact@earbee.org
+    about: A question or an idea that isn't a bug or a feature request.

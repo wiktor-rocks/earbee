@@ -43,6 +43,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-11: A contact address, contact@earbee.org
+
+- **What:** the README has a "Contact" section (before "Licence"): email contact@earbee.org, or open an issue for a bug or a feature request. The page for opening a new issue also offers "Email", for a question or an idea.
+- **Why:** the owner's request: an email address on the website and on GitHub, now that contact@earbee.org works (forwarded by the domain's registrar).
+- **How:** text only. The website got the address too, in its own repository.
+- **Where:** `README.md` ("Contact"); `.github/ISSUE_TEMPLATE/config.yml` (`contact_links`).
+- **Verified by:** `npm run format:check`.
+
+---
+
 ## 2026-11-09: A `dev` branch between the experiments and `testing`
 
 - **What:** a new permanent branch, `dev`, where work happens now. The chain is `exp/<idea>` → `dev` → `testing` → `main`. Fixes, small changes and features that take days are committed on `dev`; experiments start from `dev` and are merged back into it; the CHANGELOG is written there. `testing` only fast-forwards to `dev` when the owner says `dev` is finished, after `npm test`, and nothing is committed to it directly; `main` still fast-forwards to `testing`.

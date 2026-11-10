@@ -44,6 +44,10 @@ npm start            # run it
 npm run build:linux  # or build:win, build:mac: the app for your system, in dist/
 ```
 
+## Contact
+
+Questions, ideas or a bug: email [contact@earbee.org](mailto:contact@earbee.org). Bugs and feature requests can also go in [the issues](https://github.com/wiktor-rocks/earbee/issues/new/choose).
+
 ## Licence
 
 MIT: see [LICENSE](LICENSE). EarBee is built on Signalsmith Stretch, Mediabunny, wavesurfer.js, the Beat This! beat tracker, ONNX Runtime, Electron and the Righteous and Nunito fonts, each under its own licence, and downloads the Demucs stem model when it's first used: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
