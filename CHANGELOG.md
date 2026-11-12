@@ -43,6 +43,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-12: The recent files move into a side menu, File › Open recent
+
+- **What:** the File menu no longer lists the recent projects and files itself. It has one row, "Open recent ›", whose side menu opens beside it with the two lists, headed "Projects" and "Files" (up to 5 of each, as before). Pointing at the row opens it after a moment; so do a click, Enter and →. ← and Esc close it and go back to the row; pointing at another row of the File menu closes it too. Picking an entry closes both menus and opens it, as before. With nothing on the lists, the row isn't there. The welcome screen is unchanged.
+- **Why:** the owner's note for 0.4.0: the recent files cluttered the File menu (up to 12 extra rows under its four items). The owner chose one side menu with both lists, over one side menu per list or lists that fold open in place.
+- **How:** the side menu is a `[popover]` element inside the File menu's own element, which makes it the File menu's child: opening it leaves the File menu open, a press in the File menu closes only the side menu, and closing the File menu closes it too. CSS places it against the row (`anchor-name: --recent-open`, `position-area: right span-bottom`, flipping near the window's edge). The File menu's arrow keys and its close-on-pick now skip a side menu's items and the row that opens it. Shortcuts already ignore keys pressed in an open popover, so ← and → don't step through the song meanwhile.
+- **Where:** `src/ui/menu.js` (`bindSubmenu`, new; `bindMenu` keeps to its own items); `src/features/recent.js` (`bindRecent`, `render`: the row's visibility, the headings); `index.html` (`#recentMenuButton`, `#fileMenuRecent` is now a popover); `src/ui/dom.js`; `style.css` (Menus: `.submenu-button`, `.recent-menu`).
+- **Verified by:** `npm run check`; `npm run test:unit` (434); `TB_TOPICS=22` (58, with new checks: the row reached by the arrow keys, → opens the side menu beside the File menu with the keyboard on its first entry, the arrow keys stay in it, ← closes it back to the row) and `TB_TOPICS=03,16` (97; topic 16's list of the File menu's rows leaves out the new row, as it did the recent entries); the smoke test (33). The screenshot `tests/output/file-menu-recent.png` shows it in place. Not yet tried in a real window by the owner, nor on Windows or Mac.
+
+---
+
 ## 2026-11-11: A contact address, contact@earbee.org
 
 - **What:** the README has a "Contact" section (before "Licence"): email contact@earbee.org, or open an issue for a bug or a feature request. The page for opening a new issue also offers "Email", for a question or an idea.

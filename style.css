@@ -1713,8 +1713,33 @@ body.dragging .welcome-hint {
   flex: 1;
 }
 
-/* The recent files in the File menu (src/features/recent.js): a long name
-   is cut short, and the row's tooltip has the full path. */
+/* A row that opens a side menu (ui/menu.js bindSubmenu): its chevron
+   points the way, and the row stays lit while the side menu is open. */
+.submenu-button .chevron {
+  flex: none;
+  color: var(--muted);
+  transform: rotate(-90deg);
+}
+
+.submenu-button[aria-expanded="true"] {
+  background: var(--surface-hover);
+}
+
+/* File › Open recent: the side menu beside its row, level with it (or to
+   its left, or upwards, near the window's edge). */
+#recentMenuButton {
+  anchor-name: --recent-open;
+}
+
+.recent-menu {
+  position-anchor: --recent-open;
+  position-area: right span-bottom;
+  margin: -7px 0 0 8px;
+  min-width: 220px;
+}
+
+/* The recent files in it (src/features/recent.js): a long name is cut
+   short, and the row's tooltip has the full path. */
 .menu-heading {
   margin: 6px 10px 4px;
   color: var(--muted);

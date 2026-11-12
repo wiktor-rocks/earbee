@@ -756,8 +756,23 @@
         <span class="menu-label">From YouTube…</span>
       </button>
       <hr />
-      <!-- The projects and files opened lately (src/features/recent.js). -->
-      <div id="fileMenuRecent" role="none" hidden></div>
+      <!-- The projects and files opened lately (src/features/recent.js), in
+           a side menu opened from this row. It sits inside the File menu,
+           which makes it the File menu's child (ui/menu.js bindSubmenu). -->
+      <button
+        id="recentMenuButton"
+        class="menu-item submenu-button"
+        type="button"
+        role="menuitem"
+        aria-haspopup="menu"
+        aria-expanded="false"
+        hidden
+      >
+        <svg class="icon" aria-hidden="true"></svg>
+        <span class="menu-label">Open recent</span>
+        <svg class="icon chevron" aria-hidden="true"><use href="#i-chevron" /></svg>
+      </button>
+      <div id="fileMenuRecent" class="menu recent-menu" role="menu" aria-label="Open recent" popover></div>
     </div>
 
     <!-- The beats menu (see features/beats.js), opened by the ♩ chip once

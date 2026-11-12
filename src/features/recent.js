@@ -1,7 +1,7 @@
 // Recent files: the projects and the songs or videos opened lately, in two
-// lists, on the welcome screen and in the File menu. One click opens an
-// entry, through the same steps as opening a file (openRecent, in
-// features/project/), so unsaved changes are asked about first.
+// lists, on the welcome screen and in the File menu (File › Open recent, a
+// side menu). One click opens an entry, through the same steps as opening a
+// file (openRecent, in features/project/), so unsaved changes are asked about first.
 //
 // The lists themselves are the main process's (electron/recent-files.js). It
 // tells the page when they change, so whatever is opened or saved shows up
@@ -11,6 +11,7 @@
 import { CONFIG } from "../config.js";
 import { fileExtension } from "../core/media.js";
 import { dom, element, guarded, onClick } from "../ui/dom.js";
+import { bindSubmenu } from "../ui/menu.js";
 import { openRecent } from "./project/index.js";
 
 /**
@@ -145,15 +146,13 @@ function render(/** @type {RecentLists} */ lists) {
   const { projects, files } = lists;
   const any = projects.length + files.length > 0;
   dom.welcomeRecent.hidden = !any;
-  dom.fileMenuRecent.hidden = !any;
+  dom.recentMenuButton.hidden = !any;
+  if (!any && dom.fileMenuRecent.matches(":popover-open")) dom.fileMenuRecent.hidePopover();
   dom.welcomeRecentLists.replaceChildren(
     ...(projects.length ? [welcomeList("Recent projects", projects, true)] : []),
     ...(files.length ? [welcomeList("Recent files", files, false)] : []),
   );
-  dom.fileMenuRecent.replaceChildren(
-    ...menuList("Open a recent project", projects, true),
-    ...menuList("Open a recent file", files, false),
-  );
+  dom.fileMenuRecent.replaceChildren(...menuList("Projects", projects, true), ...menuList("Files", files, false));
 }
 
 /**
@@ -162,6 +161,12 @@ function render(/** @type {RecentLists} */ lists) {
  */
 export async function bindRecent() {
   if (!bridge) return;
+  bindSubmenu({
+    parent: dom.fileMenu,
+    button: dom.recentMenuButton,
+    menu: dom.fileMenuRecent,
+    itemSelector: ".menu-item",
+  });
   bridge.onChanged(render);
   onClick(dom.welcomeRecentClear, async () => {
     render(await bridge.clear());

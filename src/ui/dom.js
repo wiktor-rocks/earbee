@@ -22,6 +22,7 @@ export const dom = {
   welcomeRecent: $("welcomeRecent"),
   welcomeRecentLists: $("welcomeRecentLists"),
   welcomeRecentClear: $("welcomeRecentClear"),
+  recentMenuButton: $("recentMenuButton"),
   fileMenuRecent: $("fileMenuRecent"),
   welcomeDropText: $("welcomeDropText"),
   dropOverlayText: $("dropOverlayText"),

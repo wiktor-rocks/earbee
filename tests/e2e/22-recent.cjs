@@ -50,6 +50,8 @@ module.exports = async function (h) {
   const pickInMenu = async (name) => {
     await js(`fileMenuButton.click()`);
     await sleep(100);
+    await js(`recentMenuButton.click()`);
+    await sleep(100);
     await js(`[...fileMenuRecent.querySelectorAll(".recent-item")]
       .find((row) => row.querySelector(".menu-label").textContent === ${JSON.stringify(name)}).click()`);
     await idle();
@@ -78,7 +80,7 @@ module.exports = async function (h) {
   await welcomeAgain();
   check("nothing yet: no list and no headings on the welcome screen", await js(`!welcomeRecent.checkVisibility()`));
   check("…the welcome screen has no entries behind it", (await js(`welcomeRecentLists.childElementCount`)) === 0);
-  check("…and the File menu has no section", await js(`fileMenuRecent.hidden`));
+  check("…and the File menu has no Open recent", await js(`recentMenuButton.hidden`));
 
   /* ---------- What goes on the lists ---------- */
 
@@ -165,10 +167,26 @@ module.exports = async function (h) {
 
   await js(`fileMenuButton.click()`);
   await sleep(150);
+  check("the File menu has Open recent", await js(`recentMenuButton.checkVisibility()`));
+  check("…but not the lists themselves", !(await js(`fileMenuRecent.matches(":popover-open")`)));
+  key("End");
+  await sleep(50);
+  check("…the arrow keys reach it", await js(`document.activeElement === recentMenuButton`));
+  key("Right");
+  await sleep(150);
+  check(
+    "→ opens the side menu, the File menu stays open",
+    await js(`fileMenuRecent.matches(":popover-open") && fileMenu.matches(":popover-open")`),
+  );
+  check("…with the keyboard on its first entry", await js(`document.activeElement.classList.contains("recent-item")`));
+  const sideOfMenu = await js(
+    `fileMenuRecent.getBoundingClientRect().left >= fileMenu.getBoundingClientRect().right - 1`,
+  );
+  check("…beside the File menu", sideOfMenu);
   const headings = await js(`[...fileMenuRecent.querySelectorAll(".menu-heading")].map((row) => row.textContent)`);
   check(
-    "the File menu shows both lists",
-    headings.join() === "Open a recent project,Open a recent file" && (await inMenu()).includes("work.ebee"),
+    "the side menu shows both lists",
+    headings.join() === "Projects,Files" && (await inMenu()).includes("work.ebee"),
     JSON.stringify({ headings, rows: await inMenu() }),
   );
   const menuTooltip = await js(`fileMenuRecent.querySelector(".recent-item").title`);
@@ -176,9 +194,14 @@ module.exports = async function (h) {
   await shot("file-menu-recent.png");
   key("End");
   await sleep(50);
-  check("the arrow keys reach the entries", await js(`document.activeElement.classList.contains("recent-item")`));
-  key("Home");
-  await sleep(50);
+  check("…the arrow keys stay in it", await js(`fileMenuRecent.contains(document.activeElement)`));
+  key("Left");
+  await sleep(150);
+  check(
+    "← closes it, back to Open recent",
+    !(await js(`fileMenuRecent.matches(":popover-open")`)) &&
+      (await js(`fileMenu.matches(":popover-open") && document.activeElement === recentMenuButton`)),
+  );
   await js(`fileMenu.hidePopover()`);
   await sleep(100);
   await pickInMenu("alpha.wav");
