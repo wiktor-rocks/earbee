@@ -778,6 +778,8 @@ module.exports = async function (h) {
   setStemStartFails(true);
   await clearMessage();
   await press(".stems-whole");
+  // (The stems were ready before the press too: wait for what it says.)
+  for (let i = 0; i < 100 && !(await message()); i++) await sleep(100);
   state = await waitFor((s) => s.busy === null && s.ready, 10_000);
   said = await message();
   setStemStartFails(false);

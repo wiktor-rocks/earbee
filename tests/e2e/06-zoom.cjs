@@ -156,7 +156,9 @@ module.exports = async function (h) {
       `(() => { const r = document.getElementById("waveform-minimap").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`,
     );
     key("Space");
-    await sleep(100);
+    // Until the view has gone back to where Space plays from: that takes the
+    // output's delay (CONFIG.audio.latencyHint), about 0.1 s.
+    await sleep(250);
     wheel(Math.round(mini.x), Math.round(mini.y), -1500 * zoomSign);
     await sleep(100);
     check(
