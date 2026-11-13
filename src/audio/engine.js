@@ -28,7 +28,7 @@ import { clamp } from "../core/format.js";
 
 /** @param {{ onError: (error: unknown) => void }} options */
 export function createAudioEngine({ onError }) {
-  const { paramRampSeconds, limiter: limiterConfig } = CONFIG.audio;
+  const { paramRampSeconds, limiter: limiterConfig, latencyHint } = CONFIG.audio;
 
   let context = null;
   let stretch = null;
@@ -123,7 +123,7 @@ export function createAudioEngine({ onError }) {
   }
 
   async function create() {
-    context = new AudioContext(sampleRate ? { sampleRate } : undefined);
+    context = new AudioContext({ latencyHint, ...(sampleRate ? { sampleRate } : {}) });
     await context.resume();
 
     stretch = await SignalsmithStretch(context);

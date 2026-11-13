@@ -43,6 +43,19 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-13: No more dropouts with a stem muted on a busy computer
+
+- **What:** playback no longer has short dropouts (clicks, tiny gaps) when a stem is muted, soloed, panned or turned down while the computer is busy with something else. And the sound now goes out through a larger buffer, which rides out a busy moment for any song, with or without stems. A key press is heard about 35 ms later than before (play, pause, a jump); the time shown and the video still match what's heard.
+- **Why:** the owner heard hiccups in playback since the stems arrived, with plenty of memory free and no video. Measured (docs/diagnostics/audio-dropouts.md): with a stem muted the audio thread did more than twice its usual work (29 % of a core against 13 %), and under load it dropped out far more often than the full mix (in 40 s: 38 against 0 with 16 busy loops, 201 against 3 and 2342 against 343 with processes copying memory, 781 against 8 with processes allocating). On a quiet computer there were none in 10 minutes, and none were in the sound itself (recorded and checked, straight and looped).
+- **How:** two changes.
+  - The stretcher's worklet refills its whole input (about 0.1 s) on every block of 128 samples, and the stems were mixed over all of it each time. It now keeps the mixed input from one block to the next and mixes only the new samples (`stemCache`); whatever changes the mix (the track, a piece of stems arriving, a gain) makes it start over (`stemVersion`). The result is the same sample for sample. Nothing is allocated in the mixing any more.
+  - The audio context asks for the "playback" buffer (`CONFIG.audio.latencyHint`): 23 ms here against 11. The transport already allows for the output delay, so positions stay exact.
+  - After both, the same test: no dropouts except under the heaviest memory load (17 for the full mix, 46 with a stem muted, in 40 s), and the audio thread at 13 % of a core with a stem muted.
+- **Where:** `src/vendor/signalsmith-stretch/SignalsmithStretch.mjs` (`process`, `mixStems`, the remote methods; described in its `README.md`); `src/audio/engine.js` (`create`); `src/config.js` (`audio.latencyHint`); new: `tests/diagnostics/dropouts.cjs` (`npm run diagnose:dropouts -- <project.ebee>`), `docs/diagnostics/audio-dropouts.md`; `README.md`.
+- **Verified by:** `npm run check`; `TB_TOPICS=03,04,05,08,11,21 npm test` (434 unit, 250 e2e, 33 smoke: topic 21's renders with stems are still identical sample for sample, and the positions and the video's frames still match the sound); `npm run diagnose:dropouts`, before and after (the table in the diagnostics doc). Not verified: how it sounds to the owner's ear; whether these were the very hiccups the owner heard (they weren't reproduced on a quiet computer, only under load); Windows and Mac; separating a song while playing wasn't measured again after the fix.
+
+---
+
 ## 2026-11-12: The recent files move into a side menu, File › Open recent
 
 - **What:** the File menu no longer lists the recent projects and files itself. It has one row, "Open recent ›", whose side menu opens beside it with the two lists, headed "Projects" and "Files" (up to 5 of each, as before). Pointing at the row opens it after a moment; so do a click, Enter and →. ← and Esc close it and go back to the row; pointing at another row of the File menu closes it too. Picking an entry closes both menus and opens it, as before. With nothing on the lists, the row isn't there. The welcome screen is unchanged.

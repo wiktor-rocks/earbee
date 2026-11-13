@@ -85,6 +85,13 @@ export const CONFIG = {
   audio: {
     // Smoothing for volume and EQ changes, so they don't click.
     paramRampSeconds: 0.015,
+    // How large a buffer the sound goes out through: "playback" asks for
+    // one that rides out a busy computer (about 23 ms here, against 11 for
+    // the browser's default, "interactive"), so playback doesn't drop out
+    // while other programs work; a key press is heard that much later, and
+    // the time shown allows for it (audio/engine.js outputDelay). Measured
+    // in docs/diagnostics/audio-dropouts.md.
+    latencyHint: /** @type {AudioContextLatencyCategory} */ ("playback"),
     // Brick-wall limiter that stops volume > 100% and EQ boosts clipping.
     limiter: { threshold: -1, knee: 0, ratio: 20, attack: 0.002, release: 0.1 },
     // Rate for files the chunked decoder can't read, which decodeAudioData

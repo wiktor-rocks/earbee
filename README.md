@@ -75,6 +75,7 @@ MIT: see [LICENSE](LICENSE). EarBee is built on Signalsmith Stretch, Mediabunny,
 | `TB_TOPICS=02,10 npx electron tests/run.cjs`      | Only some end-to-end topics (by number); later topics may need what earlier ones loaded                                                                                                          |
 | `npm run check`                                   | Formatting (Prettier), lint (ESLint, including the import layering in `src/`) and type check (TypeScript on JSDoc)                                                                               |
 | `npm run diagnose:loading`                        | Linux: measure loading of long files (10 min – 2 h) and write raw results to `tests/output/diagnostics/`; see `docs/diagnostics/long-file-loading.md`                                            |
+| `npm run diagnose:dropouts -- <project.ebee>`     | Linux: count audio dropouts while a project with stems plays and the computer is kept busy (10 min, plays quietly through the speakers); see `docs/diagnostics/audio-dropouts.md`                |
 | `npm run format`                                  | Format all files                                                                                                                                                                                 |
 | `npm run build:dir`                               | Unpacked Linux build in `dist/linux-unpacked`                                                                                                                                                    |
 | `npm run build:linux` / `build:win` / `build:mac` | Linux AppImage / Windows installer (`-setup.exe`) / macOS `.dmg` for Apple Silicon (on a Mac; signed ad hoc), in `dist/`. Releases are built by `.github/workflows/release.yml` on a version tag |
@@ -172,6 +173,7 @@ tests/
   fake-yt-dlp.cjs    stands in for yt-dlp, so downloads test offline
   launch.cjs, make-fixtures.sh
   diagnostics/       measuring long-file loading (npm run diagnose:loading)
+                     and audio dropouts (npm run diagnose:dropouts)
 CHANGELOG.md       What changed, why, how and where, newest first
 ```
 

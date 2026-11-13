@@ -37,6 +37,8 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 			this.audioBuffersStart = 0; // time-stamp for the first audio buffer
 			this.audioBuffersEnd = 0; // just to be helpful
 			this.stems = null; // patched: stems mixed into the input (mixStems)
+			this.stemCache = null; // patched: the last block's mixed input (process)
+			this.stemVersion = 0; // patched: counts what changes the mixed input: the track, the stems, their gains
 			
 			this.timeIntervalSamples = sampleRate*0.1;
 			this.timeIntervalCounter = 0;
@@ -133,6 +135,7 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 					return obj;
 				},
 				dropBuffers: toSeconds => {
+					++this.stemVersion; // patched: the mixed input kept (process) is out of date
 					if (typeof toSeconds !== 'number') {
 						let buffers = this.audioBuffers.flat(1).map(b => b.buffer);
 						this.audioBuffers = [];
@@ -163,6 +166,7 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 					};
 				},
 				addBuffers: sampleBuffers => {
+					++this.stemVersion; // patched: the mixed input kept (process) is out of date
 					sampleBuffers = [].concat(sampleBuffers);
 					this.audioBuffers.push(sampleBuffers);
 					let length = sampleBuffers[0].length;
@@ -173,6 +177,7 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 				// the track's sample `start` (0 if not given); covered: the spans of the track's samples separated so
 				// far, [[from, to], …] (all of it if not given)
 				addStems: stems => {
+					++this.stemVersion; // patched: the mixed input kept (process) is out of date
 					this.stems = {tracks: stems.tracks, scales: stems.scales, covered: stems.covered || null, start: stems.start || 0, gains: stems.tracks.map(() => 1), other: 1, active: false};
 					return true;
 				},
@@ -180,6 +185,7 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 				// `from`, and the spans covered now
 				writeStems: (from, pieces, covered) => {
 					if (!this.stems) return false;
+					++this.stemVersion; // patched: the mixed input kept (process) is out of date
 					let at = from - this.stems.start;
 					pieces.forEach((channels, s) => channels.forEach((piece, c) => {
 						let samples = this.stems.tracks[s][c];
@@ -194,6 +200,7 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 				// and the rest's (the track minus the stems)
 				setStemGains: (gains, other) => {
 					if (!this.stems) return false;
+					++this.stemVersion; // patched: the mixed input kept (process) is out of date
 					this.stems.gains = gains.slice(0, this.stems.tracks.length);
 					this.stems.other = other;
 					let identity = gain => typeof gain === 'number' ? gain === 1 : gain[0] === 1 && gain[1] === 0 && gain[2] === 0 && gain[3] === 1;
@@ -201,6 +208,7 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 					return true;
 				},
 				dropStems: () => {
+					++this.stemVersion; // patched: the mixed input kept (process) is out of date
 					this.stems = null;
 					return true;
 				}
@@ -265,8 +273,9 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 		mixStems(buffer, at, count, channel, from) {
 			let covered = this.stems.covered;
 			if (!covered) return this.mixStemsPart(buffer, at, count, channel, from);
-			for (let [start, end] of covered) {
-				let a = Math.max(start, from), b = Math.min(end, from + count);
+			// (By index: nothing is allocated here, on the audio thread.)
+			for (let i = 0; i < covered.length; ++i) {
+				let a = Math.max(covered[i][0], from), b = Math.min(covered[i][1], from + count);
 				if (a < b) this.mixStemsPart(buffer, at + a - from, b - a, channel, a);
 			}
 		}
@@ -375,6 +384,26 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 				// Fill the buffer with previous input
 				let buffers = outputList[0].map((_, c) => new Float32Array(memory, this.buffersIn[c], this.bufferLength));
 
+				// patched: the stems' mix of this input is kept from one block to the
+				// next (stemCache). The input is refilled whole on every block, and
+				// all but its newest samples were in the block before: those are
+				// taken from the copy kept, and only what's new is mixed (from
+				// `fresh` on). Mixing all of it every block more than doubled the
+				// audio thread's work, enough for dropouts on a busy computer.
+				let stems = this.stems?.active ? this.stems : null;
+				let stemCache = null, fresh = 0, shift = 0;
+				if (stems) {
+					stemCache = this.stemCache;
+					if (!stemCache || stemCache.length !== this.bufferLength || stemCache.data.length !== buffers.length) {
+						stemCache = this.stemCache = {length: this.bufferLength, data: buffers.map(() => new Float32Array(this.bufferLength)), start: 0, version: -1};
+					}
+					// How far the input moved on since the copy was made: usable if nothing else changed.
+					shift = inputSamplesEnd - this.bufferLength - stemCache.start;
+					if (stemCache.version === this.stemVersion && shift >= 0 && shift < this.bufferLength) fresh = this.bufferLength - shift;
+				} else if (this.stemCache) {
+					this.stemCache.version = -1;
+				}
+
 				let blockSamples = 0; // current write position in the temporary input buffer
 				let audioBufferIndex = 0;
 				let audioSamples = this.audioBuffersStart; // start of current audio buffer
@@ -395,7 +424,10 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 						buffers.forEach((buffer, c) => {
 							let channelBuffer = audioBuffer[c%audioBuffer.length];
 							buffer.subarray(blockSamples).set(channelBuffer.subarray(startIndex, startIndex + count));
-							if (this.stems?.active) this.mixStems(buffer, blockSamples, count, c, inputSamples); // patched
+							if (stems) { // patched
+								let skip = Math.max(0, fresh - blockSamples); // mixed already, in the block before
+								if (skip < count) this.mixStems(buffer, blockSamples + skip, count - skip, c, inputSamples + skip);
+							}
 						});
 						inputSamples += count; // patched: was audioSamples += count
 						blockSamples += count;
@@ -405,6 +437,18 @@ function registerWorkletProcessor(Module, audioNodeKey) {
 				}
 				if (blockSamples < this.bufferLength) {
 					buffers.forEach(buffer => buffer.subarray(blockSamples).fill(0));
+				}
+				if (stems) { // patched: the samples kept, into the input; the new ones, into the copy
+					for (let c = 0; c < buffers.length; ++c) {
+						let kept = stemCache.data[c];
+						if (fresh > 0) {
+							kept.copyWithin(0, shift);
+							buffers[c].set(kept.subarray(0, fresh));
+						}
+						kept.set(buffers[c].subarray(fresh), fresh);
+					}
+					stemCache.start = inputSamplesEnd - this.bufferLength;
+					stemCache.version = this.stemVersion;
 				}
 
 				// constantly seeking, so we don't have to worry about the input buffers needing to be a rate-dependent size
