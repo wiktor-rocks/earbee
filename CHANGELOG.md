@@ -43,6 +43,18 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-14: Version 0.3.1
+
+- **What:** EarBee 0.3.1, a small release. Details are in the entries below, back to "A contact address, contact@earbee.org" (2026-11-11).
+  - **Fixed:** short dropouts in the sound with a stem muted, soloed, panned or turned down while the computer is busy. The sound also goes out through a larger buffer, which rides out a busy moment for any song.
+  - **Changed:** the recent files are in a side menu, File › Open recent, instead of in the File menu itself.
+- **Why:** the fix matters to anyone using the stems, so it goes out before 0.4.0.
+- **How:** `npm version 0.3.1 --no-git-tag-version`; `testing` and `main` moved up; the tag `v0.3.1` builds the draft release.
+- **Where:** `package.json`, `package-lock.json`.
+- **Verified by:** the full `npm test` on these files, before the commit: 434 unit, 748 end-to-end, 33 smoke, all pass. The draft release's files and its AppImage are checked after the tag, before publishing.
+
+---
+
 ## 2026-11-13: No more dropouts with a stem muted on a busy computer
 
 - **What:** playback no longer has short dropouts (clicks, tiny gaps) when a stem is muted, soloed, panned or turned down while the computer is busy with something else. And the sound now goes out through a larger buffer, which rides out a busy moment for any song, with or without stems. A key press is heard about 35 ms later than before (play, pause, a jump); the time shown and the video still match what's heard.
