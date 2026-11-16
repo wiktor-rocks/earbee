@@ -89,8 +89,8 @@ export function createTakePlayer({ engine, transport, getRate }) {
     source.buffer = bufferIn(context);
     const envelope = context.createGain();
     envelope.gain.setValueAtTime(0, at);
-    envelope.gain.linearRampToValueAtTime(1, at + fade);
-    envelope.gain.setValueAtTime(1, end - fade);
+    envelope.gain.linearRampToValueAtTime(take.gain, at + fade);
+    envelope.gain.setValueAtTime(take.gain, end - fade);
     envelope.gain.linearRampToValueAtTime(0, end);
     source.connect(envelope).connect(engine.takeInput());
     source.start(at, offset + late, length - late);

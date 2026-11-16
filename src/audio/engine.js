@@ -16,7 +16,7 @@ import { clamp } from "../core/format.js";
  * Exposes: init, useSampleRate, loadPieces, schedule, setVolume, setBalance, setEq,
  *          setFocus, now, outputDelay, resume, click; and loadStems,
  *          writeStems, setStemGains, dropStems for Stems (src/features/stems/);
- *          audioContext, takeInput for Recording (src/features/recording/)
+ *          audioContext, takeInput, setTrackLevel for Recording (src/features/recording/)
  * Values set before init() are remembered and applied when the graph
  * is built, so settings can change before any audio is loaded.
  *
@@ -36,6 +36,7 @@ export function createAudioEngine({ onError }) {
   let masterGain = null;
   let sides = null; // the balance's { left, right } gain nodes
   let takeGain = null; // Recording (src/features/recording/): where a take comes in
+  let trackGain = null; // Recording (src/features/recording/): the track alone, before a take joins it
   let initPromise = null;
   let sampleRate; // wanted context rate; undefined = the device's default
   const eqFilters = {};
@@ -44,6 +45,7 @@ export function createAudioEngine({ onError }) {
   const desired = {
     volume: 1,
     balance: 0, // percent: -100 (only the left) … 100 (only the right)
+    trackLevel: 1, // Recording (src/features/recording/): 0 while a take is soloed
     eqGains: {},
     eqEnabled: false,
     focus: /** @type {{ highpass: number | null, lowpass: number | null }} */ ({ highpass: null, lowpass: null }),
@@ -120,7 +122,11 @@ export function createAudioEngine({ onError }) {
     const limiter = context.createDynamicsCompressor();
     for (const [param, value] of Object.entries(limiterConfig)) limiter[param].value = value;
 
-    node.connect(masterGain).connect(splitter);
+    // Recording (src/features/recording/): the track's own gain, so a take
+    // soloed is heard without it (a take joins after it, at the master volume).
+    trackGain = context.createGain();
+    trackGain.gain.value = desired.trackLevel;
+    node.connect(trackGain).connect(masterGain).connect(splitter);
     merger.connect(limiter).connect(context.destination);
   }
 
@@ -148,7 +154,7 @@ export function createAudioEngine({ onError }) {
     if (context.sampleRate === rate) return;
 
     const old = context;
-    context = stretch = masterGain = sides = takeGain = initPromise = null;
+    context = stretch = masterGain = sides = takeGain = trackGain = initPromise = null;
     for (const id of Object.keys(eqFilters)) delete eqFilters[id];
     for (const filters of Object.values(focusFilters)) filters.length = 0;
     await old.close();
@@ -228,6 +234,12 @@ export function createAudioEngine({ onError }) {
         takeGain.connect(masterGain);
       }
       return takeGain;
+    },
+
+    // The track's level under a take: 1, or 0 while the take is soloed.
+    setTrackLevel(level) {
+      desired.trackLevel = level;
+      if (trackGain) rampParam(trackGain.gain, level);
     },
 
     now: () => context?.currentTime ?? 0,

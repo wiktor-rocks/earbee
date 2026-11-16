@@ -80,7 +80,7 @@ test("a pass too short to be a take is left out", () => {
   near(takes[0].start, 10);
 });
 
-const take = { start: 10, end: 14, rate: 1, sampleRate: 1000, lead: 200, samples: new Float32Array(4400) };
+const take = { start: 10, end: 14, rate: 1, sampleRate: 1000, lead: 200, gain: 1, samples: new Float32Array(4400) };
 
 test("a position's place in a take allows for the lead, the speed and the nudge", () => {
   near(takeOffset(take, 10, 0), 0.2);

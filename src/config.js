@@ -328,7 +328,7 @@ export const CONFIG = {
     // The nudge, in ms: what's left of the delay between playing and
     // recording after the delays the system reports are taken off. Above
     // 0, the take plays that much earlier.
-    nudge: { min: -150, max: 150, step: 1, initial: 0 },
+    nudge: { min: -300, max: 300, step: 1, initial: 0 },
     // A take keeps this many seconds of the recording before and after
     // it, so the nudge has something to move into.
     margin: 0.2,
@@ -338,6 +338,29 @@ export const CONFIG = {
     maxTakes: 20,
     // Recording stops by itself after this long (10 minutes: 100 MB).
     maxSeconds: 600,
+    // A take plays louder than it came in, so a quiet input (a guitar
+    // straight into an interface) is heard beside a finished song: its
+    // recording's loudest sample is brought up to `level` (0…1), by at
+    // most `maxGain` times (30 dB), so noise isn't made into a take.
+    loudness: { level: 0.7, maxGain: 32 },
+    // Calibrating (calibrate.js): `clicks` clicks, `gap` seconds apart,
+    // the first `lead` seconds after the input opens. A click is looked
+    // for from `before` seconds before its time to `after` after it; it
+    // starts where the level first reaches `onset` of its loudest sample,
+    // and has to be louder than `floor` and `overNoise` times the
+    // recording's usual level. At least half must be within `agree`
+    // seconds of each other.
+    calibration: {
+      clicks: 8,
+      gap: 0.4,
+      lead: 0.6,
+      before: 0.1,
+      after: 0.3,
+      onset: 0.3,
+      floor: 0.001,
+      overNoise: 8,
+      agree: 0.005,
+    },
     // A recording whose loudest sample is below this (−60 dB) is silence:
     // the wrong input, or nothing plugged in. It's said, not kept.
     silence: 0.001,

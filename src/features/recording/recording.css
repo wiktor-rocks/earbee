@@ -14,21 +14,18 @@
   color: var(--danger);
 }
 
-/* The take's row: its name, its volume, M (no solo: one column fewer than
-   a stem's). */
-.recording-mixer {
-  grid-template-columns: minmax(0, 1fr) auto auto;
+/* The nudge, a small knob with its name and value beside it, and
+   Calibrate, which measures it, at the other end. */
+.recording-timing {
+  display: flex;
+  flex: 1 1 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
 }
 
-/* The nudge: a small knob with its name and value beside it. */
 .recording-nudge {
   --knob-size: 28px;
-
-  flex: 1 1 100%;
-}
-
-.recording-nudge[hidden] {
-  display: none;
 }
 
 /* The list of takes (a .menu, style.css): left of the side panel, against

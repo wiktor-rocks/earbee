@@ -26,13 +26,20 @@
  *   4. The take plays with the track (player.js), through the Mixer's
  *      volume and balance but not the track's speed, pitch or EQ: as it
  *      was played. So it plays only at the speed it was recorded at; at
- *      another, it's silent and its line says so.
+ *      another, it's silent and its line says so. Soloed (S), it plays
+ *      without the track.
  *
  * Lining up: the delay between the track being rendered and what's played
  * along to it coming back in is the output's delay plus the input's, as
  * the system reports them. What it doesn't report is the nudge (ms, kept
- * between runs): set by ear once for an input, on a take of something
- * sharp played on the beat.
+ * between runs): measured by Calibrate (calibrate.js: a few clicks played
+ * and found again in the input, which has to hear the output: a cable
+ * from an output to the input, or a microphone at the speaker), or set by
+ * ear, on a take of something sharp played on the beat.
+ *
+ * Loudness: an instrument straight into an interface comes in far quieter
+ * than a finished song, so a take plays louder than it was recorded: its
+ * recording's loudest sample brought up to CONFIG.recording.loudness.
  *
  * Self-contained: this folder, its recording.css, and the lines marked
  * "Recording (" (app.js, open-file.js, index.html, config.js,
@@ -45,10 +52,11 @@
 
 import { CONFIG } from "../../config.js";
 import { hasAudio, player, settings } from "../../context.js";
-import { clamp, formatDuration, formatSpeed, formatTrackTime } from "../../core/format.js";
+import { clamp, formatDuration, formatSigned, formatSpeed, formatTrackTime } from "../../core/format.js";
 import { $, reportError } from "../../ui/dom.js";
 import { readStored, store } from "../../ui/storage.js";
 import { notify } from "../../ui/toast.js";
+import { clickDelay } from "./calibrate.js";
 import { listInputs, openInput, startCapture } from "./capture.js";
 import { buildRecorder } from "./dock.js";
 import { createTakePlayer, sameSpeed } from "./player.js";
@@ -65,7 +73,7 @@ let takes = []; // the open track's, oldest first
 /** @type {number | null} */
 let selected = null; // the one that plays
 let lastId = 0;
-let mix = { volume: CONFIG.recording.volume.initial, mute: false };
+let mix = { volume: CONFIG.recording.volume.initial, solo: false, mute: false };
 let nudge = CONFIG.recording.nudge.initial; // ms
 /** @type {{ id: string, label: string }[]} */
 let inputs = []; // the sound inputs there are
@@ -75,7 +83,7 @@ let input = { id: "", label: "" };
 /** @type {{ stream: MediaStream, capture: Awaited<ReturnType<typeof startCapture>>, timer: ReturnType<typeof setTimeout> } | null} */
 let probe = null;
 
-/** @type {"idle" | "opening" | "recording" | "finishing"} */
+/** @type {"idle" | "opening" | "recording" | "finishing" | "calibrating"} */
 let stage = "idle";
 // The recording going on: its input, what collects it, where the track
 // was when it began (`anchor`, on the render clock), the loop it runs
@@ -131,6 +139,11 @@ function apply() {
   takePlayer.setTake(stage === "idle" ? current() : null);
   takePlayer.setNudge(nudge / 1000);
   takePlayer.setGain(mix.mute ? 0 : mix.volume);
+  // Soloed, the take plays without the track: only while it is heard, so
+  // a solo never leaves silence (no take, another speed, muted, recording).
+  const take = current();
+  const heard = stage === "idle" && take !== null && sameSpeed(take.rate, settings.speed) && !mix.mute;
+  player.engine.setTrackLevel(mix.solo && heard ? 0 : 1);
   render();
 }
 
@@ -244,9 +257,11 @@ async function finish() {
     const recording = await capture.stop();
     if (opened !== generation) return;
 
-    const { margin, minSeconds, maxTakes, silence } = CONFIG.recording;
+    const { margin, minSeconds, maxTakes, silence, loudness } = CONFIG.recording;
+    let peak = 0;
+    for (const sample of recording.samples) peak = Math.max(peak, Math.abs(sample));
     // Silence: the wrong input, or nothing plugged into it.
-    if (recording.samples.every((sample) => Math.abs(sample) < silence)) {
+    if (peak < silence) {
       const name = inputs.find(({ id }) => id === input.id)?.label ?? "the system's default input";
       notify("Nothing came in, so no take was kept", `${name} was silent. Is it the right input?`);
       return;
@@ -255,6 +270,7 @@ async function finish() {
       rate: anchor.rate,
       margin,
       minSeconds,
+      gain: Math.min(loudness.maxGain, loudness.level / peak),
     });
     for (const take of cut) takes.push({ ...take, id: ++lastId });
     takes = takes.slice(-maxTakes);
@@ -280,6 +296,58 @@ async function finish() {
 
 const toggle = () => (stage === "recording" ? finish() : start());
 
+/* ---------- Calibrating ---------- */
+
+// Plays a few clicks while the input is recorded, and sets the nudge to
+// where they turn up in it, against where they would with no delay
+// unreported.
+async function calibrate() {
+  const { engine, transport } = player;
+  if (stage !== "idle" || !hasAudio()) return;
+  const { clicks, gap, lead, ...find } = CONFIG.recording.calibration;
+  stopListening();
+  transport.pause(); // the clicks alone
+  stage = "calibrating";
+  apply();
+  /** @type {MediaStream | null} */
+  let stream = null;
+  try {
+    stream = await openInput(input.id);
+    const capture = await startCapture(engine.audioContext(), stream, {
+      channel: "mix",
+      delay: engine.outputDelay(),
+      onLevel: showLevel,
+    });
+    engine.resume()?.catch(reportError);
+    const first = engine.now() + lead;
+    const times = Array.from({ length: clicks }, (_, i) => first + i * gap);
+    for (const at of times) engine.click(at, true);
+    const wait = lead + clicks * gap + engine.outputDelay() + capture.inputDelay + CONFIG.recording.tail;
+    await new Promise((resolve) => setTimeout(resolve, wait * 1000));
+    const found = clickDelay(await capture.stop(), times, find);
+
+    const { min, max } = CONFIG.recording.nudge;
+    const ms = found ? Math.round(found.delay * 1000) : 0;
+    if (!found) {
+      notify(
+        "The clicks didn't come in",
+        "The input has to hear the output: a cable from an output to this input, or a microphone at the speaker.",
+      );
+    } else if (ms < min || ms > max) {
+      notify("The delay is more than the nudge can take", `${formatSigned(ms, " ms")} was measured.`);
+    } else {
+      changeNudge(ms);
+      const spread = Math.max(1, Math.round(found.spread * 1000));
+      notify(`Nudge set to ${formatSigned(ms, " ms")}`, `${found.found} of ${clicks} clicks, within ${spread} ms.`);
+    }
+  } finally {
+    for (const track of stream?.getTracks() ?? []) track.stop();
+    ui?.level(null);
+    stage = "idle";
+    apply();
+  }
+}
+
 // While recording, or with a take: follows what has no event of its own.
 // The speed (a take plays at its own only; a change ends a recording),
 // the time shown, and the limit.
@@ -288,7 +356,7 @@ function watch() {
     speed = settings.speed;
     if (stage === "recording") finish().catch(reportError);
     takePlayer?.refresh();
-    render();
+    apply();
   }
   if (stage !== "recording") return;
   if (performance.now() - session.began > CONFIG.recording.maxSeconds * 1000) finish().catch(reportError);
@@ -348,6 +416,7 @@ export function bindRecording() {
     onSelect: select,
     onDelete: remove,
     onInput: chooseInput,
+    onCalibrate: calibrate,
   });
   refreshInputs().catch(reportError);
   navigator.mediaDevices.addEventListener("devicechange", () => void refreshInputs().catch(reportError));
@@ -375,6 +444,6 @@ export function resetRecording() {
   takes = [];
   selected = null;
   lastId = 0;
-  mix = { volume: CONFIG.recording.volume.initial, mute: false };
+  mix = { volume: CONFIG.recording.volume.initial, solo: false, mute: false };
   apply();
 }

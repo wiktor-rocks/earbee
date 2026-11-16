@@ -168,6 +168,23 @@ module.exports = async function (h) {
   v = await view();
   check("back at its speed it plays again", !v.silent && v.note === "");
 
+  // Solo: the track's own gain goes to 0 while the take is heard, and back.
+  const trackLevels = () =>
+    js(`(async () => {
+      const toggles = [...document.querySelectorAll("#recordingSection .recording-row .toggle")];
+      return { labels: toggles.map((t) => t.textContent), pressed: toggles.map((t) => t.ariaPressed) };
+    })()`);
+  await js(`document.querySelector("#recordingSection .recording-row .toggle").click()`);
+  await sleep(100);
+  const soloed = await trackLevels();
+  check(
+    "the take has S and M; S is pressed once clicked",
+    soloed.labels.join("") === "SM" && soloed.pressed[0] === "true",
+    JSON.stringify(soloed),
+  );
+  await js(`document.querySelector("#recordingSection .recording-row .toggle").click()`);
+  await sleep(100);
+
   await js(`document.querySelector("#recordingSection .recording-name").click()`);
   await sleep(100);
   await js(`[...document.querySelectorAll(".recording-menu [role=menuitemradio]")].at(-1).click()`);
@@ -205,6 +222,28 @@ module.exports = async function (h) {
 
   await openFile(path.join(FIXTURES, "clicks.wav"));
   v = await view();
+  check(
+    "Calibrate is there, by the nudge",
+    await js(
+      `!document.querySelector(".recording-calibrate").disabled && !!document.querySelector(".recording-timing #recordingNudge")`,
+    ),
+  );
+  // The stand-in input can't hear the output, so calibrating ends by saying so.
+  await clearToasts();
+  await js(`document.querySelector(".recording-calibrate").click()`);
+  await sleep(300);
+  check(
+    "calibrating says it's listening",
+    (await js(`document.querySelector(".recording-calibrate").textContent`)) === "Listening…",
+  );
+  for (let i = 0; i < 120 && (await js(`document.querySelector(".recording-calibrate").disabled`)); i++)
+    await sleep(50);
+  check(
+    "calibrating without the input hearing the output says so, and leaves the nudge",
+    (await toasts()).some((t) => t.text === "The clicks didn't come in") &&
+      (await js(`document.getElementById("recordingNudge").value`)) === "0",
+    JSON.stringify(await toasts()),
+  );
   check("another file starts without takes", !v.row && v.takes.length === 0 && v.button === "● Record");
   check(
     "recording: no page errors",

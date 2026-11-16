@@ -42,6 +42,7 @@
  * @property {number} rate The speed it was recorded at (1 = normal).
  * @property {number} sampleRate
  * @property {number} lead
+ * @property {number} gain How much louder than recorded it plays (its recording's, so takes of one recording keep their levels against each other).
  * @property {Float32Array} samples
  */
 
@@ -83,10 +84,10 @@ export function passes(anchor, endTime, loop, duration) {
  * before and after it.
  * @param {Recording} recording
  * @param {Pass[]} found
- * @param {{ rate: number, margin: number, minSeconds: number }} options
+ * @param {{ rate: number, margin: number, minSeconds: number, gain?: number }} options
  * @returns {Take[]}
  */
-export function cutTakes(recording, found, { rate, margin, minSeconds }) {
+export function cutTakes(recording, found, { rate, margin, minSeconds, gain = 1 }) {
   const { samples, sampleRate, time } = recording;
   const index = (at) => Math.round((at - time) * sampleRate);
   /** @type {Take[]} */
@@ -105,6 +106,7 @@ export function cutTakes(recording, found, { rate, margin, minSeconds }) {
       rate,
       sampleRate,
       lead: first - begin,
+      gain,
       samples: samples.slice(begin, finish),
     });
   }
