@@ -163,7 +163,13 @@
  *                  song split into its instruments by the stem model in
  *                  the main process, electron/stems/: index.js, its
  *                  worker.js and stems.css; self-contained, its wiring
- *                  marked "Stems (", off with CONFIG.stems.enabled)
+ *                  marked "Stems (", off with CONFIG.stems.enabled),
+ *                  recording/ (a sound input recorded while the track
+ *                  plays, and played back with it, a line in the Mixer:
+ *                  index.js, capture.js and its worklet, takes.js,
+ *                  player.js, dock.js, recording.css; self-contained, its
+ *                  wiring marked "Recording (", off with
+ *                  CONFIG.recording.enabled)
  *   app.js         This file: creates and wires the components, the
  *                  SHORTCUTS table, start()
  *   vendor/        Signalsmith Stretch, patched to read across several
@@ -313,6 +319,7 @@ import { bindVideoZoom, resetVideoZoom, videoZoomChanged, zoomVideoIn, zoomVideo
 import { beatsAction, bindBeats, isBeatMenuOpen, snapForDrag, toggleBeatClick } from "./features/beats.js";
 import { bindVideoWindow, toggleVideoWindow, videoPictureChanged } from "./features/video-window/index.js"; // Video window (src/features/video-window/)
 import { bindStems } from "./features/stems/index.js"; // Stems (src/features/stems/)
+import { bindRecording } from "./features/recording/index.js"; // Recording (src/features/recording/)
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
 import { bindProject, isSaveDialogOpen, openFile, saveProject, saveProjectAs } from "./features/project/index.js";
 import { bindSettings, isSettingsOpen } from "./features/settings.js";
@@ -736,6 +743,7 @@ function start() {
   bindBigVideo(); // Big video (src/features/big-video.js)
   bindStageSplit(); // Stage split (src/features/stage-split.js)
   bindStems(); // Stems (src/features/stems/): before the panel order, which finds its section
+  bindRecording(); // Recording (src/features/recording/)
   bindPanelOrder(); // Panel order (src/features/panel-order.js)
   bindPanelSections(); // Panel sections (src/features/panel-sections.js)
   bindVideoZoom($("videoPane")); // Video zoom (src/features/video-zoom.js)

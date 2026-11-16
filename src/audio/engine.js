@@ -222,7 +222,7 @@ export function createAudioEngine({ onError }) {
     // speed, pitch or EQ.
     audioContext: () => context,
     takeInput() {
-      if (!context) return null;
+      if (!masterGain) return null; // no graph yet
       if (!takeGain) {
         takeGain = context.createGain();
         takeGain.connect(masterGain);

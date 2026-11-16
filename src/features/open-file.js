@@ -40,6 +40,7 @@ import {
 } from "../ui/dom.js";
 import { resetBeats } from "./beats.js";
 import { resetStems } from "./stems/index.js"; // Stems (src/features/stems/)
+import { resetRecording } from "./recording/index.js"; // Recording (src/features/recording/)
 import { setLoopRegion } from "./playback.js";
 import { resetMarks } from "./marks.js";
 
@@ -194,6 +195,7 @@ export async function loadMediaFile(media, signal) {
   resetMarks(decoded.duration);
   resetBeats(media);
   resetStems(media, { duration: decoded.duration, sampleRate: decoded.sampleRate }); // Stems (src/features/stems/)
+  resetRecording(); // Recording (src/features/recording/)
   resetSoundSettings();
   resetTimelineShare(); // Stage split (src/features/stage-split.js)
   dom.fileName.textContent = media.name;

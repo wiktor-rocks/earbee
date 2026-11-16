@@ -28,6 +28,8 @@
     <link rel="stylesheet" href="src/features/video-window/video-window.css" />
     <link rel="stylesheet" href="src/features/stems/stems.css" />
     <!-- Stems (src/features/stems/) -->
+    <link rel="stylesheet" href="src/features/recording/recording.css" />
+    <!-- Recording (src/features/recording/) -->
   </head>
 
   <body>
@@ -571,6 +573,9 @@
               <!-- Stems (src/features/stems/): the song split into its
                    instruments; filled in by the feature (removed when it's off). -->
               <div id="stemsSection" class="stems-part" hidden></div>
+              <!-- Recording (src/features/recording/): yourself recorded into
+                   the mix; filled in by the feature (removed when it's off). -->
+              <div id="recordingSection" class="stems-part recording-part" hidden></div>
             </div>
 
             <div id="eqSection" class="dock-group eq-group bypassed">

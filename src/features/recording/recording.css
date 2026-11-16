@@ -1,0 +1,51 @@
+/* Recording (src/features/recording/): its part of the Mixer, under the
+   stems, in their look (stems.css: the head, a row, a quiet line). */
+
+/* The Record button, across the part, like the stems' buttons; while
+   recording, in the colour of something that's on. */
+.recording-part .recording-action {
+  flex: 1 1 100%;
+  justify-content: flex-start;
+  font-variant-numeric: tabular-nums;
+}
+
+.recording-part .recording-action.on {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+/* The take's row: its name, its volume, M (no solo: one column fewer than
+   a stem's). */
+.recording-mixer {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+
+/* The nudge: a small knob with its name and value beside it. */
+.recording-nudge {
+  --knob-size: 28px;
+
+  flex: 1 1 100%;
+}
+
+.recording-nudge[hidden] {
+  display: none;
+}
+
+/* The list of takes (a .menu, style.css): left of the side panel, against
+   the take's name, as a stem's panel is; each with where it starts and its
+   speed, quieter. */
+.recording-menu {
+  position-anchor: --take-menu;
+  position-area: left span-bottom;
+  min-width: 220px;
+  margin: 0 10px 0 0;
+}
+
+.recording-menu .menu-item small {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.recording-menu .menu-item[aria-checked="true"] .menu-label {
+  font-weight: 800;
+}

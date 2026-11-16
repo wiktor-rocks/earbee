@@ -30,6 +30,9 @@ function prepare() {
   fs.mkdirSync(OUTPUT, { recursive: true });
   fs.rmSync(DOWNLOADS, { recursive: true, force: true });
   app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
+  // Recording (src/features/recording/): Chromium's stand-in for the sound
+  // input (a beep a second), so recording needs no microphone.
+  app.commandLine.appendSwitch("use-fake-device-for-media-stream");
   require(path.join(PROJECT, "electron", "media-files.js")).registerMediaScheme(protocol); // as main.js does
 }
 

@@ -92,9 +92,12 @@ export async function startCapture(context, stream, { channel, delay }) {
      * @returns {Promise<import("./takes.js").Recording>}
      */
     async stop() {
+      // The worklet answers with what it still held; not if its context
+      // was closed meanwhile (a track at another rate was opened).
       await new Promise((resolve) => {
         finished = () => resolve(undefined);
         node.port.postMessage({ on: false });
+        setTimeout(resolve, 500);
       });
       node.port.onmessage = null;
       source.disconnect();

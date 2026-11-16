@@ -62,6 +62,7 @@ const TOPICS = [
   "20-beats.cjs",
   "21-stems.cjs", // Stems (src/features/stems/)
   "22-recent.cjs", // Recent files (src/features/recent.js)
+  "23-recording.cjs", // Recording (src/features/recording/)
 ];
 
 prepare();
