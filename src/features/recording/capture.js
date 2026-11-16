@@ -1,28 +1,36 @@
-// Recording (src/features/recording/): the sound input, recorded in the
-// player's own AudioContext, so its samples are on the same clock as the
-// track (takes.js says why that matters). Nothing of it is heard: no
-// monitoring.
+// Recording (src/features/recording/): the sound input, recorded so that
+// every sample has a time on the clock the track plays by (takes.js says
+// why that matters). Nothing of it is heard: no monitoring.
 //
 // The input is opened as it is, without the browser's voice processing
 // (echo cancellation, noise suppression, automatic gain: made for calls,
-// they'd mangle an instrument and add delay). A worklet
-// (capture-worklet.js) collects the samples; stopping joins them into one
-// recording.
+// they'd mangle an instrument and add delay).
+//
+// Its timing comes from the browser's own stamps, not from when the sound
+// reaches the page. Each chunk of the input says when it was captured, on
+// the page's clock (performance.now). The player's AudioContext says, as
+// often as asked, which of its samples is leaving for the speakers at
+// which moment on that same clock (getOutputTimestamp): the "tie" between
+// the two clocks, noisy each time, steady in the middle of many. So a
+// chunk captured at T was played while the track's sound rendered at
+// (T − tie) was heard, whatever buffers the sound waited in on the way in.
+// Measured (2026-11, a loop from the output back into an input, opened ten
+// times): the same to about 2 ms each time, where reading the input inside
+// the AudioContext moved by 20 ms from one opening to the next. What's
+// left is a constant, the nudge.
 //
 //   listInputs()                       the inputs there are, the system's default aside: [{ id, label }]
 //   openInput(deviceId)                the input (the system's default without an id): a MediaStream
-//   startCapture(context, stream, { channel, delay, onLevel, keep })
-//     → { inputDelay, stop() → Recording (takes.js) }
+//   startCapture(context, stream, { onLevel, keep })
+//     → { stop() → Recording (takes.js): mono, at the input's own rate }
 //     onLevel(peak) hears each chunk's loudest sample (0…1), for a meter;
 //     with `keep` false nothing is kept (only listening, for the meter).
-//     `delay`: the seconds from the player rendering a sound to it being
-//     heard (the output's delay); the input's own, as the system reports
-//     it, is added, and both are taken off the recording's time.
 import { AppError } from "../../core/errors.js";
 
-const worklet = new URL("./capture-worklet.js", import.meta.url);
-/** @type {WeakSet<BaseAudioContext>} */
-const loaded = new WeakSet(); // the contexts the worklet is loaded into
+const TIE_MS = 20; // how often the two clocks are tied while recording
+const TIE_WINDOW = 500; // a chunk's tie: the middle one of those within this many ms of it
+
+const median = (values) => values.toSorted((a, b) => a - b)[values.length >> 1];
 
 /** The sound inputs, named once the user has allowed one to be opened. */
 export async function listInputs() {
@@ -55,69 +63,91 @@ export async function openInput(deviceId) {
 }
 
 /**
- * @param {AudioContext} context
- * @param {MediaStream} stream
- * @param {{ channel: number | "mix", delay: number, onLevel?: (peak: number) => void, keep?: boolean }} options
+ * When the first of a recording's samples was played, on the render clock
+ * (seconds): each chunk's own answer (its capture time less the tie around
+ * then, less the samples before it), and the middle one of them all.
+ * @param {{ at: number, before: number }[]} chunks Each one's capture time (ms) and the samples before it.
+ * @param {{ at: number, tie: number }[]} ties
+ * @param {number} sampleRate
  */
-export async function startCapture(context, stream, { channel, delay, onLevel, keep = true }) {
-  if (!loaded.has(context)) {
-    await context.audioWorklet.addModule(worklet);
-    loaded.add(context);
-  }
-  // The input's delay as the system reports it (seconds; not in the types yet).
-  const inputDelay = /** @type {any} */ (stream.getAudioTracks()[0]?.getSettings())?.latency ?? 0;
-
-  const source = context.createMediaStreamSource(stream);
-  const node = new AudioWorkletNode(context, "earbee-capture", {
-    numberOfInputs: 1,
-    numberOfOutputs: 1,
-    processorOptions: { channel },
+export function firstSampleTime(chunks, ties, sampleRate) {
+  if (!chunks.length || !ties.length) return 0;
+  let from = 0;
+  const answers = chunks.map(({ at, before }) => {
+    while (from < ties.length - 1 && ties[from].at < at - TIE_WINDOW) from++;
+    let to = from;
+    while (to < ties.length && ties[to].at <= at + TIE_WINDOW) to++;
+    // None that near (the page was held up): the nearest there is.
+    const near = to > from ? ties.slice(from, to) : [ties[Math.min(from, ties.length - 1)]];
+    return (at - median(near.map(({ tie }) => tie))) / 1000 - before / sampleRate;
   });
-  // The worklet only runs while it leads somewhere: into a gain of 0.
-  const silence = context.createGain();
-  silence.gain.value = 0;
-  source.connect(node).connect(silence).connect(context.destination);
+  return median(answers);
+}
 
-  /** @type {{ frame: number, samples: Float32Array }[]} */
+/**
+ * @param {AudioContext} context The player's: the clock the recording's time is on.
+ * @param {MediaStream} stream
+ * @param {{ onLevel?: (peak: number) => void, keep?: boolean }} [options]
+ */
+export function startCapture(context, stream, { onLevel, keep = true } = {}) {
+  const Processor = /** @type {any} */ (globalThis).MediaStreamTrackProcessor;
+  if (!Processor) throw new AppError("This version of the browser can't record the input.");
+  /** @type {ReadableStreamDefaultReader<any>} */
+  const reader = new Processor({ track: stream.getAudioTracks()[0] }).readable.getReader();
+
+  /** @type {{ at: number, tie: number }[]} */
+  const ties = [];
+  const tieTimer = setInterval(() => {
+    const { contextTime, performanceTime } = context.getOutputTimestamp();
+    if (contextTime > 0) ties.push({ at: performanceTime, tie: performanceTime - contextTime * 1000 });
+  }, TIE_MS);
+
+  /** @type {{ at: number, before: number, samples: Float32Array }[]} */
   const chunks = [];
-  /** @type {(() => void) | null} */
-  let finished = null;
-  node.port.onmessage = ({ data }) => {
-    if (data.done) return finished?.();
-    if (keep) chunks.push(data);
-    if (!onLevel) return;
-    let peak = 0;
-    for (const sample of data.samples) peak = Math.max(peak, Math.abs(sample));
-    onLevel(peak);
-  };
-  node.port.postMessage({ on: true });
+  let sampleRate = context.sampleRate;
+  let length = 0;
+  /** @type {Float32Array | null} */
+  let plane = null; // one channel of a chunk, on its way into the mix
+
+  const reading = (async () => {
+    for (;;) {
+      const { value: data, done } = await reader.read();
+      if (done) return;
+      try {
+        const frames = data.numberOfFrames;
+        const samples = new Float32Array(frames);
+        if (!plane || plane.length !== frames) plane = new Float32Array(frames);
+        // The input's channels into one: their average.
+        for (let channel = 0; channel < data.numberOfChannels; channel++) {
+          data.copyTo(plane, { planeIndex: channel, format: "f32-planar" });
+          for (let i = 0; i < frames; i++) samples[i] += plane[i] / data.numberOfChannels;
+        }
+        sampleRate = data.sampleRate;
+        if (keep) chunks.push({ at: data.timestamp / 1000, before: length, samples });
+        length += frames;
+        if (onLevel) {
+          let peak = 0;
+          for (const sample of samples) peak = Math.max(peak, Math.abs(sample));
+          onLevel(peak);
+        }
+      } finally {
+        data.close();
+      }
+    }
+  })();
 
   return {
-    inputDelay,
     /**
      * Ends it, and gives what was recorded.
      * @returns {Promise<import("./takes.js").Recording>}
      */
     async stop() {
-      // The worklet answers with what it still held; not if its context
-      // was closed meanwhile (a track at another rate was opened).
-      await new Promise((resolve) => {
-        finished = () => resolve(undefined);
-        node.port.postMessage({ on: false });
-        setTimeout(resolve, 500);
-      });
-      node.port.onmessage = null;
-      source.disconnect();
-      node.disconnect();
-      silence.disconnect();
-
-      // Each chunk goes where its frame says, so a gap in the input (it
-      // stalled) stays a gap: what follows isn't moved earlier.
-      const first = chunks[0]?.frame ?? 0;
-      const last = chunks.at(-1);
-      const samples = new Float32Array(last ? last.frame + last.samples.length - first : 0);
-      for (const chunk of chunks) samples.set(chunk.samples, chunk.frame - first);
-      return { samples, sampleRate: context.sampleRate, time: first / context.sampleRate - delay - inputDelay };
+      clearInterval(tieTimer);
+      await reader.cancel().catch(() => {});
+      await reading.catch(() => {});
+      const samples = new Float32Array(keep ? length : 0);
+      for (const chunk of chunks) samples.set(chunk.samples, chunk.before);
+      return { samples, sampleRate, time: firstSampleTime(chunks, ties, sampleRate) };
     },
   };
 }

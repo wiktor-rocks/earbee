@@ -32,7 +32,8 @@ function prepare() {
   app.commandLine.appendSwitch("autoplay-policy", "no-user-gesture-required");
   // Recording (src/features/recording/): Chromium's stand-in for the sound
   // input (a beep a second), so recording needs no microphone.
-  app.commandLine.appendSwitch("use-fake-device-for-media-stream");
+  // TB_REAL_INPUT=1 leaves the computer's own inputs, to measure with them.
+  if (process.env.TB_REAL_INPUT !== "1") app.commandLine.appendSwitch("use-fake-device-for-media-stream");
   require(path.join(PROJECT, "electron", "media-files.js")).registerMediaScheme(protocol); // as main.js does
 }
 

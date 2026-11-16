@@ -230,6 +230,7 @@ module.exports = async function (h) {
   );
   // The stand-in input can't hear the output, so calibrating ends by saying so.
   await clearToasts();
+  const nudgeBefore = await js(`document.getElementById("recordingNudge").value`);
   await js(`document.querySelector(".recording-calibrate").click()`);
   await sleep(300);
   check(
@@ -241,7 +242,7 @@ module.exports = async function (h) {
   check(
     "calibrating without the input hearing the output says so, and leaves the nudge",
     (await toasts()).some((t) => t.text === "The clicks didn't come in") &&
-      (await js(`document.getElementById("recordingNudge").value`)) === "0",
+      (await js(`document.getElementById("recordingNudge").value`)) === nudgeBefore,
     JSON.stringify(await toasts()),
   );
   check("another file starts without takes", !v.row && v.takes.length === 0 && v.button === "● Record");

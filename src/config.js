@@ -325,9 +325,10 @@ export const CONFIG = {
     enabled: true,
     // The take's volume knob: 1 is the take as recorded.
     volume: { min: 0, max: 2, step: 0.01, initial: 1 },
-    // The nudge, in ms: what's left of the delay between playing and
-    // recording after the delays the system reports are taken off. Above
-    // 0, the take plays that much earlier.
+    // The nudge, in ms: what the browser's stamps leave out of the delay
+    // between playing and recording (capture.js), a constant for a
+    // computer and its sound devices. Above 0, the take plays that much
+    // earlier.
     nudge: { min: -300, max: 300, step: 1, initial: 0 },
     // A take keeps this many seconds of the recording before and after
     // it, so the nudge has something to move into.
@@ -370,7 +371,7 @@ export const CONFIG = {
     // see that it's the right one.
     listenMs: 8000,
     // After stopping, the input is recorded this much longer (seconds, on
-    // top of the delays), so the last notes played are in.
+    // top of the output's delay), so the last notes played are in.
     tail: 0.25,
     // Playing a take: its sound is handed to the audio thread `ahead`
     // seconds before it's due, looked at every `tickMs`, up to

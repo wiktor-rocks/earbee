@@ -5,11 +5,11 @@
 // Two clocks meet here. The track's position is known at the time the
 // player renders it (the AudioContext clock; audio/transport.js
 // positionAtOutput). What's played along to it is heard later, by the
-// output's delay, and comes back into the player later again, by the
-// input's. capture.js takes both delays off, so a recording's `time` is on
-// the render clock: the sample at `time` was played while the track's
-// position rendered at `time` was heard. What the system doesn't report of
-// the delay is the nudge, taken off when a take plays.
+// output's delay, and recorded later again. capture.js works that out, so
+// a recording's `time` is on the render clock: the sample at `time` was
+// played while the track's position rendered at `time` was heard. The
+// constant its working leaves out is the nudge, taken off when a take
+// plays.
 //
 //   passes(anchor, endTime, loop, duration)  the stretches of the track a recording ran over
 //   cutTakes(recording, passes, options)     a take for each
@@ -26,8 +26,8 @@
  */
 
 /**
- * What was recorded: mono samples at `sampleRate`, the first at `time` on
- * the render clock (see above).
+ * What was recorded: mono samples at `sampleRate` (the input's own rate),
+ * the first at `time` on the render clock (see above).
  * @typedef {{ samples: Float32Array, sampleRate: number, time: number }} Recording
  */
 

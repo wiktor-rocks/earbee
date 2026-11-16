@@ -166,7 +166,7 @@
  *                  marked "Stems (", off with CONFIG.stems.enabled),
  *                  recording/ (a sound input recorded while the track
  *                  plays, and played back with it, a line in the Mixer:
- *                  index.js, capture.js and its worklet, takes.js,
+ *                  index.js, capture.js, takes.js, calibrate.js,
  *                  player.js, dock.js, recording.css; self-contained, its
  *                  wiring marked "Recording (", off with
  *                  CONFIG.recording.enabled)

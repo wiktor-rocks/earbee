@@ -12,8 +12,8 @@
  *      few seconds, the meter showing its level, to see it's the right
  *      one; the meter also moves while recording.
  *   1. Record opens the input (capture.js) and starts playback if it isn't
- *      playing. The input is recorded in the player's own AudioContext, so
- *      every sample has a time on the clock the track plays by.
+ *      playing. Every sample recorded gets a time on the clock the track
+ *      plays by, from the browser's own stamps of when it was captured.
  *   2. Recording ends with the button again, or when playback does, or
  *      when the track stops going straight on: a seek, a change of the
  *      loop or of the speed. (A loop going around is not that.) The input
@@ -29,9 +29,9 @@
  *      another, it's silent and its line says so. Soloed (S), it plays
  *      without the track.
  *
- * Lining up: the delay between the track being rendered and what's played
- * along to it coming back in is the output's delay plus the input's, as
- * the system reports them. What it doesn't report is the nudge (ms, kept
+ * Lining up: capture.js works out when each sample was played against
+ * the track, from the browser's stamps on both sides. What those leave out
+ * is a constant for a computer and its sound devices, the nudge (ms, kept
  * between runs): measured by Calibrate (calibrate.js: a few clicks played
  * and found again in the input, which has to hear the output: a cable
  * from an output to the input, or a microphone at the speaker), or set by
@@ -43,7 +43,7 @@
  *
  * Self-contained: this folder, its recording.css, and the lines marked
  * "Recording (" (app.js, open-file.js, index.html, config.js,
- * audio/engine.js). With CONFIG.recording.enabled off, its part of the
+ * audio/engine.js; tests/e2e/harness.cjs for its stand-in input). With CONFIG.recording.enabled off, its part of the
  * Mixer is removed and nothing else happens.
  *
  *   bindRecording()    builds the part (once, at startup)
@@ -80,7 +80,7 @@ let inputs = []; // the sound inputs there are
 // The one chosen ("" and no label: the system's default).
 let input = { id: "", label: "" };
 // Listening to the input for the meter alone, after it's chosen.
-/** @type {{ stream: MediaStream, capture: Awaited<ReturnType<typeof startCapture>>, timer: ReturnType<typeof setTimeout> } | null} */
+/** @type {{ stream: MediaStream, capture: ReturnType<typeof startCapture>, timer: ReturnType<typeof setTimeout> } | null} */
 let probe = null;
 
 /** @type {"idle" | "opening" | "recording" | "finishing" | "calibrating"} */
@@ -90,7 +90,7 @@ let stage = "idle";
 // around, and when it began (for the time shown and the limit).
 /** @type {{
  *   stream: MediaStream,
- *   capture: Awaited<ReturnType<typeof startCapture>>,
+ *   capture: ReturnType<typeof startCapture>,
  *   anchor: { time: number, position: number, rate: number },
  *   loop: import("../../core/timeline.js").Loop | null,
  *   began: number,
@@ -176,7 +176,7 @@ async function listen() {
   const context = player.engine.audioContext();
   if (stage !== "idle" || !context) return;
   const stream = await openInput(input.id);
-  const capture = await startCapture(context, stream, { channel: "mix", delay: 0, onLevel: showLevel, keep: false });
+  const capture = startCapture(context, stream, { onLevel: showLevel, keep: false });
   const timer = setTimeout(stopListening, CONFIG.recording.listenMs);
   probe = { stream, capture, timer };
   if (stage !== "idle") stopListening(); // a recording began meanwhile
@@ -201,15 +201,11 @@ async function start() {
   apply();
   /** @type {MediaStream | null} */
   let stream = null;
-  /** @type {Awaited<ReturnType<typeof startCapture>> | null} */
+  /** @type {ReturnType<typeof startCapture> | null} */
   let capture = null;
   try {
     stream = await openInput(input.id);
-    capture = await startCapture(engine.audioContext(), stream, {
-      channel: "mix",
-      delay: engine.outputDelay(),
-      onLevel: showLevel,
-    });
+    capture = startCapture(engine.audioContext(), stream, { onLevel: showLevel });
     refreshInputs().catch(reportError); // named, now that one was opened
     if (opened !== generation) throw new Error("another file was opened meanwhile");
 
@@ -217,6 +213,7 @@ async function start() {
       engine.resume()?.catch(reportError);
       transport.play();
     }
+    speed = settings.speed; // a change just before Record isn't one during it (watch)
     // Where the track is, as rendered now: what's played from here on is the recording.
     const time = engine.now();
     session = {
@@ -252,7 +249,7 @@ async function finish() {
 
   try {
     // What was played up to now is still on its way in.
-    const wait = engine.outputDelay() + capture.inputDelay + CONFIG.recording.tail;
+    const wait = engine.outputDelay() + CONFIG.recording.tail;
     await new Promise((resolve) => setTimeout(resolve, wait * 1000));
     const recording = await capture.stop();
     if (opened !== generation) return;
@@ -313,16 +310,12 @@ async function calibrate() {
   let stream = null;
   try {
     stream = await openInput(input.id);
-    const capture = await startCapture(engine.audioContext(), stream, {
-      channel: "mix",
-      delay: engine.outputDelay(),
-      onLevel: showLevel,
-    });
+    const capture = startCapture(engine.audioContext(), stream, { onLevel: showLevel });
     engine.resume()?.catch(reportError);
     const first = engine.now() + lead;
     const times = Array.from({ length: clicks }, (_, i) => first + i * gap);
     for (const at of times) engine.click(at, true);
-    const wait = lead + clicks * gap + engine.outputDelay() + capture.inputDelay + CONFIG.recording.tail;
+    const wait = lead + clicks * gap + engine.outputDelay() + CONFIG.recording.tail;
     await new Promise((resolve) => setTimeout(resolve, wait * 1000));
     const found = clickDelay(await capture.stop(), times, find);
 

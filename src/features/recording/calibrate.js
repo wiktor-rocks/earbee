@@ -1,5 +1,5 @@
-// Recording (src/features/recording/): measuring the delay the system
-// doesn't report. Clicks are played at known times while the input is
+// Recording (src/features/recording/): measuring the nudge, the constant
+// that capture.js's timing leaves out. Clicks are played at known times while the input is
 // recorded, with the input hearing the output (a cable from an output to
 // the input, or a microphone at the speaker); where each click turns up in
 // the recording, against where it would with nothing unreported, is what
