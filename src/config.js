@@ -318,6 +318,37 @@ export const CONFIG = {
     memory: { model: 2e9, blend: 100e6, share: 0.8, totalShare: 0.5 },
   },
 
+  // Recording (src/features/recording/): a sound input recorded while the
+  // track plays, and played back with it, a line in the Mixer. Off, none
+  // of it loads.
+  recording: {
+    enabled: true,
+    // The take's volume knob: 1 is the take as recorded.
+    volume: { min: 0, max: 2, step: 0.01, initial: 1 },
+    // The nudge, in ms: what's left of the delay between playing and
+    // recording after the delays the system reports are taken off. Above
+    // 0, the take plays that much earlier.
+    nudge: { min: -150, max: 150, step: 1, initial: 0 },
+    // A take keeps this many seconds of the recording before and after
+    // it, so the nudge has something to move into.
+    margin: 0.2,
+    // A pass around the loop shorter than this isn't kept as a take.
+    minSeconds: 0.5,
+    // The most takes kept for a track: the oldest goes when another comes.
+    maxTakes: 20,
+    // Recording stops by itself after this long (10 minutes: 100 MB).
+    maxSeconds: 600,
+    // After stopping, the input is recorded this much longer (seconds, on
+    // top of the delays), so the last notes played are in.
+    tail: 0.25,
+    // Playing a take: its sound is handed to the audio thread `ahead`
+    // seconds before it's due, looked at every `tickMs`, up to
+    // `lookahead` seconds on (so a loop's next time around is ready before
+    // it comes); each piece fades in and out over `fade` seconds, so one
+    // that starts or ends part way through a note doesn't click.
+    play: { ahead: 0.05, tickMs: 200, lookahead: 1.5, fade: 0.004 },
+  },
+
   // Recent files (electron/recent-files.js, src/features/recent.js): how
   // many are kept per list (projects, files), all shown on the welcome
   // screen, and how many of each the File menu shows.

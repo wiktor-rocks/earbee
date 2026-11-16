@@ -15,7 +15,8 @@ import { clamp } from "../core/format.js";
  *
  * Exposes: init, useSampleRate, loadPieces, schedule, setVolume, setBalance, setEq,
  *          setFocus, now, outputDelay, resume, click; and loadStems,
- *          writeStems, setStemGains, dropStems for Stems (src/features/stems/)
+ *          writeStems, setStemGains, dropStems for Stems (src/features/stems/);
+ *          audioContext, takeInput for Recording (src/features/recording/)
  * Values set before init() are remembered and applied when the graph
  * is built, so settings can change before any audio is loaded.
  *
@@ -34,6 +35,7 @@ export function createAudioEngine({ onError }) {
   let stretch = null;
   let masterGain = null;
   let sides = null; // the balance's { left, right } gain nodes
+  let takeGain = null; // Recording (src/features/recording/): where a take comes in
   let initPromise = null;
   let sampleRate; // wanted context rate; undefined = the device's default
   const eqFilters = {};
@@ -146,7 +148,7 @@ export function createAudioEngine({ onError }) {
     if (context.sampleRate === rate) return;
 
     const old = context;
-    context = stretch = masterGain = sides = initPromise = null;
+    context = stretch = masterGain = sides = takeGain = initPromise = null;
     for (const id of Object.keys(eqFilters)) delete eqFilters[id];
     for (const filters of Object.values(focusFilters)) filters.length = 0;
     await old.close();
@@ -211,6 +213,23 @@ export function createAudioEngine({ onError }) {
     writeStems,
     setStemGains,
     dropStems,
+
+    // Recording (src/features/recording/): the context, to record the
+    // input on the track's own clock (null before any audio; another one
+    // after a track at another rate), and where a take is played into: a
+    // gain of its own (the take's volume) into the master volume, so it
+    // gets the volume, the balance and the limiter, but not the track's
+    // speed, pitch or EQ.
+    audioContext: () => context,
+    takeInput() {
+      if (!context) return null;
+      if (!takeGain) {
+        takeGain = context.createGain();
+        takeGain.connect(masterGain);
+      }
+      return takeGain;
+    },
+
     now: () => context?.currentTime ?? 0,
     // Time from audio leaving the graph to it reaching the speakers.
     outputDelay: () => (context ? (context.baseLatency || 0) + (context.outputLatency || 0) : 0),
