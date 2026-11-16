@@ -1,15 +1,18 @@
-// Recording (src/features/recording/): its part of the Mixer. The Record
+// Recording (src/features/recording/): its part of the Mixer. The input to
+// record, with a meter that moves while it's listened to; the Record
 // button; once there's a take, its row, as a stem's (its name, which opens
 // the list of takes; a small volume knob; M for mute), the nudge under it,
 // and a quiet line when the take can't play at the speed set. It only
 // shows and reports: index.js keeps the takes and plays them.
 //
-//   buildRecorder(section, { volume, nudge, onRecord, onMix, onNudge, onSelect, onDelete })
+//   buildRecorder(section, { volume, nudge, onRecord, onMix, onNudge, onSelect, onDelete, onInput })
 //     onRecord()                        the Record button (start, or stop)
 //     onMix({ volume } | { mute })      the take's volume and mute
 //     onNudge(ms)                       the nudge
 //     onSelect(id), onDelete(id)        from the list of takes
-//     → { render(view) }                shows a View (below)
+//     onInput(id)                       the input chosen ("" for the system's default)
+//     → { render(view), level(fraction | null) }
+//                                       shows a View (below); the meter (null: not listening)
 import { formatSigned } from "../../core/format.js";
 import { element, guarded, onClick } from "../../ui/dom.js";
 import { buildKnob } from "../../ui/knob.js";
@@ -26,6 +29,8 @@ import { bindMenu } from "../../ui/menu.js";
  * @property {{ volume: number, mute: boolean }} mix
  * @property {number} nudge In ms.
  * @property {string} note Why the take isn't heard ("" when it is).
+ * @property {{ id: string, label: string }[]} inputs The sound inputs, the system's default aside.
+ * @property {string} input The one chosen ("" for the system's default).
  */
 
 const ANCHOR = "--take-menu";
@@ -49,14 +54,30 @@ function rangeInput(range, props = {}) {
  *   onNudge: (ms: number) => void,
  *   onSelect: (id: number) => void,
  *   onDelete: (id: number) => void,
+ *   onInput: (id: string) => void,
  * }} options
  */
-export function buildRecorder(section, { volume, nudge, onRecord, onMix, onNudge, onSelect, onDelete }) {
+export function buildRecorder(section, { volume, nudge, onRecord, onMix, onNudge, onSelect, onDelete, onInput }) {
   let listed = ""; // the takes the list was last built for
 
   const record = element("button", { type: "button", className: "recording-action" });
   record.setAttribute("aria-pressed", "false");
   onClick(record, onRecord);
+
+  /* ---------- The input, and its meter ---------- */
+
+  const input = element("select", {
+    className: "recording-input",
+    ariaLabel: "Sound input",
+    title: "The sound input to record: your interface's input, or a microphone",
+  });
+  input.addEventListener(
+    "change",
+    guarded(() => onInput(input.value)),
+  );
+  let offered = ""; // the inputs the select was last built for
+  const meterFill = element("div", { className: "recording-meter-fill" });
+  const meter = element("div", { className: "recording-meter", title: "The input's level", hidden: true }, meterFill);
 
   /* ---------- The take's row ---------- */
 
@@ -166,6 +187,8 @@ export function buildRecorder(section, { volume, nudge, onRecord, onMix, onNudge
 
   section.append(
     element("div", { className: "stems-head" }, element("h3", { textContent: "Recording" })),
+    input,
+    meter,
     mixer,
     nudgeCell,
     note,
@@ -209,8 +232,25 @@ export function buildRecorder(section, { volume, nudge, onRecord, onMix, onNudge
       note.hidden = !current || view.note === "";
       note.textContent = view.note;
 
+      // The inputs, only when they changed (an open select would close).
+      const key = JSON.stringify(view.inputs);
+      if (key !== offered) {
+        offered = key;
+        input.replaceChildren(
+          element("option", { value: "", textContent: "System default input" }),
+          ...view.inputs.map(({ id, label }) => element("option", { value: id, textContent: label })),
+        );
+      }
+      input.value = view.input;
+      input.disabled = stage !== "idle";
+
       if (!current && menu.matches(":popover-open")) menu.hidePopover();
       renderMenu(view);
+    },
+    /** The meter: how full (0…1), or null to put it away. @param {number | null} fraction */
+    level(fraction) {
+      meter.hidden = fraction === null;
+      meterFill.style.width = `${Math.round((fraction ?? 0) * 100)}%`;
     },
   };
 }

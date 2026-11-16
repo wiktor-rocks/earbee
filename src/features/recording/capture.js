@@ -9,10 +9,12 @@
 // (capture-worklet.js) collects the samples; stopping joins them into one
 // recording.
 //
-//   listInputs()                       the inputs there are: [{ id, label }]
+//   listInputs()                       the inputs there are, the system's default aside: [{ id, label }]
 //   openInput(deviceId)                the input (the system's default without an id): a MediaStream
-//   startCapture(context, stream, { channel, delay })
+//   startCapture(context, stream, { channel, delay, onLevel, keep })
 //     → { inputDelay, stop() → Recording (takes.js) }
+//     onLevel(peak) hears each chunk's loudest sample (0…1), for a meter;
+//     with `keep` false nothing is kept (only listening, for the meter).
 //     `delay`: the seconds from the player rendering a sound to it being
 //     heard (the output's delay); the input's own, as the system reports
 //     it, is added, and both are taken off the recording's time.
@@ -25,8 +27,9 @@ const loaded = new WeakSet(); // the contexts the worklet is loaded into
 /** The sound inputs, named once the user has allowed one to be opened. */
 export async function listInputs() {
   const devices = await navigator.mediaDevices.enumerateDevices();
+  // Chromium lists the system's default (and the one for calls) again, under ids of their own.
   return devices
-    .filter((device) => device.kind === "audioinput")
+    .filter((device) => device.kind === "audioinput" && !["default", "communications"].includes(device.deviceId))
     .map((device) => ({ id: device.deviceId, label: device.label }));
 }
 
@@ -54,9 +57,9 @@ export async function openInput(deviceId) {
 /**
  * @param {AudioContext} context
  * @param {MediaStream} stream
- * @param {{ channel: number | "mix", delay: number }} options
+ * @param {{ channel: number | "mix", delay: number, onLevel?: (peak: number) => void, keep?: boolean }} options
  */
-export async function startCapture(context, stream, { channel, delay }) {
+export async function startCapture(context, stream, { channel, delay, onLevel, keep = true }) {
   if (!loaded.has(context)) {
     await context.audioWorklet.addModule(worklet);
     loaded.add(context);
@@ -80,8 +83,12 @@ export async function startCapture(context, stream, { channel, delay }) {
   /** @type {(() => void) | null} */
   let finished = null;
   node.port.onmessage = ({ data }) => {
-    if (data.done) finished?.();
-    else chunks.push(data);
+    if (data.done) return finished?.();
+    if (keep) chunks.push(data);
+    if (!onLevel) return;
+    let peak = 0;
+    for (const sample of data.samples) peak = Math.max(peak, Math.abs(sample));
+    onLevel(peak);
   };
   node.port.postMessage({ on: true });
 

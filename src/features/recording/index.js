@@ -7,6 +7,10 @@
  * exactly where it was played, and nothing is monitored (you hear your
  * instrument as you play it, not through EarBee).
  *
+ *   0. The input is chosen in its part of the Mixer (kept between runs;
+ *      the system's default until then). Choosing one listens to it for a
+ *      few seconds, the meter showing its level, to see it's the right
+ *      one; the meter also moves while recording.
  *   1. Record opens the input (capture.js) and starts playback if it isn't
  *      playing. The input is recorded in the player's own AudioContext, so
  *      every sample has a time on the clock the track plays by.
@@ -17,7 +21,8 @@
  *   3. The recording is cut into takes (takes.js): one for each time
  *      around the loop, or a single one without a loop. Each knows where
  *      on the track it starts and the speed it was recorded at. The
- *      newest plays; the others are in the take's list.
+ *      newest plays; the others are in the take's list. A recording of
+ *      silence (the wrong input, nothing plugged in) is said, not kept.
  *   4. The take plays with the track (player.js), through the Mixer's
  *      volume and balance but not the track's speed, pitch or EQ: as it
  *      was played. So it plays only at the speed it was recorded at; at
@@ -44,7 +49,7 @@ import { clamp, formatDuration, formatSpeed, formatTrackTime } from "../../core/
 import { $, reportError } from "../../ui/dom.js";
 import { readStored, store } from "../../ui/storage.js";
 import { notify } from "../../ui/toast.js";
-import { openInput, startCapture } from "./capture.js";
+import { listInputs, openInput, startCapture } from "./capture.js";
 import { buildRecorder } from "./dock.js";
 import { createTakePlayer, sameSpeed } from "./player.js";
 import { cutTakes, passes } from "./takes.js";
@@ -52,6 +57,7 @@ import { cutTakes, passes } from "./takes.js";
 /** @typedef {import("./takes.js").Take & { id: number }} KeptTake */
 
 const NUDGE_KEY = "earbee.recording.nudge";
+const INPUT_KEY = "earbee.recording.input"; // the input chosen: { id, label }
 const WATCH_MS = 250;
 
 /** @type {KeptTake[]} */
@@ -61,6 +67,13 @@ let selected = null; // the one that plays
 let lastId = 0;
 let mix = { volume: CONFIG.recording.volume.initial, mute: false };
 let nudge = CONFIG.recording.nudge.initial; // ms
+/** @type {{ id: string, label: string }[]} */
+let inputs = []; // the sound inputs there are
+// The one chosen ("" and no label: the system's default).
+let input = { id: "", label: "" };
+// Listening to the input for the meter alone, after it's chosen.
+/** @type {{ stream: MediaStream, capture: Awaited<ReturnType<typeof startCapture>>, timer: ReturnType<typeof setTimeout> } | null} */
+let probe = null;
 
 /** @type {"idle" | "opening" | "recording" | "finishing"} */
 let stage = "idle";
@@ -103,6 +116,12 @@ function render() {
       take && !sameSpeed(take.rate, settings.speed)
         ? `Recorded at ${formatSpeed(take.rate)}: it plays at that speed.`
         : "",
+    // One that was chosen and is gone stays listed, so it's seen to be missing.
+    inputs:
+      input.id && !inputs.some(({ id }) => id === input.id)
+        ? [...inputs, { id: input.id, label: `${input.label || "The input chosen"} (not connected)` }]
+        : inputs,
+    input: input.id,
   });
 }
 
@@ -115,12 +134,56 @@ function apply() {
   render();
 }
 
+/* ---------- The input ---------- */
+
+// The meter, from a chunk's loudest sample: in dB, so quiet playing shows.
+function showLevel(peak) {
+  const { meterDb } = CONFIG.recording;
+  ui?.level(clamp((20 * Math.log10(Math.max(peak, 1e-9)) + meterDb) / meterDb, 0, 1));
+}
+
+async function refreshInputs() {
+  inputs = await listInputs();
+  render();
+}
+
+function stopListening() {
+  if (!probe) return;
+  const { stream, capture, timer } = probe;
+  probe = null;
+  clearTimeout(timer);
+  capture.stop().catch(() => {});
+  for (const track of stream.getTracks()) track.stop();
+  ui?.level(null);
+}
+
+// Listens to the input for a while, for the meter: is it the right one?
+async function listen() {
+  stopListening();
+  const context = player.engine.audioContext();
+  if (stage !== "idle" || !context) return;
+  const stream = await openInput(input.id);
+  const capture = await startCapture(context, stream, { channel: "mix", delay: 0, onLevel: showLevel, keep: false });
+  const timer = setTimeout(stopListening, CONFIG.recording.listenMs);
+  probe = { stream, capture, timer };
+  if (stage !== "idle") stopListening(); // a recording began meanwhile
+  refreshInputs().catch(reportError); // named, now that one was opened
+}
+
+async function chooseInput(id) {
+  input = { id, label: inputs.find((each) => each.id === id)?.label ?? "" };
+  store(INPUT_KEY, JSON.stringify(input));
+  render();
+  await listen();
+}
+
 /* ---------- Recording ---------- */
 
 async function start() {
   const { engine, transport } = player;
   if (stage !== "idle" || !hasAudio()) return;
   const opened = generation;
+  stopListening();
   stage = "opening";
   apply();
   /** @type {MediaStream | null} */
@@ -128,8 +191,13 @@ async function start() {
   /** @type {Awaited<ReturnType<typeof startCapture>> | null} */
   let capture = null;
   try {
-    stream = await openInput();
-    capture = await startCapture(engine.audioContext(), stream, { channel: "mix", delay: engine.outputDelay() });
+    stream = await openInput(input.id);
+    capture = await startCapture(engine.audioContext(), stream, {
+      channel: "mix",
+      delay: engine.outputDelay(),
+      onLevel: showLevel,
+    });
+    refreshInputs().catch(reportError); // named, now that one was opened
     if (opened !== generation) throw new Error("another file was opened meanwhile");
 
     if (!transport.playing) {
@@ -150,6 +218,7 @@ async function start() {
   } catch (error) {
     capture?.stop().catch(() => {});
     for (const track of stream?.getTracks() ?? []) track.stop();
+    ui?.level(null);
     stage = "idle";
     apply();
     if (opened === generation) throw error;
@@ -175,7 +244,13 @@ async function finish() {
     const recording = await capture.stop();
     if (opened !== generation) return;
 
-    const { margin, minSeconds, maxTakes } = CONFIG.recording;
+    const { margin, minSeconds, maxTakes, silence } = CONFIG.recording;
+    // Silence: the wrong input, or nothing plugged into it.
+    if (recording.samples.every((sample) => Math.abs(sample) < silence)) {
+      const name = inputs.find(({ id }) => id === input.id)?.label ?? "the system's default input";
+      notify("Nothing came in, so no take was kept", `${name} was silent. Is it the right input?`);
+      return;
+    }
     const cut = cutTakes(recording, passes(anchor, endTime, loop, duration), {
       rate: anchor.rate,
       margin,
@@ -196,6 +271,7 @@ async function finish() {
     }
   } finally {
     for (const track of stream.getTracks()) track.stop();
+    ui?.level(null);
     session = null;
     stage = "idle";
     apply();
@@ -254,6 +330,12 @@ export function bindRecording() {
   }
   const stored = Number(readStored(NUDGE_KEY));
   if (Number.isFinite(stored)) nudge = clamp(stored, CONFIG.recording.nudge.min, CONFIG.recording.nudge.max);
+  try {
+    const chosen = JSON.parse(readStored(INPUT_KEY) ?? "null");
+    if (typeof chosen?.id === "string") input = { id: chosen.id, label: String(chosen.label ?? "") };
+  } catch {
+    // Not what was stored: the system's default.
+  }
 
   const { engine, transport } = player;
   takePlayer = createTakePlayer({ engine, transport, getRate: () => settings.speed });
@@ -265,7 +347,10 @@ export function bindRecording() {
     onNudge: changeNudge,
     onSelect: select,
     onDelete: remove,
+    onInput: chooseInput,
   });
+  refreshInputs().catch(reportError);
+  navigator.mediaDevices.addEventListener("devicechange", () => void refreshInputs().catch(reportError));
   section.hidden = false;
 
   // Whatever stops the track going straight on ends the recording there.

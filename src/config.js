@@ -338,6 +338,14 @@ export const CONFIG = {
     maxTakes: 20,
     // Recording stops by itself after this long (10 minutes: 100 MB).
     maxSeconds: 600,
+    // A recording whose loudest sample is below this (−60 dB) is silence:
+    // the wrong input, or nothing plugged in. It's said, not kept.
+    silence: 0.001,
+    // The meter's range: this many dB below full, up to full.
+    meterDb: 60,
+    // After an input is chosen, the meter listens to it this long (ms), to
+    // see that it's the right one.
+    listenMs: 8000,
     // After stopping, the input is recorded this much longer (seconds, on
     // top of the delays), so the last notes played are in.
     tail: 0.25,

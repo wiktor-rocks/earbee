@@ -49,3 +49,44 @@
 .recording-menu .menu-item[aria-checked="true"] .menu-label {
   font-weight: 800;
 }
+
+/* The input to record, across the part; under it the meter, a thin bar
+   that fills with the input's level while it's listened to. */
+.recording-part .recording-input {
+  flex: 1 1 100%;
+  min-width: 0;
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: 600 12px/1.2 var(--sans);
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.recording-part .recording-input:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.recording-meter {
+  flex: 1 1 100%;
+  overflow: hidden;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+}
+
+.recording-meter[hidden] {
+  display: none;
+}
+
+.recording-meter-fill {
+  width: 0;
+  height: 100%;
+  border-radius: 2px;
+  background: var(--accent);
+  transition: width 0.12s linear;
+}

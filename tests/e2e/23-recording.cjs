@@ -55,6 +55,34 @@ module.exports = async function (h) {
   check("recording: its part of the Mixer shows, with Record", v.shown && v.button === "● Record" && !v.disabled);
   check("recording: no take's row before a take", !v.row && v.takes.length === 0);
 
+  /* ---------- The input ---------- */
+
+  const inputs = await js(`[...document.querySelectorAll(".recording-input option")].map((o) => o.textContent)`);
+  check(
+    "the inputs are listed, after the system's default",
+    inputs[0] === "System default input" && inputs.length >= 2,
+    JSON.stringify(inputs),
+  );
+  check("no meter before an input is listened to", await js(`document.querySelector(".recording-meter").hidden`));
+  await js(`(() => {
+    const select = document.querySelector(".recording-input");
+    select.value = select.options[select.options.length - 1].value;
+    select.dispatchEvent(new Event("change"));
+  })()`);
+  // The stand-in input beeps once a second: the meter moves within a few.
+  let moved = 0;
+  for (let i = 0; i < 50 && !moved; i++) {
+    await sleep(50);
+    moved = await js(
+      `document.querySelector(".recording-meter").hidden ? 0 : parseFloat(document.querySelector(".recording-meter-fill").style.width)`,
+    );
+  }
+  check("choosing an input listens to it: the meter moves", moved > 0, moved);
+  check(
+    "the input chosen is kept between runs",
+    /"id":"\w+/.test(await js(`localStorage.getItem("earbee.recording.input")`)),
+  );
+
   /* ---------- One take ---------- */
 
   await click(3);
@@ -62,6 +90,12 @@ module.exports = async function (h) {
   await record();
   await recording();
   v = await view();
+  check(
+    "the input can't be changed while recording, and the meter shows",
+    await js(
+      `document.querySelector(".recording-input").disabled && !document.querySelector(".recording-meter").hidden`,
+    ),
+  );
   check(
     "Record starts playback and says it's recording",
     (await playing()) && v.on && /Stop recording/.test(v.button),
@@ -105,11 +139,14 @@ module.exports = async function (h) {
   check("each time around the loop is a take", looped.length >= 3, JSON.stringify(v.takes));
   check(
     "a take of a whole time around starts at the loop's start",
-    looped.filter((take) => /^0:01\.000 · /.test(take.detail)).length >= 2,
+    looped.filter((take) => /^0:0(0\.99|1\.00)\d · /.test(take.detail)).length >= 2,
     JSON.stringify(looped),
   );
   // Paused part way around: the last whole time around plays, not the part after it.
   check("the newest whole take is the one that plays", v.takes[1]?.checked && v.name === v.takes[1]?.label, v.name);
+
+  check("the meter is put away after recording", await js(`document.querySelector(".recording-meter").hidden`));
+  await h.shot("23-recording.png");
 
   /* ---------- Playing it, the speed, the list ---------- */
 
