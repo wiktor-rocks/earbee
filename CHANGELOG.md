@@ -43,6 +43,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-17: Version 0.3.2
+
+- **What:** EarBee 0.3.2, with one change: a download for Intel Macs again, `mac-x64.dmg`, beside the Apple Silicon one (details in "Intel Macs again" below). On an Intel Mac, the beats come from the simple beat finder, and the Stems part of the Mixer offers no separating.
+- **Why:** someone asked for an Intel Mac build; the owner wants it in every release from now on.
+- **How:** `npm version 0.3.2 --no-git-tag-version`; `testing` and `main` moved up; the tag `v0.3.2` builds the draft release. The website's second Mac button goes live with it (EarBee/earbee.org, `main` moved up to `draft`).
+- **Where:** `package.json`, `package-lock.json`.
+- **Verified by:** the full `npm test` on these files, before the commit: 438 unit, 748 end-to-end, 33 smoke, all pass. The draft release's files, its mac-intel-check and its AppImage are checked after the tag, before publishing.
+
+---
+
 ## 2026-11-17: Intel Macs again
 
 - **What:** from 0.3.2, each release has a Mac download for Intel Macs again, `EarBee-…-mac-x64.dmg`, beside the Apple Silicon one. On an Intel Mac, EarBee finds the beats with the simple beat finder (no beat model), and the Stems part of the Mixer offers no separating: it says "Separating stems isn't available on this computer." A project's saved stems still load and play there, since they need no model.
