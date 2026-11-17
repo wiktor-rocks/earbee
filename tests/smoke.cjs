@@ -120,6 +120,20 @@ async function session(profile, steps) {
     await steps(page);
     page.evaluate("window.close()").catch(() => {});
     page.close();
+    if (process.platform === "darwin") {
+      // On a Mac the app stays open with no window, as Mac apps do
+      // (main.js, "window-all-closed"): the window goes, then it's quit
+      // here, as the user would from the menu or the Dock.
+      const pageGone = async () => {
+        const targets = await (await fetch(`http://127.0.0.1:${PORT}/json/list`)).json();
+        return !targets.some((target) => target.url.endsWith("index.html"));
+      };
+      const closed = await waitFor(() => pageGone().catch(() => false), 5000);
+      check("the window closes, and the app stays open (a Mac)", closed && app.child.exitCode === null);
+      app.child.kill();
+      await Promise.race([app.exited, sleep(5000)]);
+      return;
+    }
     const code = await Promise.race([app.exited, sleep(5000).then(() => "timeout")]);
     check("app quits when the window is closed", code !== "timeout", `exit: ${code}`);
   } finally {
