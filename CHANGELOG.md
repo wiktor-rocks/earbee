@@ -43,6 +43,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-17: "macOS 13 or later" where the Mac downloads are offered
+
+- **What:** the release notes, the README, earbee.org's Mac card and its FAQ say the Mac downloads need macOS 13 (Ventura) or later. The published 0.3.2 release's notes were changed by hand to say so too.
+- **Why:** the first Intel Mac user had macOS 11.7, and macOS refused to open EarBee ("minimum macOS 13.0"). Nothing said so before the download. The minimum comes from Electron (44): Electron 38 dropped macOS 11, and later versions raised it to 13. It applies to Apple Silicon too, and it applied to 0.2.0 (the same Electron).
+- **How:** text only. Supporting older macOS would mean building the Mac app on Electron 37 or older, which no longer gets security fixes: not done.
+- **Where:** `.github/workflows/release.yml` (the notes' Mac line), `README.md`; EarBee/earbee.org: `index.html` (the Mac card), `_data/faq.json`.
+- **Verified by:** `npm run check`; the site's `npm run check`, `npm run build` and `node scripts/seo/check.cjs`; the live release notes read back.
+
+---
+
 ## 2026-11-17: Version 0.3.2
 
 - **What:** EarBee 0.3.2, with one change: a download for Intel Macs again, `mac-x64.dmg`, beside the Apple Silicon one (details in "Intel Macs again" below). On an Intel Mac, the beats come from the simple beat finder, and the Stems part of the Mixer offers no separating.

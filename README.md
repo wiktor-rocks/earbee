@@ -15,7 +15,7 @@ For Windows, macOS and Linux; free and open source (MIT).
 Get the latest version from the [releases page](https://github.com/wiktor-rocks/earbee/releases/latest), or from [the website](https://earbee.org/) (its own repository: [EarBee/earbee.org](https://github.com/EarBee/earbee.org)).
 
 - **Windows:** `EarBee-…-win-x64-setup.exe`, an installer (no admin rights needed). Windows may warn about an unrecognised app the first time; choose **More info**, then **Run anyway**. After that, EarBee updates itself.
-- **macOS:** `EarBee-…-mac-arm64.dmg` for Apple Silicon (M1 or later), `EarBee-…-mac-x64.dmg` for Intel Macs (it finds the beats a simpler way, and has no stem separation: ONNX Runtime, which runs those models, has no Intel Mac build). Drag it to Applications. It isn't signed by Apple, so the first time, right-click it and choose **Open**. On recent macOS: try to open it, then go to System Settings › Privacy & Security and choose **Open Anyway**.
+- **macOS:** `EarBee-…-mac-arm64.dmg` for Apple Silicon (M1 or later), `EarBee-…-mac-x64.dmg` for Intel Macs (it finds the beats a simpler way, and has no stem separation: ONNX Runtime, which runs those models, has no Intel Mac build). Both need macOS 13 (Ventura) or later. Drag it to Applications. It isn't signed by Apple, so the first time, right-click it and choose **Open**. On recent macOS: try to open it, then go to System Settings › Privacy & Security and choose **Open Anyway**.
 - **Linux:** `EarBee-…-linux-x86_64.AppImage`. Make it executable (`chmod +x EarBee-*.AppImage`) and run it. It updates itself.
 
 On a Mac, EarBee tells you when there's a new version. Settings › General › Check for updates turns the checking off.
