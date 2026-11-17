@@ -9,6 +9,15 @@
 # not by Apple: enough for Apple Silicon to run them, after the user
 # allows it once.
 #
+# One Mac job builds both Macs' files (package.json: arm64 and x64), with
+# one latest-mac.yml listing both. The Intel one (x64) has no beat model
+# and no stem separation: ONNX Runtime has no Intel Mac build. The
+# mac-intel-check job then starts it on an Intel Mac (the smoke test).
+# The draft is made whether or not that passes: look at it before
+# publishing (docs/maintaining.md, "Check the draft"). GitHub's last Intel
+# Mac machine, macos-15-intel, goes in 2027: then that job fails at once,
+# and should be removed; the releases go on without it.
+#
 # Updates: the Windows installer and the AppImage update themselves from
 # the latest published release (electron/updates.js), through the
 # latest.yml and latest-linux.yml files and the .blockmap files uploaded
@@ -65,6 +74,26 @@ jobs:
             dist/latest*.yml
           if-no-files-found: error
 
+  # The Intel Mac build, started on an Intel Mac. Not needed by the
+  # release (see the top).
+  mac-intel-check:
+    needs: build
+    runs-on: macos-15-intel
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@v4
+        with:
+          name: earbee-macOS
+          path: files
+      # With TB_APP_BINARY, the smoke test needs nothing from node_modules.
+      - name: Smoke test of the Intel build
+        run: |
+          hdiutil attach -nobrowse -readonly -mountpoint "$RUNNER_TEMP/earbee" files/*-mac-x64.dmg
+          TB_APP_BINARY="$RUNNER_TEMP/earbee/EarBee.app/Contents/MacOS/EarBee" node tests/smoke.cjs
+
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -80,7 +109,7 @@ jobs:
 
           **Downloads:**
           - **Windows:** the \`win-x64-setup.exe\`, an installer (no admin rights needed). Windows may warn about an unrecognised app the first time; choose *More info*, then *Run anyway*. EarBee then updates itself.
-          - **macOS:** the \`mac-arm64.dmg\`, for Apple Silicon (M1 or later). For Intel Macs, the last version is 0.2.0. It isn't signed by Apple: the first time, right-click it and choose *Open*, or allow it in System Settings › Privacy & Security. EarBee tells you when there's a new version.
+          - **macOS:** the \`mac-arm64.dmg\` for Apple Silicon (M1 or later), the \`mac-x64.dmg\` for Intel Macs (it finds the beats a simpler way, and has no stem separation). It isn't signed by Apple: the first time, right-click it and choose *Open*, or allow it in System Settings › Privacy & Security. EarBee tells you when there's a new version.
           - **Linux:** the \`linux-x86_64.AppImage\`. Make it executable (\`chmod +x\`) and run it. It updates itself.
 
           What changed: see [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/${GITHUB_REF_NAME}/CHANGELOG.md).

@@ -4,8 +4,10 @@
 // don't pass through here: the page's stems worker and the process talk
 // over a message channel made here, one end to each.
 //
-//   handleStems(ipcMain, { utilityProcess, MessageChannelMain, userData, devCopy?, fetch? })
-//     "stems:model"     → { ready, bytes }: whether the model is there, and its size
+//   handleStems(ipcMain, { utilityProcess, MessageChannelMain, userData, devCopy?, fetch?, supported? })
+//     "stems:model"     → { ready, bytes, supported }: whether the model is there, its
+//                         size, and whether this system can run it (no ONNX Runtime on
+//                         an Intel Mac: ../onnx-runtime.js; the page then has no Stems)
 //     "stems:download"  → { ok: true } | { ok: false, canceled?, error }: fetches it,
 //                         sending "stems:progress" { fraction } meanwhile
 //     "stems:start"     → { ok: true } | { ok: false, error }: starts a process,
@@ -20,10 +22,14 @@
 //   closing or crashing stops it too.
 const path = require("path");
 const { createModelFile, ModelFileError } = require("./model-file");
+const { onnxRuntimeAvailable } = require("../onnx-runtime");
 
 const SCRIPT = path.join(__dirname, "process.js");
 
-function handleStems(ipcMain, { utilityProcess, MessageChannelMain, userData, devCopy = null, fetch }) {
+function handleStems(
+  ipcMain,
+  { utilityProcess, MessageChannelMain, userData, devCopy = null, fetch, supported = onnxRuntimeAvailable() },
+) {
   const modelFile = createModelFile({ userData, devCopy, fetch });
   let job = null; // { child, sender, closing } while a process runs
   let download = null; // { abort: AbortController, sender }, while downloading
@@ -34,7 +40,7 @@ function handleStems(ipcMain, { utilityProcess, MessageChannelMain, userData, de
     stopping?.child.kill();
   }
 
-  ipcMain.handle("stems:model", () => modelFile.status());
+  ipcMain.handle("stems:model", () => ({ ...modelFile.status(), supported }));
 
   ipcMain.handle("stems:download", async (event) => {
     const abort = new AbortController();

@@ -76,7 +76,7 @@ import { coveredLength, covers, coversAll } from "./spans.js";
  * The part of window.earbee (electron/preload.js) used here; missing
  * outside Electron.
  * @typedef {{
- *   model(): Promise<{ ready: boolean, bytes: number }>,
+ *   model(): Promise<{ ready: boolean, bytes: number, supported: boolean }>,
  *   download(): Promise<{ ok: boolean, canceled?: boolean, error?: string }>,
  *   start(): Promise<{ ok: boolean, error?: string }>,
  *   cancel(): Promise<void>,
@@ -126,6 +126,10 @@ let revision = 0; // counts the stems separated (not those a project brings back
 let preparedRevision = 0; // the revision `audio` was made at
 let modelBytes = 0;
 let modelReady = false;
+// Whether this system can run the stem model: not without an ONNX Runtime
+// build (an Intel Mac). Then nothing is offered to separate, but a
+// project's stems still load and play: they need no model.
+let separable = true;
 // What's going on: "idle", "download", "decode", "separate" (the first
 // part), "rest" (the rest, while the mixer shows), "load" (from a
 // project) or "ready".
@@ -376,7 +380,7 @@ async function widen() {
  * @param {{ onlyLoop?: boolean }} [options]
  */
 async function separate({ onlyLoop = false } = {}) {
-  if (!bridge || !media || job) return;
+  if (!bridge || !separable || !media || job) return;
   const running = startJob();
   const { current, stillCurrent } = running;
   const part = onlyLoop ? firstPart() : null;
@@ -843,8 +847,9 @@ function render() {
   const loopDone =
     Boolean(found && loop) &&
     covers(found.covered, Math.ceil(loop.start * found.sampleRate), Math.floor(loop.end * found.sampleRate));
-  ui.loopAction.hidden = busy || all || loopDone || Boolean(held);
-  ui.action.hidden = busy || all || Boolean(held);
+  ui.loopAction.hidden = !separable || busy || all || loopDone || Boolean(held);
+  ui.action.hidden = !separable || busy || all || Boolean(held);
+  ui.unsupported.hidden = separable || Boolean(found) || busy;
   ui.held.hidden = !held || busy;
   ui.held.textContent = `This project's stems weren't loaded: ${held?.mismatched ? "they don't match this file" : "not enough memory"}. Saving keeps them.`;
   ui.busy.hidden = !busy;
@@ -891,6 +896,11 @@ function build(section) {
   const busy = element("div", { className: "stems-busy" }, status, stop);
   const preparing = element("p", { className: "stems-note stems-preparing" });
   const heldNote = element("p", { className: "stems-note stems-held" });
+  const unsupported = element("p", {
+    className: "stems-note stems-unsupported",
+    textContent: "Separating stems isn't available on this computer.",
+    hidden: true,
+  });
   const reset = element("button", {
     type: "button",
     className: "icon-button small",
@@ -917,12 +927,26 @@ function build(section) {
     busy,
     preparing,
     heldNote,
+    unsupported,
   );
   onClick(loopAction, () => separate({ onlyLoop: true }));
   onClick(action, () => separate());
   onClick(stop, stopSeparating);
   onClick(reset, resetMix);
-  return { section, loopAction, action, busy, status, stop, mixer, mixerRows, preparing, held: heldNote, reset };
+  return {
+    section,
+    loopAction,
+    action,
+    busy,
+    status,
+    stop,
+    mixer,
+    mixerRows,
+    preparing,
+    held: heldNote,
+    unsupported,
+    reset,
+  };
 }
 
 /* ---------- Wiring ---------- */
@@ -951,6 +975,7 @@ export function bindStems() {
   bridge
     .model()
     .then((model) => {
+      separable = model.supported !== false;
       modelReady = model.ready;
       modelBytes = model.bytes;
       render();

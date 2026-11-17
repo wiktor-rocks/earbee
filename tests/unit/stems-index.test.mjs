@@ -20,7 +20,7 @@ beforeEach(() => {
 });
 afterEach(() => fs.rmSync(userData, { recursive: true, force: true }));
 
-function setUp({ model = true } = {}) {
+function setUp({ model = true, supported = true } = {}) {
   if (model) fs.writeFileSync(devCopy, "model");
   const handlers = new Map();
   const ipcMain = { handle: (channel, handler) => handlers.set(channel, handler) };
@@ -56,6 +56,7 @@ function setUp({ model = true } = {}) {
     userData,
     devCopy,
     fetch: async () => new Response(),
+    supported,
   });
   const call = (channel) => handlers.get(channel)({ sender });
   return { call, forks, sender, stems };
@@ -80,6 +81,11 @@ test("without the model, it doesn't start", async () => {
   const started = await call("stems:start");
   assert.equal(started.ok, false);
   assert.equal(forks.length, 0);
+});
+
+test("says whether this system can run the model (no ONNX Runtime on an Intel Mac)", async () => {
+  assert.equal((await setUp().call("stems:model")).supported, true);
+  assert.equal((await setUp({ supported: false }).call("stems:model")).supported, false);
 });
 
 test("Cancel stops the process, quietly", async () => {
