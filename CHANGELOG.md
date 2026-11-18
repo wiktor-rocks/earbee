@@ -43,6 +43,18 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-18: Search history in From YouTube
+
+- **What:** while the From YouTube dialog's box is empty, it lists the searches made lately: the words and the site (YouTube or SoundCloud), newest first. One click searches them again on that site. × removes one, and Clear removes them all. ↓ from the box goes into the list, and ↑ from its first row comes back. Typing hides the list and brings back the results, which were kept. It keeps the newest 20, between runs. The same words on the same site (spaces and case aside) move to the top instead of showing twice.
+- **Why:** "history for youtube search", in NEXT-RELEASE-0.4.0's list for the app. The owner chose: past searches only (Open recent already lists downloads), shown while the box is empty, the newest 20 kept between runs.
+- **How:**
+  - A search is kept once it has answered (`searchFor`, page 1), even with no results. A failed or stopped one isn't.
+  - The list is plain data (`core/search-history.js`: `addSearch`, `removeSearch`, `parseHistory`), stored as JSON under `earbee.searchHistory` (`ui/storage.js`). When it's read back, an entry for a site that's no longer in `SEARCH_SOURCES` is left out.
+  - `updateSearchMode` shows the list. While the list shows, a CSS rule hides the rest of `.youtube-results`, so the results come back unchanged.
+  - A row sets the box and the site (remembered as `downloads.searchSource`, as the picker does), then searches.
+- **Where:** `src/features/download.js` ("Search history"), `src/core/search-history.js`, `src/config.js` (`search.historyMax`), `src/ui/dom.js`, `index.html` (`#searchHistory`), `style.css` ("Searching (in the download dialog)"), `docs/glossary.md`; tests: `tests/unit/search-history.test.mjs`, `tests/e2e/09-downloads.cjs`.
+- **Verified by:** `npm run check`; `TB_TOPICS=03,09 npm test` (451 unit, 109 e2e, 33 smoke, all passing). The new checks: no history at first; after the searches, newest first, with sites, without the failed or stopped ones; ↓ / ↑; a click searching again on its site and moving it to the top; emptying and typing; ×; Clear. The screenshot `search-history.png` was looked at. Not checked: a real search through yt-dlp, in a real window.
+
 ## 2026-11-18: Notifications in one place, with a log
 
 - **What:** every message EarBee shows (a file opened, a project saved, a download, the stems ready, a notice, an error) appears in the same stack, with the same look, at the transport's top right corner. It follows the transport in every layout: the side panel left or right, big video's compact bar, smaller windows. On the welcome screen it's in the window's bottom-right corner.

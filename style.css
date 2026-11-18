@@ -1055,6 +1055,97 @@ body.dragging .welcome-hint {
   align-self: center;
 }
 
+/* The searches made lately (features/download.js), while the box is
+   empty: in place of the results, which stay hidden until something is
+   typed. A row each: the words and the site; one click searches again. */
+.youtube-results:has(> .search-history:not([hidden])) > :not(.search-history) {
+  display: none;
+}
+
+.search-history {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.search-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 2px 0;
+}
+
+.search-history-head h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.search-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0 -4px;
+  padding: 3px 4px;
+  list-style: none;
+}
+
+.search-history-list li {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.search-history-item {
+  flex: 1;
+  min-width: 0;
+  justify-content: flex-start;
+  gap: 10px;
+  padding: 6px 10px;
+  border-color: transparent;
+  background: transparent;
+  font-weight: 500;
+  text-align: left;
+}
+
+.search-history-item .icon {
+  flex: none;
+  color: var(--muted);
+}
+
+.search-history-list li:hover .search-history-item,
+.search-history-item:focus-visible {
+  border-color: var(--hairline);
+  background: var(--surface-2);
+}
+
+.search-history-text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.search-history-source {
+  flex: none;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.search-history-remove {
+  flex: none;
+  padding: 6px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
 /* ---------- From YouTube dialog ---------- */
 
 /* Built like Settings: its header bar (.settings-head), the options as
@@ -1068,7 +1159,7 @@ body.dragging .welcome-hint {
   width: min(720px, calc(100vw - 32px));
 }
 
-.youtube-dialog:has(#searchResults:not([hidden])) {
+.youtube-dialog:has(#searchResults:not([hidden])):not(:has(#searchHistory:not([hidden]))) {
   height: min(760px, calc(100vh - 48px));
 }
 

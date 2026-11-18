@@ -924,6 +924,14 @@
           </div>
         </div>
         <div class="youtube-results">
+          <!-- The searches made lately, while the box is empty (features/download.js). -->
+          <section id="searchHistory" class="search-history" aria-labelledby="searchHistoryTitle" hidden>
+            <div class="search-history-head">
+              <h3 id="searchHistoryTitle">Recent searches</h3>
+              <button id="searchHistoryClear" class="small" type="button">Clear</button>
+            </div>
+            <ol id="searchHistoryList" class="search-history-list"></ol>
+          </section>
           <p id="searchStatus" class="search-status" role="status" hidden></p>
           <ol id="searchResults" class="search-results" aria-label="Search results" hidden></ol>
           <button id="searchMore" class="search-more" type="button" hidden>Show more</button>

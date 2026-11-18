@@ -4,12 +4,15 @@
 // downloads like a link. The download itself runs in the main process
 // (electron/downloader.js), reached through window.earbee
 // (electron/preload.js); the file then opens like any other.
+import { CONFIG } from "../config.js";
 import { AppError } from "../core/errors.js";
 import { formatCount, formatDuration, formatEta } from "../core/format.js";
+import { addSearch, parseHistory, removeSearch } from "../core/search-history.js";
 import { SEARCH_SOURCES, isLinkOn, sourceById } from "../search/sources.js";
 import { dom, element, guarded, onClick, setLoadingStatus, showNotice } from "../ui/dom.js";
 import { defaultPaths, getPrefs, setPref } from "../ui/prefs.js";
 import { isTextField } from "../ui/shortcuts.js";
+import { readStored, store } from "../ui/storage.js";
 import { notify } from "../ui/toast.js";
 import { isLoading, withLoading } from "./open-file.js";
 import { confirmUnsaved, loadMedia } from "./project/index.js";
@@ -167,6 +170,9 @@ export function bindDownloads() {
 // main process (electron/downloader.js, with yt-dlp), which also fetches
 // the pictures and hands them over as data: URLs: the page never touches
 // the network. The sites are src/search/sources.js.
+//
+// While the box is empty, the searches made lately show instead of the
+// results (Search history, below): one click searches again, on its site.
 
 const looksLikeLink = (text) => /^https?:\/\/\S+$/i.test(text.trim());
 
@@ -280,6 +286,7 @@ async function searchFor(text, page = 1) {
   for (const { index, src } of early.get(answer.searchId) ?? []) showPicture(answer.searchId, index, src);
   early.delete(answer.searchId);
 
+  if (page === 1) rememberSearch(text, source.id);
   dom.searchMore.hidden = !answer.more;
   if (dom.searchResults.children.length === 0) showStatus(`No results for “${text}” on ${source.name}.`);
   else showStatus("");
@@ -298,13 +305,104 @@ function cancelSearch() {
   bridge.cancelSearch();
 }
 
+/* ---------- Search history ---------- */
+
+// The words searched and where, newest first, kept between runs in the
+// browser's storage (CONFIG.search.historyMax of them; core/search-history.js
+// says what counts as the same search). A search is kept once it has
+// answered, even with no results; a failed or canceled one isn't.
+
+const HISTORY_KEY = "earbee.searchHistory";
+/** @type {import("../core/search-history.js").PastSearch[] | null} */
+let history = null;
+
+const pastSearches = () =>
+  (history ??= parseHistory(
+    readStored(HISTORY_KEY),
+    CONFIG.search.historyMax,
+    SEARCH_SOURCES.map((source) => source.id),
+  ));
+
+/** @param {import("../core/search-history.js").PastSearch[]} next */
+function saveHistory(next) {
+  history = next;
+  store(HISTORY_KEY, JSON.stringify(next));
+  renderHistory();
+  updateSearchMode();
+}
+
+/** @param {string} text @param {string} source */
+const rememberSearch = (text, source) =>
+  saveHistory(addSearch(pastSearches(), { text, source, time: Date.now() }, CONFIG.search.historyMax));
+
+const historyButtons = () =>
+  /** @type {HTMLButtonElement[]} */ ([...dom.searchHistoryList.querySelectorAll(".search-history-item")]);
+
+function renderHistory() {
+  const rows = pastSearches().map((search, index) => {
+    const source = sourceById(search.source);
+    const again = element(
+      "button",
+      { type: "button", className: "search-history-item" },
+      element("span", { className: "search-history-text" }, search.text),
+      element("span", { className: "search-history-source" }, source?.name ?? search.source),
+    );
+    again.insertAdjacentHTML("afterbegin", `<svg class="icon" aria-hidden="true"><use href="#i-search" /></svg>`);
+    again.title = `Search ${source?.name ?? ""} for “${search.text}” again`;
+    onClick(again, () => searchAgain(search));
+    const remove = element("button", { type: "button", className: "search-history-remove" });
+    remove.innerHTML = `<svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>`;
+    remove.title = "Remove from history";
+    remove.setAttribute("aria-label", `Remove “${search.text}” from history`);
+    onClick(remove, () => {
+      const at = historyButtons().indexOf(/** @type {any} */ (document.activeElement));
+      saveHistory(removeSearch(pastSearches(), index));
+      // Focus stays in the list (or goes back to the box when it's empty).
+      const left = historyButtons();
+      (left[Math.min(Math.max(at, index), left.length - 1)] ?? dom.downloadUrl).focus();
+    });
+    return element("li", {}, again, remove);
+  });
+  dom.searchHistoryList.replaceChildren(...rows);
+}
+
+// A past search: its words in the box, its site picked (and remembered,
+// as the picker does), and searched.
+/** @param {import("../core/search-history.js").PastSearch} search */
+async function searchAgain(search) {
+  dom.downloadUrl.value = search.text;
+  dom.searchSource.value = search.source;
+  updateSearchMode();
+  dom.downloadUrl.focus();
+  await Promise.all([searchFor(search.text), setPref("downloads", "searchSource", search.source)]);
+}
+
+// ↓ from the empty box to the first past search; ↑ / ↓ between them, and
+// ↑ from the first back to the box.
+/** @param {KeyboardEvent} event */
+function moveInHistory(event) {
+  if (dom.searchHistory.hidden || !["ArrowDown", "ArrowUp"].includes(event.key)) return;
+  const buttons = historyButtons();
+  const target = /** @type {HTMLElement} */ (event.target);
+  const at = buttons.indexOf(/** @type {HTMLButtonElement} */ (target));
+  let next;
+  if (target === dom.downloadUrl) next = event.key === "ArrowDown" ? buttons[0] : null;
+  else if (at !== -1) next = event.key === "ArrowDown" ? buttons[at + 1] : (buttons[at - 1] ?? dom.downloadUrl);
+  if (!next) return;
+  event.preventDefault();
+  next.focus();
+}
+
 /* ---------- The dialog ---------- */
 
-// Download for a link, Search for words (and then where to search).
+// Download for a link, Search for words (and then where to search); the
+// search history while the box is empty (the results stay, hidden, until
+// something is typed again).
 function updateSearchMode() {
   const isLink = looksLikeLink(dom.downloadUrl.value);
   dom.downloadSubmit.textContent = isLink ? "Download" : "Search";
   dom.searchSource.hidden = isLink;
+  dom.searchHistory.hidden = dom.downloadUrl.value.trim() !== "" || pastSearches().length === 0;
 }
 
 // The dialog opens empty, on the site last searched.
@@ -328,6 +426,13 @@ function bindSearch(onPick) {
     ...SEARCH_SOURCES.map((source) => element("option", { value: source.id }, source.name)),
   );
   dom.downloadUrl.addEventListener("input", updateSearchMode);
+  renderHistory();
+  onClick(dom.searchHistoryClear, () => {
+    saveHistory([]);
+    dom.downloadUrl.focus();
+  });
+  dom.downloadUrl.addEventListener("keydown", moveInHistory);
+  dom.searchHistoryList.addEventListener("keydown", moveInHistory);
   bridge.onThumbnail(({ searchId, index, src }) => showPicture(searchId, index, src));
   onClick(dom.searchMore, () => searchFor(current.text, current.page + 1));
   // Another site: remembered, and the same words searched there.

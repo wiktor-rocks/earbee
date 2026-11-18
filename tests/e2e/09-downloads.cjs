@@ -130,6 +130,8 @@ module.exports = async function (h) {
       );
     const submit = () => js(`document.querySelector("#downloadForm button[type=submit]").click()`);
     await js(`document.getElementById("downloadButton").click()`);
+    await js(`searchHistoryClear.click()`); // no searches from an earlier run
+    check("no searches yet: no search history", await js(`searchHistory.hidden`));
     await type("test words");
     check(
       "words turn Download into Search, with where to search",
@@ -205,6 +207,76 @@ module.exports = async function (h) {
       searching === "Searching YouTube…" && (await status()) === "" && (await rows()).length === 0,
       searching,
     );
+
+    // The search history (features/download.js): the searches that
+    // answered, newest first, while the box is empty.
+    {
+      const past = () =>
+        js(
+          `searchHistory.hidden ? null : [...document.querySelectorAll(".search-history-item")].map((b) => b.querySelector(".search-history-text").textContent + "@" + b.querySelector(".search-history-source").textContent)`,
+        );
+      check(
+        "…with the recent searches instead, newest first, each with its site (not the failed or stopped ones)",
+        JSON.stringify(await past()) ===
+          JSON.stringify(["nothing@YouTube", "test words@YouTube", "test words@SoundCloud"]),
+        JSON.stringify(await past()),
+      );
+      await shot("search-history.png");
+      await js(`downloadUrl.focus()`);
+      key("Down");
+      await sleep(100);
+      const first = await js(`document.activeElement === document.querySelector(".search-history-item")`);
+      key("Down");
+      key("Up");
+      key("Up");
+      await sleep(100);
+      check(
+        "↓ from the box goes to the first one, ↑ comes back",
+        first && (await js(`document.activeElement.id`)) === "downloadUrl",
+      );
+      await js(`document.querySelectorAll(".search-history-item")[2].click()`);
+      await until(async () => (await rows())[0]?.meta.startsWith("Uploader 1"));
+      check(
+        "a click searches again, on its site",
+        (await js(`downloadUrl.value`)) === "test words" &&
+          (await js(`searchSource.value`)) === "soundcloud" &&
+          (await rows()).length === 8 &&
+          (await past()) === null,
+        JSON.stringify({ box: await js(`downloadUrl.value`), rows: (await rows()).length }),
+      );
+      check(
+        "…and moves to the top",
+        JSON.stringify(
+          await js(`JSON.parse(localStorage.getItem("earbee.searchHistory")).map((s) => s.text + "@" + s.source)`),
+        ) === JSON.stringify(["test words@soundcloud", "nothing@youtube", "test words@youtube"]),
+      );
+      await type("");
+      check(
+        "emptying the box shows the history in place of the results",
+        (await past())?.length === 3 && !(await js(`searchResults.checkVisibility()`)),
+      );
+      await type("test");
+      check(
+        "…and typing brings the results back",
+        (await past()) === null && (await js(`searchResults.checkVisibility()`)) && (await rows()).length === 8,
+      );
+      await type("");
+      await js(`document.querySelector(".search-history-remove").click()`);
+      check(
+        "× removes one",
+        JSON.stringify(await past()) === JSON.stringify(["nothing@YouTube", "test words@YouTube"]) &&
+          JSON.parse(await js(`localStorage.getItem("earbee.searchHistory")`)).length === 2,
+        JSON.stringify(await past()),
+      );
+      await js(`searchHistoryClear.click()`);
+      check(
+        "Clear empties it, and it goes",
+        (await past()) === null && (await js(`localStorage.getItem("earbee.searchHistory")`)) === "[]",
+      );
+      // Back on YouTube for what follows (the box is empty: no search).
+      await js(`searchSource.value = "youtube"; searchSource.dispatchEvent(new Event("change"))`);
+      await sleep(200);
+    }
     await type("https://fake.test/song");
     check(
       "a link is a Download again",
