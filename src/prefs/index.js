@@ -244,7 +244,9 @@ const layoutSection = defineSection({
 // Settings › Downloads: where downloaded files go, and what the From
 // YouTube dialog downloads, and where it searches. electron/downloader.js reads them for each
 // download; features/download.js starts the dialog on `kind`.
-const VIDEO_HEIGHTS = [480, 720, 1080, 1440, 2160];
+// The video qualities offered (Settings › Downloads, the From YouTube
+// dialog); the main process accepts only these (electron/downloader.js).
+export const VIDEO_HEIGHTS = [480, 720, 1080, 1440, 2160];
 
 const downloadsSection = defineSection({
   id: "downloads",
@@ -289,7 +291,7 @@ const downloadsSection = defineSection({
       key: "maxHeight",
       type: "choice",
       label: "Best video quality",
-      help: "Above 1080p, YouTube's videos are VP9 or AV1, which take more of the computer to play.",
+      help: "What the From YouTube dialog starts on; you can pick another there. Above 1080p, YouTube's videos are VP9 or AV1, which take more of the computer to play.",
       default: 1080,
       options: VIDEO_HEIGHTS.map((height) => ({ value: height, label: `${height}p` })),
     },

@@ -8,6 +8,7 @@ import { CONFIG } from "../config.js";
 import { AppError } from "../core/errors.js";
 import { formatCount, formatDuration, formatEta } from "../core/format.js";
 import { addSearch, parseHistory, removeSearch } from "../core/search-history.js";
+import { VIDEO_HEIGHTS } from "../prefs/index.js";
 import { SEARCH_SOURCES, isLinkOn, sourceById } from "../search/sources.js";
 import { dom, element, guarded, onClick, setLoadingStatus, showNotice } from "../ui/dom.js";
 import { defaultPaths, getPrefs, setPref } from "../ui/prefs.js";
@@ -39,7 +40,7 @@ import { confirmUnsaved, loadMedia } from "./project/index.js";
  * The part of window.earbee (electron/preload.js) used here; missing
  * outside Electron, and then there's no downloading or searching at all.
  * @typedef {object} DownloadBridge
- * @property {(url: string, kind: string) => Promise<DownloadResult>} download
+ * @property {(url: string, kind: string, maxHeight: number) => Promise<DownloadResult>} download
  * @property {() => Promise<void>} cancelDownload
  * @property {(callback: (progress: DownloadProgress) => void) => () => void} onDownloadProgress
  * @property {(text: string, source: string, page: number) => Promise<SearchAnswer>} search
@@ -65,7 +66,7 @@ function describeDownload({ stage, part = 1, parts = 1, fraction, eta }, kind = 
 
 // Downloads `url` (in the main process) and opens the file. Canceling just
 // returns to what was there before.
-async function downloadLink(url, kind) {
+async function downloadLink(url, kind, maxHeight) {
   if (!bridge || !(await confirmUnsaved())) return;
   const withChapters = dom.downloadChapters.checked; // as the dialog was left
   return withLoading(url, async (signal) => {
@@ -78,7 +79,7 @@ async function downloadLink(url, kind) {
     });
     let result;
     try {
-      result = await bridge.download(url, kind);
+      result = await bridge.download(url, kind, maxHeight);
     } finally {
       stopListening();
       signal.removeEventListener("abort", cancel);
@@ -99,8 +100,15 @@ async function downloadLink(url, kind) {
   });
 }
 
-// Starts on the kind set in Settings › Downloads, and says where the file
-// will go and the best video quality, from there too.
+// The quality only matters for a video: off for audio, and the Video
+// tile says it ("up to 1080p").
+function showQuality() {
+  dom.downloadVideoLabel.textContent = `up to ${dom.downloadQuality.value}p`;
+  dom.downloadQuality.disabled = new FormData(dom.downloadForm).get("downloadKind") !== "video";
+}
+
+// Starts on the kind and the best video quality set in Settings ›
+// Downloads, and says where the file will go, from there too.
 function openDownloadDialog(url = "") {
   // Not over another dialog (Settings) or while something loads.
   if (!bridge || isLoading() || document.querySelector("dialog[open]")) return;
@@ -109,7 +117,8 @@ function openDownloadDialog(url = "") {
   dom.downloadUrl.value = url;
   const radios = /** @type {RadioNodeList} */ (dom.downloadForm.elements.namedItem("downloadKind"));
   radios.value = kind;
-  dom.downloadVideoLabel.textContent = `up to ${maxHeight}p`; // the Video tile's detail
+  dom.downloadQuality.value = String(maxHeight); // for this download only
+  showQuality();
   dom.downloadFolder.textContent = folder ?? defaultPaths["downloads.folder"] ?? "your Downloads folder";
   resetSearch();
   dom.downloadDialog.showModal();
@@ -136,18 +145,29 @@ export function bindDownloads() {
     guarded(() => setPref("downloads", "chapters", dom.downloadChapters.checked)),
   );
   const chosenKind = () => (new FormData(dom.downloadForm).get("downloadKind") === "video" ? "video" : "audio");
+  const chosenHeight = () => Number(dom.downloadQuality.value);
+  // The quality: the heights Settings offers; chosen here, it's for this
+  // download only (the setting is where the dialog starts).
+  dom.downloadQuality.replaceChildren(
+    ...VIDEO_HEIGHTS.map((height) => element("option", { value: String(height) }, `${height}p`)),
+  );
+  dom.downloadQuality.addEventListener("change", showQuality);
+  dom.downloadForm.addEventListener("change", (event) => {
+    if (/** @type {HTMLInputElement} */ (event.target).name === "downloadKind") showQuality();
+  });
   // A link downloads; words search, and the dialog stays open for the results.
   dom.downloadForm.addEventListener("submit", (event) => {
     event.preventDefault();
     const text = dom.downloadUrl.value.trim();
     if (!looksLikeLink(text)) return guarded(searchFor)(text);
     dom.downloadDialog.close();
-    guarded(downloadLink)(text, chosenKind());
+    guarded(downloadLink)(text, chosenKind(), chosenHeight());
   });
   bindSearch((result) => {
     const kind = chosenKind();
+    const height = chosenHeight();
     dom.downloadDialog.close();
-    guarded(downloadLink)(result.url, kind);
+    guarded(downloadLink)(result.url, kind, height);
   });
 
   // Pasting a link anywhere but a text field opens the dialog with it.

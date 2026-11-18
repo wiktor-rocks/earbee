@@ -902,7 +902,12 @@
           </div>
           <div class="youtube-options">
             <div class="pref-field">
-              <div class="pref-head"><span id="downloadKindLabel" class="pref-label">Get</span></div>
+              <div class="pref-head">
+                <span id="downloadKindLabel" class="pref-label">Get</span>
+                <!-- The best video quality for this download; it starts on
+                     Settings › Downloads' and isn't saved. -->
+                <select id="downloadQuality" class="download-quality" aria-label="Best video quality"></select>
+              </div>
               <div class="pref-options pref-options-row" role="radiogroup" aria-labelledby="downloadKindLabel">
                 <label class="pref-option"
                   ><input type="radio" name="downloadKind" value="audio" checked />

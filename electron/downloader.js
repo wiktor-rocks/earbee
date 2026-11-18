@@ -37,6 +37,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const searchSources = require("../src/search/sources.js");
+const { VIDEO_HEIGHTS } = require("../src/prefs/index.js");
 
 const RELEASES = "https://github.com/yt-dlp/yt-dlp/releases/latest/download/";
 const UPDATE_EVERY_MS = 24 * 60 * 60 * 1000;
@@ -487,15 +488,20 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
 
   /**
    * Downloads `url` as audio or video into the download folder; returns
-   * the file's path and the video's chapters.
+   * the file's path and the video's chapters. `maxHeight`, the best video
+   * quality the dialog chose, is taken only if it's one Settings offers
+   * (VIDEO_HEIGHTS, as it goes into yt-dlp's format); otherwise the
+   * setting's.
    * @param {string} url
    * @param {"audio" | "video"} kind
    * @param {(progress: object) => void} onProgress
+   * @param {{ maxHeight?: number }} [choice]
    */
-  async function download(url, kind, onProgress) {
+  async function download(url, kind, onProgress, choice = {}) {
     if (current) throw new DownloadError("A download is already running.");
     if (!(kind in PARTS)) throw new DownloadError(`Unknown download kind: ${kind}`);
-    const { folder = null, maxHeight = 1080 } = prefs?.() ?? {};
+    const { folder = null, maxHeight: setting = 1080 } = prefs?.() ?? {};
+    const maxHeight = VIDEO_HEIGHTS.includes(choice.maxHeight) ? choice.maxHeight : setting;
     const format = formatFor(kind, maxHeight);
     const link = checkUrl(url);
     const job = { child: null, canceled: false, abort: new AbortController() };
@@ -642,12 +648,12 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
 function handleDownloads(ipcMain, { share, openExternal, ...options }) {
   const downloader = createDownloader(options);
 
-  ipcMain.handle("download:start", async (event, url, kind) => {
+  ipcMain.handle("download:start", async (event, url, kind, maxHeight) => {
     const send = (progress) => {
       if (!event.sender.isDestroyed()) event.sender.send("download:progress", progress);
     };
     try {
-      const { file, chapters } = await downloader.download(url, kind, send);
+      const { file, chapters } = await downloader.download(url, kind, send, { maxHeight });
       return { ok: true, name: path.basename(file), path: file, url: share(file), chapters };
     } catch (error) {
       if (!(error instanceof DownloadError)) console.error("Download failed:", error);

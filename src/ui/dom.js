@@ -53,6 +53,7 @@ export const dom = {
   downloadUrl: /** @type {HTMLInputElement} */ ($("downloadUrl")),
   downloadClose: $("downloadClose"),
   downloadVideoLabel: $("downloadVideoLabel"),
+  downloadQuality: /** @type {HTMLSelectElement} */ ($("downloadQuality")),
   downloadFolder: $("downloadFolder"),
   downloadSubmit: $("downloadSubmit"),
   downloadChapters: /** @type {HTMLInputElement} */ ($("downloadChapters")),

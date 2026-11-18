@@ -43,6 +43,17 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-18: Video quality chosen in From YouTube
+
+- **What:** the From YouTube dialog has a quality picker (480p to 2160p) at the right of "Get". It starts on Settings › Downloads › Best video quality each time, and a choice there is for that download only: the setting doesn't change. It's off while Audio is chosen, and the Video tile's "up to …p" follows it. The setting's help says so.
+- **Why:** "choose download quality from the youtube download menu", in NEXT-RELEASE-0.4.0's list for the app. The owner wants it in the dialog, with Settings keeping the default.
+- **How:**
+  - `VIDEO_HEIGHTS` is now exported from `src/prefs/index.js`, so the setting, the picker and the main process share one list.
+  - The chosen height goes with the download: `downloadLink(url, kind, maxHeight)` → `earbee.download(url, kind, maxHeight)` → `download:start` → `downloader.download(url, kind, onProgress, { maxHeight })`.
+  - The main process uses the height only if it's in `VIDEO_HEIGHTS`, because it goes into yt-dlp's format string. Anything else falls back to the setting, as before.
+- **Where:** `src/features/download.js` (`showQuality`, `chosenHeight`), `src/prefs/index.js`, `src/ui/dom.js`, `index.html` (`#downloadQuality`), `style.css` (`.download-quality`), `electron/preload.js`, `electron/downloader.js` (`download`, the `download:start` handler); tests: `tests/e2e/13-settings.cjs`.
+- **Verified by:** `npm run check`; `TB_TOPICS=03,09,13 npm test` (451 unit, 172 e2e, 33 smoke) and `TB_TOPICS=03,13 npm test` after the picker's style (116 e2e, 33 smoke), all passing. The new checks: the picker starts on the setting (720p); it's off for audio; 1440p chosen changes the Video tile and asks yt-dlp for `height<=1440` while the setting stays 720p; the dialog starts on 720p again; a height the page sends that Settings doesn't offer (123) gives the setting's. The screenshot `download-quality.png` was looked at. Not checked: a real YouTube download at a chosen quality.
+
 ## 2026-11-18: Search history in From YouTube
 
 - **What:** while the From YouTube dialog's box is empty, it lists the searches made lately: the words and the site (YouTube or SoundCloud), newest first. One click searches them again on that site. × removes one, and Clear removes them all. ↓ from the box goes into the list, and ↑ from its first row comes back. Typing hides the list and brings back the results, which were kept. It keeps the newest 20, between runs. The same words on the same site (spaces and case aside) move to the top instead of showing twice.

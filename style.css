@@ -1269,6 +1269,23 @@ body.dragging .welcome-hint {
   padding: 16px 18px;
 }
 
+/* The best video quality, at the right of "Get"; off for audio. */
+.download-quality {
+  height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--surface-2);
+  color: var(--text);
+  font: 600 12px/1.2 var(--sans);
+  cursor: pointer;
+}
+
+.download-quality:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .youtube-options .pref-head label {
   cursor: pointer;
 }

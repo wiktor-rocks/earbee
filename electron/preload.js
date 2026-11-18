@@ -60,7 +60,8 @@ ipcRenderer.on("stems:port", (event) => window.postMessage("earbee:stems-port", 
 contextBridge.exposeInMainWorld("earbee", {
   // Resolves to { ok: true, name, path, url } or { ok: false, canceled, error };
   // `url` serves the saved file in pieces (media-files.js).
-  download: (url, kind) => ipcRenderer.invoke("download:start", String(url), String(kind)),
+  download: (url, kind, maxHeight) =>
+    ipcRenderer.invoke("download:start", String(url), String(kind), Number(maxHeight)),
   cancelDownload: () => ipcRenderer.invoke("download:cancel"),
   // Resolves to { ok: true, searchId, results, more } or { ok: false, canceled, error }
   // (src/search/sources.js says what a result is); setup progress comes

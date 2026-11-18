@@ -170,8 +170,23 @@ module.exports = async function (h) {
     "the From YouTube dialog starts on the kind, quality and folder from Settings",
     (await js(`document.querySelector('input[name="downloadKind"][value="video"]').checked`)) &&
       (await js(`document.getElementById("downloadVideoLabel").textContent`)) === "up to 720p" &&
-      (await js(`document.getElementById("downloadFolder").textContent`)) === elsewhere,
+      (await js(`document.getElementById("downloadFolder").textContent`)) === elsewhere &&
+      (await js(`downloadQuality.value`)) === "720" &&
+      !(await js(`downloadQuality.disabled`)),
   );
+  // The quality can be changed there, for this download only; it's off for audio.
+  const pickKind = (kind) => js(`document.querySelector('input[name="downloadKind"][value="${kind}"]').click()`);
+  await pickKind("audio");
+  const offForAudio = await js(`downloadQuality.disabled`);
+  await pickKind("video");
+  await js(`downloadQuality.value = "1440"; downloadQuality.dispatchEvent(new Event("change", { bubbles: true }))`);
+  check(
+    "the dialog's quality: off for audio, and the Video tile follows it",
+    offForAudio &&
+      !(await js(`downloadQuality.disabled`)) &&
+      (await js(`downloadVideoLabel.textContent`)) === "up to 1440p",
+  );
+  await shot("download-quality.png");
   await js(
     `document.getElementById("downloadUrl").value = "https://fake.test/song"; document.querySelector("#downloadForm button[type=submit]").click()`,
   );
@@ -185,7 +200,28 @@ module.exports = async function (h) {
     const args = JSON.parse(fs.readFileSync(path.join(OUTPUT, "fake-yt-dlp-args.json"), "utf8"));
     return args[args.indexOf("-f") + 1];
   })();
-  check("yt-dlp is asked for at most 720p", format.includes("height<=720") && !format.includes("1080"), format);
+  check(
+    "yt-dlp is asked for the dialog's quality, 1440p; the setting stays 720p",
+    format.includes("height<=1440") && !format.includes("720") && saved().downloads.maxHeight === 720,
+    format,
+  );
+  await js(`document.getElementById("downloadButton").click()`);
+  await sleep(150);
+  check("…and the dialog starts on the setting again", (await js(`downloadQuality.value`)) === "720");
+  key("Escape");
+  await sleep(200);
+  // The main process takes only the qualities Settings offers; anything
+  // else from the page is the setting's.
+  {
+    const odd = await js(`earbee.download("https://fake.test/song", "video", 123)`);
+    const args = JSON.parse(fs.readFileSync(path.join(OUTPUT, "fake-yt-dlp-args.json"), "utf8"));
+    const asked = args[args.indexOf("-f") + 1];
+    check(
+      "a quality Settings doesn't offer is ignored: the setting's is used",
+      odd.ok && asked.includes("height<=720") && !asked.includes("123"),
+      asked,
+    );
+  }
   const files = fs.existsSync(elsewhere) ? fs.readdirSync(elsewhere) : [];
   check(
     "the download is saved in the chosen folder",
