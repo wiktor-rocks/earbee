@@ -209,11 +209,27 @@ let pick = () => {};
 
 /* ---------- Showing ---------- */
 
-/** @param {string} text @param {"" | "error"} [kind] */
+// Show more: ready, fetching the next page (disabled), or that failed
+// (a click tries again; the reason is its tooltip).
+/** @param {"ready" | "loading" | "failed"} state @param {string} [reason] */
+function showMoreState(state, reason = "") {
+  dom.searchMore.hidden = false;
+  dom.searchMore.disabled = state === "loading";
+  dom.searchMore.classList.toggle("loading", state === "loading");
+  dom.searchMore.classList.toggle("error", state === "failed");
+  dom.searchMore.textContent =
+    state === "loading" ? "Loading more…" : state === "failed" ? "Couldn't load more. Try again" : "Show more";
+  dom.searchMore.title = state === "failed" ? reason : "";
+}
+
+// The line above the results: "busy" (a search running, with the same
+// turning ring as Show more), an error, or plain.
+/** @param {string} text @param {"" | "error" | "busy"} [kind] */
 function showStatus(text, kind = "") {
   dom.searchStatus.hidden = !text;
   dom.searchStatus.textContent = text;
   dom.searchStatus.classList.toggle("error", kind === "error");
+  dom.searchStatus.classList.toggle("loading", kind === "busy");
 }
 
 // "Queen Official · 5:55 · 2.1B views", leaving out what isn't known.
@@ -271,13 +287,17 @@ async function searchFor(text, page = 1) {
     pictures.clear();
     early.clear();
   }
-  dom.searchMore.hidden = true;
-  showStatus(`Searching ${source.name}…`);
+  // A new search says so above the list; the next page, on Show more
+  // itself, where the eyes are (the line above is scrolled away by then).
+  if (page === 1) {
+    dom.searchMore.hidden = true;
+    showStatus(`Searching ${source.name}…`, "busy");
+  } else showMoreState("loading");
 
   // The first search also sets up the downloader, which can take a while.
   const stopListening = bridge.onDownloadProgress((progress) => {
     if (mine !== latest || !["setup", "update"].includes(progress.stage)) return;
-    showStatus(describeDownload(progress));
+    showStatus(describeDownload(progress), "busy");
   });
   let answer;
   try {
@@ -291,10 +311,11 @@ async function searchFor(text, page = 1) {
   }
   if (mine !== latest) return; // a newer search, or the dialog closed
   if (!answer.ok) {
-    showStatus(answer.canceled ? "" : answer.error, "error");
-    if (page > 1) dom.searchMore.hidden = false; // try again
+    if (page === 1) showStatus(answer.canceled ? "" : answer.error, "error");
+    else showMoreState(answer.canceled ? "ready" : "failed", answer.error); // a click tries again
     return;
   }
+  showMoreState("ready");
 
   const built = answer.results.map(buildRow);
   dom.searchResults.append(...built.map((each) => each.row));

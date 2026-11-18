@@ -127,7 +127,8 @@
  * end of section 4): the loader bars, the loading screen's pulsing aura,
  * on the welcome screen its entrance, the floating bee and breathing
  * aura, and the drop indicator's marching ring; the Settings switches'
- * sliding knob and search results' pictures fading in (section 4); the
+ * sliding knob, search results' pictures fading in and the searching
+ * ring turning (section 4); the
  * player's drop overlay and notifications sliding in and out
  * (section 5).
  * ============================================================ */
@@ -1053,6 +1054,43 @@ body.dragging .welcome-hint {
 
 .search-more {
   align-self: center;
+  gap: 8px;
+}
+
+/* A search running ("Searching YouTube…") or fetching the next page
+   ("Loading more…"): a small turning ring before the words (still, with
+   reduced motion: the words say it). */
+.search-status.loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-status.loading::before,
+.search-more.loading::before {
+  content: "";
+  width: 12px;
+  height: 12px;
+  border: 2px solid var(--muted);
+  border-right-color: transparent;
+  flex: none;
+  border-radius: 50%;
+  animation: search-turn 0.8s linear infinite !important;
+}
+
+.search-more.loading:disabled {
+  opacity: 1;
+  cursor: progress;
+}
+
+.search-more.error {
+  color: var(--danger);
+}
+
+@keyframes search-turn {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* The searches made lately (features/download.js), while the box is
@@ -1995,6 +2033,8 @@ body.dragging .welcome-hint {
   html .welcome .welcome-logo,
   html .welcome .logo-aura::before,
   html body.dragging .drop-ring rect,
+  html .search-status.loading::before,
+  html .search-more.loading::before,
   html .toast {
     animation: none !important;
   }

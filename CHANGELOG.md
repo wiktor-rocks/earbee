@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-18: Searching shows it's busy: a turning ring, and Show more says "Loading more…"
+
+- **What:** in From YouTube, "Searching YouTube…" (and the downloader's setup line before a first search) has a small turning ring before it. Show more stays where it is while the next page comes, turns into "Loading more…" with the same ring, and can't be clicked again. If that page fails, the button says "Couldn't load more. Try again", with the reason as its tooltip, and a click tries again. With reduced motion, the ring stands still.
+- **Why:** the owner: a click on Show more gave no feedback, which was confusing. Show more hid itself, and "Searching…" was shown on the line above the results, scrolled out of view by then. Then: the same ring for "Searching YouTube". The first build's ring didn't turn: the page's rule that stops every animation not marked `!important` (style.css, section 1) stopped it too.
+- **How:** `showMoreState` ("ready", "loading", "failed") in `searchFor` for pages after the first. `showStatus` gains the kind "busy" (class `loading`). One `::before` ring for both, `search-turn` marked `!important`, and listed in the reduced-motion block.
+- **Where:** `src/features/download.js` (`showMoreState`, `showStatus`, `searchFor`); `style.css` ("Searching (in the download dialog)", the reduced-motion block in section 4, and the list in section 1's comment); `tests/e2e/09-downloads.cjs`.
+- **Verified by:** `npm run check`; `TB_TOPICS=03,09 npm test` (111 e2e, 33 smoke, all passing). New checks: Show more goes through "Loading more… (disabled)" and back to "Show more"; while searching, the status line's ring has the `search-turn` animation. Not checked: the ring in a real window, by eye.
+
 ## 2026-11-18: More room above the welcome screen's recent files
 
 - **What:** the recent projects and files sit 36 px below the welcome screen's drop zone, instead of 8 px.

@@ -153,8 +153,17 @@ module.exports = async function (h) {
     );
     check("…and Show more", await js(`!searchMore.hidden`));
     await shot("search-results.png");
+    // What Show more says while the next page comes: every state it goes through.
+    await js(
+      `window.__moreStates = []; new MutationObserver(() => __moreStates.push(searchMore.textContent + (searchMore.disabled ? " (disabled)" : ""))).observe(searchMore, { childList: true, attributes: true, attributeFilter: ["disabled"] })`,
+    );
     await js(`searchMore.click()`);
     await until(async () => (await rows()).length === 12);
+    check(
+      "Show more says it's loading (and can't be clicked again) while the next page comes",
+      (await js(`__moreStates`)).includes("Loading more… (disabled)"),
+      JSON.stringify(await js(`__moreStates`)),
+    );
     found = await rows();
     check(
       "Show more adds the next ones, then hides (no more)",
@@ -199,6 +208,14 @@ module.exports = async function (h) {
     await submit();
     await sleep(300);
     const searching = await status();
+    const ring = await js(
+      `(() => { const r = getComputedStyle(searchStatus, "::before"); return { name: r.animationName, width: r.width }; })()`,
+    );
+    check(
+      "while searching, the line has a turning ring",
+      ring.name === "search-turn" && ring.width === "12px",
+      JSON.stringify(ring),
+    );
     key("Escape");
     await sleep(300);
     await js(`document.getElementById("downloadButton").click()`);
