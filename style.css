@@ -663,7 +663,7 @@ body.dragging .welcome-hint {
    the whole screen. */
 .welcome-recent {
   width: 100%;
-  margin-top: 8px;
+  margin-top: 36px; /* clear of the drop zone's dashed border */
 }
 
 .welcome-recent-lists {

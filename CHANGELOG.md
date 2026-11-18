@@ -43,6 +43,13 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-18: More room above the welcome screen's recent files
+
+- **What:** the recent projects and files sit 36 px below the welcome screen's drop zone, instead of 8 px.
+- **Why:** the owner asked for more margin between the drop zone's dashed border and "Recent projects". The gap had shrunk when the welcome screen's message line went (it sat between them; "Notifications in one place" below).
+- **How / where:** `.welcome-recent`'s `margin-top` in `style.css` ("Welcome screen").
+- **Verified by:** `npm run check`; `TB_TOPICS=22 npm test` (58 e2e, 33 smoke); the screenshot `welcome-recent.png` was looked at.
+
 ## 2026-11-18: Video quality chosen in From YouTube
 
 - **What:** the From YouTube dialog has a quality picker (480p to 2160p) at the right of "Get". It starts on Settings › Downloads › Best video quality each time, and a choice there is for that download only: the setting doesn't change. It's off while Audio is chosen, and the Video tile's "up to …p" follows it. The setting's help says so.
