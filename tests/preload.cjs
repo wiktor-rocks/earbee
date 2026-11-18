@@ -63,6 +63,25 @@ webFrame.executeJavaScript(`
   window.AudioContext = class extends NativeContext {
     constructor(...args) { super(...args); window.__contexts.push(this); }
   };
+  // The notice or error showing (ui/toast.js): its text and kind, "" if none.
+  window.__message = () => {
+    const card = document.querySelector("#notices .toast:not(.toast-done)");
+    return {
+      text: card?.querySelector(".toast-text").textContent ?? "",
+      kind: card?.dataset.kind ?? "",
+      color: card ? getComputedStyle(card.querySelector(".toast-mark")).color : "",
+    };
+  };
+  // Where the notifications' stack is, against where it belongs: 12 px
+  // above the transport's top and in from its right end, or 16 px from the
+  // window's corner when there's no transport (the welcome screen).
+  window.__stackPlace = () => {
+    const stack = document.getElementById("notices").getBoundingClientRect();
+    const bar = document.querySelector(".transport");
+    const t = bar.checkVisibility() ? bar.getBoundingClientRect() : null;
+    const want = t ? { right: t.right - 12, bottom: t.top - 12 } : { right: innerWidth - 16, bottom: innerHeight - 16 };
+    return { right: Math.round(stack.right), bottom: Math.round(stack.bottom), want: { right: Math.round(want.right), bottom: Math.round(want.bottom) }, onTransport: !!t, fits: Math.abs(stack.right - want.right) <= 1 && Math.abs(stack.bottom - want.bottom) <= 1 };
+  };
   window.__parseTime = (text) => {
     const parts = text.split(" / ")[0].split(":").map(Number);
     return parts.reduce((acc, v) => acc * 60 + v, 0);

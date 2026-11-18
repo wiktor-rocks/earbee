@@ -26,7 +26,7 @@ module.exports = async function (h) {
   await openFile(path.join(FIXTURES, "counter.webm"));
   check("new file clears loop", (await loopInfo()).hidden);
   check("the audio runs at the file's rate (48 kHz Opus)", (await js(`__contexts.at(-1).sampleRate`)) === 48000);
-  check("message cleared on load", (await js(`document.getElementById("message").textContent`)) === "");
+  check("message cleared on load", (await js(`__message().text`)) === "");
   await drag(1, 2, ["shift"]);
   loop = await loopRange();
   await sleep(1500); // let the proxy build a bit
@@ -335,7 +335,7 @@ module.exports = async function (h) {
   const playingFrom = Number(await js(`videoCanvas.dataset.frameTime`));
   await sleep(800);
   const playingTo = Number(await js(`videoCanvas.dataset.frameTime`));
-  const playingMessage = await js(`document.getElementById("message").textContent`);
+  const playingMessage = await js(`__message().text`);
   const playingCentre = await pixel(box.left + box.width / 2, box.top + box.height / 2);
   await ensurePaused();
   check(
@@ -400,7 +400,7 @@ module.exports = async function (h) {
   // Whatever goes wrong with the zoom costs the zoom, never the picture.
   // Broken views sent straight to the worker (as a bug could) are taken
   // as safe ones (video/zoom.js safeView), and the picture plays on.
-  const stopped = async () => /stopped|failed/.test(await js(`document.getElementById("message").textContent`));
+  const stopped = async () => /stopped|failed/.test(await js(`__message().text`));
   const playsOn = async (ms) => {
     const from = Number(await js(`videoCanvas.dataset.frameTime`));
     await sleep(ms);
@@ -471,11 +471,7 @@ module.exports = async function (h) {
     `side ${sideBefore} → ${sideAfter}, ${JSON.stringify(going)}, zoom ${await zoomNow()}`,
   );
   await shot("video-zoom-rotated.png");
-  check(
-    "…and nothing said the zoom failed",
-    !(await stopped()),
-    await js(`document.getElementById("message").textContent`),
-  );
+  check("…and nothing said the zoom failed", !(await stopped()), await js(`__message().text`));
 
   // The zoom's edge cases: another file chosen while zoomed in, an audio
   // file, a jump where the proxy isn't built yet, resizing while zoomed
@@ -555,7 +551,7 @@ module.exports = async function (h) {
   check(
     "with an audio file, the zoom's keys and the wheel do nothing (and break nothing)",
     (await js(`videoPane.hidden`)) && (await zoomNow()) === "" && !(await stopped()),
-    `${await js(`videoPane.hidden`)} "${await zoomNow()}" "${await js(`document.getElementById("message").textContent`)}"`,
+    `${await js(`videoPane.hidden`)} "${await zoomNow()}" "${await js(`__message().text`)}"`,
   );
 
   // A jump far into a long video right after opening, zoomed in: its proxy
@@ -739,18 +735,14 @@ module.exports = async function (h) {
   );
   key("0", ["control"]);
   await sleep(200);
-  check(
-    "…and nothing in all of this said the zoom failed",
-    !(await stopped()),
-    await js(`document.getElementById("message").textContent`),
-  );
+  check("…and nothing in all of this said the zoom failed", !(await stopped()), await js(`__message().text`));
 
   // Opening another video while one plays: the old one's decoding is cut
   // off as it's put away. That's no problem with the new file, which used
   // to be told "Part of the video couldn't be decoded". Ends on
   // long-counter.webm again, as before.
   await js(
-    `window.__videoProblems = 0; new MutationObserver(() => { if (/couldn't be decoded/.test(document.getElementById("message").textContent)) __videoProblems++; }).observe(document.getElementById("message"), { childList: true, subtree: true, characterData: true })`,
+    `window.__videoProblems = 0; new MutationObserver(() => { if (/couldn't be decoded/.test(__message().text)) __videoProblems++; }).observe(document.getElementById("notices"), { childList: true, subtree: true, characterData: true })`,
   );
   for (let i = 0; i < 4; i++) {
     key("Space");

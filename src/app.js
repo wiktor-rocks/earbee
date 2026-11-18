@@ -125,7 +125,8 @@
  *                  listeners), pref-fields.js (one Settings control per
  *                  field type), menu.js (popover menus), storage.js
  *                  (browser storage that never throws), toast.js
- *                  (notifications: small confirmations, notify())
+ *                  (notifications: every message, in one stack above the
+ *                  transport, and their log)
  *   features/      playback.js (and the A–B loop), beats.js (finding the
  *                  beats on demand: the worker, then the beat model window
  *                  by window; the ♩ chip and its menu of edits; the
@@ -205,10 +206,12 @@
  *   New settings section      A defineSection() in src/prefs/index.js,
  *                             listed in SECTIONS there; the dialog gets a
  *                             tab for it.
- *   A new notification        notify(text, detail?) from ui/toast.js, only to
+ *   A new notification        notify(text, detail?) from ui/toast.js, to
  *                             confirm something worked (it may be turned off
  *                             in Settings › General); problems go to
- *                             showNotice / reportError (ui/dom.js).
+ *                             showNotice / reportError (ui/dom.js), which
+ *                             stay until closed. All of them land in the
+ *                             same stack and in Settings › Notifications.
  *   New kind of setting       An entry in TYPES (src/prefs/fields.js) and a
  *                             renderer in ui/pref-fields.js.
  *   New colour theme          Add one to src/themes/palettes.js and list it

@@ -28,12 +28,10 @@ module.exports = async function (h) {
 
   fs.writeFileSync(path.join(FIXTURES, "bad.mp3"), "not audio");
   await openFile(path.join(FIXTURES, "bad.mp3"));
-  const msg = await js(
-    `(() => { const e = document.getElementById("message"); return { text: e.textContent, notice: e.classList.contains("notice"), color: getComputedStyle(e).color }; })()`,
-  );
+  const msg = await js(`__message()`);
   check(
     "bad file after first load: red error in player",
-    msg.text.includes("Couldn't open") && !msg.notice,
+    msg.text.includes("Couldn't open") && msg.kind === "error",
     JSON.stringify(msg),
   );
   check("bad file keeps loop of previous song", !(await loopInfo()).hidden);
@@ -47,12 +45,10 @@ module.exports = async function (h) {
   // FLAC and ALAC aren't supported: each is refused like a bad file.
   for (const name of ["no-flac.flac", "no-alac.m4a"]) {
     await openFile(path.join(FIXTURES, name));
-    const refused = await js(
-      `(() => { const e = document.getElementById("message"); return { text: e.textContent, notice: e.classList.contains("notice") }; })()`,
-    );
+    const refused = await js(`__message()`);
     check(
       `${name} is refused with a red error`,
-      refused.text.includes(`Couldn't open “${name}”`) && !refused.notice,
+      refused.text.includes(`Couldn't open “${name}”`) && refused.kind === "error",
       JSON.stringify(refused),
     );
     check(
@@ -92,7 +88,7 @@ module.exports = async function (h) {
 
   const state = () =>
     js(
-      `({ file: fileName.textContent, speed: speedValue.textContent, message: message.textContent, overlay: !loadingOverlay.hidden, status: overlayStatus.textContent, cancel: !overlayCancel.hidden, ready: !play.disabled, workers: __workers.live() })`,
+      `({ file: fileName.textContent, speed: speedValue.textContent, message: __message().text, overlay: !loadingOverlay.hidden, status: overlayStatus.textContent, cancel: !overlayCancel.hidden, ready: !play.disabled, workers: __workers.live() })`,
     );
   async function waitForOverlay() {
     for (let i = 0; i < 100 && (await state()).overlay; i++) await sleep(50);

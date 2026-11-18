@@ -27,7 +27,7 @@ module.exports = async function (h) {
     const dialogOpen = () => js(`document.getElementById("downloadDialog").open`);
     const ui = () =>
       js(
-        `({ overlay: !document.getElementById("loadingOverlay").hidden, status: document.getElementById("overlayStatus").textContent, cancel: !document.getElementById("overlayCancel").hidden, file: document.getElementById("fileName").textContent, message: document.getElementById("message").textContent, error: !document.getElementById("message").classList.contains("notice"), video: !document.getElementById("videoPane").hidden })`,
+        `({ overlay: !document.getElementById("loadingOverlay").hidden, status: document.getElementById("overlayStatus").textContent, cancel: !document.getElementById("overlayCancel").hidden, file: document.getElementById("fileName").textContent, message: __message().text, error: __message().kind === "error", video: !document.getElementById("videoPane").hidden })`,
       );
     const waitIdle = async () => {
       for (let i = 0; i < 300; i++) {

@@ -201,6 +201,10 @@ module.exports = async function (h) {
   await sleep(300);
   check("…which the wheel doesn't zoom", (await layout()).fit);
   check("…the sidebar's own choice is untouched", l.sidebarKey === before.sidebarKey, String(l.sidebarKey));
+  {
+    const place = await js(`__stackPlace()`);
+    check("…the notifications above its compact transport", place.onTransport && place.fits, JSON.stringify(place));
+  }
   await shot("big-video.png");
   await click(15); // past what the zoomed-in view showed before (the start)
   await sleep(300);

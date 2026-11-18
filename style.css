@@ -368,27 +368,6 @@ kbd {
   text-align: center;
 }
 
-/* Errors are red; notices (something works only partly) are neutral.
-   Used in the transport bar and on the welcome screen. */
-.message {
-  flex: 1;
-  min-width: 0;
-  max-height: 3.2em;
-  overflow: auto;
-  color: var(--danger);
-  font: 11px/1.4 var(--mono);
-  white-space: pre-wrap;
-}
-
-.message.notice {
-  color: var(--muted);
-  font: 12px/1.4 var(--sans);
-}
-
-.message:empty {
-  visibility: hidden;
-}
-
 /* ============================================================
  * 4. SCREENS
  * Welcome (until the first file loads), the loading screen that
@@ -677,19 +656,6 @@ body.dragging .welcome-hint {
   width: 13px;
   height: 13px;
   color: var(--accent);
-}
-
-.welcome-message {
-  min-height: 1.4em;
-  margin-top: 16px;
-  max-height: none;
-  font: 14px/1.4 var(--sans);
-  text-align: center;
-}
-
-/* A notice there is as large as an error (.message.notice is smaller). */
-.welcome-message.notice {
-  font-size: 14px;
 }
 
 /* The recent files (src/features/recent.js), under the card: two lists side
@@ -1404,6 +1370,70 @@ body.dragging .welcome-hint {
 
 .settings-message:empty {
   display: none;
+}
+
+/* Settings › Notifications (features/notification-log.js): every message
+   shown, newest first, in the notifications' own look (the mark), with
+   its time on the right. The text can be selected, to copy a path. */
+.notification-log-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.notification-log-head .pref-help {
+  margin: 0;
+}
+
+.notification-log-empty {
+  margin: 8px 0;
+  color: var(--muted);
+}
+
+.notification-log {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  list-style: none;
+}
+
+.notification-log:empty {
+  display: none;
+}
+
+.notification-log-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 1.4;
+  user-select: text;
+}
+
+.notification-log-entry + .notification-log-entry {
+  border-top: 1px solid var(--hairline);
+}
+
+.notification-log-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.notification-log-time {
+  flex: none;
+  color: var(--muted);
+  font: 11px/1.5 var(--mono);
 }
 
 /* One setting: a card with its label, help, control and Reset. */
@@ -2645,12 +2675,13 @@ body.stage-split-dragging * {
 
 /* ---------- Transport bar ---------- */
 
-/* Three parts: the time and any message on the left; the step arrows,
-   Play and Stop in the middle (centred, the sides being equal), as rings;
-   the step size on the right. Always one row: wrapping would make the bar
-   taller and take that height from the waveform. When room runs out the
-   message gives way. */
+/* Three parts: the time on the left; the step arrows, Play and Stop in
+   the middle (centred, the sides being equal), as rings; the step size on
+   the right. Always one row: wrapping would make the bar taller and take
+   that height from the waveform. The notifications' stack sits on its top
+   right corner (its anchor). */
 .transport {
+  anchor-name: --transport;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
@@ -3559,30 +3590,37 @@ body.panel-order-dragging * {
 }
 
 /* ---------- Notifications (ui/toast.js) ----------
-   Small confirmations at the bottom centre, above everything but modal
-   dialogs; only the toasts themselves take clicks (one dismisses it).
-   Raised above the transport, so they never cover Play. */
+   Every message, in one stack: on the transport's top right corner, so it
+   follows the transport in every layout (the side panel on either side,
+   big video's compact bar), and in the window's corner when there's no
+   transport (the welcome screen). Above everything but modal dialogs; only
+   the cards take clicks (one removes it). One look for every kind; only
+   the mark says which. */
 
-.toasts {
+.notices {
   position: fixed;
-  bottom: 76px;
-  left: 50%;
+  right: anchor(--transport right, 16px);
+  bottom: calc(anchor(--transport top, 4px) + 12px);
   z-index: 30;
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   gap: 6px;
-  width: min(480px, calc(100vw - 32px));
-  transform: translateX(-50%);
+  width: min(360px, calc(100vw - 32px));
   pointer-events: none;
+}
+
+/* A little in from the transport's right end, clear of its padding. */
+.app:not([hidden]) ~ .notices {
+  margin-right: 12px;
 }
 
 .toast {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: flex-start;
+  gap: 10px;
   max-width: 100%;
-  padding: 8px 14px;
+  padding: 8px 10px 8px 12px;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface-2);
@@ -3597,10 +3635,54 @@ body.panel-order-dragging * {
     transform 0.2s !important;
 }
 
-.toast small {
+/* The kind: a tick, an "i", or a red "!". */
+.toast-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 17px;
+  height: 17px;
+  border: 1.5px solid var(--muted);
+  border-radius: 50%;
+  color: var(--muted);
+  font: 700 10px/1 var(--sans);
+}
+
+.toast-done .toast-mark {
+  border-color: var(--accent-text);
+  color: var(--accent-text);
+}
+
+.toast-error .toast-mark {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.toast-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  max-height: 12em;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.toast-detail {
   color: var(--muted);
   font: 11px/1.4 var(--mono);
-  overflow-wrap: anywhere;
+}
+
+button.toast-close {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: -1px -2px 0 0;
+  color: var(--muted);
+  font-size: 16px;
+  line-height: 1;
 }
 
 .toast.leaving {

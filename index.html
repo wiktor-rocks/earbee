@@ -87,8 +87,6 @@
           </ul>
         </div>
 
-        <div id="welcomeMessage" class="message welcome-message" role="status"></div>
-
         <!-- The projects and files opened lately (src/features/recent.js). -->
         <section id="welcomeRecent" class="welcome-recent" aria-label="Recent files" hidden>
           <div id="welcomeRecentLists" class="welcome-recent-lists"></div>
@@ -172,6 +170,16 @@
           stroke-linejoin="round"
         />
         <circle cx="8" cy="8" r="2.2" fill="none" stroke="currentColor" stroke-width="1.3" />
+      </symbol>
+      <symbol id="i-bell" viewBox="0 0 16 16">
+        <path
+          d="M4 11.5V7a4 4 0 0 1 8 0v4.5l1.2 1.2H2.8ZM6.5 13.5a1.5 1.5 0 0 0 3 0"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.3"
+          stroke-linejoin="round"
+          stroke-linecap="round"
+        />
       </symbol>
       <symbol id="i-palette" viewBox="0 0 16 16">
         <path
@@ -428,7 +436,7 @@
           <div id="waveform-minimap" class="waveform-minimap" aria-label="Full track overview"></div>
         </div>
 
-        <!-- The transport, under the waveform: the time (and any message) on
+        <!-- The transport, under the waveform: the time on
              the left; the step arrows, Play and Stop as rings in the middle;
              the step size on the right. -->
         <section class="transport" aria-label="Transport">
@@ -436,7 +444,6 @@
             <output id="trackTime" class="track-time" aria-label="Playback position and track duration"
               >0:00.000 / 0:00.000</output
             >
-            <div id="message" class="message" role="status"></div>
           </div>
 
           <div class="transport-controls">
@@ -943,6 +950,10 @@
       </div>
       <p id="settingsMessage" class="settings-message" role="alert"></p>
     </dialog>
+
+    <!-- Every message, in one place (ui/toast.js): above the transport's
+         right end, or the window's corner on the welcome screen. -->
+    <div id="notices" class="notices" aria-live="polite"></div>
 
     <script type="module" src="src/app.js"></script>
   </body>

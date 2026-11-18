@@ -2,10 +2,13 @@
 // welcome screen). It's generated from the sections in src/prefs: one tab
 // per section, one control per field (ui/pref-fields.js). A change applies
 // and is saved at once (ui/prefs.js); there's no OK or Cancel. The colour
-// theme is chosen here too (Settings › Theme); there's no other way.
+// theme is chosen here too (Settings › Theme); there's no other way. Last,
+// a tab that isn't a section: the notification log
+// (features/notification-log.js).
 import { SECTIONS } from "../prefs/index.js";
 import { $, element, onClick } from "../ui/dom.js";
 import { renderField } from "../ui/pref-fields.js";
+import { buildNotificationLog } from "./notification-log.js";
 import {
   chooseFolder,
   defaultPaths,
@@ -29,7 +32,7 @@ const sections = () => SECTIONS.filter((section) => hasMainProcess || !section.e
 
 // Runs a change, clearing an earlier failure first. A change that fails (a
 // refused value, a folder that can't be chosen) is explained in the dialog,
-// which covers the app's own message line, and `refresh` shows the values
+// which covers the app's own notifications, and `refresh` shows the values
 // that were kept again.
 async function attempt(change, refresh) {
   message.textContent = "";
@@ -45,8 +48,6 @@ async function attempt(change, refresh) {
 /** @param {import("../prefs/fields.js").Section} section */
 function buildPanel(section) {
   const panel = element("section", { className: "settings-panel", id: `settings-${section.id}` });
-  panel.setAttribute("role", "tabpanel");
-  panel.setAttribute("aria-labelledby", `settings-tab-${section.id}`);
   const show = (values) => fields.forEach((field) => field.update(values));
   const refresh = () => show(getPrefs(section.id));
   const fields = section.fields
@@ -81,17 +82,23 @@ function spriteIcon(id) {
   return svg;
 }
 
+/** @param {{ id: string, title: string, icon?: string }} section @param {HTMLElement} panel */
+function addTab(section, panel) {
+  const tab = element("button", { type: "button", className: "settings-tab", id: `settings-tab-${section.id}` });
+  if (section.icon) tab.append(spriteIcon(section.icon));
+  tab.append(section.title);
+  tab.setAttribute("role", "tab");
+  tab.setAttribute("aria-controls", `settings-${section.id}`);
+  onClick(tab, () => selectTab(section.id));
+  tabs.append(tab);
+  panel.setAttribute("role", "tabpanel");
+  panel.setAttribute("aria-labelledby", `settings-tab-${section.id}`);
+  panels.append(panel);
+}
+
 function build() {
-  for (const section of sections()) {
-    const tab = element("button", { type: "button", className: "settings-tab", id: `settings-tab-${section.id}` });
-    if (section.icon) tab.append(spriteIcon(section.icon));
-    tab.append(section.title);
-    tab.setAttribute("role", "tab");
-    tab.setAttribute("aria-controls", `settings-${section.id}`);
-    onClick(tab, () => selectTab(section.id));
-    tabs.append(tab);
-    panels.append(buildPanel(section));
-  }
+  for (const section of sections()) addTab(section, buildPanel(section));
+  addTab({ id: "notifications", title: "Notifications", icon: "bell" }, buildNotificationLog("settings-notifications"));
   selectTab(sections()[0].id);
 }
 

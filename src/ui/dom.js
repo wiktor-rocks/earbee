@@ -9,6 +9,7 @@ import { beats, hasAudio, player, settings, totalSemitones } from "../context.js
 import { AppError } from "../core/errors.js";
 import { focusPresetFor } from "../core/focus.js";
 import { formatPitchTotal, formatSpeed, formatStepSize, formatTrackTime, noteName } from "../core/format.js";
+import { showMessage } from "./toast.js";
 
 /** @param {string} id */
 export const $ = (id) => document.getElementById(id);
@@ -16,7 +17,6 @@ export const $ = (id) => document.getElementById(id);
 export const dom = {
   welcome: $("welcome"),
   welcomeOpen: $("welcomeOpen"),
-  welcomeMessage: $("welcomeMessage"),
   welcomeDownload: $("welcomeDownload"),
   welcomeProjectFormat: $("welcomeProjectFormat"),
   welcomeRecent: $("welcomeRecent"),
@@ -64,7 +64,6 @@ export const dom = {
   fileInfo: $("fileInfo"),
   fileName: $("fileName"),
   fileMeta: $("fileMeta"),
-  message: $("message"),
   trackTime: $("trackTime"),
   loopInfo: $("loopInfo"),
   playButton: /** @type {HTMLButtonElement} */ ($("play")),
@@ -112,18 +111,10 @@ const transportButtons = () => [dom.playButton, dom.stopButton, dom.stepBackButt
 
 /* ---------- Errors and notices ---------- */
 
-// One message line: in the transport bar, or under the drop zone while
-// the welcome screen is up. An error means something failed (red); a
-// notice means something works only partly (neutral). Confirmations that
-// something worked are notifications instead (notify, ui/toast.js).
-function showMessage(text, kind) {
-  const line = dom.app.hidden ? dom.welcomeMessage : dom.message;
-  line.textContent = text;
-  line.classList.toggle("notice", kind === "notice");
-  // A long recent list may have scrolled the welcome screen's line away.
-  if (text && line === dom.welcomeMessage) line.scrollIntoView({ block: "nearest" });
-}
-
+// Problems, in the notifications' stack (ui/toast.js): an error means
+// something failed; a notice means something works only partly. Either
+// stays until it's closed or the next one replaces it. Confirmations that
+// something worked are notify() there.
 const showError = (text) => showMessage(text, "error");
 export const showNotice = (text) => showMessage(text, "notice");
 export const clearMessage = () => showMessage("", "notice");

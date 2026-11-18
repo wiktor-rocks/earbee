@@ -256,9 +256,10 @@ export const CONFIG = {
     startTimeoutMs: 30_000,
   },
 
-  // The notifications (ui/toast.js): how long one shows, and how many at
-  // once (a new one pushes out the oldest).
-  notifications: { showMs: 4000, max: 3 },
+  // The notifications (ui/toast.js): how long a confirmation shows, how
+  // many at once (a new one pushes out the oldest), and how many the log
+  // keeps (Settings › Notifications; the oldest go).
+  notifications: { showMs: 4000, max: 3, logMax: 200 },
 
   // Stems (src/features/stems/): the open song split into its instruments
   // by the stem model (electron/stems/). Off, none of it loads: no section

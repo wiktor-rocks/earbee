@@ -247,7 +247,7 @@ module.exports = async function (h) {
   await open(alpha);
   fs.rmSync(doomed);
   await pickInMenu("doomed.wav");
-  const said = await js(`message.textContent`);
+  const said = await js(`__message().text`);
   check(
     "a file that has gone says so, and where it was",
     said === `“doomed.wav” isn't in ${folder} any more, so it's off the list.`,
@@ -261,7 +261,7 @@ module.exports = async function (h) {
   await open(alpha);
   fs.rmSync(doomedProject);
   await pickInMenu("doomed.ebee");
-  check("a project that has gone says so too", (await js(`message.textContent`)).startsWith("“doomed.ebee” isn't in "));
+  check("a project that has gone says so too", (await js(`__message().text`)).startsWith("“doomed.ebee” isn't in "));
   check("…and it's off the list", !projectNames().includes("doomed.ebee"), projectNames().join());
 
   // A project whose song has gone: the question a project always asks.
@@ -289,7 +289,7 @@ module.exports = async function (h) {
   await js(`[...document.querySelectorAll(".recent-open")]
     .find((row) => row.querySelector(".recent-name").textContent === "doomed-too.wav").focus()`);
   await pickOnWelcome("doomed-too.wav");
-  check("on the welcome screen too", (await js(`welcomeMessage.textContent`)).startsWith("“doomed-too.wav” isn't in "));
+  check("on the welcome screen too", (await js(`__message().text`)).startsWith("“doomed-too.wav” isn't in "));
   check(
     "…with the focus back on Open",
     (await js(`document.activeElement.id`)) === "welcomeOpen",

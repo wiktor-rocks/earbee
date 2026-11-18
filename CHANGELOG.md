@@ -43,6 +43,27 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-18: Notifications in one place, with a log
+
+- **What:** every message EarBee shows (a file opened, a project saved, a download, the stems ready, a notice, an error) appears in the same stack, with the same look, at the transport's top right corner. It follows the transport in every layout: the side panel left or right, big video's compact bar, smaller windows. On the welcome screen it's in the window's bottom-right corner.
+  - A confirmation fades after 4 s. A notice or an error stays until it's closed (×) or the next one takes its place; there's only ever one. A small mark tells the kinds apart: a tick, an "i", or a red "!".
+  - A click anywhere on any card removes it at once, with no fade.
+  - **Settings › Notifications** (a new tab) lists every message shown, newest first, with its time and detail (a path can be selected and copied). It's kept between runs (the newest 200) and has a Clear button. Confirmations turned off in Settings › General are still logged there.
+  - A new version is also said once in the stack ("EarBee X is downloaded", or "is out" on a Mac), beside the pill.
+- **Why:** NEXT-RELEASE-0.4.0's "Notifications rebuilt": messages showed up in weird places. Confirmations floated at the bottom centre of the window, off-centre with the side panel and over the picture in big video. Errors and notices were a small red or grey line next to the time, or under the drop zone on the welcome screen. The owner chose the corner above the transport, and that a notice or an error stays until closed. They added the instant click and the log.
+- **How:**
+  - `ui/toast.js` is the one place: `notify` (done) and `showMessage` (notice, error; empty text clears, as before). It no longer imports `ui/dom.js`, which now delegates `showNotice`, `reportError` and `clearMessage` to it, so no caller changed.
+  - The stack, `#notices`, is placed with CSS anchor positioning on `.transport` (`anchor-name: --transport`). The fallback values in `anchor()` put it in the window's corner when the transport isn't shown.
+  - The log is plain data (`core/notification-log.js`: `appendEntry`, `parseLog`), stored as JSON in the browser's storage under `earbee.notificationLog` (`ui/storage.js`). Its length is `CONFIG.notifications.logMax`.
+  - The Settings tab isn't a prefs section: `features/settings.js` adds it after the sections (`addTab`), with its panel from `features/notification-log.js`, which redraws on `onLogChange`.
+  - Removed: `#message`, `#welcomeMessage` and their `.message` / `.welcome-message` styles.
+- **Where:** `src/ui/toast.js`, `src/ui/dom.js` ("Errors and notices"), `src/core/notification-log.js`, `src/features/notification-log.js`, `src/features/settings.js`, `src/features/updates.js`, `src/config.js` (`notifications.logMax`), `src/prefs/index.js` (the switch's help); `index.html` (`#notices`, the `i-bell` icon); `style.css` ("Notifications (ui/toast.js)", the notification log in "Settings dialog", `anchor-name` in "Transport bar"); `docs/glossary.md`, `README.md` and the `src/app.js` header. Tests: `tests/preload.cjs` (`__message()`, `__stackPlace()`), `tests/e2e/harness.cjs` (`toasts()` reads only the stack), topics 02, 07, 08, 09, 13, 16, 19, 20, 21 and 22 read the stack instead of the message line, and `tests/unit/notification-log.test.mjs`.
+- **Verified by:**
+  - `npm run check`; `npm run test:unit` (443 pass);
+  - `TB_TOPICS=01,02,03,04,05,06,07,08,09 npm test` (389 e2e, 33 smoke) and `TB_TOPICS=03,13,16,19,20,21,22 npm test` (297 e2e, 33 smoke), all passing. New checks: the stack's place with the panel right and left, in big video and on the welcome screen; the order and kinds; a notice replacing an error; a click removing a card in the same frame; the fade; the log newest first, live, trimmed to 200, cleared, and kept over a reload.
+  - The screenshots `notifications.png`, `notification-log.png` and `welcome-error.png` were looked at.
+  - Not checked: a real window (`npm start`) and the video window by hand.
+
 ## 2026-11-17: "macOS 13 or later" where the Mac downloads are offered
 
 - **What:** the release notes, the README, earbee.org's Mac card and its FAQ say the Mac downloads need macOS 13 (Ventura) or later. The published 0.3.2 release's notes were changed by hand to say so too.

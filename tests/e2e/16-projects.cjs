@@ -238,7 +238,7 @@ module.exports = async function (h) {
   check(
     "saving shows a notification with where, not a message in the transport bar",
     (await toasts()).some((t) => t.text === "Project saved" && t.detail === linked) &&
-      !(await js(`document.getElementById("message").textContent`)).includes("Saved"),
+      !(await js(`__message().text`)).includes("Saved"),
     JSON.stringify(await toasts()),
   );
   await shot("project-saved-toast.png");

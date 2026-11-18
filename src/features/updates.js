@@ -9,6 +9,7 @@
  *              work first, as when quitting).
  *   available  On a Mac, which can't update itself: "EarBee 0.3.1 is out".
  *              A click opens the release's page, to download it.
+ * Each new version is also said once in the notifications (ui/toast.js).
  * Nothing shows outside a packaged EarBee: the main process doesn't check.
  *
  * Removing it means deleting this file, its part in style.css ("Update
@@ -17,6 +18,7 @@
 
 import { $, onClick } from "../ui/dom.js";
 import { bindMenu } from "../ui/menu.js";
+import { notify } from "../ui/toast.js";
 
 /** @typedef {null | { kind: "ready", version: string } | { kind: "available", version: string, url: string }} UpdateState */
 
@@ -26,6 +28,7 @@ export function bindUpdates() {
   const pills = [$("updatePill"), $("welcomeUpdatePill")];
   /** @type {UpdateState} */
   let state = null;
+  let announced = ""; // the version last said in a notification
 
   /** @param {UpdateState} next */
   function render(next) {
@@ -43,6 +46,11 @@ export function bindUpdates() {
     }
     if (state?.kind === "ready")
       $("updateMenuNote").textContent = `EarBee ${state.version} is downloaded. It's installed when you quit.`;
+    if (state && state.version + state.kind !== announced) {
+      announced = state.version + state.kind;
+      if (state.kind === "ready") notify(`EarBee ${state.version} is downloaded`, "It's installed when you quit.");
+      else notify(`EarBee ${state.version} is out`, "Click the pill in the top bar to download it.");
+    }
   }
 
   // Ready: the menu. Available: the page, straight away.

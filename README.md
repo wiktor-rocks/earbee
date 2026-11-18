@@ -134,7 +134,7 @@ src/               The page (ES modules, no build step), in layers:
   context.js         settings, the track's marks, the shared components (`player`)
   ui/                dom.js, controls.js, shortcuts.js, theme.js, prefs.js,
                      pref-fields.js, menu.js (popover menus), storage.js
-                     (browser storage), toast.js (notifications)
+                     (browser storage), toast.js (notifications and their log)
   features/          playback.js (and the A–B loop), beats.js (finding the
                      beats, the beat click), marks.js, open-file.js,
                      download.js (and search), settings.js (and the theme

@@ -6,8 +6,8 @@ import { DEFAULT_PREFS, THEMES } from "../themes/index.js";
 import { defineSection, normalizeAll } from "./fields.js";
 
 // Settings › General: app-wide choices. `notifications` turns the small
-// confirmations (ui/toast.js) on and off; problems always show in the
-// transport bar. `beatClick` plays a click on each found beat
+// confirmations (ui/toast.js) on and off; problems always show, and
+// all of them are kept in Settings › Notifications. `beatClick` plays a click on each found beat
 // (features/beats.js), to hear whether the beat lines sit on the beat;
 // it's set in the beats menu (the ♩ chip) or with Shift+B, not here.
 // `knobSensitivity` is how far a drag turns the dock's knobs
@@ -23,7 +23,7 @@ const generalSection = defineSection({
       key: "notifications",
       type: "boolean",
       label: "Show notifications",
-      help: "Short messages that confirm something worked, such as where a file was saved.",
+      help: "Short messages that confirm something worked, such as where a file was saved. Problems always show; Notifications lists them all.",
       default: true,
     },
     {

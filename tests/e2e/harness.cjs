@@ -311,12 +311,13 @@ async function createHarness() {
     }
   }
   const pos = () => js(`__parseTime(document.getElementById("trackTime").textContent)`);
-  // The notifications showing (ui/toast.js): [{ text, detail }], oldest first.
+  // The confirmations showing (ui/toast.js): [{ text, detail }], oldest
+  // first. The notice or error showing is __message() (tests/preload.cjs).
   const toasts = () =>
     js(
-      `[...document.querySelectorAll(".toast:not(.leaving)")].map((t) => ({ text: t.querySelector("span").textContent, detail: t.querySelector("small")?.textContent ?? "" }))`,
+      `[...document.querySelectorAll("#notices .toast-done:not(.leaving)")].map((t) => ({ text: t.querySelector(".toast-text").textContent, detail: t.querySelector("small")?.textContent ?? "" }))`,
     );
-  const clearToasts = () => js(`document.querySelectorAll(".toast").forEach((t) => t.remove())`);
+  const clearToasts = () => js(`document.querySelectorAll("#notices .toast").forEach((t) => t.remove())`);
   const loopInfo = () =>
     js(
       `(() => { const e = document.getElementById("loopInfo"); return { hidden: e.hidden, text: e.textContent, disabled: e.classList.contains("disabled") }; })()`,

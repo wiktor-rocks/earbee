@@ -111,15 +111,21 @@ module.exports = async function (h) {
   check("failed first load: Open button focused", await js(`document.activeElement.id === "welcomeOpen"`));
   await js(`window.__slowDecode = 0`);
   sc = await screens();
-  const wm = await js(
-    `(() => { const e = document.getElementById("welcomeMessage"); return { text: e.textContent, notice: e.classList.contains("notice"), color: getComputedStyle(e).color }; })()`,
-  );
+  const wm = await js(`__message()`);
   check("bad first file: stays on welcome", sc.welcome && !sc.app, JSON.stringify(sc));
   check(
-    "bad first file: red error on welcome",
-    wm.text.includes("Couldn't open") && !wm.notice && wm.color === "rgb(255, 107, 107)",
+    "bad first file: an error on welcome",
+    wm.text.includes("Couldn't open") && wm.kind === "error" && wm.color === "rgb(255, 107, 107)",
     JSON.stringify(wm),
   );
+  {
+    const place = await js(`__stackPlace()`);
+    check(
+      "…in the window's bottom-right corner (no transport)",
+      !place.onTransport && place.fits,
+      JSON.stringify(place),
+    );
+  }
   await shot("welcome-error.png");
   // Recent files (src/features/recent.js): none yet, and a failed file isn't one.
   check("no recent files on a first run", await js(`!welcomeRecent.checkVisibility()`));
@@ -176,7 +182,7 @@ module.exports = async function (h) {
     Math.abs(widths.wrapper - (widths.container * 20) / 15) < 4,
     JSON.stringify(widths),
   );
-  check("welcome error cleared from player", (await js(`document.getElementById("message").textContent`)) === "");
+  check("welcome error cleared from player", (await js(`__message().text`)) === "");
   check(
     "a dropped file with no place on this computer isn't a recent file",
     h.recentFiles.list().files.length === 0,

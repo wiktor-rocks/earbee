@@ -331,7 +331,7 @@ module.exports = async function (h) {
   c = await found();
   check("a steady tone has no steady beat", c.text === "♩ No steady beat", JSON.stringify(c));
   check("…and the step stays in seconds", (await stepText()) === "Step 1 s", await stepText());
-  await js(`document.getElementById("message").textContent = ""`);
+  await js(`document.querySelectorAll("#notices .toast").forEach((t) => t.click())`);
   await clearToasts();
   key("\\");
   await sleep(150);

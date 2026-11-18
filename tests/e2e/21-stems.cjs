@@ -424,9 +424,9 @@ module.exports = async function (h) {
     const bytes = fs.existsSync(file) ? fs.readFileSync(file) : Buffer.alloc(0);
     return bytes.indexOf(0) > 0 ? JSON.parse(bytes.subarray(0, bytes.indexOf(0)).toString()) : null;
   };
-  // The error line (reportError), emptied first.
-  const message = () => js(`message.textContent`);
-  const clearMessage = () => js(`message.textContent = ""`);
+  // The error showing (reportError), closed first.
+  const message = () => js(`__message().text`);
+  const clearMessage = () => js(`document.querySelectorAll("#notices .toast").forEach((t) => t.click())`);
   await openFile(path.join(FIXTURES, "bars.wav"));
   await clearMessage();
   memory.available = stems.length * 30;

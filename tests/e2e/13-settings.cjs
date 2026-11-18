@@ -1,5 +1,6 @@
 // Settings: the dialog (generated from src/prefs), the General, Theme,
 // Layout, Downloads and Advanced sections, Reset, a change made elsewhere showing in the dialog,
+// the notifications (their place, kinds and clicks) and their log in Settings › Notifications,
 // the top bar hiding itself, what the main process refuses, and keeping the values over a reload.
 // Part of the end-to-end run (see run.cjs); `h` is the harness.
 const fs = require("fs");
@@ -30,7 +31,7 @@ module.exports = async function (h) {
   check(
     "one tab per settings section",
     JSON.stringify(await js(`[...document.querySelectorAll(".settings-tab")].map((tab) => tab.textContent)`)) ===
-      JSON.stringify(["General", "Theme", "Waveform", "Layout", "Downloads", "Advanced"]),
+      JSON.stringify(["General", "Theme", "Waveform", "Layout", "Downloads", "Advanced", "Notifications"]),
   );
   // The dialog has one size: switching tabs, or fields showing and hiding,
   // never moves it or its tabs.
@@ -353,6 +354,101 @@ module.exports = async function (h) {
     check("…back on the right, as it was", JSON.stringify(await boxes()) === JSON.stringify(before));
   }
 
+  // The notifications (ui/toast.js): one stack on the transport's top right
+  // corner, wherever the side panel is; a notice or an error stays (one at a
+  // time, at the bottom), a confirmation fades; a click removes any of them
+  // at once. Then their log, Settings › Notifications.
+  {
+    const toast = (call) => js(`import("./src/ui/toast.js").then((m) => { ${call}; })`);
+    const cards = () =>
+      js(
+        `[...document.querySelectorAll("#notices .toast:not(.leaving)")].map((t) => t.dataset.kind + ":" + t.querySelector(".toast-text").textContent)`,
+      );
+    const logShown = () =>
+      js(
+        `[...document.querySelectorAll("#settings-notifications .notification-log-entry")].map((e) => e.querySelector(".notification-log-body span").textContent)`,
+      );
+    await js(`document.querySelectorAll("#notices .toast").forEach((t) => t.click())`);
+    await toast(`m.clearNotificationLog()`);
+
+    await toast(`m.notify("A test confirmation", "/some/path.ebee")`);
+    const right = await js(`__stackPlace()`);
+    check(
+      "notifications: above the transport's right end (the panel on the right)",
+      right.onTransport && right.fits,
+      JSON.stringify(right),
+    );
+    await js(`earbee.prefs.set("layout", "panelSide", "left")`);
+    await sleep(300);
+    const left = await js(`__stackPlace()`);
+    check("…and with the panel on the left", left.onTransport && left.fits, JSON.stringify(left));
+    await js(`earbee.prefs.set("layout", "panelSide", "right")`);
+    await sleep(200);
+
+    await toast(`m.showMessage("A test error", "error")`);
+    await toast(`m.notify("Another confirmation")`);
+    check(
+      "a notice or an error stays at the bottom, confirmations above it",
+      JSON.stringify(await cards()) ===
+        JSON.stringify(["done:A test confirmation", "done:Another confirmation", "error:A test error"]) &&
+        (await js(`document.querySelector("#notices .toast-error").getAttribute("role")`)) === "alert",
+      JSON.stringify(await cards()),
+    );
+    await shot("notifications.png");
+    await toast(`m.showMessage("A test notice", "notice")`);
+    check(
+      "…and the next one takes its place",
+      (await js(`__message().text`)) === "A test notice" &&
+        (await js(`document.querySelectorAll("#notices .toast:not(.toast-done)").length`)) === 1,
+    );
+    check(
+      "a click removes a confirmation at once",
+      await js(
+        `(() => { const t = document.querySelector("#notices .toast-done"); t.click(); return !t.isConnected; })()`,
+      ),
+    );
+    check(
+      "…and a notice",
+      await js(
+        `(() => { const t = document.querySelector("#notices .toast-notice"); t.click(); return !t.isConnected; })()`,
+      ),
+    );
+    await sleep(4600);
+    check("a confirmation fades by itself", (await cards()).length === 0, JSON.stringify(await cards()));
+
+    await js(`document.getElementById("settingsButton").click()`);
+    await sleep(200);
+    await tab("notifications");
+    check(
+      "Settings › Notifications lists them, newest first",
+      JSON.stringify(await logShown()) ===
+        JSON.stringify(["A test notice", "Another confirmation", "A test error", "A test confirmation"]),
+      JSON.stringify(await logShown()),
+    );
+    await shot("notification-log.png");
+    await toast(`m.notify("While it's open")`);
+    await sleep(100);
+    check("…as they come", (await logShown())[0] === "While it's open", JSON.stringify(await logShown()));
+    await toast(`for (let i = 0; i < 205; i++) m.notify("Many " + i)`);
+    check(
+      "…keeping the newest 200",
+      (await logShown()).length === 200 &&
+        (await logShown())[0] === "Many 204" &&
+        JSON.parse(await js(`localStorage.getItem("earbee.notificationLog")`)).length === 200,
+    );
+    await js(`document.querySelector("#settings-notifications .notification-log-head button").click()`);
+    await sleep(100);
+    check(
+      "Clear empties it",
+      (await logShown()).length === 0 &&
+        (await js(`document.querySelector(".notification-log-empty").checkVisibility()`)),
+    );
+    await js(`document.getElementById("settingsDialog").close()`);
+    await js(`document.querySelectorAll("#notices .toast").forEach((t) => t.click())`);
+    await toast(`m.showMessage("Kept over a reload", "error")`);
+    await js(`document.querySelectorAll("#notices .toast").forEach((t) => t.click())`);
+  }
+
   // Updates (src/features/updates.js): the switch in General; the pill from
   // the main process's state (the harness stands in for electron/updates.js).
   {
@@ -410,6 +506,13 @@ module.exports = async function (h) {
     "settings are kept over a reload",
     (await js(`document.documentElement.dataset.theme`)) === "one-dark" &&
       (await js(`document.querySelector('#settings-downloads [data-key="kind"] input[value="video"]').checked`)),
+  );
+
+  check(
+    "the notification log is kept over a reload",
+    (await js(`import("./src/ui/toast.js").then((m) => m.notificationLog().map((e) => e.text))`)).includes(
+      "Kept over a reload",
+    ),
   );
 
   // Back to the defaults for anything after this.
