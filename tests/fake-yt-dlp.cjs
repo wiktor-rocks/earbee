@@ -12,6 +12,8 @@
 //   https://fake.test/forbidden YouTube refuses the stream (HTTP 403)
 //   https://fake.test/flaky     refuses once (403), then works like /song
 //   https://fake.test/chapters  like /song, with chapters (any other: none)
+//   https://fake.test/small     like /song, but its video is only 480p
+// A video's picture is as tall as -f asks (height<=N), at most 1080p.
 // A search (ytsearchN:words or scsearchN:words, with --flat-playlist)
 // prints one JSON line per result, honouring --playlist-items a:b:
 //   nothing   no results
@@ -101,6 +103,9 @@ fs.writeFileSync(path.join(__dirname, "output", "fake-yt-dlp-args.json"), JSON.s
   for (const part of parts) {
     console.log("[tb-title] fakeId123 Test Song: “Quotes” / Slashes");
     console.log(`[tb-chapters] ${url.pathname === "/chapters" ? JSON.stringify(CHAPTERS) : "NA"}`);
+    const asked = Number(/height<=(\d+)/.exec(option("-f"))?.[1] ?? 1080);
+    const best = url.pathname === "/small" ? 480 : 1080;
+    console.log(`[tb-height] ${part.ext === "webm" ? Math.min(asked, best) : "NA"}`);
     const source = path.join(fixtures, part.file);
     const total = fs.statSync(source).size;
     const target = option("-o").replace("%(format_id)s", part.id).replace("%(ext)s", part.ext);

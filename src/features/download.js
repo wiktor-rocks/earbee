@@ -29,8 +29,9 @@ import { confirmUnsaved, loadMedia } from "./project/index.js";
  *
  * `url` serves the saved file to the page in pieces (electron/media-files.js).
  * `chapters`: the ones the uploader gave the video, in seconds ([] if none).
+ * `height`: the video's picture as downloaded (null for audio, or unknown).
  * @typedef {{ ok: true, name: string, path: string, url: string,
- *   chapters: { start: number, end: number, title: string }[] }
+ *   chapters: { start: number, end: number, title: string }[], height?: number | null }
  *   | { ok: false, canceled: boolean, error: string }} DownloadResult
  *
  * @typedef {import("../search/sources.js").SearchResult} SearchResult
@@ -96,7 +97,14 @@ async function downloadLink(url, kind, maxHeight) {
       chapters: withChapters ? (result.chapters ?? []) : [],
     });
     showNotice(notices.join(" "));
-    notify(`Downloaded “${result.name}”`, result.path);
+    // A video with less than the quality chosen says so: that's all it has.
+    const lower = kind === "video" && result.height && result.height < maxHeight;
+    notify(
+      lower
+        ? `Downloaded “${result.name}” at ${result.height}p, the best this video has`
+        : `Downloaded “${result.name}”`,
+      result.path,
+    );
   });
 }
 

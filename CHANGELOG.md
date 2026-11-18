@@ -43,6 +43,17 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-18: A video downloaded below the chosen quality says so
+
+- **What:** when a downloaded video's picture is less tall than the quality chosen, its notification says what it got: "Downloaded “…” at 480p, the best this video has". Otherwise it's as before.
+- **Why:** the owner: someone might be confused about why their video is lower quality than the one they chose. Asked whether yt-dlp can tell a video's best quality: not from a search (its results don't carry formats), only with one more request per video, 1–3 s each. The owner chose to say it once the video is downloaded, which costs no extra requests, over saying it in each result card.
+- **How:**
+  - yt-dlp is also asked to print `before_dl:[tb-height] %(height)s` for each part; the sound part prints "NA". `fetchParts` keeps the tallest, and it goes back as `height` in the download's result.
+  - `downloadLink` compares it with the quality chosen for that download.
+  - The fake yt-dlp prints the height too: as tall as `-f` asks, at most 1080p, or 480p for `https://fake.test/small`.
+- **Where:** `electron/downloader.js` (`fetchParts`, `download`, the `download:start` handler), `src/features/download.js` (`downloadLink`, the `DownloadResult` type), `tests/fake-yt-dlp.cjs`, `tests/e2e/09-downloads.cjs`.
+- **Verified by:** `npm run check`; `TB_TOPICS=03,09,13 npm test` (451 unit, 176 e2e, 33 smoke, all passing). New checks: `/small` as video at 1080p says "at 480p, the best this video has"; `/song` at 1080p says only "Downloaded …". Not checked: the real yt-dlp's `%(height)s` for each part of a real YouTube video. It's yt-dlp's documented field for a format's height, but no real download was run.
+
 ## 2026-11-18: Searching shows it's busy: a turning ring, and Show more says "Loading more…"
 
 - **What:** in From YouTube, "Searching YouTube…" (and the downloader's setup line before a first search) has a small turning ring before it. Show more stays where it is while the next page comes, turns into "Loading more…" with the same ring, and can't be clicked again. If that page fails, the button says "Couldn't load more. Try again", with the reason as its tooltip, and a click tries again. With reduced motion, the ring stands still.

@@ -420,6 +420,7 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
     let title = "";
     let id = "";
     let chapters = null; // from the first part (a video's sound part says it again)
+    let height = null; // the picture's, as downloaded (null for audio, or unknown)
     const files = [];
     let movedOn = false; // stopped at the start of a second video
     onProgress({ stage: "download", part: 1, parts, fraction: 0 });
@@ -442,6 +443,8 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
         "before_dl:[tb-title] %(id)s %(title)s",
         "--print",
         "before_dl:[tb-chapters] %(chapters)j",
+        "--print",
+        "before_dl:[tb-height] %(height)s",
         "--print",
         "after_move:[tb-file] %(filepath)s",
         "--progress-template",
@@ -467,6 +470,10 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
           onProgress({ stage: "download", part, parts, fraction: 0, title });
         } else if (tag === "[tb-chapters]") {
           chapters ??= parseChapters(rest.join(" "));
+        } else if (tag === "[tb-height]") {
+          // "NA" for the sound part.
+          const value = Number(rest[0]);
+          if (Number.isInteger(value) && value > 0) height = Math.max(height ?? 0, value);
         } else if (tag === "[tb-progress]") {
           const [done, total, estimate, eta] = rest.map(Number);
           const size = total || estimate;
@@ -483,7 +490,7 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
       },
     );
     const ok = code === 0 || (movedOn && files.length === parts);
-    return { ok, stderr, files, title, id, chapters: chapters ?? [] };
+    return { ok, stderr, files, title, id, chapters: chapters ?? [], height };
   }
 
   /**
@@ -521,12 +528,12 @@ function createDownloader({ binDir, saveDir, prefs, ytDlp, jsRuntime = process.e
         fs.rmSync(work, { recursive: true, force: true });
         fs.mkdirSync(work);
       }
-      const { ok, stderr, files, title, id, chapters } = result;
+      const { ok, stderr, files, title, id, chapters, height } = result;
       if (!ok) throw new DownloadError(explainFailure(stderr));
       if (!files.length) throw new DownloadError("The download produced no file.");
 
       onProgress({ stage: "join" });
-      return { file: await join(files, title, id, kind === "video", folder ?? saveDir), chapters };
+      return { file: await join(files, title, id, kind === "video", folder ?? saveDir), chapters, height };
     } finally {
       current = null;
       fs.rmSync(work, { recursive: true, force: true });
@@ -653,8 +660,8 @@ function handleDownloads(ipcMain, { share, openExternal, ...options }) {
       if (!event.sender.isDestroyed()) event.sender.send("download:progress", progress);
     };
     try {
-      const { file, chapters } = await downloader.download(url, kind, send, { maxHeight });
-      return { ok: true, name: path.basename(file), path: file, url: share(file), chapters };
+      const { file, chapters, height } = await downloader.download(url, kind, send, { maxHeight });
+      return { ok: true, name: path.basename(file), path: file, url: share(file), chapters, height };
     } catch (error) {
       if (!(error instanceof DownloadError)) console.error("Download failed:", error);
       return {

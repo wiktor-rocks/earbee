@@ -413,8 +413,25 @@ module.exports = async function (h) {
     await waitIdle();
     u = await ui();
     check("a one-off 403 is retried and succeeds", !u.error && u.file.endsWith(".m4a"), JSON.stringify(u));
+    // A video with less than the quality chosen (1080p) says what it got.
+    await h.clearToasts();
+    await download("https://fake.test/small", "video");
+    await waitIdle();
+    check(
+      "a video below the chosen quality says so when downloaded",
+      (await toasts()).some(
+        (t) => t.text === "Downloaded “Test Song “Quotes” Slashes [fakeId123].mp4” at 480p, the best this video has",
+      ),
+      JSON.stringify(await toasts()),
+    );
+    await h.clearToasts();
     await download("https://fake.test/song", "video"); // back to the video, as the checks below expect
     await waitIdle();
+    check(
+      "…one with the quality chosen doesn't",
+      (await toasts()).some((t) => t.text === "Downloaded “Test Song “Quotes” Slashes [fakeId123].mp4”"),
+      JSON.stringify(await toasts()),
+    );
 
     // Cancel: back to the player, nothing saved or left behind.
     await download("https://fake.test/slow", "audio");
