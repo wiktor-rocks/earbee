@@ -4,7 +4,7 @@ EarBee is an Electron app for transcribing music. You open a song or a video, sl
 
 **Files**
 
-- `electron/`: the Electron main process: `main.js` (window, security), `windows.js` (window state, the splash, the video window), `prefs-store.js` (settings and the colour theme), `downloader.js` (yt-dlp), `media-files.js` (serving downloads to the page), `project-files.js` (.ebee files), `system.js` and `preload.js` (the page's bridge to them).
+- `electron/`: the Electron main process: `main.js` (window, security), `windows.js` (window state, the splash, the video window), `prefs-store.js` (settings and the colour theme), `downloader.js` (yt-dlp), `media-files.js` (serving downloads to the page), `project-files.js` (.ebee files), `session-store.js` (the last session), `system.js` and `preload.js` (the page's bridge to them).
 - `src/`: the page, as ES modules in layers. `core/`, `themes/`, `search/` → `prefs/`, `marks/`, `project/` → `config.js` → `audio/`, `video/`, `waveform.js`, `timeline.js` → `context.js` → `ui/` → `features/` → `app.js`.
 - `index.html` and `style.css`: the page and its look.
 - `assets/`: the logo and icons; `scripts/make-images.py` makes them from the source image.
@@ -40,6 +40,30 @@ The architecture overview, the file map and a list of where to make common chang
 | §14 Startup                              | `src/app.js` (`start`)                                                                   |
 | `main.js`, `downloader.js`, `preload.js` | `electron/`                                                                              |
 | `tests/run.cjs` (one sequence)           | `tests/run.cjs` + `tests/e2e/`                                                           |
+
+---
+
+## 2026-11-20: Pick up where you left off: the last session, kept as you go
+
+- **What:** EarBee keeps what's open as you go: the song or video, the marks, the loop, the sound settings, the beats, the place, the zoom and the stems. On the next start, after quitting or a crash, the welcome screen offers it above the recent files, under "Pick up where you left off". The row shows the name, when it was kept ("today 14:32") and "unsaved changes" if there were any. One click reopens it as it was; × forgets it.
+  - **A song never saved as a project** comes back with its marks and settings, and with the • (still unsaved).
+  - **A project's file isn't written:** its unsaved changes are kept beside it. Reopening opens the project and puts them back over it, with the •; Save writes them, Don't save leaves the project as it was. If the project was saved since (in another EarBee), it opens as saved and says so.
+  - **Stems** are copied once, when they're ready and nothing is playing, and come back without separating again. Stems the project already has aren't copied.
+  - A song or project that has gone says so, and the offer stays. Opening another file replaces the last session.
+  - Closing still asks Save / Don't save, as before (the owner's choice): this is a safety net, not a replacement for saving.
+- **Why:** NEXT-RELEASE-0.4.0's "Autosave, and reopen the last session". The owner chose an offer on the welcome screen (not reopening by itself), a separate copy rather than writing into the project file, keeping the stems (copied once), and keeping the close dialog.
+- **How:**
+  - **The page** (`features/project/last-session.js`) captures every section (`sections.js`), as a project would, without the stems' bytes: the stems section names them `"project"` (the open project's own) or `"file"` (the copy). It writes 2 s after a change (`CONFIG.session.autosaveDelay`, checked after the same inputs, clicks and keys as unsaved changes, plus marks, beats, pause and jumps), every 30 s while playing (`playingInterval`), and synchronously on `pagehide`. It only writes when the JSON changed. A kill leaves the write before it.
+  - **The stems' copy:** once the stems are `"ready"` (the new `stemsStage()` in `features/stems/index.js`) and playback is paused, `whenPrepared()`, then one stem per idle callback (about 6 MB each), so no message is big and playback comes first. Their `revision` (which changes only when new stems are separated) says whether the copy is current; while stems are loading, the section as last kept stands in.
+  - **The main process** (`electron/session-store.js`) keeps `last-session/session.json` (written to a temporary file, then renamed) and `stems-<uuid>.bin`. Its writes are asynchronous, one after the other, because the main process also serves the song or video to the page: written synchronously, a write sometimes took it 40–100 ms. Only the final write, as the window goes, is synchronous, and an earlier write still going never lands over it. The page never names a path: the media is looked up from its URL (`mediaFiles.lookup`), and the project is the one that URL belongs to. A saved project now owns its media's URL (`mediaFiles.belongsTo`, called by `project-files.js` after a save), so a session saved with Save As names the project. Reopening a project goes through `projectFiles.open` (its media search and locate dialog), and only the sections that differ from the project's are restored over it, so identical beats or stems don't count as a change or load twice. An older stems copy is deleted once the session no longer names it.
+  - **The offer** is `#welcomeSession`, in the recent files' row style; `formatWhen` (`core/format.js`) says when. `bindProject` now resolves once the offer is in place, so the window shows with it.
+- **Where:** new: `electron/session-store.js`, `src/features/project/last-session.js`, `tests/e2e/23-last-session.cjs`, `tests/unit/session-store.test.mjs`. Changed: `electron/main.js`, `electron/preload.js` (`window.earbee.session`), `electron/media-files.js` (`belongsTo`), `electron/project-files.js`; `src/features/project/index.js` (`openLastSession`, `restoreChanges`), `src/features/stems/index.js` (`stemsStage`), `src/config.js` (`session`), `src/core/format.js` (`formatWhen`), `src/ui/dom.js`, `src/app.js`, `index.html`, `style.css` ("Welcome screen"); `tests/e2e/harness.cjs`, `tests/run.cjs`, `tests/smoke.cjs`; `README.md`, `AGENTS.md`, `docs/glossary.md`.
+- **Verified by:** `npm run check`; the full `npm test` (467 unit, 808 e2e, 39 smoke, all passing).
+  - **Unit** (`session-store.test.mjs`, 16): writing and reading, damaged or foreign files, a song that has gone, a project's session and a project saved since, the stems a stem at a time and served back, an older copy deleted, the final write overtaking an earlier one, `formatWhen`.
+  - **Topic 23** (30): a song's session after a reload, as it was (speed, pitch, loop, marks, place) with the •; a project with a change not saved (its file byte for byte the same), reopened with the change and the •, then saved; a project saved since; a song gone; ×; a new file replacing it; stems copied once, not again for a mix change, and back without separating. While playing, a write takes the page 0.2–0.8 ms (9.4 ms at most with the main process's answer), with no long task.
+  - **The smoke test**, through the real `main.js`: a mark added, the app killed (SIGKILL), and on the next start the offer, and Reopen bringing the mark back.
+  - Topic 22's selectors now look only in the recent files (the offer has rows of the same kind).
+  - The screenshot `last-session-offer.png` was looked at. Not checked: a real window by hand (`npm start`), Windows and the Mac, two EarBee windows at once (the last to write wins, by design).
 
 ---
 

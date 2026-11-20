@@ -161,6 +161,25 @@ contextBridge.exposeInMainWorld("earbee", {
     },
   },
 
+  // The last session (src/features/project/last-session.js,
+  // electron/session-store.js): kept as you go, offered on the next start.
+  session: {
+    // { mediaUrl, sections, unsaved } → whether it was kept
+    write: (request) => ipcRenderer.invoke("session:write", request),
+    // The same, as the page goes: done before it returns.
+    writeFinal: (request) => ipcRenderer.sendSync("session:write-final", request),
+    // { name, savedAt, project, unsaved }, or null
+    summary: () => ipcRenderer.invoke("session:summary"),
+    // { ok: true, kind: "media", media, sections }, or what project.open
+    // answers plus { session, changedSince }; or { ok: false, canceled?, error? }
+    open: () => ipcRenderer.invoke("session:open"),
+    forget: () => ipcRenderer.invoke("session:forget"),
+    // The stems' bytes, a stem at a time: begin → { ok, token }, add each, end.
+    beginStems: () => ipcRenderer.invoke("session:stems-begin"),
+    addStem: (token, id, bytes) => ipcRenderer.invoke("session:stems-add", String(token), String(id), bytes),
+    endStems: (token) => ipcRenderer.invoke("session:stems-end", String(token)),
+  },
+
   // See src/ui/prefs.js. set, reset and chooseFolder resolve to
   // { ok: true, values } (the section's values after it) or { ok: false, error }.
   prefs: {

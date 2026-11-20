@@ -327,4 +327,9 @@ export const CONFIG = {
   // many are kept per list (projects, files), all shown on the welcome
   // screen, and how many of each the File menu shows.
   recent: { max: 8, inMenu: 5 },
+
+  // The last session (src/features/project/last-session.js): kept this
+  // long after a change (ms; several in a row, once), and while playing,
+  // this often for the place (ms).
+  session: { autosaveDelay: 2000, playingInterval: 30000 },
 };

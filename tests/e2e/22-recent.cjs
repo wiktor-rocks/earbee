@@ -286,7 +286,7 @@ module.exports = async function (h) {
   await open(doomedToo);
   await welcomeAgain();
   fs.rmSync(doomedToo);
-  await js(`[...document.querySelectorAll(".recent-open")]
+  await js(`[...document.querySelectorAll("#welcomeRecent .recent-open")]
     .find((row) => row.querySelector(".recent-name").textContent === "doomed-too.wav").focus()`);
   await pickOnWelcome("doomed-too.wav");
   check("on the welcome screen too", (await js(`__message().text`)).startsWith("“doomed-too.wav” isn't in "));
@@ -307,7 +307,7 @@ module.exports = async function (h) {
     wc.sendInputEvent({ type: "char", keyCode: "\r" });
     wc.sendInputEvent({ type: "keyUp", keyCode: "Return" });
   };
-  await js(`document.querySelector(".recent-remove").focus()`);
+  await js(`document.querySelector("#welcomeRecent .recent-remove").focus()`);
   pressEnter();
   await sleep(200);
   check(
@@ -317,16 +317,16 @@ module.exports = async function (h) {
   );
   check(
     "…and moves on to the next one's button",
-    await js(`document.activeElement === document.querySelectorAll(".recent-remove")[0]`),
+    await js(`document.activeElement === document.querySelectorAll("#welcomeRecent .recent-remove")[0]`),
   );
   check("…and the file itself is still there", fs.existsSync(gamma));
-  await js(`[...document.querySelectorAll(".recent-remove")].at(-1).focus()`);
+  await js(`[...document.querySelectorAll("#welcomeRecent .recent-remove")].at(-1).focus()`);
   pressEnter();
   await sleep(200);
   check(
     "removing the last row moves up one",
     (await onWelcome())["Recent files"].join() === "beta.wav" &&
-      (await js(`document.activeElement === document.querySelector(".recent-remove")`)),
+      (await js(`document.activeElement === document.querySelector("#welcomeRecent .recent-remove")`)),
     JSON.stringify(await onWelcome()),
   );
   await js(`welcomeRecentClear.click()`);
@@ -353,7 +353,7 @@ module.exports = async function (h) {
       return box.top >= -1 && box.bottom <= innerHeight + 1;
     };
     return {
-      seen: inView([...document.querySelectorAll(".recent-open")].at(-1)),
+      seen: inView([...document.querySelectorAll("#welcomeRecent .recent-open")].at(-1)),
       clear: inView(welcomeRecentClear),
       sideways: document.documentElement.scrollWidth > innerWidth,
       cut: [...document.querySelectorAll(".recent-name")].some((name) => name.scrollWidth > name.clientWidth),

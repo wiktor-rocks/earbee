@@ -29,6 +29,8 @@
 //              with unsaved changes asks first (guardClose).
 //   Recent     The projects and files opened lately (recent-files.js,
 //              recent-files.json), listed and opened through the preload.
+//   Last       The last session, kept as you go (session-store.js,
+//   session    last-session/), offered back on the next start.
 //   Window    Remembers its size, position and maximised state between
 //              runs (windows.js). The title follows the page's
 //              <title>, which names the open file. While the page loads,
@@ -58,6 +60,7 @@ const { handleRendererCrash, handleSystem } = require("./system");
 const { createPrefsStore, createThemeView, handlePrefs } = require("./prefs-store");
 const { createProjectFiles, guardClose, handleProjects } = require("./project-files");
 const { createRecentFiles, handleRecentFiles } = require("./recent-files");
+const { createSessionStore, handleSessions } = require("./session-store");
 const { handleSplash, loadWindowState, rememberWindowState, showAfterSplash } = require("./windows");
 const { allowVideoWindow, handleVideoWindows } = require("./windows"); // Video window (src/features/video-window/)
 const { handleStems } = require("./stems"); // Stems (src/features/stems/)
@@ -192,6 +195,7 @@ const projectDialogs = {
 let stems = null; // Stems (src/features/stems/): what handleStems gives, once ready
 /** @type {ReturnType<typeof handleUpdates> | null} */
 let updates = null; // Updates (src/features/updates.js), once ready
+let sessions = null; // The last session (session-store.js), once ready
 
 // The app's own windows (not the video window, which stays black).
 const mainWindows = new Set();
@@ -222,7 +226,11 @@ function createWindow() {
   // menu is the system's, at the top of the screen, and stays.)
   win.removeMenu();
   mainWindows.add(win);
-  win.on("closed", () => mainWindows.delete(win));
+  const contentsId = win.webContents.id;
+  win.on("closed", () => {
+    mainWindows.delete(win);
+    sessions?.closed(contentsId);
+  });
 
   // The page never navigates or opens windows; a dropped file or a stray
   // link must not replace the app.
@@ -288,6 +296,8 @@ app.whenReady().then(() => {
     projectFiles,
     pages: () => [...mainWindows].map((win) => win.webContents),
   });
+  sessions = createSessionStore(path.join(userData, "last-session"), { mediaFiles, projectFiles });
+  handleSessions(ipcMain, sessions);
   handleDownloads(ipcMain, {
     binDir: path.join(userData, "bin"),
     saveDir: downloadsFolder,

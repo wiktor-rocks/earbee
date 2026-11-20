@@ -19,6 +19,8 @@ export const dom = {
   welcomeOpen: $("welcomeOpen"),
   welcomeDownload: $("welcomeDownload"),
   welcomeProjectFormat: $("welcomeProjectFormat"),
+  welcomeSession: $("welcomeSession"),
+  welcomeSessionList: $("welcomeSessionList"),
   welcomeRecent: $("welcomeRecent"),
   welcomeRecentLists: $("welcomeRecentLists"),
   welcomeRecentClear: $("welcomeRecentClear"),

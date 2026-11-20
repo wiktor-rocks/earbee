@@ -140,6 +140,15 @@ function createMediaFiles() {
       if (token && shared.has(token)) shared.set(token, { ...shared.get(token), path: file, name, offset, size });
     },
     /**
+     * The URL's song or video is `project`'s from now on (it was saved as one).
+     * @param {string} url
+     * @param {string} project
+     */
+    belongsTo(url, project) {
+      const token = tokenOf(url);
+      if (token && shared.has(token)) shared.set(token, { ...shared.get(token), project });
+    },
+    /**
      * What a URL from share() serves, or null if it isn't one.
      * @param {string} url
      * @returns {{ path: string, name: string, offset: number, size: number | null, project: string | null } | null}

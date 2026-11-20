@@ -1013,6 +1013,14 @@ export function resetStems(next, nextTrack = null) {
 export const stemsFound = () => found;
 
 /**
+ * What's going on with the stems: "idle", "download", "decode",
+ * "separate", "rest", "load" (from a project or the last session) or
+ * "ready". The last session (features/project/last-session.js) copies them
+ * once they're ready, and keeps the ones loading as they were.
+ */
+export const stemsStage = () => stage;
+
+/**
  * What a project saves (project.js): the stems' Opus bytes and the spans
  * they cover, the mix, and `revision`, which changes whenever the stems
  * do; or a project's stems that didn't fit in memory, as they came. Null

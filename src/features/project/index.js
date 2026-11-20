@@ -11,6 +11,10 @@
 // section needs no wiring of its own. The title then ends in •, and
 // opening something else or closing the window asks first.
 //
+// Every session is also kept as you go, as the last session
+// (last-session.js), which the welcome screen offers back on the next
+// start; reopening it is openLastSession, below.
+//
 // Outside Electron (no bridge) media files still open; there is no saving.
 import { hasAudio, marks, player } from "../../context.js";
 import { AppError } from "../../core/errors.js";
@@ -21,6 +25,7 @@ import { notify } from "../../ui/toast.js";
 import { beatEvents } from "../beats.js";
 import { importChapters } from "../marks.js";
 import { loadMediaFile, withLoading } from "../open-file.js";
+import { bindLastSession, bridge as lastSession, projectSaved, sessionStarted } from "./last-session.js";
 import { SECTIONS } from "./sections.js";
 
 /**
@@ -162,6 +167,7 @@ async function startMediaSession(media) {
   // It opened, and has a place on this computer (a file dropped from
   // another program may not): it goes on the recent list.
   if (session.mediaUrl) recent?.note(session.mediaUrl);
+  sessionStarted();
 }
 
 /**
@@ -200,7 +206,63 @@ async function loadProject(opened, signal) {
     notices.push(`Found “${opened.media.name}”; save the project to remember where it is now.`);
   }
   recent?.note(opened.media.url);
+  sessionStarted({ stems: opened.sections.stems, stemsFrom: "project" });
   return notices;
+}
+
+/**
+ * The last session's sections over the project just loaded: only those
+ * that differ from the project's own (bringing back the same beats or
+ * stems again would count as a change, or load them twice).
+ * @param {Record<string, any>} projectSections
+ * @param {Record<string, any>} sessionSections
+ */
+function restoreChanges(projectSections, sessionSections) {
+  const changed = Object.fromEntries(
+    Object.entries(sessionSections).filter(
+      ([id, data]) => JSON.stringify(data) !== JSON.stringify(projectSections[id]),
+    ),
+  );
+  return restoreProject(changed, player.transport.duration);
+}
+
+/**
+ * Reopens the last session (the welcome screen's offer): the song or video
+ * as it was, or the project with its unsaved changes over it (the • shows
+ * if there are any). If the project was saved since, as saved.
+ */
+export async function openLastSession() {
+  if (!lastSession || !(await confirmUnsaved())) return;
+  const opened = await lastSession.open();
+  if (!opened.ok) {
+    if (opened.error) throw new AppError(opened.error);
+    return;
+  }
+  if (opened.kind === "media") {
+    return withLoading(opened.media.name, async (signal) => {
+      const notices = await loadMediaFile(opened.media, signal);
+      await startMediaSession(opened.media);
+      notices.push(...restoreProject(opened.sections, player.transport.duration));
+      checkDirty();
+      sessionStarted({ stems: opened.sections.stems, stemsFrom: opened.stemsFrom });
+      showNotice(notices.join(" "));
+      notify(`Reopened “${opened.media.name}”`);
+    });
+  }
+  const project =
+    /** @type {OpenedProject & { session: Record<string, any>, changedSince: boolean, stemsFrom: any }} */ (opened);
+  return withLoading(project.name, async (signal) => {
+    const notices = await loadProject(project, signal);
+    if (project.changedSince) notices.push(`“${project.name}” was saved since, so it opened as saved.`);
+    else {
+      notices.push(...restoreChanges(project.sections, project.session));
+      const stems = project.session.stems ?? project.sections.stems;
+      sessionStarted({ stems, stemsFrom: project.stemsFrom ?? (project.sections.stems?.stems ? "project" : null) });
+    }
+    checkDirty();
+    showNotice(notices.join(" "));
+    notify(`Reopened “${project.name}”`);
+  });
 }
 
 /**
@@ -282,6 +344,7 @@ async function writeProject(file, embed) {
     linkable: result.linkable,
   });
   markSaved();
+  projectSaved();
   notify("Project saved", result.path);
   return true;
 }
@@ -325,8 +388,12 @@ export function saveProject() {
 
 export const isSaveDialogOpen = () => dom.saveDialog.open;
 
+/**
+ * Binds saving and opening; resolves once the welcome screen's offer of the
+ * last session is in place.
+ */
 export function bindProject() {
-  if (!bridge) return; // not in Electron: no saving
+  if (!bridge) return Promise.resolve(); // not in Electron: no saving
   dom.saveButton.hidden = false;
   dom.saveAsButton.hidden = false;
   dom.welcomeProjectFormat.hidden = false;
@@ -350,4 +417,9 @@ export function bindProject() {
       if (await saveProject()) bridge.close();
     }),
   );
+
+  return bindLastSession({
+    session: () => ({ mediaUrl: session.mediaUrl, unsaved: session.dirty }),
+    open: openLastSession,
+  });
 }

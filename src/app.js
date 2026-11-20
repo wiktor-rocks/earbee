@@ -49,7 +49,10 @@
  *              per part (features/project/sections.js); the file's frame
  *              in src/project; reading and writing in the main process
  *              (electron/project-files.js). Unsaved changes show a • in the
- *              title and are asked about before they'd be lost.
+ *              title and are asked about before they'd be lost. The
+ *              session is also kept as you go, as the last session
+ *              (features/project/last-session.js, electron/session-store.js),
+ *              which the welcome screen offers back on the next start.
  *   stems      The song split into its instruments on demand, by the stem
  *              model in the main process (electron/stems/), then mixed
  *              into Signalsmith's input with a volume, solo and mute each
@@ -137,7 +140,8 @@
  *                  (the File menu), recent.js (the recent files, on the
  *                  welcome screen and in that menu), layout.js (the shortcuts dialog, the
  *                  sidebar toggle), project/ (saving and opening project
- *                  files: index.js; what they save: sections.js),
+ *                  files: index.js; what they save: sections.js; the last
+ *                  session, kept as you go and offered back: last-session.js),
  *                  video-window/ (the video in a window of its own, with
  *                  its own video-window.css; self-contained, its wiring
  *                  marked "Video window ("),
@@ -728,7 +732,7 @@ function start() {
   bindLoadCancel();
   bindFileInput(openFile);
   bindFileDrop(openFile);
-  bindProject();
+  const lastSessionShown = bindProject(); // and the last session's offer
   bindDownloads();
   bindFileMenu();
   const recentShown = bindRecent();
@@ -764,7 +768,7 @@ function start() {
   setTimeout(() => dom.welcome.classList.add("settled"), 1000);
   // The window stays hidden behind a splash until now (electron/windows.js),
   // and until the recent files are in place, so the screen doesn't jump.
-  recentShown.finally(() => /** @type {any} */ (window).earbee?.ready?.());
+  Promise.allSettled([recentShown, lastSessionShown]).finally(() => /** @type {any} */ (window).earbee?.ready?.());
 }
 
 start();

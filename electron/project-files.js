@@ -237,6 +237,9 @@ function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
       // inside the new file, from there (the old one may have been replaced).
       // Then it is only inside a project, and a later save can't link to it.
       if (embed) mediaFiles.update(mediaUrl, { path: target, offset: headerBytes.length + 1, size, name: source.name });
+      // Either way, it's this project's song or video now (the last session,
+      // session-store.js, comes back to the project).
+      mediaFiles.belongsTo(mediaUrl, target);
       return { ok: true, path: target, name: path.basename(target), embedded: embed, linkable: linkable && !embed };
     },
   };

@@ -29,7 +29,7 @@ On a Mac, EarBee tells you when there's a new version. Settings › General › 
 - **Find the beats** (B): a beat-tracking model marks every beat and the first of each bar on the waveform, shows the tempo, and lets ← / → step by beat or by bar. A click on the tempo opens the beats menu: a click on each beat (also Shift+B) to check them by ear, and fixes for the song: a steady grid, half or double time, no strong first beat, bars starting a beat earlier or later, and lines between the beats (halves, triplets, quarters). Projects keep the beats and the edits.
 - **Split it into stems:** vocals, drums, bass, guitar, piano and the rest, on your own computer, in about as long as the song plays. Solo the guitar or mute it, at any speed, and a project keeps them. The model (Demucs, by Meta) is a separate download, and its licence is likely non-commercial: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 - **Videos too,** in sync at any speed; in their own window if you like.
-- **Save your session** (marks, loop, speed and EQ) in a `.ebee` project file.
+- **Save your session** (marks, loop, speed and EQ) in a `.ebee` project file. And if you don't, or EarBee is closed or crashes before you do: the next start offers to pick up where you left off.
 - **Open from YouTube:** paste a link or search, and it opens once downloaded (only download what you have the rights to).
 - **EQ, volume up to 200 %, a balance between left and right** (for the old stereo recordings with an instrument on one side), **17 colour themes,** and long files (an hour or two) open in seconds.
 - **Works offline;** only downloading (from YouTube, and the stem model once) and checking for updates need the internet.
@@ -102,6 +102,7 @@ electron/          The main process (CommonJS, Node)
   downloader.js      downloading links, and searching by keywords, with yt-dlp
   media-files.js     serves downloaded files (or a slice of one) to the page by private URL
   project-files.js   reads and writes project files (.ebee); the close guard
+  session-store.js   keeps the last session as you go (last-session/), to offer it back
   system.js          available memory; recovering from a crashed page
   beat-model.js      runs the beat model for the page, in a utility process
                      (beat-model-process.js) on the native ONNX Runtime
@@ -139,7 +140,8 @@ src/               The page (ES modules, no build step), in layers:
                      beats, the beat click), marks.js, open-file.js,
                      download.js (and search), settings.js (and the theme
                      menu), file-menu.js, layout.js, big-video.js,
-                     project/ (index.js: save and open; sections.js: what is saved),
+                     project/ (index.js: save and open; sections.js: what is saved;
+                     last-session.js: the last session, kept as you go),
                      video-window/ (the video in its own window; self-contained),
                      stems/ (separating, the mixer, the stems in projects;
                      self-contained)

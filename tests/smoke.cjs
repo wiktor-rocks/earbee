@@ -290,6 +290,61 @@ const near = (a, b) => Math.abs(a - b) <= 40; // window decorations differ betwe
       );
       check("a click on it opens it", opened, await page.evaluate("document.title"));
     });
+
+    // The last session, through the real main.js: a mark added, then the
+    // app killed (no chance to save anything as it goes). On the next
+    // start, the welcome screen offers the session, and Reopen brings the
+    // mark back.
+    {
+      const app = startApp(profile);
+      try {
+        const page = await connect();
+        await waitFor(() => page.evaluate(`!!document.querySelector("#welcomeRecent .recent-open")`), 10000);
+        await page.evaluate(`document.querySelector("#welcomeRecent .recent-open").click()`);
+        await waitFor(async () => (await page.evaluate("document.title")) === "EarBee — recent song.wav", 10000);
+        await sleep(500);
+        await page.evaluate(
+          `window.dispatchEvent(new KeyboardEvent("keydown", { code: "KeyM", key: "m", bubbles: true }))`,
+        );
+        const marked = await waitFor(
+          () => page.evaluate(`document.querySelectorAll("#marksList .mark-row").length === 1`),
+          3000,
+        );
+        check("last session: a mark added", marked);
+        const keptFile = path.join(profile, "last-session", "session.json");
+        const kept = await waitFor(() => {
+          try {
+            return JSON.parse(fs.readFileSync(keptFile, "utf8")).sections.marks.marks.length === 1;
+          } catch {
+            return false;
+          }
+        }, 8000);
+        check("last session: kept as you go", kept);
+        page.close();
+      } finally {
+        app.child.kill("SIGKILL");
+        await Promise.race([app.exited, sleep(5000)]);
+      }
+    }
+    await session(profile, async (page) => {
+      const offered = await waitFor(() => page.evaluate(`welcomeSession.checkVisibility()`), 5000);
+      check(
+        "last session: after a kill, the next start offers it",
+        offered &&
+          (await page.evaluate(`welcomeSession.querySelector(".recent-name").textContent`)) === "recent song.wav",
+      );
+      await page.evaluate(`welcomeSession.querySelector(".recent-open").click()`);
+      const back = await waitFor(
+        () => page.evaluate(`document.querySelectorAll("#marksList .mark-row").length === 1`),
+        10000,
+      );
+      check("last session: Reopen brings the mark back", back);
+      // Nothing unsaved left, so closing doesn't ask (a native dialog here).
+      await page.evaluate(
+        `import("./src/context.js").then(({ marks, player }) => marks.reset(player.transport.duration))`,
+      );
+      await waitFor(async () => !(await page.evaluate("document.title")).endsWith(" •"), 3000);
+    });
   } catch (error) {
     check("smoke test ran", false, error.stack);
   } finally {

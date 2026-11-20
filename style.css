@@ -769,6 +769,16 @@ body.dragging .welcome-hint {
   color: var(--text);
 }
 
+/* The last session's offer (src/features/project/last-session.js), above
+   the recent files, in the same rows; the recent files then come closer. */
+.welcome-session {
+  text-align: left;
+}
+
+.welcome-session:not([hidden]) + .welcome-recent {
+  margin-top: 20px;
+}
+
 /* In a short window, a smaller bee leaves more room for the lists. */
 @media (max-height: 719px) {
   .welcome-content:has(.welcome-recent:not([hidden])) .welcome-logo {

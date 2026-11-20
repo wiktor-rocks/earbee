@@ -56,3 +56,23 @@ export function formatEta(seconds) {
   const total = Math.round(seconds);
   return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, "0")}`;
 }
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/**
+ * When something was kept, in local time, as short as is clear:
+ * "today 14:32", "yesterday 09:10", "18 Nov, 09:10", "18 Nov 2025, 09:10".
+ * @param {number} time ms since 1970
+ * @param {number} now ms since 1970
+ */
+export function formatWhen(time, now) {
+  const at = new Date(time);
+  const clock = `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`;
+  const day = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const today = new Date(now);
+  const days = Math.round((day(today) - day(at)) / 86400000);
+  if (days === 0) return `today ${clock}`;
+  if (days === 1) return `yesterday ${clock}`;
+  const year = at.getFullYear() === today.getFullYear() ? "" : ` ${at.getFullYear()}`;
+  return `${at.getDate()} ${MONTHS[at.getMonth()]}${year}, ${clock}`;
+}

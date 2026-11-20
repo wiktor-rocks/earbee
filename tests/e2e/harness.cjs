@@ -117,6 +117,12 @@ async function createHarness() {
     projectFiles,
     pages: () => BrowserWindow.getAllWindows().map((win) => win.webContents),
   });
+  // The last session as main.js keeps it, in a fresh folder each run.
+  const { createSessionStore, handleSessions } = require(path.join(PROJECT, "electron", "session-store.js"));
+  const lastSessionFolder = path.join(OUTPUT, "last-session");
+  fs.rmSync(lastSessionFolder, { recursive: true, force: true });
+  const sessions = createSessionStore(lastSessionFolder, { mediaFiles, projectFiles });
+  handleSessions(ipcMain, sessions);
   // As main.js does, except that a test can pretend the system has only
   // `memory.available` bytes left, or `memory.total` in all (null: the
   // real figure; `memory.available` undefined: unknown, as on macOS).
@@ -377,6 +383,8 @@ async function createHarness() {
     projectDialogs,
     recentFiles,
     recentFilesPath,
+    sessions, // the last session (electron/session-store.js)
+    lastSessionFolder,
     setStemDelay: (ms) => (stemDelay = ms), // Stems: each segment this much slower
     setStemStartFails: (yes) => (stemStartFails = yes), // Stems: the stem process can't start
     setStemModelGone: (gone) => showStemModel(!gone), // Stems: the model's file deleted, or back
