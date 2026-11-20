@@ -154,6 +154,24 @@ describe("main process", () => {
     assert.equal(mediaFiles.lookup(opened.media.url).project, target, "the song says which project it came with");
   });
 
+  test("a Save dialog left open holds up no other save", async () => {
+    const mediaUrl = mediaFiles.share(mediaFile);
+    let answer;
+    const before = dialogs.save;
+    dialogs.save = () => new Promise((resolve) => (answer = resolve)); // the user hasn't chosen yet
+    try {
+      const asking = projects.save(null, { file: null, mediaUrl, embed: false, duration: 2, sections });
+      const other = path.join(folder, "while-asking.ebee");
+      const saved = await projects.save(null, { file: other, mediaUrl, embed: false, duration: 2, sections });
+      assert.equal(saved.ok, true);
+      assert.ok(fs.existsSync(other));
+      answer(null);
+      assert.deepEqual(await asking, { ok: false, canceled: true });
+    } finally {
+      dialogs.save = before;
+    }
+  });
+
   test("saved with the media inside: served as a slice of the project, even after saving over it", async () => {
     const mediaUrl = mediaFiles.share(mediaFile);
     const target = path.join(folder, "inside.ebee");

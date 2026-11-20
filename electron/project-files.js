@@ -122,11 +122,8 @@ async function replaceFile(from, to) {
 function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
   let saving = /** @type {Promise<unknown>} */ (Promise.resolve()); // the save going, if any (save())
 
-  /**
-   * @param {any} sender
-   * @param {{ file: string | null, mediaUrl: string, embed: boolean, duration: number, sections: object }} request
-   */
-  async function saveNow(sender, { file, mediaUrl, embed, duration, sections }) {
+  // The media `mediaUrl` names, and whether a project can link to it.
+  function sourceOf(mediaUrl, embed) {
     const source = mediaFiles.lookup(mediaUrl);
     if (!source) throw new Error("The song or video being played isn't one the project can name.");
     const linkable = source.offset === 0 && source.size === null;
@@ -134,13 +131,15 @@ function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
       throw new project.ProjectFormatError(
         "This song or video is inside its project, so a new project must have it inside too.",
       );
-    let target = file;
-    if (!target) {
-      const folder = path.dirname(source.path);
-      const chosen = await dialogs.save(sender, path.join(folder, projectNameFor(source.name)));
-      if (!chosen) return { ok: false, canceled: true };
-      target = withExtension(chosen);
-    }
+    return { source, linkable };
+  }
+
+  /**
+   * @param {{ file: string, mediaUrl: string, embed: boolean, duration: number, sections: object }} request
+   */
+  async function saveNow({ file: target, mediaUrl, embed, duration, sections }) {
+    // Looked up now, in its turn: a save before it may have moved the media.
+    const { source, linkable } = sourceOf(mediaUrl, embed);
     if (path.resolve(target) === path.resolve(source.path) && linkable)
       throw new project.ProjectFormatError("A project can't be saved over its own song or video.");
 
@@ -247,12 +246,21 @@ function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
      * Writes a project, after any other save still going (one at a time,
      * whichever window asks: a save reads the media from where the one
      * before may have just moved it). `mediaUrl` names the media being
-     * played (from share()); `file` is where to write, or null to ask.
+     * played (from share()); `file` is where to write, or null to ask,
+     * which is done first, so a Save dialog left open holds up no other
+     * window's saves.
      * @param {any} sender
      * @param {{ file: string | null, mediaUrl: string, embed: boolean, duration: number, sections: object }} request
      */
-    save(sender, request) {
-      const turn = saving.then(() => saveNow(sender, request));
+    async save(sender, request) {
+      let file = request.file;
+      if (!file) {
+        const { source } = sourceOf(request.mediaUrl, request.embed);
+        const chosen = await dialogs.save(sender, path.join(path.dirname(source.path), projectNameFor(source.name)));
+        if (!chosen) return { ok: false, canceled: true };
+        file = withExtension(chosen);
+      }
+      const turn = saving.then(() => saveNow({ ...request, file }));
       saving = turn.catch(() => {});
       return turn;
     },

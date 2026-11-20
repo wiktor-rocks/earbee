@@ -15,6 +15,8 @@ module.exports = async function (h) {
   const { projectDialogs, setStemDelay, setSaveDelay, memory, FIXTURES, OUTPUT } = h;
 
   const folder = path.join(OUTPUT, "autosave");
+  // Writable again first, in case a run before stopped while it wasn't.
+  if (fs.existsSync(folder)) fs.chmodSync(folder, 0o755);
   fs.rmSync(folder, { recursive: true, force: true });
   fs.mkdirSync(folder, { recursive: true });
   const song = (name, fixture = "tone.wav") => {
@@ -41,6 +43,16 @@ module.exports = async function (h) {
   const marksIn = (file) => JSON.parse(fs.readFileSync(file, "utf8")).sections.marks.marks?.length ?? 0;
   // A wait longer than CONFIG.project.autosaveDelay, and the save.
   const waitOut = () => sleep(3000);
+  // `work` with the folder read-only (nothing can be saved there); writable
+  // again afterwards, whatever happens.
+  const readOnly = async (work) => {
+    fs.chmodSync(folder, 0o555);
+    try {
+      return await work();
+    } finally {
+      fs.chmodSync(folder, 0o755);
+    }
+  };
   const addMark = async (time) => {
     await click(time);
     key("M");
@@ -120,15 +132,15 @@ module.exports = async function (h) {
 
   /* ---------- A failure, shown once ---------- */
 
-  fs.chmodSync(folder, 0o555);
-  await addMark(5);
-  await waitOut();
-  const first = await js(`__message()?.text ?? ""`);
-  await js(`import("./src/ui/dom.js").then(({ clearMessage }) => clearMessage())`);
-  await addMark(6);
-  await waitOut();
-  const second = await js(`__message()?.text ?? ""`);
-  fs.chmodSync(folder, 0o755);
+  const { first, second } = await readOnly(async () => {
+    await addMark(5);
+    await waitOut();
+    const first = await js(`__message()?.text ?? ""`);
+    await js(`import("./src/ui/dom.js").then(({ clearMessage }) => clearMessage())`);
+    await addMark(6);
+    await waitOut();
+    return { first, second: await js(`__message()?.text ?? ""`) };
+  });
   check(
     "autosave: a save that fails says so once, not again for the next change",
     /Couldn't save the project/.test(first) && second === "" && (await unsaved()),
@@ -231,13 +243,14 @@ module.exports = async function (h) {
   await addMark(2);
   await clearToasts();
   projectDialogs.confirm = "cancel";
-  fs.chmodSync(folder, 0o555);
   const askedBefore = projectDialogs.asked.length;
-  await open(leaveFor);
-  const stuckTitle = await title();
-  projectDialogs.confirm = "discard";
-  await open(leaveFor);
-  fs.chmodSync(folder, 0o755);
+  const stuckTitle = await readOnly(async () => {
+    await open(leaveFor);
+    const stuckTitle = await title();
+    projectDialogs.confirm = "discard";
+    await open(leaveFor);
+    return stuckTitle;
+  });
   check(
     "autosave: a project that can't be saved asks Save / Don't save / Cancel before another file opens",
     projectDialogs.asked.slice(askedBefore).filter(([kind]) => kind === "confirm").length === 2 &&
@@ -246,6 +259,44 @@ module.exports = async function (h) {
     JSON.stringify({ asked: projectDialogs.asked.slice(askedBefore), stuckTitle, now: await title() }),
   );
   projectDialogs.confirm = "cancel";
+
+  /* ---------- A save still writing when something else opens ---------- */
+
+  // Autosave off: Ctrl+S on a project, then, while it's writing, another
+  // change and another file, with Don't save. The save ends after the
+  // song has opened, and leaves the song as it is: not that project.
+  await setAutosave(false);
+  const late = path.join(folder, "late.ebee");
+  await saveAs(late);
+  const lateSong = song("late-song.wav");
+  await addMark(2);
+  setSaveDelay(4000); // long enough for the song to open meanwhile
+  key("S", ["control"]);
+  await sleep(300);
+  await addMark(3);
+  projectDialogs.confirm = "discard";
+  await open(lateSong);
+  const openedFirst = (await title()).includes("late-song.wav") && fs.statSync(late).mtimeMs < Date.now() - 1000;
+  await sleep(4500); // the save has ended
+  setSaveDelay(0);
+  const lateTitle = await title();
+  projectDialogs.save = null; // Save As canceled, if it's asked
+  const askedAt = projectDialogs.asked.length;
+  key("S", ["control"]);
+  await sleep(500);
+  await js(`saveDialog.open && saveDialog.close("")`);
+  check(
+    "a save that ends after another file has opened leaves that file alone: Ctrl+S asks where to save the song",
+    openedFirst &&
+      lateTitle.includes("late-song.wav") &&
+      !lateTitle.includes("late.ebee") &&
+      (await js(`document.title`)).includes("late-song.wav") &&
+      marksIn(late) === 1 &&
+      projectDialogs.asked.length === askedAt,
+    JSON.stringify({ openedFirst, lateTitle, marks: marksIn(late), asked: projectDialogs.asked.slice(askedAt) }),
+  );
+  projectDialogs.confirm = "cancel";
+  await setAutosave(true);
 
   /* ---------- Stems ---------- */
 

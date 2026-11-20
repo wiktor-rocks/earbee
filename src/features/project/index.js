@@ -242,10 +242,15 @@ export async function confirmUnsaved() {
 
 /* ---------- Sessions ---------- */
 
+// Counts the sessions started: a save that ends after another file has
+// opened (Don't save, while it was still writing) leaves that one alone.
+let sessionNumber = 0;
+
 // A media file opened on its own: a new, untitled session. Its URL in the
 // main process is what a project will name it by (a download already has one).
 /** @param {import("../../core/media.js").Media} media */
 async function startMediaSession(media) {
+  sessionNumber++;
   Object.assign(session, { mediaName: media.name, path: null, name: null, embedded: false, linkable: true });
   session.mediaUrl = "url" in media ? media.url : null;
   if (!session.mediaUrl && bridge && media instanceof File) {
@@ -277,6 +282,7 @@ export async function loadMedia(media, signal, { chapters = [] } = {}) {
 
 /** @param {OpenedProject} opened @param {AbortSignal} signal */
 async function loadProject(opened, signal) {
+  sessionNumber++;
   const notices = await loadMediaFile(opened.media, signal);
   notices.push(...restoreProject(opened.sections, player.transport.duration));
   Object.assign(session, {
@@ -437,6 +443,7 @@ async function writeNow(where, { quiet = false }) {
   // made while it's being written stays unsaved.
   const sections = captureProject();
   const state = dirtyingState();
+  const mine = sessionNumber;
   const result = await bridge.save({
     file,
     mediaUrl: session.mediaUrl,
@@ -448,6 +455,7 @@ async function writeNow(where, { quiet = false }) {
     if (result.canceled) return false;
     throw new AppError(`Couldn't save the project: ${result.error}`);
   }
+  if (mine !== sessionNumber) return true; // saved; but something else is open now
   Object.assign(session, {
     path: result.path,
     name: result.name,
@@ -464,8 +472,15 @@ async function writeNow(where, { quiet = false }) {
 
 // The Save As dialog: link to the media, or put it inside; then the
 // native Save dialog. Resolves true once it's saved.
-export function saveProjectAs() {
-  if (!bridge || !hasAudio()) return Promise.resolve(false);
+export const saveProjectAs = () => askSaveAs().then((outcome) => outcome === "saved");
+
+/**
+ * Save As, saying how it ended: "saved", "canceled" (either dialog), or
+ * "failed" (shown).
+ * @returns {Promise<"saved" | "canceled" | "failed">}
+ */
+function askSaveAs() {
+  if (!bridge || !hasAudio()) return Promise.resolve("canceled");
   const { saveModeLink: link, saveModeEmbed: inside } = dom;
   link.disabled = !session.linkable;
   (session.embedded || !session.linkable ? inside : link).checked = true;
@@ -477,11 +492,14 @@ export function saveProjectAs() {
     dom.saveDialog.addEventListener(
       "close",
       () => {
-        if (dom.saveDialog.returnValue !== "save") return resolve(false);
-        writeProject({ file: null, embed: inside.checked }).then(resolve, (error) => {
-          reportError(error);
-          resolve(false);
-        });
+        if (dom.saveDialog.returnValue !== "save") return resolve("canceled");
+        writeProject({ file: null, embed: inside.checked }).then(
+          (saved) => resolve(saved ? "saved" : "canceled"),
+          (error) => {
+            reportError(error);
+            resolve("failed");
+          },
+        );
       },
       { once: true },
     );
@@ -529,17 +547,22 @@ export function bindProject() {
 
   // The window is closing and the user chose Save.
   // Closing with unsaved changes, and Save chosen (or the project saves
-  // itself): saved, then closed. If the project couldn't be written, the
-  // main process asks Save / Don't save / Cancel, so it can still be left.
+  // itself): saved, then closed. If it couldn't be written, the main
+  // process asks Save / Don't save / Cancel, so it can still be left.
   // (Save As canceled: the window just stays open.)
   bridge.onSaveThenClose(
     guarded(async () => {
       if (!session.path) {
-        if (await saveProjectAs()) bridge.close();
+        const outcome = await askSaveAs();
+        if (outcome === "saved") bridge.close();
+        else if (outcome === "failed") bridge.saveFailed();
         return;
       }
       try {
         if (await writeProject(OPEN_PROJECT)) bridge.close();
+        else if (!hasAudio())
+          bridge.close(); // nothing to save
+        else bridge.saveFailed();
       } catch (error) {
         reportError(error);
         bridge.saveFailed();

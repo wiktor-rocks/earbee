@@ -104,15 +104,15 @@ function adoptOldSettings() {
     console.warn("Couldn't copy the settings from ScriBee:", error);
   }
 }
-adoptOldSettings();
-
 // One EarBee at a time (packaged): starting it again opens another window
 // in the one running, so two never clash over the same settings folder
 // (the last session's files, the recent files, the settings). Not for
 // `npm start`, which is used beside the installed EarBee; and per settings
-// folder, so the tests (each with their own) are unaffected.
+// folder, so the tests (each with their own) are unaffected. Checked
+// before anything touches that folder.
 const anotherIsRunning = app.isPackaged && !app.requestSingleInstanceLock();
 if (anotherIsRunning) app.quit();
+else adoptOldSettings();
 app.on("second-instance", () => {
   if (app.isReady()) createWindow();
 });

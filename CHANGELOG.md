@@ -43,6 +43,23 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-20: Saving: a Save dialog holds nothing up; a late save leaves the next file alone
+
+- **What:** five fixes from a second code review, of the day's saving and closing work (`f70a24e`, `08d5c3a`, `d35cf71`):
+  - **A Save dialog left open in one window no longer holds up other windows' saves.** Since saves go one at a time, one window's Save dialog made every other window's save, and its closing, wait for it.
+  - **A save that ends after another file has opened leaves that file alone.** If you pressed Ctrl+S on a big project and then opened another song with Don't save while it was still writing, the song took the project's name and place. The next Ctrl+S then wrote the song over the project. This was there before today's work.
+  - **Closing a song whose Save As fails asks Save / Don't save / Cancel,** instead of just staying open. Canceling Save As still just keeps the window open.
+  - **A second EarBee started while one is running quits before touching the settings folder.** It used to copy the old ScriBee settings first.
+  - **Tests:** topic 24 makes its folder writable again whatever happens, so a failed run doesn't break the next.
+- **Why:** a `/code-review medium` of the day's three commits; the owner said to fix everything it found.
+- **How:**
+  - `electron/project-files.js`: `save()` asks where (`dialogs.save`) before joining the queue (`saving`), so only the writing (`saveNow`) waits its turn; `sourceOf()` is shared by both.
+  - `src/features/project/index.js`: `sessionNumber` counts the sessions started (`startMediaSession`, `loadProject`); `writeNow` leaves `session` alone if it changed during `bridge.save`. `askSaveAs()` says how Save As ended ("saved", "canceled", "failed"); `saveProjectAs()` keeps its true/false. The save-then-close handler calls `bridge.saveFailed()` on "failed", and when the project can't be written.
+  - `electron/main.js`: `anotherIsRunning` is worked out before `adoptOldSettings()`, which runs only if this EarBee is the one.
+  - `tests/e2e/24-autosave.cjs`: `readOnly(work)`, with `try/finally`, and a `chmod` back before the folder is emptied.
+- **Where:** `electron/project-files.js`, `electron/main.js`, `src/features/project/index.js`, `tests/unit/project.test.mjs`, `tests/e2e/24-autosave.cjs`.
+- **Verified by:** `npm run check`; `npm run test:unit` (480 pass; new: a save to a given file finishes while another's Save dialog is still open, and that one then answers canceled). `TB_TOPICS=16,24 npm test` (66 pass, smoke 39 pass), with a new check in 24: with autosave off and a 4 s save, Ctrl+S, a change, then a song opened with Don't save. After the save, the title is the song's, Ctrl+S asks where to save it, and the project still has what was saved. With the fix taken out for one run, that check failed as the review said (the song became `late.ebee` and wrote over it with 0 marks). Not checked: closing a song whose Save As fails (no closing window in the harness; the main side is in `close-guard`); the order of the lock and the old settings, which needs a packaged build.
+
 ## 2026-11-20: The welcome screen's recent files scroll by themselves
 
 - **What:** on the welcome screen, the bee, the title and the drop zone always stay in the same place, however many recent files and projects there are. The last session ("Pick up where you left off") and the recent files fill the room below. When they don't fit, they scroll on their own, with softly faded edges, and **Clear recent files** scrolls with them. Before, the whole screen was centred, so more recent files pushed the bee and the drop zone up, and a long list scrolled the whole screen. In a short window (under 720 px) the bee is smaller, now with or without recent files, so nothing moves when they're cleared. Only a window too short for the drop zone itself scrolls the whole screen.
