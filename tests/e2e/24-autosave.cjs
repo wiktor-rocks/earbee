@@ -12,7 +12,7 @@ const path = require("path");
 
 module.exports = async function (h) {
   const { js, key, check, sleep, setFiles, click, toasts, clearToasts, ensurePaused } = h;
-  const { projectDialogs, setStemDelay, memory, FIXTURES, OUTPUT } = h;
+  const { projectDialogs, setStemDelay, setSaveDelay, memory, FIXTURES, OUTPUT } = h;
 
   const folder = path.join(OUTPUT, "autosave");
   fs.rmSync(folder, { recursive: true, force: true });
@@ -176,6 +176,76 @@ module.exports = async function (h) {
   await open(song("after.wav"));
   await open(inside);
   check("…and still opens, with it", (await js(`document.querySelectorAll("#marksList .mark-row").length`)) === 1);
+
+  /* ---------- While a save is going ---------- */
+
+  // Each save starts 1.5 s late, as a big project's takes a while.
+  const marksInside = () => header().sections.marks.marks.length;
+  const length = () => js(`import("./src/context.js").then(({ player }) => player.transport.duration)`);
+  const fullLength = await length();
+  setSaveDelay(1500);
+  await addMark(5);
+  await sleep(2400); // the save by itself has started, and is still going
+  await addMark(6);
+  await sleep(1500); // it's done; the second mark came too late for it
+  const afterFirst = { marks: marksInside(), unsaved: await unsaved() };
+  await sleep(4500); // the next save by itself
+  check(
+    "autosave: a change made while a save is going stays unsaved, then saves itself",
+    afterFirst.marks === 2 && afterFirst.unsaved && marksInside() === 3 && !(await unsaved()),
+    JSON.stringify({ afterFirst, then: marksInside() }),
+  );
+
+  await addMark(7);
+  await sleep(2400); // saving by itself
+  key("S", ["control"]); // and Ctrl+S meanwhile: it waits for that save
+  await sleep(4500);
+  setSaveDelay(0);
+  const savedTwice = { marks: marksInside(), unsaved: await unsaved() };
+  await open(song("between.wav"));
+  await open(inside);
+  check(
+    "…Ctrl+S during a save waits for it: the project, with its media inside, opens whole",
+    savedTwice.marks === 4 &&
+      !savedTwice.unsaved &&
+      (await js(`document.querySelectorAll("#marksList .mark-row").length`)) === 4 &&
+      Math.abs((await length()) - fullLength) < 0.05,
+    JSON.stringify({ savedTwice, length: await length(), fullLength }),
+  );
+
+  // A name still being typed when another file opens: saved with it.
+  await js(
+    `(() => { const name = document.querySelector("#marksList .mark-name"); name.focus(); name.value = "Chorus"; name.dispatchEvent(new Event("input")); })()`,
+  );
+  await open(song("typed.wav"));
+  check(
+    "autosave: a name being typed is saved when another file opens",
+    JSON.stringify(header().sections.marks).includes("Chorus"),
+    JSON.stringify(header().sections.marks).slice(0, 200),
+  );
+
+  // A project that can't be saved: opening another file asks after all.
+  const stuck = path.join(folder, "stuck.ebee");
+  await saveAs(stuck);
+  const leaveFor = song("leave-for.wav");
+  await addMark(2);
+  await clearToasts();
+  projectDialogs.confirm = "cancel";
+  fs.chmodSync(folder, 0o555);
+  const askedBefore = projectDialogs.asked.length;
+  await open(leaveFor);
+  const stuckTitle = await title();
+  projectDialogs.confirm = "discard";
+  await open(leaveFor);
+  fs.chmodSync(folder, 0o755);
+  check(
+    "autosave: a project that can't be saved asks Save / Don't save / Cancel before another file opens",
+    projectDialogs.asked.slice(askedBefore).filter(([kind]) => kind === "confirm").length === 2 &&
+      stuckTitle.includes("stuck.ebee") &&
+      (await title()).includes("leave-for.wav"),
+    JSON.stringify({ asked: projectDialogs.asked.slice(askedBefore), stuckTitle, now: await title() }),
+  );
+  projectDialogs.confirm = "cancel";
 
   /* ---------- Stems ---------- */
 

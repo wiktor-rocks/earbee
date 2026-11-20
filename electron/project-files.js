@@ -120,6 +120,78 @@ async function replaceFile(from, to) {
  * @param {string} [options.appVersion]
  */
 function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
+  let saving = /** @type {Promise<unknown>} */ (Promise.resolve()); // the save going, if any (save())
+
+  /**
+   * @param {any} sender
+   * @param {{ file: string | null, mediaUrl: string, embed: boolean, duration: number, sections: object }} request
+   */
+  async function saveNow(sender, { file, mediaUrl, embed, duration, sections }) {
+    const source = mediaFiles.lookup(mediaUrl);
+    if (!source) throw new Error("The song or video being played isn't one the project can name.");
+    const linkable = source.offset === 0 && source.size === null;
+    if (!embed && !linkable)
+      throw new project.ProjectFormatError(
+        "This song or video is inside its project, so a new project must have it inside too.",
+      );
+    let target = file;
+    if (!target) {
+      const folder = path.dirname(source.path);
+      const chosen = await dialogs.save(sender, path.join(folder, projectNameFor(source.name)));
+      if (!chosen) return { ok: false, canceled: true };
+      target = withExtension(chosen);
+    }
+    if (path.resolve(target) === path.resolve(source.path) && linkable)
+      throw new project.ProjectFormatError("A project can't be saved over its own song or video.");
+
+    const size = await sliceSize(source);
+    const media = {
+      name: source.name,
+      path: embed ? null : source.path,
+      relativePath: embed ? null : path.relative(path.dirname(target), source.path),
+      size,
+      duration,
+      embedded: embed,
+    };
+    // The sections' binary data goes after the media, each at its place.
+    const { sections: plain, blobs } = project.extractBlobs(sections);
+    let at = embed ? size : 0;
+    const places = Object.fromEntries(
+      blobs.map(({ id, bytes }) => {
+        const place = { offset: at, size: bytes.byteLength };
+        at += bytes.byteLength;
+        return [id, place];
+      }),
+    );
+    const header = project.serializeProject({ media, sections: plain, blobs: places, appVersion });
+    const headerBytes = Buffer.from(header, "utf8");
+
+    const temporary = `${target}.${process.pid}-${Date.now()}.tmp`;
+    try {
+      await fs.promises.writeFile(temporary, headerBytes);
+      if (embed || blobs.length) await fs.promises.appendFile(temporary, Buffer.from([project.MEDIA_SEPARATOR]));
+      if (embed && size > 0) {
+        await pipeline(
+          fs.createReadStream(source.path, { start: source.offset, end: source.offset + size - 1 }),
+          fs.createWriteStream(temporary, { flags: "a" }),
+        );
+      }
+      for (const { bytes } of blobs) await fs.promises.appendFile(temporary, bytes);
+      await replaceFile(temporary, target);
+    } catch (error) {
+      await fs.promises.rm(temporary, { force: true });
+      throw error;
+    }
+    // The page goes on reading its media by the same URL; once it's
+    // inside the new file, from there (the old one may have been replaced).
+    // Then it is only inside a project, and a later save can't link to it.
+    if (embed) mediaFiles.update(mediaUrl, { path: target, offset: headerBytes.length + 1, size, name: source.name });
+    // Either way, it's this project's song or video now (the last session,
+    // session-store.js, comes back to the project).
+    mediaFiles.belongsTo(mediaUrl, target);
+    return { ok: true, path: target, name: path.basename(target), embedded: embed, linkable: linkable && !embed };
+  }
+
   async function findLinkedMedia(sender, projectFile, media) {
     for (const candidate of mediaCandidates(projectFile, media)) {
       if (await isFile(candidate)) return { file: candidate, relinked: false };
@@ -172,75 +244,17 @@ function createProjectFiles({ mediaFiles, dialogs, appVersion }) {
     },
 
     /**
-     * Writes a project. `mediaUrl` names the media being played (from
-     * share()); `file` is where to write, or null to ask.
+     * Writes a project, after any other save still going (one at a time,
+     * whichever window asks: a save reads the media from where the one
+     * before may have just moved it). `mediaUrl` names the media being
+     * played (from share()); `file` is where to write, or null to ask.
      * @param {any} sender
      * @param {{ file: string | null, mediaUrl: string, embed: boolean, duration: number, sections: object }} request
      */
-    async save(sender, { file, mediaUrl, embed, duration, sections }) {
-      const source = mediaFiles.lookup(mediaUrl);
-      if (!source) throw new Error("The song or video being played isn't one the project can name.");
-      const linkable = source.offset === 0 && source.size === null;
-      if (!embed && !linkable)
-        throw new project.ProjectFormatError(
-          "This song or video is inside its project, so a new project must have it inside too.",
-        );
-      let target = file;
-      if (!target) {
-        const folder = path.dirname(source.path);
-        const chosen = await dialogs.save(sender, path.join(folder, projectNameFor(source.name)));
-        if (!chosen) return { ok: false, canceled: true };
-        target = withExtension(chosen);
-      }
-      if (path.resolve(target) === path.resolve(source.path) && linkable)
-        throw new project.ProjectFormatError("A project can't be saved over its own song or video.");
-
-      const size = await sliceSize(source);
-      const media = {
-        name: source.name,
-        path: embed ? null : source.path,
-        relativePath: embed ? null : path.relative(path.dirname(target), source.path),
-        size,
-        duration,
-        embedded: embed,
-      };
-      // The sections' binary data goes after the media, each at its place.
-      const { sections: plain, blobs } = project.extractBlobs(sections);
-      let at = embed ? size : 0;
-      const places = Object.fromEntries(
-        blobs.map(({ id, bytes }) => {
-          const place = { offset: at, size: bytes.byteLength };
-          at += bytes.byteLength;
-          return [id, place];
-        }),
-      );
-      const header = project.serializeProject({ media, sections: plain, blobs: places, appVersion });
-      const headerBytes = Buffer.from(header, "utf8");
-
-      const temporary = `${target}.${process.pid}-${Date.now()}.tmp`;
-      try {
-        await fs.promises.writeFile(temporary, headerBytes);
-        if (embed || blobs.length) await fs.promises.appendFile(temporary, Buffer.from([project.MEDIA_SEPARATOR]));
-        if (embed && size > 0) {
-          await pipeline(
-            fs.createReadStream(source.path, { start: source.offset, end: source.offset + size - 1 }),
-            fs.createWriteStream(temporary, { flags: "a" }),
-          );
-        }
-        for (const { bytes } of blobs) await fs.promises.appendFile(temporary, bytes);
-        await replaceFile(temporary, target);
-      } catch (error) {
-        await fs.promises.rm(temporary, { force: true });
-        throw error;
-      }
-      // The page goes on reading its media by the same URL; once it's
-      // inside the new file, from there (the old one may have been replaced).
-      // Then it is only inside a project, and a later save can't link to it.
-      if (embed) mediaFiles.update(mediaUrl, { path: target, offset: headerBytes.length + 1, size, name: source.name });
-      // Either way, it's this project's song or video now (the last session,
-      // session-store.js, comes back to the project).
-      mediaFiles.belongsTo(mediaUrl, target);
-      return { ok: true, path: target, name: path.basename(target), embedded: embed, linkable: linkable && !embed };
+    save(sender, request) {
+      const turn = saving.then(() => saveNow(sender, request));
+      saving = turn.catch(() => {});
+      return turn;
     },
   };
 }
@@ -303,7 +317,10 @@ function handleProjects(ipcMain, projectFiles, { mediaFiles, dialogs, state, rec
 /**
  * Before `win` closes with unsaved changes: Save / Don't save / Cancel.
  * Save asks the page to save, which closes the window once it has
- * ("project:close"); Cancel keeps it open.
+ * ("project:close"), or says it couldn't ("project:save-failed"), which
+ * asks again, so a project that can't be saved can still be closed with
+ * Don't save. Cancel keeps it open. Don't save calls `onDiscard` first
+ * (the last session forgets what was thrown away: session-store.js).
  *
  * And first, while something that closing would stop is still running
  * (`busy`: Stems (src/features/stems/), a separation or the model's
@@ -317,9 +334,10 @@ function handleProjects(ipcMain, projectFiles, { mediaFiles, dialogs, state, rec
  * @param {(contents: any) => string | null} [options.busy] What is running for this page, or null.
  * @param {() => boolean} [options.autosave] Whether projects save themselves (Settings › General):
  *   then a project with unsaved changes is saved without asking (a song not
- *   yet a project still asks).
+ *   yet a project still asks), unless that save fails.
+ * @param {(contents: any) => void} [options.onDiscard] The user chose Don't save.
  */
-function guardClose(win, { ipcMain, dialogs, state, busy = () => null, autosave = () => false }) {
+function guardClose(win, { ipcMain, dialogs, state, busy = () => null, autosave = () => false, onDiscard = () => {} }) {
   const contents = win.webContents;
   const id = contents.id;
   let asking = false;
@@ -333,6 +351,16 @@ function guardClose(win, { ipcMain, dialogs, state, busy = () => null, autosave 
     leaving = true;
     win.close();
   };
+  // Save / Don't save / Cancel (`askFirst` false: Save, without asking).
+  async function decide(name, askFirst) {
+    const choice = askFirst ? await dialogs.confirm(contents, name) : "save";
+    if (choice === "save") contents.send("project:save-then-close");
+    else if (choice === "discard") {
+      state.delete(id);
+      onDiscard(contents);
+      leave();
+    }
+  }
   win.on("close", async (event) => {
     if (leaving) return;
     const running = busy(contents);
@@ -344,12 +372,7 @@ function guardClose(win, { ipcMain, dialogs, state, busy = () => null, autosave 
     try {
       if (running && !(await dialogs.confirmBusy?.(contents, running))) return;
       if (!page?.dirty) return leave();
-      const choice = autosave() && page.name ? "save" : await dialogs.confirm(contents, page.name);
-      if (choice === "save") contents.send("project:save-then-close");
-      else if (choice === "discard") {
-        state.delete(id);
-        leave();
-      }
+      await decide(page.name, !(autosave() && page.name));
     } finally {
       asking = false;
     }
@@ -359,8 +382,22 @@ function guardClose(win, { ipcMain, dialogs, state, busy = () => null, autosave 
     state.delete(id);
     leave();
   };
+  // The page couldn't save: ask, whether or not it was asked before.
+  const saveFailed = async (event) => {
+    if (event.sender !== contents || asking || leaving) return;
+    asking = true;
+    try {
+      await decide(state.get(id)?.name ?? "", true);
+    } finally {
+      asking = false;
+    }
+  };
   ipcMain.on("project:close", close);
-  win.on("closed", () => ipcMain.removeListener("project:close", close));
+  ipcMain.on("project:save-failed", saveFailed);
+  win.on("closed", () => {
+    ipcMain.removeListener("project:close", close);
+    ipcMain.removeListener("project:save-failed", saveFailed);
+  });
 }
 
 module.exports = {

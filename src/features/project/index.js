@@ -54,6 +54,7 @@ import { SECTIONS } from "./sections.js";
  * @property {(dirty: boolean, name: string) => void} setDirty
  * @property {(callback: () => void) => () => void} onSaveThenClose
  * @property {() => void} close
+ * @property {() => void} saveFailed
  */
 const bridge = /** @type {ProjectBridge | undefined} */ (/** @type {any} */ (window).earbee?.project);
 
@@ -143,11 +144,20 @@ function scheduleDirtyCheck() {
   });
 }
 
-// What is open now counts as saved.
-function markSaved() {
-  session.saved = dirtyingState();
+// What is open now counts as saved (or `state`, what a save wrote: a
+// change made while it was writing is still unsaved).
+function markSaved(state = dirtyingState()) {
+  session.saved = state;
   checkDirty();
   renderTitle();
+}
+
+// A name still being typed (Ctrl+S works in text fields; a file can be
+// dropped meanwhile) counts: its field only commits on "change", which
+// hasn't fired yet.
+function commitTyping() {
+  const focused = document.activeElement;
+  if (focused instanceof HTMLElement && isTextField(focused)) focused.dispatchEvent(new Event("change"));
 }
 
 /* ---------- Saving by itself ---------- */
@@ -157,14 +167,16 @@ function markSaved() {
 // would, CONFIG.project.autosaveDelay after the last change. Not while
 // playing: a save copies the stems (and the media, if it's inside), so it
 // waits for a pause. Nor while a name is being typed, while the stems are
-// being separated (each new part would mean another save), or while a
+// being separated (each new part would mean another save), or while any
 // save or the Save As dialog is going: it tries again a moment later.
 // Quietly: the • going away says it's saved. A failure is shown once,
-// not again for each change after it.
+// not again for each change after it. Opening something else or closing
+// saves without asking; if that save fails, they ask after all, so a
+// project that can't be saved (a full disk, an unplugged stick) can still
+// be left.
 const autosaveOn = () => getPrefs("general")?.autosave === true;
 const STEMS_BUSY = new Set(["download", "decode", "separate", "rest"]);
 let autosaveTimer = 0;
-let autosaving = false;
 let autosaveError = "";
 let failedState = null; // what a save by itself failed on: not tried again until it changes
 
@@ -180,7 +192,7 @@ function autosaveWaits() {
   const focused = document.activeElement;
   return (
     player.transport.playing ||
-    autosaving ||
+    savesGoing > 0 ||
     dom.saveDialog.open ||
     (focused instanceof HTMLElement && isTextField(focused)) ||
     STEMS_BUSY.has(stemsStage())
@@ -191,9 +203,8 @@ async function autosaveNow() {
   autosaveTimer = 0;
   if (!autosaveOn() || !session.path || !session.dirty) return;
   if (autosaveWaits()) return scheduleAutosave();
-  autosaving = true;
   try {
-    await writeProject(session.path, session.embedded, { quiet: true });
+    await writeProject(OPEN_PROJECT, { quiet: true });
     autosaveError = "";
     failedState = null;
   } catch (error) {
@@ -202,26 +213,27 @@ async function autosaveNow() {
     autosaveError = message;
     failedState = dirtyingState();
   } finally {
-    autosaving = false;
     checkDirty(); // changed meanwhile: again, in a moment
   }
 }
 
 /**
  * Before what is open is replaced: if it has unsaved changes, Save / Don't
- * save / Cancel (a project that saves itself: saved, without asking).
- * Resolves true to go ahead.
+ * save / Cancel (a project that saves itself: saved, without asking,
+ * unless that save fails). Resolves true to go ahead.
  */
 export async function confirmUnsaved() {
+  commitTyping(); // a name still being typed is a change too
   checkDirty();
   if (!bridge || !session.dirty) return true;
   if (autosaveOn() && session.path) {
     clearTimeout(autosaveTimer);
     autosaveTimer = 0;
-    return writeProject(session.path, session.embedded, { quiet: true }).catch((error) => {
+    const saved = await writeProject(OPEN_PROJECT, { quiet: true }).catch((error) => {
       reportError(error);
       return false;
     });
+    if (saved) return true;
   }
   const choice = await bridge.confirm(session.name ?? "");
   if (choice === "save") return saveProject();
@@ -387,30 +399,50 @@ async function showOpenedProject(opened) {
 
 /* ---------- Saving ---------- */
 
+// Saves go one at a time: a second one (Ctrl+S during a save by itself,
+// opening another file, closing) waits for the one going, so two never
+// write the same file at once (with the media inside, the second would
+// copy it from where the first had just moved it).
+const OPEN_PROJECT = "open project";
+let saveQueue = /** @type {Promise<unknown>} */ (Promise.resolve());
+let savesGoing = 0;
+
 /**
- * Writes the project to `file` (null: the user picks where). Resolves
- * true once it's saved. `quiet` (saving by itself): no notification, and
- * a name being typed isn't committed.
- * @param {string | null} file
- * @param {boolean} embed
+ * Writes the project, after any save still going. `where`: OPEN_PROJECT
+ * (where it is, as it is, when this save's turn comes) or a new place
+ * (`file` null: the user picks it). Resolves true once it's saved.
+ * `quiet` (saving by itself, or before something else opens): no
+ * notification.
+ * @param {typeof OPEN_PROJECT | { file: string | null, embed: boolean }} where
  * @param {{ quiet?: boolean }} [options]
  */
-async function writeProject(file, embed, { quiet = false } = {}) {
+function writeProject(where, options = {}) {
+  savesGoing++;
+  const turn = saveQueue.then(() => writeNow(where, options));
+  saveQueue = turn.catch(() => {});
+  return turn.finally(() => savesGoing--);
+}
+
+/** @param {typeof OPEN_PROJECT | { file: string | null, embed: boolean }} where @param {{ quiet?: boolean }} options */
+async function writeNow(where, { quiet = false }) {
   if (!bridge || !hasAudio()) return false;
+  const { file, embed } = where === OPEN_PROJECT ? { file: session.path, embed: session.embedded } : where;
+  if (where === OPEN_PROJECT && !file) return false; // not a project (any more)
   if (!session.mediaUrl)
     throw new AppError(`“${session.mediaName}” isn't a file on this computer, so a project can't name it.`);
-  // A name still being typed (Ctrl+S works in text fields) counts: its
-  // field only commits on "change", which hasn't fired yet.
-  const focused = document.activeElement;
-  if (!quiet && focused instanceof HTMLElement && isTextField(focused)) focused.dispatchEvent(new Event("change"));
+  commitTyping(); // (a save by itself never starts while a name is being typed)
   // What a section is still making, first (sections.js, prepare).
   await Promise.all(SECTIONS.map((section) => section.prepare?.()));
+  // What is written, and so what counts as saved once it is: a change
+  // made while it's being written stays unsaved.
+  const sections = captureProject();
+  const state = dirtyingState();
   const result = await bridge.save({
     file,
     mediaUrl: session.mediaUrl,
     embed,
     duration: player.transport.duration,
-    sections: captureProject(),
+    sections,
   });
   if (!result.ok) {
     if (result.canceled) return false;
@@ -422,7 +454,7 @@ async function writeProject(file, embed, { quiet = false } = {}) {
     embedded: result.embedded,
     linkable: result.linkable,
   });
-  markSaved();
+  markSaved(state);
   projectSaved();
   autosaveError = ""; // saved: a failure from before would be news again
   failedState = null;
@@ -446,7 +478,7 @@ export function saveProjectAs() {
       "close",
       () => {
         if (dom.saveDialog.returnValue !== "save") return resolve(false);
-        writeProject(null, inside.checked).then(resolve, (error) => {
+        writeProject({ file: null, embed: inside.checked }).then(resolve, (error) => {
           reportError(error);
           resolve(false);
         });
@@ -461,7 +493,7 @@ export function saveProjectAs() {
 /** Saves where it was saved before, as it was; the first time, Save As. */
 export function saveProject() {
   if (!session.path) return saveProjectAs();
-  return writeProject(session.path, session.embedded).catch((error) => {
+  return writeProject(OPEN_PROJECT).catch((error) => {
     reportError(error);
     return false;
   });
@@ -496,9 +528,22 @@ export function bindProject() {
   player.transport.on("state", () => scheduleAutosave());
 
   // The window is closing and the user chose Save.
+  // Closing with unsaved changes, and Save chosen (or the project saves
+  // itself): saved, then closed. If the project couldn't be written, the
+  // main process asks Save / Don't save / Cancel, so it can still be left.
+  // (Save As canceled: the window just stays open.)
   bridge.onSaveThenClose(
     guarded(async () => {
-      if (await saveProject()) bridge.close();
+      if (!session.path) {
+        if (await saveProjectAs()) bridge.close();
+        return;
+      }
+      try {
+        if (await writeProject(OPEN_PROJECT)) bridge.close();
+      } catch (error) {
+        reportError(error);
+        bridge.saveFailed();
+      }
     }),
   );
 

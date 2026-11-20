@@ -106,6 +106,14 @@ async function createHarness() {
   };
   const projectState = new Map();
   const projectFiles = createProjectFiles({ mediaFiles, dialogs: stubDialogs, appVersion: "test" });
+  // setSaveDelay(ms): each project save starts that much later, as a big
+  // project's would take, so a test can change something while it goes.
+  let saveDelay = 0;
+  const saveRightAway = projectFiles.save;
+  projectFiles.save = async (...args) => {
+    if (saveDelay) await new Promise((resolve) => setTimeout(resolve, saveDelay));
+    return saveRightAway(...args);
+  };
   // Recent files as main.js keeps them, in a fresh file each run.
   const { createRecentFiles, handleRecentFiles } = require(path.join(PROJECT, "electron", "recent-files.js"));
   const recentFilesPath = path.join(OUTPUT, "recent-files.json");
@@ -386,6 +394,7 @@ async function createHarness() {
     sessions, // the last session (electron/session-store.js)
     lastSessionFolder,
     setStemDelay: (ms) => (stemDelay = ms), // Stems: each segment this much slower
+    setSaveDelay: (ms) => (saveDelay = ms), // each project save this much slower
     setStemStartFails: (yes) => (stemStartFails = yes), // Stems: the stem process can't start
     setStemModelGone: (gone) => showStemModel(!gone), // Stems: the model's file deleted, or back
     externalOpens, // the links Open on YouTube passed to the system browser

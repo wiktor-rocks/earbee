@@ -43,6 +43,21 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-20: Saves wait for each other; a project that can't be saved can still be left
+
+- **What:** fixes to saving, found by a code review of "Save projects automatically" before it reached `testing`:
+  - **A change made while a project is saving stays unsaved.** Before, if you added a mark while a project was saving itself (a project with the video inside takes seconds), the • went away as if the mark had been written. It wasn't, and closing didn't ask. Now the • stays and it saves itself a moment later.
+  - **Two saves never write the same project at once.** Ctrl+S, opening another file or closing during a save by itself now waits for that save. Before, with the media inside, the second save could copy the video from the wrong place in the file and leave the project's video broken.
+  - **A project that can't be saved can still be left.** With autosave on, closing and opening another file save without asking. If that save fails (a full disk, an unplugged stick, a read-only folder), they now ask Save / Don't save / Cancel after all. Before, the window wouldn't close and another file wouldn't open.
+  - **A mark's name still being typed is kept** when another file opens or the window closes, with autosave on or off. Before, it was lost: it didn't count as a change until its field was left.
+- **Why:** a `/code-review medium` of `dev` (2026-11-20) found these; the owner asked for them to be fixed before trying the features by hand.
+- **How:**
+  - **The page** (`features/project/index.js`): `writeProject(where, options)` joins a queue (`saveQueue`, `savesGoing`) and its work is `writeNow`. `OPEN_PROJECT` saves the project where it is when its turn comes; Save As passes `{ file: null, embed }`. `writeNow` takes `captureProject()` and `dirtyingState()` together, and `markSaved(state)` records what was written, not what is open after the save. `autosaveWaits` waits for any save going (`savesGoing`). `commitTyping()` sends the focused text field its `change` before every save and at the start of `confirmUnsaved`. `confirmUnsaved` falls back to `bridge.confirm` when its quiet save fails. The save-then-close handler calls `bridge.saveFailed()` when the project can't be written (not when Save As is canceled).
+  - **The main process** (`electron/project-files.js`): `save()` runs one save at a time (`saving`, `saveNow`), whichever window asks. `guardClose` listens for `project:save-failed` and asks Save / Don't save / Cancel; Save sends `project:save-then-close` again. It also takes `onDiscard`, called on Don't save, for the last session.
+  - `electron/preload.js`: `project.saveFailed()`.
+- **Where:** `src/features/project/index.js`, `electron/project-files.js`, `electron/preload.js`; tests in `tests/unit/close-guard.test.mjs`, `tests/e2e/24-autosave.cjs` and `tests/e2e/harness.cjs` (`setSaveDelay`: each project save starts that much later).
+- **Verified by:** `npm run check`; `npm run test:unit` (474 pass, four new in close-guard: Don't save calls `onDiscard`; a failed save asks, and Don't save closes; Cancel stays open and Save sends again; another window's failure is ignored); `TB_TOPICS=16,24 npm test`, then `TB_TOPICS=24 npm test` after the typed-name fix (21 pass, smoke 39 pass). The new e2e checks, with each save starting 1.5 s late: a mark added during a save keeps the • and saves itself next; Ctrl+S during a save of a project with its media inside leaves a project that opens with every mark and its whole 20 s; a name being typed is in the file after another file opens; in a read-only folder, opening another file asks, and Cancel stays. Not checked by hand in a real window yet; closing is checked by the unit tests only.
+
 ## 2026-11-20: Save projects automatically (a setting)
 
 - **What:** Settings › General has "Save projects automatically", off at first. With it on, an open project saves itself, as Ctrl+S would, 2 s after the last change, quietly: no "Project saved", the • going away says it. Projects with the song or video inside save themselves too.

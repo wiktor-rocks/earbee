@@ -131,13 +131,16 @@ contextBridge.exposeInMainWorld("earbee", {
     // "save" | "discard" | "cancel"
     confirm: (name) => ipcRenderer.invoke("project:confirm", String(name ?? "")),
     setDirty: (dirty, name) => ipcRenderer.send("project:dirty", Boolean(dirty), String(name ?? "")),
-    // The window is closing and the user chose Save: `callback` saves, then calls close().
+    // The window is closing and the user chose Save (or the project saves
+    // itself): `callback` saves, then calls close(), or saveFailed() if it
+    // couldn't, which asks Save / Don't save / Cancel.
     onSaveThenClose(callback) {
       const listener = () => callback();
       ipcRenderer.on("project:save-then-close", listener);
       return () => ipcRenderer.removeListener("project:save-then-close", listener);
     },
     close: () => ipcRenderer.send("project:close"),
+    saveFailed: () => ipcRenderer.send("project:save-failed"),
   },
 
   // Recent files (src/features/recent.js, electron/recent-files.js). The
@@ -174,10 +177,12 @@ contextBridge.exposeInMainWorld("earbee", {
     // answers plus { session, changedSince }; or { ok: false, canceled?, error? }
     open: () => ipcRenderer.invoke("session:open"),
     forget: () => ipcRenderer.invoke("session:forget"),
-    // The stems' bytes, a stem at a time: begin → { ok, token }, add each, end.
+    // The stems' bytes, a stem at a time: begin → { ok, token }, add each,
+    // end; or abort, which throws away what was written.
     beginStems: () => ipcRenderer.invoke("session:stems-begin"),
     addStem: (token, id, bytes) => ipcRenderer.invoke("session:stems-add", String(token), String(id), bytes),
     endStems: (token) => ipcRenderer.invoke("session:stems-end", String(token)),
+    abortStems: (token) => ipcRenderer.invoke("session:stems-abort", String(token)),
   },
 
   // See src/ui/prefs.js. set, reset and chooseFolder resolve to

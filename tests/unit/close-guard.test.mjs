@@ -43,13 +43,26 @@ function setUp({
   const state = new Map(dirty ? [[7, { dirty: true, name }]] : []);
   const ipcMain = Object.assign(new EventEmitter(), { removeListener: EventEmitter.prototype.removeListener });
   const status = { running };
-  guardClose(win, { ipcMain, dialogs, state, busy: () => status.running, autosave: () => autosave });
+  const discarded = [];
+  guardClose(win, {
+    ipcMain,
+    dialogs,
+    state,
+    busy: () => status.running,
+    autosave: () => autosave,
+    onDiscard: (sender) => discarded.push(sender.id),
+  });
   // close(), then the dialogs' answers.
   const close = async () => {
     win.close();
     await new Promise((resolve) => setImmediate(resolve));
   };
-  return { win, contents, asked, close, status, ipcMain };
+  // The page says its save failed; then the dialogs' answers.
+  const saveFails = async () => {
+    ipcMain.emit("project:save-failed", { sender: contents });
+    await new Promise((resolve) => setImmediate(resolve));
+  };
+  return { win, contents, asked, close, status, ipcMain, discarded, saveFails };
 }
 
 test("nothing unsaved and nothing running: it just closes", async () => {
@@ -121,4 +134,42 @@ test("projects saving themselves, with a separation running: that's asked first,
   await close();
   assert.deepEqual(asked, [["busy", "separate"]]);
   assert.deepEqual(contents.sent, ["project:save-then-close"]);
+});
+
+test("Don't save: the last session is told, then it closes", async () => {
+  const { win, close, discarded } = setUp({ dirty: true, choice: "discard" });
+  await close();
+  assert.equal(win.closed, true);
+  assert.deepEqual(discarded, [7]);
+});
+
+test("a project saving itself that can't be saved: then it asks, and Don't save closes", async () => {
+  const { win, contents, asked, close, saveFails, discarded } = setUp({ dirty: true, autosave: true });
+  await close();
+  assert.deepEqual(contents.sent, ["project:save-then-close"]);
+  await saveFails();
+  assert.deepEqual(asked, [["confirm", "Song.ebee"]]);
+  assert.equal(win.closed, true);
+  assert.deepEqual(discarded, [7]);
+});
+
+test("a save that fails, then Cancel: it stays open; Save tries again", async () => {
+  const kept = setUp({ dirty: true, autosave: true, choice: "cancel" });
+  await kept.close();
+  await kept.saveFails();
+  assert.equal(kept.win.closed, false);
+  assert.deepEqual(kept.discarded, []);
+
+  const again = setUp({ dirty: true, autosave: true, choice: "save" });
+  await again.close();
+  await again.saveFails();
+  assert.deepEqual(again.contents.sent, ["project:save-then-close", "project:save-then-close"]);
+  assert.equal(again.win.closed, false, "not until the page says it's saved");
+});
+
+test("another window's failed save isn't this one's", async () => {
+  const { asked, ipcMain } = setUp({ dirty: true });
+  ipcMain.emit("project:save-failed", { sender: { id: 8 } });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(asked, []);
 });
