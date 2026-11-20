@@ -17,6 +17,9 @@
 // kept in session.json, and reopening opens the project, then puts them
 // back over it. Stems the project already has aren't copied ("project").
 //
+// Closing a window with Don't save throws its changes away here too: a
+// project is offered back as last saved, a song never saved isn't.
+//
 // One last session per computer: whichever window wrote last. Like the
 // recent files, the page never names a path: the song or video is named by
 // the URL it plays it from (media-files.js), and the project is the one that
@@ -35,6 +38,8 @@ const STEMS_SUFFIX = ".bin";
 // the ones in this folder.
 const FROM_PROJECT = "project";
 const FROM_FILE = "file";
+// How long a stems file another EarBee made is left alone, unnamed.
+const OTHERS_KEPT_MS = 24 * 60 * 60 * 1000;
 
 const isObject = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const isStemsName = (name) =>
@@ -102,6 +107,15 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
   // Stems files being written, by their token: the window, the name, where each is.
   /** @type {Map<string, { owner: number, file: string, at: number, blobs: Record<string, { offset: number, size: number }>, done: Promise<void> }>} */
   const writing = new Map();
+  // The stems files this EarBee made: only those go as soon as nothing
+  // names them. (Another EarBee using this folder, `npm start` beside the
+  // installed one, may still be using its own.)
+  const made = new Set();
+  // The window whose session session.json is (the last to write), and the
+  // windows whose changes were thrown away (Don't save): nothing more of
+  // theirs is kept.
+  let lastWriter = null;
+  const discarded = new Set();
 
   function read() {
     try {
@@ -143,8 +157,8 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
   }
 
   // Stems files nobody uses any more: not in session.json, not a window's,
-  // not being written. (Another EarBee's, being written right now, is left
-  // alone for an hour.)
+  // not being written. Those this EarBee made go at once; any other (another
+  // EarBee's, maybe still in use) once it's a day old.
   function tidy() {
     const kept = new Set([read()?.stems?.file, ...[...stemsOf.values()].map((stems) => stems.file)]);
     for (const { file: name } of writing.values()) kept.add(`${name}.tmp`);
@@ -158,7 +172,7 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
       if (!name.startsWith(STEMS_PREFIX) || kept.has(name)) continue;
       const full = path.join(folder, name);
       try {
-        if (now() - fs.statSync(full).mtimeMs > 60 * 60 * 1000 || !name.endsWith(".tmp")) fs.rmSync(full);
+        if (made.has(name.replace(/\.tmp$/, "")) || now() - fs.statSync(full).mtimeMs > OTHERS_KEPT_MS) fs.rmSync(full);
       } catch {
         // gone already
       }
@@ -192,6 +206,7 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
      * @param {{ final?: boolean }} [options]
      */
     async write(sender, { mediaUrl, sections, unsaved }, { final = false } = {}) {
+      if (discarded.has(sender.id)) return false;
       const source = mediaFiles.lookup(mediaUrl);
       if (!source || !isObject(sections)) return false;
       const projectFile = source.project && project.isProjectName(source.project) ? source.project : null;
@@ -222,6 +237,7 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
         },
         final,
       );
+      lastWriter = sender.id;
       await written;
       // An older copy of the stems isn't named any more: it goes.
       if (before && before !== stems?.file) tidy();
@@ -237,6 +253,7 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
       const token = crypto.randomUUID();
       const name = `${STEMS_PREFIX}${token}${STEMS_SUFFIX}`;
       fs.writeFileSync(path.join(folder, `${name}.tmp`), "");
+      made.add(name);
       writing.set(token, { owner: sender.id, file: name, at: 0, blobs: {}, done: Promise.resolve() });
       return token;
     },
@@ -271,6 +288,54 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
       writing.delete(token);
       fs.renameSync(path.join(folder, `${stems.file}.tmp`), path.join(folder, stems.file));
       stemsOf.set(sender.id, { file: stems.file, blobs: stems.blobs });
+      tidy();
+    },
+
+    /**
+     * The stems file being written isn't wanted after all: it goes.
+     * @param {any} sender
+     * @param {string} token
+     */
+    async abortStems(sender, token) {
+      const stems = writing.get(token);
+      if (!stems || stems.owner !== sender.id) return;
+      writing.delete(token);
+      await stems.done.catch(() => {});
+      await fs.promises.rm(path.join(folder, `${stems.file}.tmp`), { force: true });
+    },
+
+    /**
+     * The user closed `id`'s window with Don't save: what it threw away
+     * isn't offered back. If the last session is that window's, a project
+     * is kept as it was last saved (no changes, no place), and a song
+     * never saved is forgotten. Nothing more from that window is kept.
+     * @param {number} id
+     */
+    discard(id) {
+      discarded.add(id);
+      if (lastWriter !== id) return;
+      const saved = read();
+      if (!saved?.project) return this.forget();
+      let mtimeMs;
+      try {
+        mtimeMs = fs.statSync(saved.project.path).mtimeMs;
+      } catch {
+        return this.forget(); // the project has gone too
+      }
+      writeFile(
+        {
+          format: FORMAT,
+          version: VERSION,
+          savedAt: now(),
+          name: saved.name,
+          unsaved: false,
+          media: saved.media,
+          project: { path: saved.project.path, mtimeMs },
+          sections: {},
+          stems: null,
+        },
+        true,
+      );
       tidy();
     },
 
@@ -344,7 +409,12 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
     /** A window has closed: its stems file is no longer its. @param {number} id */
     closed(id) {
       stemsOf.delete(id);
-      for (const [token, stems] of writing) if (stems.owner === id) writing.delete(token);
+      discarded.delete(id);
+      for (const [token, stems] of writing) {
+        if (stems.owner !== id) continue;
+        writing.delete(token);
+        fs.rmSync(path.join(folder, `${stems.file}.tmp`), { force: true });
+      }
     },
 
     tidy,
@@ -384,6 +454,9 @@ function handleSessions(ipcMain, sessions) {
   );
   ipcMain.handle("session:stems-end", (event, token) =>
     answer(async () => (await sessions.endStems(event.sender, String(token)), { ok: true })),
+  );
+  ipcMain.handle("session:stems-abort", (event, token) =>
+    answer(async () => (await sessions.abortStems(event.sender, String(token)), { ok: true })),
   );
 }
 

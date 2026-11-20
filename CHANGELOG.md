@@ -43,6 +43,31 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-20: The last session: the right stems, Don't save forgets, one EarBee at a time
+
+- **What:** fixes to "Pick up where you left off", found by the same code review:
+  - **The right stems come back.** If you opened another song or project while the last one's stems were still being copied for the session, the next start could play the old song's stems over the new one. A copy now stops when another file opens, and throws away what it wrote.
+  - **The stems copy waits while you play,** instead of carrying on with each stem's few MB.
+  - **No half-written copies left behind:** a copy that stops, or a window closed during one, deletes its file at once. Before, it stayed for up to an hour.
+  - **Ctrl+S with nothing to save keeps your place.** Before, Reopen then said the project "was saved since" and opened it at the start.
+  - **Don't save means it** (the owner's call). Closing a window with Don't save no longer brings the thrown-away changes back on the next start. A project is offered as it was last saved; a song never saved isn't offered.
+  - **One EarBee at a time.** Starting EarBee while it's running opens another window in the one running, as it would in most apps. Before, two EarBees could share the settings folder, and one could delete the other's stems copy. `npm start` isn't affected: it runs beside the installed EarBee as before.
+- **Why:** the `/code-review medium` of `dev` (2026-11-20). The owner chose that Don't save forgets, and one EarBee with more windows over only sparing another EarBee's files.
+- **How:**
+  - **The copy** (`features/project/last-session.js`): `sessionStarted()` counts the sessions (`sessions`). `copyStems(revision, session)` checks that count and the stems' revision before each stem and before `endStems`, and waits while playing (`untilPaused`). Any copy that doesn't end calls `bridge.abortStems`. `projectSaved()` clears `lastWritten`, so the session is written again with the project's new time.
+  - **The store** (`electron/session-store.js`):
+    - `abortStems` (`session:stems-abort`) drops the copy being written and deletes its `.tmp`; `closed(id)` deletes that window's too;
+    - `tidy()` deletes at once only the stems files this process `made`; any other unnamed file only once it's a day old (`OTHERS_KEPT_MS`), since it may be another EarBee's (`npm start`);
+    - `discard(id)` ignores that window's later writes, including the final one as it closes. If the last session is that window's, it writes it again with no sections, no stems and `unsaved: false` for a project, and forgets it for a song.
+  - **Closing:** `guardClose`'s `onDiscard` (main.js) calls `sessions.discard`.
+  - **One EarBee** (`electron/main.js`): a packaged EarBee takes `app.requestSingleInstanceLock()`. If another has it, this one quits (`anotherIsRunning`), and the one running opens a window (`second-instance`). The lock is released before "Restart and update now", because the AppImage updater starts the new version while the old one is still quitting (`AppImageUpdater.doInstall`).
+  - AGENTS.md › Test builds: quit the installed EarBee before starting a test build, or it only opens a window of the installed one.
+- **Where:** `src/features/project/last-session.js`, `electron/session-store.js`, `electron/preload.js` (`session.abortStems`), `electron/main.js`, `AGENTS.md`; tests in `tests/unit/session-store.test.mjs` and `tests/e2e/23-last-session.cjs`.
+- **Verified by:** `npm run check`; `npm run test:unit` (479 pass). Five new in session-store: abort and a closed window leave nothing; another EarBee's finished file stays for a day, then goes; Don't save forgets a song and ignores the final write; it keeps a project as saved, with nothing over it; Don't save in another window leaves the last session alone. `TB_TOPICS=21,23,24 npm test`, then `TB_TOPICS=21,23` (103 pass) and `TB_TOPICS=23` alone (31 pass), smoke 39 pass each time. The new e2e check: Ctrl+S with nothing unsaved, then Reopen, comes back to the same place with no "saved since". Topic 23's first check now reloads before forgetting the session (a page with a file open keeps it as it goes). **Not checked:**
+  - the stems copy stopping for another file, and waiting while playing, by a test (too timing-bound; checked in the code);
+  - one EarBee at a time, and an update's restart with the lock: both need a packaged build, by hand;
+  - Don't save end to end (the harness has no closing window; unit tests only).
+
 ## 2026-11-20: Saves wait for each other; a project that can't be saved can still be left
 
 - **What:** fixes to saving, found by a code review of "Save projects automatically" before it reached `testing`:

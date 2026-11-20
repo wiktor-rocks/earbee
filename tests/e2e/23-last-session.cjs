@@ -71,6 +71,8 @@ module.exports = async function (h) {
 
   /* ---------- Nothing yet ---------- */
 
+  // (Reloaded first: a page that still has a file open keeps it as it goes.)
+  await welcomeAgain();
   sessions.forget();
   await welcomeAgain();
   check("last session: nothing kept yet, nothing offered", (await offer()) === null);
@@ -175,6 +177,23 @@ module.exports = async function (h) {
   );
   await autosaved();
   check("…after which the session has nothing unsaved", kept()?.unsaved === false);
+
+  // Ctrl+S with nothing to save still writes the file again (a newer
+  // time on it): the session follows, so Reopen still comes back here.
+  await click(5);
+  await autosaved();
+  const place = (await state()).time;
+  key("S", ["control"]);
+  await sleep(600);
+  await autosaved();
+  await welcomeAgain();
+  await reopen();
+  const afterResave = { message: await js(`__message()?.text ?? ""`), time: (await state()).time };
+  check(
+    "last session: Ctrl+S with nothing unsaved, then Reopen: back where you were, not “saved since”",
+    !/was saved since/.test(afterResave.message) && afterResave.time === place,
+    JSON.stringify({ place, ...afterResave }),
+  );
 
   /* ---------- The project saved since ---------- */
 

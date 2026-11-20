@@ -106,6 +106,17 @@ function adoptOldSettings() {
 }
 adoptOldSettings();
 
+// One EarBee at a time (packaged): starting it again opens another window
+// in the one running, so two never clash over the same settings folder
+// (the last session's files, the recent files, the settings). Not for
+// `npm start`, which is used beside the installed EarBee; and per settings
+// folder, so the tests (each with their own) are unaffected.
+const anotherIsRunning = app.isPackaged && !app.requestSingleInstanceLock();
+if (anotherIsRunning) app.quit();
+app.on("second-instance", () => {
+  if (app.isReady()) createWindow();
+});
+
 app.on("child-process-gone", (_event, details) => {
   if (details.type === "GPU") {
     console.warn(`GPU process gone: ${details.reason} (exit code ${details.exitCode})`);
@@ -247,12 +258,15 @@ function createWindow() {
     state: projectState,
     busy: (contents) => stems?.busy(contents) ?? null, // Stems (src/features/stems/)
     autosave: () => prefsStore?.get("general")?.autosave === true,
+    // Don't save: the last session doesn't offer back what was thrown away.
+    onDiscard: (contents) => sessions?.discard(contents.id),
   });
   handleRendererCrash(win, dialog);
   win.loadFile(path.join(ROOT, "index.html"));
 }
 
 app.whenReady().then(() => {
+  if (anotherIsRunning) return; // quitting: the one running opens the window
   const userData = app.getPath("userData");
   const downloadsFolder = path.join(app.getPath("downloads"), "EarBee");
   prefsStore = createPrefsStore(path.join(userData, "prefs.json"), {
@@ -338,7 +352,12 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   // Updates: "Restart and update now" closed them; install and start again.
-  if (updates?.restartPending()) return updates.restart();
+  // (The new one starts while this one is still quitting: it mustn't
+  // find the lock held, or it would quit too.)
+  if (updates?.restartPending()) {
+    app.releaseSingleInstanceLock();
+    return updates.restart();
+  }
   if (process.platform !== "darwin") {
     app.quit();
   }

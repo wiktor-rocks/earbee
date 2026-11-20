@@ -217,6 +217,79 @@ describe("the last session", () => {
     assert.deepEqual(fs.readdirSync(folder), ["session.json"], "no temporary file left");
   });
 
+  test("a copy that's abandoned leaves nothing behind; nor does a window closing in the middle of one", async () => {
+    const { store } = setup();
+    const token = store.beginStems(sender);
+    await store.addStem(sender, token, "bass", new Uint8Array([1, 2]));
+    await store.abortStems({ id: 9 }, token); // not another window's to abort
+    assert.equal(fs.readdirSync(folder).length, 1);
+    await store.abortStems(sender, token);
+    assert.deepEqual(fs.readdirSync(folder), []);
+    await assert.rejects(store.addStem(sender, token, "drums", new Uint8Array([3])), "it's over");
+
+    const second = store.beginStems(sender);
+    await store.addStem(sender, second, "bass", new Uint8Array([1]));
+    store.closed(sender.id);
+    assert.deepEqual(fs.readdirSync(folder), []);
+  });
+
+  test("another EarBee's stems file, finished but not named here, is left alone for a day", async () => {
+    let clock = Date.now();
+    const { store, mediaFiles } = setup({ now: () => clock });
+    fs.mkdirSync(folder, { recursive: true });
+    const theirs = `stems-${"0".repeat(8)}-0000-0000-0000-${"0".repeat(12)}.bin`;
+    fs.writeFileSync(path.join(folder, theirs), "their stems");
+    // This EarBee's own copy, replaced by a newer one: its old one goes at once.
+    const url = mediaFiles.share(songFile);
+    for (const bytes of [[1], [2]]) {
+      const token = store.beginStems(sender);
+      await store.addStem(sender, token, "bass", new Uint8Array(bytes));
+      await store.endStems(sender, token);
+      await store.write(sender, {
+        mediaUrl: url,
+        sections: sections({ stems: { version: 1, stems: { audio: "file" } } }),
+        unsaved: true,
+      });
+    }
+    const stemsFiles = () => fs.readdirSync(folder).filter((name) => name.startsWith("stems-"));
+    assert.deepEqual(stemsFiles().sort(), [sessionJson().stems.file, theirs].sort());
+    clock += 25 * 60 * 60 * 1000;
+    store.tidy();
+    assert.deepEqual(stemsFiles(), [sessionJson().stems.file], "a day later, it goes");
+  });
+
+  test("Don't save: a song never saved isn't offered; nothing more of that window's is kept", async () => {
+    const { store, mediaFiles } = setup();
+    const url = mediaFiles.share(songFile);
+    await store.write(sender, { mediaUrl: url, sections: sections(), unsaved: true });
+    store.discard(sender.id);
+    assert.equal(store.summary(), null);
+    assert.equal(
+      await store.write(sender, { mediaUrl: url, sections: sections(), unsaved: true }, { final: true }),
+      false,
+    );
+    assert.equal(store.summary(), null, "the final write as it closes doesn't bring it back");
+  });
+
+  test("Don't save: a project is offered as last saved, without the changes thrown away", async () => {
+    const { store, mediaFiles } = setup();
+    fs.writeFileSync(projectFile, "{}");
+    const url = mediaFiles.share(songFile, { project: projectFile });
+    await store.write(sender, { mediaUrl: url, sections: sections(), unsaved: true });
+    store.discard(sender.id);
+    assert.deepEqual(store.summary(), { name: "work.ebee", savedAt: 1_000, project: "work.ebee", unsaved: false });
+    const answer = await store.open({ id: 2 });
+    assert.equal(answer.changedSince, false);
+    assert.deepEqual(answer.session, {}, "nothing over the project");
+  });
+
+  test("Don't save in a window that isn't the last session's leaves the last session alone", async () => {
+    const { store, mediaFiles } = setup();
+    await store.write(sender, { mediaUrl: mediaFiles.share(songFile), sections: sections(), unsaved: true });
+    store.discard(7);
+    assert.equal(store.summary()?.unsaved, true);
+  });
+
   test("forgetting it: nothing to offer", async () => {
     const { store, mediaFiles } = setup();
     await store.write(sender, { mediaUrl: mediaFiles.share(songFile), sections: sections(), unsaved: false });

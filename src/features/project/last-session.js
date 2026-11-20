@@ -7,8 +7,10 @@
 // What is kept is every section's saved form (sections.js), as a project
 // would save it, except the stems' bytes: those are copied once, when the
 // stems are ready and nothing is playing, a stem at a time in idle moments
-// (playback comes first). Stems the open project already has aren't copied
-// at all: the session names them "project" ("file": the copy).
+// (playback comes first: the copy waits while it plays). Stems the open
+// project already has aren't copied at all: the session names them
+// "project" ("file": the copy). A copy that's no longer wanted (another
+// file opened, newer stems) stops, and what it wrote is thrown away.
 //
 // When: a moment after any change (CONFIG.session.autosaveDelay), checked
 // after the same inputs, clicks and keys as unsaved changes; now and then
@@ -33,6 +35,7 @@ import { SECTIONS } from "./sections.js";
  * @property {() => Promise<{ ok: boolean, token?: string, error?: string }>} beginStems
  * @property {(token: string, id: string, bytes: Uint8Array) => Promise<{ ok: boolean, error?: string }>} addStem
  * @property {(token: string) => Promise<{ ok: boolean, error?: string }>} endStems
+ * @property {(token: string) => Promise<{ ok: boolean, error?: string }>} abortStems
  *
  * @typedef {{ mediaUrl: string, sections: Record<string, any>, unsaved: boolean }} SessionRequest
  * @typedef {{ name: string, savedAt: number, project: string | null, unsaved: boolean }} SessionSummary
@@ -55,6 +58,7 @@ let named = null;
 let keptStems = null;
 let lastWritten = "";
 let copying = false;
+let sessions = 0; // counts the sessions started: a copy for an earlier one stops
 
 /* ---------- What is kept ---------- */
 
@@ -120,34 +124,51 @@ const idle = () =>
     "requestIdleCallback" in window ? window.requestIdleCallback(resolve, { timeout: 2000 }) : setTimeout(resolve, 50),
   );
 
+// While it plays: until it pauses.
+async function untilPaused() {
+  while (player.transport.playing) await new Promise((resolve) => setTimeout(resolve, 500));
+}
+
 // New stems, ready: copied once, while nothing plays, a stem at a time.
 function copyStemsSoon() {
   if (copying || !bridge || stemsStage() !== "ready") return;
   const { revision } = stemsRevision();
   if (named?.revision === revision || player.transport.playing) return;
   copying = true;
-  copyStems(revision)
+  copyStems(revision, sessions)
     .catch((error) => console.warn("Couldn't keep the stems for the last session:", error))
     .finally(() => {
       copying = false;
     });
 }
 
-async function copyStems(revision) {
+// The stems of `revision`, in session number `session`. Stops (and throws
+// away what it wrote) if newer stems come or another session starts
+// meanwhile: those are copied instead, or have stems of their own.
+async function copyStems(revision, session) {
+  const wanted = () => sessions === session && stemsRevision().revision === revision;
   await whenPrepared();
   const saved = stemsToSave();
-  if (!saved || saved.revision !== revision || !bridge) return;
+  if (!saved || saved.revision !== revision || !bridge || !wanted()) return;
   const stems = Object.entries(saved.audio ?? {}).filter(([, bytes]) => ArrayBuffer.isView(bytes));
   if (stems.length !== saved.ids.length) return; // not bytes (a project's, as they came): nothing to copy
   const begun = await bridge.beginStems();
   if (!begun.ok || !begun.token) return;
-  for (const [id, bytes] of stems) {
-    await idle();
-    if (stemsRevision().revision !== revision) return; // newer ones came meanwhile: they'll be copied instead
-    const added = await bridge.addStem(begun.token, id, /** @type {Uint8Array} */ (bytes));
-    if (!added.ok) return;
+  let ended = false;
+  try {
+    for (const [id, bytes] of stems) {
+      await idle();
+      await untilPaused();
+      if (!wanted()) return;
+      const added = await bridge.addStem(begun.token, id, /** @type {Uint8Array} */ (bytes));
+      if (!added.ok) return;
+    }
+    if (!wanted()) return;
+    ended = (await bridge.endStems(begun.token)).ok;
+  } finally {
+    if (!ended) await bridge.abortStems(begun.token).catch(() => {});
   }
-  if (!(await bridge.endStems(begun.token)).ok) return;
+  if (!ended || !wanted()) return;
   named = { revision, from: "file" };
   scheduleWrite(0);
 }
@@ -161,15 +182,21 @@ async function copyStems(revision) {
  * @param {{ stems?: Record<string, any> | null, stemsFrom?: StemsFrom | null }} [brought]
  */
 export function sessionStarted({ stems = null, stemsFrom = null } = {}) {
+  sessions++;
   named = stemsFrom && stems?.stems ? { revision: stemsRevision().revision, from: stemsFrom } : null;
   keptStems = named && stems ? { ...stems, stems: { ...stems.stems, audio: stemsFrom } } : null;
   lastWritten = "";
   scheduleWrite(0);
 }
 
-/** The project was saved: its stems are in it now. */
+/**
+ * The project was saved: its stems are in it now. Kept again even if
+ * nothing else changed: the session records when the project was saved,
+ * and a project saved since it was kept opens as saved.
+ */
 export function projectSaved() {
   if (stemsToSave()) named = { revision: stemsRevision().revision, from: "project" };
+  lastWritten = "";
   scheduleWrite(0);
 }
 
