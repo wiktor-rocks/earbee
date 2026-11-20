@@ -27,7 +27,7 @@ const sections = (extra = {}) => ({ marks: { version: 1, marks: [{ time: 3 }] },
 
 // A store with a stand-in for the project files: opening the project
 // answers its own sections (with stems, as URLs).
-function setup({ now = () => 1_000 } = {}) {
+function setup({ now = () => 1_000, alone = () => false } = {}) {
   const mediaFiles = createMediaFiles();
   const opened = [];
   const projectFiles = {
@@ -42,7 +42,7 @@ function setup({ now = () => 1_000 } = {}) {
       };
     },
   };
-  const store = createSessionStore(folder, { mediaFiles, projectFiles, now });
+  const store = createSessionStore(folder, { mediaFiles, projectFiles, now, alone });
   return { store, mediaFiles, opened };
 }
 
@@ -230,6 +230,7 @@ describe("the last session", () => {
     const second = store.beginStems(sender);
     await store.addStem(sender, second, "bass", new Uint8Array([1]));
     store.closed(sender.id);
+    await new Promise((resolve) => setTimeout(resolve, 50)); // removed once nothing is being appended
     assert.deepEqual(fs.readdirSync(folder), []);
   });
 
@@ -288,6 +289,43 @@ describe("the last session", () => {
     await store.write(sender, { mediaUrl: mediaFiles.share(songFile), sections: sections(), unsaved: true });
     store.discard(7);
     assert.equal(store.summary()?.unsaved, true);
+  });
+
+  test("the only EarBee: an earlier run's stems file nothing names goes at once", async () => {
+    const { store } = setup({ alone: () => true });
+    fs.mkdirSync(folder, { recursive: true });
+    const earlier = `stems-${"1".repeat(8)}-0000-0000-0000-${"1".repeat(12)}.bin`;
+    fs.writeFileSync(path.join(folder, earlier), "an earlier run's stems");
+    store.tidy();
+    assert.deepEqual(fs.readdirSync(folder), []);
+  });
+
+  test("Don't save while that window's write is still on its way: another window's session stays", async () => {
+    const { store, mediaFiles } = setup();
+    const url = mediaFiles.share(songFile);
+    const theirs = { id: 5 };
+    await store.write(theirs, { mediaUrl: url, sections: sections({ step: { version: 1, n: 5 } }), unsaved: true });
+    const mine = store.write(sender, {
+      mediaUrl: url,
+      sections: sections({ step: { version: 1, n: 1 } }),
+      unsaved: true,
+    });
+    store.discard(sender.id); // before its write has landed
+    await mine;
+    assert.equal(sessionJson().sections.step.n, 5, "the other window's session, as it was");
+    assert.equal(store.summary()?.unsaved, true);
+  });
+
+  test("a window closing while a stem is being appended: nothing left, and the copy can't end", async () => {
+    const { store } = setup();
+    const token = store.beginStems(sender);
+    const adding = store.addStem(sender, token, "bass", new Uint8Array(1_000_000));
+    const ending = store.endStems(sender, token);
+    store.closed(sender.id);
+    await adding;
+    await assert.rejects(ending, /isn't wanted/);
+    await new Promise((resolve) => setTimeout(resolve, 50)); // the removal, after the append
+    assert.deepEqual(fs.readdirSync(folder), []);
   });
 
   test("forgetting it: nothing to offer", async () => {

@@ -678,10 +678,10 @@ body.dragging .welcome-hint {
   flex: 3 1 0;
   min-height: 0;
   width: 100%;
-  margin-top: 24px; /* clear of the drop zone's dashed border, scrolled or not */
+  margin-top: 20px; /* clear of the drop zone's dashed border, scrolled or not */
   overflow-y: auto;
   scrollbar-gutter: stable both-edges;
-  padding: 0 4px 24px;
+  padding: 16px 4px 24px; /* the fades' heights: nothing sits under them until scrolled */
   scroll-padding: 16px 0 24px; /* a row the keyboard reaches stays out of the fades */
   mask-image: linear-gradient(to bottom, transparent, #000 16px, #000 calc(100% - 24px), transparent);
 }
@@ -690,7 +690,6 @@ body.dragging .welcome-hint {
    by side, or one under the other when they don't fit. */
 .welcome-recent {
   width: 100%;
-  margin-top: 12px; /* out of the top fade */
 }
 
 .welcome-recent-lists {

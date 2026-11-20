@@ -43,6 +43,30 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-20: The last session: Don't save spares other windows; no stray stems copies
+
+- **What:** five more fixes from the second code review:
+  - **Don't save in one window can't wipe another window's last session.** Before, if the closing window's latest write hadn't reached the disk yet, Don't save could rewrite or forget another window's session, unsaved work and stems included.
+  - **A window closed in the middle of a stems copy leaves nothing behind.** Before, the part being written could come back as a stray file after the clean-up.
+  - **A stems copy that the project has made unneeded stops.** If the project saved the stems while the copy was waiting for playback to stop, the session used to name a second copy, hundreds of MB.
+  - **Stems copies from an earlier run go at once** in an installed EarBee, which is the only one using its folder, instead of staying for a day. (`npm start` keeps the day, as it may run beside the installed one.)
+  - **The welcome screen:** "Pick up where you left off" no longer sits under the list's top fade.
+- **Why:** the second `/code-review medium`; the owner said to fix everything it found.
+- **How:**
+  - **`electron/session-store.js`:**
+    - `onDisk` (replacing `lastWriter`) is the window whose write last landed, set by `writeFile(data, final, owner)` after the rename. A queued write from a `discarded` window doesn't land, and windows stay discarded after closing (a write of theirs may still be queued);
+    - `closed(id)` removes a copy's `.tmp` after `stems.done`, and `endStems` throws "isn't wanted any more" (removing the `.tmp`) if the copy left `writing` while it waited;
+    - `createSessionStore(…, { alone })`: when `alone()`, `tidy()` deletes any stems file nothing names. `main.js` passes `app.isPackaged`, since a packaged EarBee holds the lock.
+  - **`src/features/project/last-session.js`:** `copyStems`'s `wanted()` is also false once `named` has the copy's revision (the project's stems).
+  - **`style.css`** (Welcome screen): `.welcome-below` has 16 px of padding on top, the fade's height, and a 20 px margin. `.welcome-recent` has no margin of its own.
+- **Where:** `electron/session-store.js`, `electron/main.js`, `src/features/project/last-session.js`, `style.css`, `tests/unit/session-store.test.mjs`.
+- **Verified by:** `npm run check`; `npm run test:unit` (483 pass). New in session-store:
+  - Don't save before that window's write lands leaves another window's session as it was;
+  - a window closed during an append leaves nothing, and its `endStems` rejects;
+  - when alone, an earlier run's unnamed stems file goes at once.
+
+  The older abandoned-copy test now waits for the removal. `TB_TOPICS=02,21,22,23 npm test` (191 pass, smoke 39 pass). `welcome-recent.png` and `welcome-recent-small.png` were looked at. Not checked: the copy stopping once the project has the stems (timing); `alone` in a packaged build.
+
 ## 2026-11-20: Saving: a Save dialog holds nothing up; a late save leaves the next file alone
 
 - **What:** five fixes from a second code review, of the day's saving and closing work (`f70a24e`, `08d5c3a`, `d35cf71`):

@@ -146,7 +146,8 @@ function copyStemsSoon() {
 // away what it wrote) if newer stems come or another session starts
 // meanwhile: those are copied instead, or have stems of their own.
 async function copyStems(revision, session) {
-  const wanted = () => sessions === session && stemsRevision().revision === revision;
+  // (Nor once the project has them: saved meanwhile, it names its own.)
+  const wanted = () => sessions === session && stemsRevision().revision === revision && named?.revision !== revision;
   await whenPrepared();
   const saved = stemsToSave();
   if (!saved || saved.revision !== revision || !bridge || !wanted()) return;

@@ -98,8 +98,11 @@ function resolveStemsAudio(sections, resolve) {
  * @param {ReturnType<typeof import("./media-files").createMediaFiles>} options.mediaFiles
  * @param {ReturnType<typeof import("./project-files").createProjectFiles>} options.projectFiles
  * @param {() => number} [options.now]
+ * @param {() => boolean} [options.alone] Whether this is the only EarBee using
+ *   the folder (a packaged one holds the lock: main.js); then any stems file
+ *   nothing names goes at once.
  */
-function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }) {
+function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now, alone = () => false }) {
   const file = path.join(folder, "session.json");
   // Each window's stems file (its name) and where each stem is in it.
   /** @type {Map<number, { file: string, blobs: Record<string, { offset: number, size: number }> }>} */
@@ -111,10 +114,10 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
   // names them. (Another EarBee using this folder, `npm start` beside the
   // installed one, may still be using its own.)
   const made = new Set();
-  // The window whose session session.json is (the last to write), and the
-  // windows whose changes were thrown away (Don't save): nothing more of
-  // theirs is kept.
-  let lastWriter = null;
+  // The window whose session session.json is (the last write that landed),
+  // and the windows whose changes were thrown away (Don't save): nothing
+  // more of theirs is kept, not even a write already on its way.
+  let onDisk = null;
   const discarded = new Set();
 
   function read() {
@@ -132,8 +135,9 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
 
   // The main process also serves the song or video to the page, so a write
   // never holds it up: asynchronous, one after the other. Except the last
-  // one as a window closes (`final`), done before the app can quit.
-  function writeFile(data, final) {
+  // one as a window closes (`final`), done before the app can quit. `owner`:
+  // the window it's the session of (null: none's).
+  function writeFile(data, final, owner) {
     const number = ++latest;
     const text = JSON.stringify(data);
     const temporary = `${file}.${process.pid}-${number}.tmp`;
@@ -141,14 +145,18 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
       fs.mkdirSync(folder, { recursive: true });
       fs.writeFileSync(temporary, text);
       fs.renameSync(temporary, file);
+      onDisk = owner;
       return Promise.resolve();
     }
     queue = queue.then(async () => {
-      if (number !== latest) return;
+      if (number !== latest || discarded.has(owner)) return;
       try {
         await fs.promises.mkdir(folder, { recursive: true });
         await fs.promises.writeFile(temporary, text);
-        if (number === latest) await fs.promises.rename(temporary, file);
+        if (number === latest && !discarded.has(owner)) {
+          await fs.promises.rename(temporary, file);
+          onDisk = owner;
+        }
       } finally {
         await fs.promises.rm(temporary, { force: true });
       }
@@ -157,8 +165,9 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
   }
 
   // Stems files nobody uses any more: not in session.json, not a window's,
-  // not being written. Those this EarBee made go at once; any other (another
-  // EarBee's, maybe still in use) once it's a day old.
+  // not being written. Those this EarBee made go at once, and so does any
+  // other when it's the only EarBee (an earlier run's); otherwise another
+  // EarBee's, maybe still in use, once it's a day old.
   function tidy() {
     const kept = new Set([read()?.stems?.file, ...[...stemsOf.values()].map((stems) => stems.file)]);
     for (const { file: name } of writing.values()) kept.add(`${name}.tmp`);
@@ -172,7 +181,8 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
       if (!name.startsWith(STEMS_PREFIX) || kept.has(name)) continue;
       const full = path.join(folder, name);
       try {
-        if (made.has(name.replace(/\.tmp$/, "")) || now() - fs.statSync(full).mtimeMs > OTHERS_KEPT_MS) fs.rmSync(full);
+        if (alone() || made.has(name.replace(/\.tmp$/, "")) || now() - fs.statSync(full).mtimeMs > OTHERS_KEPT_MS)
+          fs.rmSync(full);
       } catch {
         // gone already
       }
@@ -236,8 +246,8 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
           stems,
         },
         final,
+        sender.id,
       );
-      lastWriter = sender.id;
       await written;
       // An older copy of the stems isn't named any more: it goes.
       if (before && before !== stems?.file) tidy();
@@ -285,6 +295,11 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
       const stems = writing.get(token);
       if (!stems || stems.owner !== sender.id) throw new Error("Not a stems file being written.");
       await stems.done;
+      // Its window closed, or it was aborted, meanwhile: not wanted any more.
+      if (writing.get(token) !== stems) {
+        await fs.promises.rm(path.join(folder, `${stems.file}.tmp`), { force: true });
+        throw new Error("The stems file isn't wanted any more.");
+      }
       writing.delete(token);
       fs.renameSync(path.join(folder, `${stems.file}.tmp`), path.join(folder, stems.file));
       stemsOf.set(sender.id, { file: stems.file, blobs: stems.blobs });
@@ -313,7 +328,7 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
      */
     discard(id) {
       discarded.add(id);
-      if (lastWriter !== id) return;
+      if (onDisk !== id) return;
       const saved = read();
       if (!saved?.project) return this.forget();
       let mtimeMs;
@@ -335,6 +350,7 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
           stems: null,
         },
         true,
+        null, // nobody's session now
       );
       tidy();
     },
@@ -407,13 +423,18 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now }
     },
 
     /** A window has closed: its stems file is no longer its. @param {number} id */
+    // (A discarded window stays discarded: a write of its may still be on
+    // its way, and a window's id is never used again.)
     closed(id) {
       stemsOf.delete(id);
-      discarded.delete(id);
       for (const [token, stems] of writing) {
         if (stems.owner !== id) continue;
         writing.delete(token);
-        fs.rmSync(path.join(folder, `${stems.file}.tmp`), { force: true });
+        // Once what's being appended is done, or the append would make it again.
+        stems.done
+          .catch(() => {})
+          .then(() => fs.promises.rm(path.join(folder, `${stems.file}.tmp`), { force: true }))
+          .catch(() => {});
       }
     },
 

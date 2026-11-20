@@ -312,7 +312,11 @@ app.whenReady().then(() => {
     projectFiles,
     pages: () => [...mainWindows].map((win) => win.webContents),
   });
-  sessions = createSessionStore(path.join(userData, "last-session"), { mediaFiles, projectFiles });
+  sessions = createSessionStore(path.join(userData, "last-session"), {
+    mediaFiles,
+    projectFiles,
+    alone: () => app.isPackaged, // it holds the lock: no other EarBee uses the folder
+  });
   handleSessions(ipcMain, sessions);
   handleDownloads(ipcMain, {
     binDir: path.join(userData, "bin"),
