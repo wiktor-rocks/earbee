@@ -120,6 +120,13 @@ async function createHarness() {
   fs.rmSync(recentFilesPath, { force: true });
   const recentFiles = createRecentFiles(recentFilesPath);
   handleProjects(ipcMain, projectFiles, { mediaFiles, dialogs: stubDialogs, state: projectState, recentFiles });
+  // Closing (guardClose isn't wired here: the window never closes): what the
+  // page answers when asked to save, then close. askToClose() asks it, as
+  // guardClose does after Save; `closeReplies` records "close" (saved, close
+  // now) and "save-failed" (couldn't save: ask again).
+  const closeReplies = [];
+  ipcMain.on("project:close", () => closeReplies.push("close"));
+  ipcMain.on("project:save-failed", () => closeReplies.push("save-failed"));
   handleRecentFiles(ipcMain, recentFiles, {
     mediaFiles,
     projectFiles,
@@ -130,6 +137,14 @@ async function createHarness() {
   const lastSessionFolder = path.join(OUTPUT, "last-session");
   fs.rmSync(lastSessionFolder, { recursive: true, force: true });
   const sessions = createSessionStore(lastSessionFolder, { mediaFiles, projectFiles });
+  // setStemCopyDelay(ms): each stem kept for the last session takes that
+  // much longer, so a test can play, save or open something meanwhile.
+  let stemCopyDelay = 0;
+  const addStemRightAway = sessions.addStem;
+  sessions.addStem = async (...args) => {
+    if (stemCopyDelay) await new Promise((resolve) => setTimeout(resolve, stemCopyDelay));
+    return addStemRightAway(...args);
+  };
   handleSessions(ipcMain, sessions);
   // As main.js does, except that a test can pretend the system has only
   // `memory.available` bytes left, or `memory.total` in all (null: the
@@ -395,10 +410,13 @@ async function createHarness() {
     lastSessionFolder,
     setStemDelay: (ms) => (stemDelay = ms), // Stems: each segment this much slower
     setSaveDelay: (ms) => (saveDelay = ms), // each project save this much slower
+    setStemCopyDelay: (ms) => (stemCopyDelay = ms), // each stem kept for the last session this much slower
     setStemStartFails: (yes) => (stemStartFails = yes), // Stems: the stem process can't start
     setStemModelGone: (gone) => showStemModel(!gone), // Stems: the model's file deleted, or back
     externalOpens, // the links Open on YouTube passed to the system browser
     projectState, // the page's unsaved state, as the main process hears it
+    askToClose: () => wc.send("project:save-then-close"), // see closeReplies
+    closeReplies,
     videoWin, // the video window (src/features/video-window/), or null
     memory,
     updates,

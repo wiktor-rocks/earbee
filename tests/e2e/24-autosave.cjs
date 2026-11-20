@@ -12,7 +12,7 @@ const path = require("path");
 
 module.exports = async function (h) {
   const { js, key, check, sleep, setFiles, click, toasts, clearToasts, ensurePaused } = h;
-  const { projectDialogs, setStemDelay, setSaveDelay, memory, FIXTURES, OUTPUT } = h;
+  const { projectDialogs, setStemDelay, setSaveDelay, askToClose, closeReplies, memory, FIXTURES, OUTPUT } = h;
 
   const folder = path.join(OUTPUT, "autosave");
   // Writable again first, in case a run before stopped while it wasn't.
@@ -45,12 +45,12 @@ module.exports = async function (h) {
   const waitOut = () => sleep(3000);
   // `work` with the folder read-only (nothing can be saved there); writable
   // again afterwards, whatever happens.
-  const readOnly = async (work) => {
-    fs.chmodSync(folder, 0o555);
+  const readOnly = async (work, dir = folder) => {
+    fs.chmodSync(dir, 0o555);
     try {
       return await work();
     } finally {
-      fs.chmodSync(folder, 0o755);
+      fs.chmodSync(dir, 0o755);
     }
   };
   const addMark = async (time) => {
@@ -295,6 +295,43 @@ module.exports = async function (h) {
       projectDialogs.asked.length === askedAt,
     JSON.stringify({ openedFirst, lateTitle, marks: marksIn(late), asked: projectDialogs.asked.slice(askedAt) }),
   );
+
+  /* ---------- Closing: save, then close ---------- */
+
+  // As guardClose asks after Save (or for a project that saves itself):
+  // what the page answers. The window itself never closes here.
+  const closing = async (then) => {
+    closeReplies.length = 0;
+    askToClose();
+    await sleep(300);
+    await then?.();
+    await sleep(800);
+    return [...closeReplies];
+  };
+  const submitSaveAs = () => js(`saveModeLink.click(); saveForm.requestSubmit()`);
+  const locked = path.join(folder, "locked");
+  fs.mkdirSync(locked);
+  await open(song("closing.wav"));
+  await addMark(2);
+  projectDialogs.save = path.join(locked, "closing.ebee");
+  const failedAs = await readOnly(() => closing(submitSaveAs), locked);
+  const canceledAs = await closing(() => js(`saveDialog.close("")`));
+  projectDialogs.save = path.join(folder, "closing.ebee");
+  const savedAs = await closing(submitSaveAs);
+  await addMark(3);
+  const failedProject = await readOnly(() => closing());
+  check(
+    "closing a song whose Save As fails asks again; canceled, it stays; saved, it closes",
+    JSON.stringify([failedAs, canceledAs, savedAs]) === JSON.stringify([["save-failed"], [], ["close"]]),
+    JSON.stringify({ failedAs, canceledAs, savedAs }),
+  );
+  check(
+    "…and a project that can't be written asks again",
+    JSON.stringify(failedProject) === JSON.stringify(["save-failed"]),
+    JSON.stringify(failedProject),
+  );
+  projectDialogs.confirm = "discard"; // what's left unsaved here, for the next open
+  await open(song("after-closing.wav"));
   projectDialogs.confirm = "cancel";
   await setAutosave(true);
 

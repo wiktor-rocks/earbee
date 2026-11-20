@@ -12,7 +12,7 @@ const path = require("path");
 
 module.exports = async function (h) {
   const { wc, js, key, check, sleep, setFiles, slide, click, shot, toasts, ensurePaused } = h;
-  const { projectDialogs, sessions, lastSessionFolder, memory, FIXTURES, OUTPUT } = h;
+  const { projectDialogs, sessions, lastSessionFolder, memory, setStemCopyDelay, FIXTURES, OUTPUT } = h;
 
   const folder = path.join(OUTPUT, "last-session-media");
   fs.rmSync(folder, { recursive: true, force: true });
@@ -323,6 +323,52 @@ module.exports = async function (h) {
       page: costs.map((cost) => round(cost.page)),
       total: costs.map((cost) => round(cost.total)),
       longTasks,
+    }),
+  );
+
+  /* ---------- Stems the project has: no copy of its own ---------- */
+
+  // New stems, being copied slowly; playback starts, which holds the copy;
+  // meanwhile the song is saved as a project, with the stems inside. Once
+  // paused, the copy isn't needed: it stops, and the session names the
+  // project's own stems. (The earlier song's copy stays this window's until
+  // it closes, as before.)
+  const filesBefore = fs.readdirSync(lastSessionFolder).filter((name) => name.startsWith("stems-"));
+  const copySong = song("copy.wav");
+  await open(copySong);
+  await ensurePaused();
+  setStemCopyDelay(1500);
+  await js(`document.querySelector("#stemsSection .stems-whole").click()`);
+  for (let i = 0; i < 1200 && !(await stemsReady()); i++) await sleep(100);
+  const copyFiles = () => fs.readdirSync(lastSessionFolder).filter((name) => name.startsWith("stems-"));
+  for (let i = 0; i < 100 && !copyFiles().some((name) => name.endsWith(".tmp")); i++) await sleep(100);
+  const copying = copyFiles().some((name) => name.endsWith(".tmp"));
+  key("Space");
+  await sleep(300);
+  const copyProject = path.join(folder, "copy.ebee");
+  projectDialogs.save = copyProject;
+  await js(`saveAsButton.click()`);
+  await sleep(150);
+  await js(`saveModeLink.click(); saveForm.requestSubmit()`);
+  for (let i = 0; i < 100 && (await unsaved()); i++) await sleep(100);
+  await sleep(2000); // the copy holds while playing
+  await ensurePaused();
+  await sleep(4000); // the stem being added, then the copy sees it isn't needed
+  setStemCopyDelay(0);
+  await autosaved();
+  check(
+    "last session: a copy of stems the project has meanwhile stops, leaving nothing; the session names the project's",
+    copying &&
+      fs.existsSync(copyProject) &&
+      kept()?.project?.path === copyProject &&
+      kept()?.sections?.stems?.stems?.audio === "project" &&
+      JSON.stringify(copyFiles()) === JSON.stringify(filesBefore), // nothing new: no copy, no .tmp
+    JSON.stringify({
+      filesBefore,
+      copying,
+      files: copyFiles(),
+      audio: kept()?.sections?.stems?.stems?.audio,
+      project: kept()?.project?.path,
     }),
   );
   memory.available = null;

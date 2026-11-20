@@ -43,6 +43,26 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-20: Checks for closing after a failed save and for an unneeded stems copy; stale copies go at start
+
+- **What:**
+  - An installed EarBee removes earlier runs' stems copies that nothing names as it starts. Before, they went only after the next change that wrote the last session.
+  - New end-to-end checks for two fixes that had been left to reading the code: closing a song whose Save As fails, and a stems copy that the project made unneeded.
+- **Why:** the owner asked why those had been left unchecked; both could be tested after all. The clear-up at start came up while planning the packaged check.
+- **How:**
+  - `electron/main.js` calls `sessions.tidy()` once, in a packaged EarBee (which holds the lock), after creating the store.
+  - **The harness** (`tests/e2e/harness.cjs`):
+    - `askToClose()` sends the page `project:save-then-close`, as `guardClose` does after Save, and `closeReplies` records what the page answers (`close`, `save-failed`);
+    - `setStemCopyDelay(ms)` slows each stem kept for the last session (it wraps `sessions.addStem`).
+- **Where:** `electron/main.js`, `tests/e2e/harness.cjs`, `tests/e2e/24-autosave.cjs`, `tests/e2e/23-last-session.cjs`.
+- **Verified by:** `npm run check`. `TB_TOPICS=24 npm test` (24 pass): Save As failing on close answers `save-failed`; canceled, nothing; saved, `close`; a project that can't be written, `save-failed`. `TB_TOPICS=23 npm test` (32 pass): stems being copied slowly, playback started, the song saved as a project meanwhile, then paused. The copy stops, no new stems file is left, and the session names the project's stems. With `wanted()`'s new condition taken out for one run, that check failed: the session named a second copy (`"file"`) and a new file appeared. The earlier song's copy stays this window's until it closes, as it did before.
+  - The full `npm test` after "Don't save spares other windows" had one failure, in topic 06 ("wheel on the minimap scrolls, doesn't zoom": the check waits a fixed 250 ms for the view to move back). Nothing that day touched the waveform, and `TB_TOPICS=03,04,05,06` passed three times out of three: a flaky check.
+  - **A packaged build** (`npm run build:linux`; its smoke test 39 pass), started by a script with a temporary settings folder (`--user-data-dir`):
+    - a stray stems file put there before the start was gone right after it;
+    - started a second time with the same folder, it quit after 1.5 s with exit code 0, while the first kept running with one more window (`xdotool`, counting windows titled EarBee: 3 → 4).
+
+    Not checked: copying the old ScriBee settings only once the lock is held (that copy is skipped with `--user-data-dir`, so it needs the real settings folder); "Restart and update now" with the lock released, which needs the two-build update test in docs/maintaining.md.
+
 ## 2026-11-20: The last session: Don't save spares other windows; no stray stems copies
 
 - **What:** five more fixes from the second code review:

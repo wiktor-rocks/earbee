@@ -317,6 +317,9 @@ app.whenReady().then(() => {
     projectFiles,
     alone: () => app.isPackaged, // it holds the lock: no other EarBee uses the folder
   });
+  // An earlier run's stems copies nothing names any more go now, not only
+  // after the next change. (Only when no other EarBee can be using them.)
+  if (app.isPackaged) sessions.tidy();
   handleSessions(ipcMain, sessions);
   handleDownloads(ipcMain, {
     binDir: path.join(userData, "bin"),
