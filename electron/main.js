@@ -196,6 +196,7 @@ let stems = null; // Stems (src/features/stems/): what handleStems gives, once r
 /** @type {ReturnType<typeof handleUpdates> | null} */
 let updates = null; // Updates (src/features/updates.js), once ready
 let sessions = null; // The last session (session-store.js), once ready
+let prefsStore = null; // The settings (prefs-store.js), once ready
 
 // The app's own windows (not the video window, which stays black).
 const mainWindows = new Set();
@@ -245,6 +246,7 @@ function createWindow() {
     dialogs: projectDialogs,
     state: projectState,
     busy: (contents) => stems?.busy(contents) ?? null, // Stems (src/features/stems/)
+    autosave: () => prefsStore?.get("general")?.autosave === true,
   });
   handleRendererCrash(win, dialog);
   win.loadFile(path.join(ROOT, "index.html"));
@@ -253,7 +255,7 @@ function createWindow() {
 app.whenReady().then(() => {
   const userData = app.getPath("userData");
   const downloadsFolder = path.join(app.getPath("downloads"), "EarBee");
-  const prefsStore = createPrefsStore(path.join(userData, "prefs.json"), {
+  prefsStore = createPrefsStore(path.join(userData, "prefs.json"), {
     legacyThemeFile: path.join(userData, "theme.json"),
   });
   themeView = createThemeView(prefsStore, nativeTheme);

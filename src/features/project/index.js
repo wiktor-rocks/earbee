@@ -11,19 +11,26 @@
 // section needs no wiring of its own. The title then ends in •, and
 // opening something else or closing the window asks first.
 //
+// With Settings › General › Save projects automatically, an open project
+// also saves itself a moment after a change (never while playing): see
+// "Saving by itself", below.
+//
 // Every session is also kept as you go, as the last session
 // (last-session.js), which the welcome screen offers back on the next
 // start; reopening it is openLastSession, below.
 //
 // Outside Electron (no bridge) media files still open; there is no saving.
+import { CONFIG } from "../../config.js";
 import { hasAudio, marks, player } from "../../context.js";
 import { AppError } from "../../core/errors.js";
 import { isProjectName } from "../../project/format.js";
 import { dom, guarded, onClick, reportError, showNotice } from "../../ui/dom.js";
+import { getPrefs, onPrefsChange } from "../../ui/prefs.js";
 import { isTextField } from "../../ui/shortcuts.js";
 import { notify } from "../../ui/toast.js";
 import { beatEvents } from "../beats.js";
 import { importChapters } from "../marks.js";
+import { stemsStage } from "../stems/index.js";
 import { loadMediaFile, withLoading } from "../open-file.js";
 import { bindLastSession, bridge as lastSession, projectSaved, sessionStarted } from "./last-session.js";
 import { SECTIONS } from "./sections.js";
@@ -116,10 +123,14 @@ function renderTitle() {
 
 function checkDirty() {
   const dirty = Boolean(bridge) && hasAudio() && (session.saved === null || dirtyingState() !== session.saved);
-  if (dirty === session.dirty) return;
+  if (dirty === session.dirty) {
+    if (dirty) scheduleAutosave(); // a change more: the wait starts again
+    return;
+  }
   session.dirty = dirty;
   renderTitle();
   bridge?.setDirty(dirty, session.name ?? "");
+  if (dirty) scheduleAutosave();
 }
 
 let checkPending = false;
@@ -139,13 +150,79 @@ function markSaved() {
   renderTitle();
 }
 
+/* ---------- Saving by itself ---------- */
+
+// Settings › General › Save projects automatically: a project (not a song
+// that has never been saved: that takes Save As) saves itself, as Ctrl+S
+// would, CONFIG.project.autosaveDelay after the last change. Not while
+// playing: a save copies the stems (and the media, if it's inside), so it
+// waits for a pause. Nor while a name is being typed, while the stems are
+// being separated (each new part would mean another save), or while a
+// save or the Save As dialog is going: it tries again a moment later.
+// Quietly: the • going away says it's saved. A failure is shown once,
+// not again for each change after it.
+const autosaveOn = () => getPrefs("general")?.autosave === true;
+const STEMS_BUSY = new Set(["download", "decode", "separate", "rest"]);
+let autosaveTimer = 0;
+let autosaving = false;
+let autosaveError = "";
+let failedState = null; // what a save by itself failed on: not tried again until it changes
+
+function scheduleAutosave() {
+  clearTimeout(autosaveTimer);
+  autosaveTimer = 0;
+  if (!autosaveOn() || !session.path || !session.dirty) return;
+  if (failedState !== null && failedState === dirtyingState()) return;
+  autosaveTimer = window.setTimeout(autosaveNow, CONFIG.project.autosaveDelay);
+}
+
+function autosaveWaits() {
+  const focused = document.activeElement;
+  return (
+    player.transport.playing ||
+    autosaving ||
+    dom.saveDialog.open ||
+    (focused instanceof HTMLElement && isTextField(focused)) ||
+    STEMS_BUSY.has(stemsStage())
+  );
+}
+
+async function autosaveNow() {
+  autosaveTimer = 0;
+  if (!autosaveOn() || !session.path || !session.dirty) return;
+  if (autosaveWaits()) return scheduleAutosave();
+  autosaving = true;
+  try {
+    await writeProject(session.path, session.embedded, { quiet: true });
+    autosaveError = "";
+    failedState = null;
+  } catch (error) {
+    const message = String(error?.message ?? error);
+    if (message !== autosaveError) reportError(error);
+    autosaveError = message;
+    failedState = dirtyingState();
+  } finally {
+    autosaving = false;
+    checkDirty(); // changed meanwhile: again, in a moment
+  }
+}
+
 /**
  * Before what is open is replaced: if it has unsaved changes, Save / Don't
- * save / Cancel. Resolves true to go ahead.
+ * save / Cancel (a project that saves itself: saved, without asking).
+ * Resolves true to go ahead.
  */
 export async function confirmUnsaved() {
   checkDirty();
   if (!bridge || !session.dirty) return true;
+  if (autosaveOn() && session.path) {
+    clearTimeout(autosaveTimer);
+    autosaveTimer = 0;
+    return writeProject(session.path, session.embedded, { quiet: true }).catch((error) => {
+      reportError(error);
+      return false;
+    });
+  }
   const choice = await bridge.confirm(session.name ?? "");
   if (choice === "save") return saveProject();
   return choice === "discard";
@@ -312,18 +389,20 @@ async function showOpenedProject(opened) {
 
 /**
  * Writes the project to `file` (null: the user picks where). Resolves
- * true once it's saved.
+ * true once it's saved. `quiet` (saving by itself): no notification, and
+ * a name being typed isn't committed.
  * @param {string | null} file
  * @param {boolean} embed
+ * @param {{ quiet?: boolean }} [options]
  */
-async function writeProject(file, embed) {
+async function writeProject(file, embed, { quiet = false } = {}) {
   if (!bridge || !hasAudio()) return false;
   if (!session.mediaUrl)
     throw new AppError(`“${session.mediaName}” isn't a file on this computer, so a project can't name it.`);
   // A name still being typed (Ctrl+S works in text fields) counts: its
   // field only commits on "change", which hasn't fired yet.
   const focused = document.activeElement;
-  if (focused instanceof HTMLElement && isTextField(focused)) focused.dispatchEvent(new Event("change"));
+  if (!quiet && focused instanceof HTMLElement && isTextField(focused)) focused.dispatchEvent(new Event("change"));
   // What a section is still making, first (sections.js, prepare).
   await Promise.all(SECTIONS.map((section) => section.prepare?.()));
   const result = await bridge.save({
@@ -345,7 +424,9 @@ async function writeProject(file, embed) {
   });
   markSaved();
   projectSaved();
-  notify("Project saved", result.path);
+  autosaveError = ""; // saved: a failure from before would be news again
+  failedState = null;
+  if (!quiet) notify("Project saved", result.path);
   return true;
 }
 
@@ -410,6 +491,9 @@ export function bindProject() {
     window.addEventListener(type, scheduleDirtyCheck, { capture: true });
   marks.on("change", scheduleDirtyCheck);
   beatEvents.on("found", scheduleDirtyCheck);
+  // Saving by itself: turned on (with unsaved changes), or playback stopped.
+  onPrefsChange("general", () => scheduleAutosave());
+  player.transport.on("state", () => scheduleAutosave());
 
   // The window is closing and the user chose Save.
   bridge.onSaveThenClose(

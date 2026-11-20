@@ -177,9 +177,10 @@ describe("the theme section", () => {
 describe("the general section", () => {
   const general = getSection("general");
 
-  test("defaults: notifications on, no beat click, knobs at 100 %, checking for updates", () => {
+  test("defaults: notifications on, projects not saving themselves, no beat click, knobs at 100 %, checking for updates", () => {
     assert.deepEqual(defaultsOf(general), {
       notifications: true,
+      autosave: false,
       beatClick: false,
       knobSensitivity: 100,
       checkUpdates: true,

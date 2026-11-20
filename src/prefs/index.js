@@ -27,6 +27,13 @@ const generalSection = defineSection({
       default: true,
     },
     {
+      key: "autosave",
+      type: "boolean",
+      label: "Save projects automatically",
+      help: "An open project saves itself a moment after each change, or once playback stops, so it never stutters. Closing saves it without asking. A song becomes a project with Save the first time.",
+      default: false,
+    },
+    {
       key: "beatClick",
       type: "boolean",
       label: "Click on each beat",

@@ -10,7 +10,14 @@ import { test } from "node:test";
 
 const { guardClose } = createRequire(import.meta.url)("../../electron/project-files.js");
 
-function setUp({ dirty = false, running = null, closeAnyway = true, choice = "discard" } = {}) {
+function setUp({
+  dirty = false,
+  running = null,
+  closeAnyway = true,
+  choice = "discard",
+  autosave = false,
+  name = "Song.ebee",
+} = {}) {
   const contents = Object.assign(new EventEmitter(), {
     id: 7,
     sent: [],
@@ -33,10 +40,10 @@ function setUp({ dirty = false, running = null, closeAnyway = true, choice = "di
     confirm: async (_sender, name) => (asked.push(["confirm", name]), choice),
     confirmBusy: async (_sender, what) => (asked.push(["busy", what]), closeAnyway),
   };
-  const state = new Map(dirty ? [[7, { dirty: true, name: "Song.ebee" }]] : []);
+  const state = new Map(dirty ? [[7, { dirty: true, name }]] : []);
   const ipcMain = Object.assign(new EventEmitter(), { removeListener: EventEmitter.prototype.removeListener });
   const status = { running };
-  guardClose(win, { ipcMain, dialogs, state, busy: () => status.running });
+  guardClose(win, { ipcMain, dialogs, state, busy: () => status.running, autosave: () => autosave });
   // close(), then the dialogs' answers.
   const close = async () => {
     win.close();
@@ -92,4 +99,26 @@ test("closing anyway with unsaved changes: then the usual question", async () =>
   saved.ipcMain.emit("project:close", { sender: saved.contents });
   assert.equal(saved.win.closed, true, "once saved, it closes without asking again");
   assert.equal(saved.asked.length, 2);
+});
+
+test("projects saving themselves: a project with unsaved changes is saved, without asking", async () => {
+  const { win, contents, asked, close, ipcMain } = setUp({ dirty: true, autosave: true });
+  await close();
+  assert.deepEqual(asked, []);
+  assert.deepEqual(contents.sent, ["project:save-then-close"]);
+  ipcMain.emit("project:close", { sender: contents });
+  assert.equal(win.closed, true);
+});
+
+test("projects saving themselves: a song not yet a project still asks", async () => {
+  const { asked, close } = setUp({ dirty: true, autosave: true, name: "", choice: "cancel" });
+  await close();
+  assert.deepEqual(asked, [["confirm", ""]]);
+});
+
+test("projects saving themselves, with a separation running: that's asked first, then saved", async () => {
+  const { asked, contents, close } = setUp({ dirty: true, autosave: true, running: "separate" });
+  await close();
+  assert.deepEqual(asked, [["busy", "separate"]]);
+  assert.deepEqual(contents.sent, ["project:save-then-close"]);
 });

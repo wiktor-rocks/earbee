@@ -63,6 +63,7 @@ const TOPICS = [
   "21-stems.cjs", // Stems (src/features/stems/)
   "22-recent.cjs", // Recent files (src/features/recent.js)
   "23-last-session.cjs", // The last session (src/features/project/last-session.js)
+  "24-autosave.cjs", // Save projects automatically (features/project/index.js)
 ];
 
 prepare();

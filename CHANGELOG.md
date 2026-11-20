@@ -43,6 +43,29 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-20: Save projects automatically (a setting)
+
+- **What:** Settings › General has "Save projects automatically", off at first. With it on, an open project saves itself, as Ctrl+S would, 2 s after the last change, quietly: no "Project saved", the • going away says it. Projects with the song or video inside save themselves too.
+  - **Not while playing:** it waits, and saves once playback pauses or stops. Nor while a mark's name is being typed (once it's in), or while the stems are being separated (once they're ready).
+  - **Closing** saves without asking, and so does opening another file.
+  - **A song never saved as a project** isn't saved (that takes Save As once) and is asked about as before.
+  - **A save that fails** says so once. It isn't tried again until something changes, and that failure isn't shown again until a save has worked.
+  - The last session ("Pick up where you left off") works as before, with the setting on or off.
+- **Why:** the owner, for 0.4.0's autosave item: "We can just make it a setting." The owner chose to save the project file itself, never while playing (a save copies the stems, about 36 MB with six, and the media if it's inside), for every project, and closing without asking.
+- **How:**
+  - **The page:** "Saving by itself" in `features/project/index.js`. `checkDirty` schedules `autosaveNow` after `CONFIG.project.autosaveDelay`, and each change starts the wait again. `autosaveNow` waits (tries again a moment later) while playing, while a text field has focus, during a save or the Save As dialog, and while `stemsStage()` is downloading, decoding or separating. It saves with `writeProject(path, embedded, { quiet: true })`: no notification, and a name being typed isn't committed.
+  - **Failures:** after one, `failedState` (the dirtying state it failed on) stops it trying again until that changes, so a failing save doesn't copy the stems every 2 s. Any save that works clears it.
+  - **Opening another file:** `confirmUnsaved` saves instead of asking, for a project.
+  - **The setting changing**, or playback stopping, schedules a save (`onPrefsChange`, transport `state`).
+  - **Closing:** `guardClose` (`electron/project-files.js`) has a new `autosave` option. With it on, a dirty project (one with a name) gets `project:save-then-close` without the dialog: the page saves, then closes, and a failed save keeps the window open with its error. A song (no name) is asked about as before. `electron/main.js` passes it from `prefsStore.get("general").autosave` (`prefsStore` is now module-level).
+- **Where:** `src/prefs/index.js` (`general.autosave`), `src/config.js` (`project.autosaveDelay`), `src/features/project/index.js`, `electron/project-files.js` (`guardClose`), `electron/main.js`; tests: `tests/e2e/24-autosave.cjs` (new), `tests/run.cjs`, `tests/unit/close-guard.test.mjs`, `tests/unit/prefs.test.mjs`; `README.md`, `AGENTS.md`, `docs/glossary.md`, the `src/app.js` header.
+- **Verified by:** `npm run check`; the full `npm test` (470 unit, 825 e2e, 39 smoke, all passing).
+  - **Topic 24** (17): off at first, and a change then isn't saved; turning it on saves what wasn't; a change saves itself, with no "Project saved"; while playing it isn't saved, and is once paused; a name half typed isn't saved, and is once it's in; a failing save (the folder read-only) is shown once, and saving works again after; a song never saved isn't saved and nothing asks; opening another file saves first, without asking; a project with its media inside saves too and opens again; with the stems being separated (slowed down) it isn't saved, and is, with them, once they're ready; off again, a change waits.
+  - **Unit:** `close-guard.test.mjs` (3 new: a dirty project closes after saving without the dialog; a song still asks; a separation running is asked about first); `prefs.test.mjs` (the default).
+  - Not checked: closing through the real `guardClose` in a real window (the e2e harness doesn't wire it; the unit test covers it), playback by ear with it on, Windows and the Mac.
+
+---
+
 ## 2026-11-20: Pick up where you left off: the last session, kept as you go
 
 - **What:** EarBee keeps what's open as you go: the song or video, the marks, the loop, the sound settings, the beats, the place, the zoom and the stems. On the next start, after quitting or a crash, the welcome screen offers it above the recent files, under "Pick up where you left off". The row shows the name, when it was kept ("today 14:32") and "unsaved changes" if there were any. One click reopens it as it was; × forgets it.

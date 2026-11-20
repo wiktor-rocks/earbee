@@ -315,8 +315,11 @@ function handleProjects(ipcMain, projectFiles, { mediaFiles, dialogs, state, rec
  * @param {ProjectDialogs & { confirmBusy?: (sender: any, what: string) => Promise<boolean> }} options.dialogs
  * @param {Map<number, { dirty: boolean, name: string }>} options.state
  * @param {(contents: any) => string | null} [options.busy] What is running for this page, or null.
+ * @param {() => boolean} [options.autosave] Whether projects save themselves (Settings › General):
+ *   then a project with unsaved changes is saved without asking (a song not
+ *   yet a project still asks).
  */
-function guardClose(win, { ipcMain, dialogs, state, busy = () => null }) {
+function guardClose(win, { ipcMain, dialogs, state, busy = () => null, autosave = () => false }) {
   const contents = win.webContents;
   const id = contents.id;
   let asking = false;
@@ -341,7 +344,7 @@ function guardClose(win, { ipcMain, dialogs, state, busy = () => null }) {
     try {
       if (running && !(await dialogs.confirmBusy?.(contents, running))) return;
       if (!page?.dirty) return leave();
-      const choice = await dialogs.confirm(contents, page.name);
+      const choice = autosave() && page.name ? "save" : await dialogs.confirm(contents, page.name);
       if (choice === "save") contents.send("project:save-then-close");
       else if (choice === "discard") {
         state.delete(id);

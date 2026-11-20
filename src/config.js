@@ -332,4 +332,9 @@ export const CONFIG = {
   // long after a change (ms; several in a row, once), and while playing,
   // this often for the place (ms).
   session: { autosaveDelay: 2000, playingInterval: 30000 },
+
+  // Save projects automatically (Settings › General, features/project/):
+  // how long after a change a project saves itself (ms; several in a row,
+  // once).
+  project: { autosaveDelay: 2000 },
 };

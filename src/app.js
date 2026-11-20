@@ -53,6 +53,8 @@
  *              session is also kept as you go, as the last session
  *              (features/project/last-session.js, electron/session-store.js),
  *              which the welcome screen offers back on the next start.
+ *              With Settings › General › Save projects automatically, an
+ *              open project saves itself (never while playing).
  *   stems      The song split into its instruments on demand, by the stem
  *              model in the main process (electron/stems/), then mixed
  *              into Signalsmith's input with a volume, solo and mute each
