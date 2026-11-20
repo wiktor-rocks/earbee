@@ -87,19 +87,23 @@
           </ul>
         </div>
 
-        <!-- The last session, offered back (src/features/project/last-session.js). -->
-        <section id="welcomeSession" class="welcome-recent welcome-session" aria-label="Last session" hidden>
-          <div class="recent-list">
-            <h2>Pick up where you left off</h2>
-            <ul id="welcomeSessionList"></ul>
-          </div>
-        </section>
+        <!-- Below the card, in the room left: it scrolls by itself, so the
+             bee and the card stay where they are however long the lists. -->
+        <div class="welcome-below">
+          <!-- The last session, offered back (src/features/project/last-session.js). -->
+          <section id="welcomeSession" class="welcome-recent welcome-session" aria-label="Last session" hidden>
+            <div class="recent-list">
+              <h2>Pick up where you left off</h2>
+              <ul id="welcomeSessionList"></ul>
+            </div>
+          </section>
 
-        <!-- The projects and files opened lately (src/features/recent.js). -->
-        <section id="welcomeRecent" class="welcome-recent" aria-label="Recent files" hidden>
-          <div id="welcomeRecentLists" class="welcome-recent-lists"></div>
-          <button id="welcomeRecentClear" class="welcome-recent-clear" type="button">Clear recent files</button>
-        </section>
+          <!-- The projects and files opened lately (src/features/recent.js). -->
+          <section id="welcomeRecent" class="welcome-recent" aria-label="Recent files" hidden>
+            <div id="welcomeRecentLists" class="welcome-recent-lists"></div>
+            <button id="welcomeRecentClear" class="welcome-recent-clear" type="button">Clear recent files</button>
+          </section>
+        </div>
       </div>
     </main>
 

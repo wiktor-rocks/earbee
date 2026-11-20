@@ -43,6 +43,23 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-20: The welcome screen's recent files scroll by themselves
+
+- **What:** on the welcome screen, the bee, the title and the drop zone always stay in the same place, however many recent files and projects there are. The last session ("Pick up where you left off") and the recent files fill the room below. When they don't fit, they scroll on their own, with softly faded edges, and **Clear recent files** scrolls with them. Before, the whole screen was centred, so more recent files pushed the bee and the drop zone up, and a long list scrolled the whole screen. In a short window (under 720 px) the bee is smaller, now with or without recent files, so nothing moves when they're cleared. Only a window too short for the drop zone itself scrolls the whole screen.
+- **Why:** the owner, for 0.4.0: "make the recent files window on the welcome page scrollable by itself, so that the rest of the UI elements stay where they are initially."
+- **How:**
+  - **`index.html`:** the last session and the recent files are inside a new `.welcome-below`.
+  - **`style.css`**, "Welcome screen":
+    - `.welcome` is the viewport's height and scrolls only if the content overflows it;
+    - `.welcome-content` fills that height. Its `::before` (`flex: 1`) is the room above the bee, and `.welcome-below` (`flex: 3`, `min-height: 0`, `overflow-y: auto`) the room below, so the card's place doesn't depend on what's in the lists;
+    - `.welcome-below` keeps a 24 px gap under the card outside its scrolling, fades its ends with a `mask-image`, keeps its rows out of the fades with padding and `scroll-padding`, and keeps the lists centred with `scrollbar-gutter: stable both-edges`;
+    - the short-window bee rule no longer depends on recent files being shown (and leaves the loading screen's bee alone).
+
+  The welcome animations are unchanged: the new box is the content's fourth child, as the lists were.
+
+- **Where:** `index.html` (`.welcome-below`), `style.css` (Welcome screen), `tests/e2e/22-recent.cjs`.
+- **Verified by:** `npm run check`; `TB_TOPICS=02,22 npm test` (88 pass, smoke 39 pass). New in topic 22: with 16 entries the drop zone is where it was with none (within 1 px), the lists' box scrolls, and the screen doesn't. The small-window checks (the last entry and Clear can be scrolled to, nothing sideways, long names cut short) still pass inside the new box. Screenshots looked at: `welcome.png` (no lists), `welcome-recent.png` (1200×800, with the last session) and `welcome-recent-small.png` (900×640, scrolled to the end). Not checked: a real window by hand, the light themes.
+
 ## 2026-11-20: The last session: the right stems, Don't save forgets, one EarBee at a time
 
 - **What:** fixes to "Pick up where you left off", found by the same code review:

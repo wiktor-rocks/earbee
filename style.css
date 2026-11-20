@@ -378,10 +378,15 @@ kbd {
 
 /* ---------- Welcome screen ---------- */
 
+/* The bee, the title and the card always sit in the same place (a quarter
+   of the room left above them, the rest below), whether or not there
+   are recent files: those scroll in the room below (.welcome-below). Only
+   a window too short for the card itself scrolls the whole screen. */
 .welcome {
-  display: grid;
-  place-items: center;
-  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  height: 100vh;
+  overflow-y: auto;
   padding: 32px 16px;
   /* A soft, static glow behind the logo, like the logo's own. */
   background: radial-gradient(circle at 50% 30%, var(--screen-glow), transparent 40%) var(--bg);
@@ -392,7 +397,13 @@ kbd {
   flex-direction: column;
   align-items: center;
   width: min(640px, 100%);
+  height: 100%;
   text-align: center;
+}
+
+.welcome-content::before {
+  content: "";
+  flex: 1 1 0;
 }
 
 /* The bee, on the welcome and loading screens. */
@@ -659,12 +670,27 @@ body.dragging .welcome-hint {
   color: var(--accent);
 }
 
+/* Under the card: the last session and the recent files, in the room
+   left, scrolling by themselves when they don't fit. Their ends fade, so
+   a row cut by the edge reads as "more this way"; the padding at the
+   bottom keeps the last row clear of the fade once scrolled to. */
+.welcome-below {
+  flex: 3 1 0;
+  min-height: 0;
+  width: 100%;
+  margin-top: 24px; /* clear of the drop zone's dashed border, scrolled or not */
+  overflow-y: auto;
+  scrollbar-gutter: stable both-edges;
+  padding: 0 4px 24px;
+  scroll-padding: 16px 0 24px; /* a row the keyboard reaches stays out of the fades */
+  mask-image: linear-gradient(to bottom, transparent, #000 16px, #000 calc(100% - 24px), transparent);
+}
+
 /* The recent files (src/features/recent.js), under the card: two lists side
-   by side, or one under the other when they don't fit. A long list scrolls
-   the whole screen. */
+   by side, or one under the other when they don't fit. */
 .welcome-recent {
   width: 100%;
-  margin-top: 36px; /* clear of the drop zone's dashed border */
+  margin-top: 12px; /* out of the top fade */
 }
 
 .welcome-recent-lists {
@@ -779,9 +805,10 @@ body.dragging .welcome-hint {
   margin-top: 20px;
 }
 
-/* In a short window, a smaller bee leaves more room for the lists. */
+/* In a short window, a smaller bee leaves more room for the lists (with or
+   without them, so the card doesn't move when they come or go). */
 @media (max-height: 719px) {
-  .welcome-content:has(.welcome-recent:not([hidden])) .welcome-logo {
+  .welcome .welcome-logo {
     width: 96px;
     height: 96px;
   }

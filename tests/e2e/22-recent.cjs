@@ -337,11 +337,24 @@ module.exports = async function (h) {
 
   /* ---------- A small window ---------- */
 
+  // Where the card is with no recent files, and then with a long list.
+  const cardTop = () => js(`Math.round(document.querySelector(".welcome-drop").getBoundingClientRect().top)`);
+  const emptyTop = await cardTop();
   for (const letter of "abcdefgh") {
     recentFiles.add("files", path.join(folder, `${letter}-a-song-with-quite-a-long-name-to-see-it-cut-short.wav`));
     recentFiles.add("projects", path.join(folder, `${letter}.ebee`));
   }
   await sleep(200);
+  const fullTop = await cardTop();
+  const below = await js(`(() => {
+    const below = document.querySelector(".welcome-below");
+    return { scrolls: below.scrollHeight > below.clientHeight, screen: document.scrollingElement.scrollHeight <= innerHeight + 1 };
+  })()`);
+  check(
+    "a long list scrolls by itself: the bee and the card stay where they were, the screen doesn't scroll",
+    Math.abs(fullTop - emptyTop) <= 1 && below.scrolls && below.screen,
+    JSON.stringify({ emptyTop, fullTop, ...below }),
+  );
   const [width, height] = win.getSize();
   win.setSize(900, 640);
   await sleep(300);
@@ -364,7 +377,7 @@ module.exports = async function (h) {
   check("…and a long name is cut short", fits.cut, JSON.stringify(fits));
   await shot("welcome-recent-small.png");
   win.setSize(width, height);
-  await js(`scrollTo(0, 0)`);
+  await js(`document.querySelector(".welcome-below").scrollTo(0, 0)`);
   recentFiles.clear();
   await sleep(100);
 };
