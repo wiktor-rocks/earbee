@@ -43,6 +43,37 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-21: Right-click menus: loop a region, save the loop as a region
+
+- **What:** right-clicking now opens a menu of what you can do with what you clicked. The first two items:
+  - **Loop this region**, on a region's bar in the marks lane or its row in the marks list. The loop becomes the region and turns on; paused, the cursor goes to the region's start, and the region is selected.
+  - **Save the loop as a region**, on the loop on the waveform or on the loop chip ("↻ 0:08–0:11"). A new region with the loop's times is added and selected, with the usual next name. If a region with those exact times is already there, that one is selected instead and nothing is added. A notification says which.
+
+  The menu opens where you clicked, or by the focused item with Shift+F10 or the Menu key. ↑ / ↓ move through it, Esc or a click elsewhere closes it, and while it's open the app's keys wait. A right-click on anything else (a point, the waveform outside the loop) does nothing, as before.
+
+- **Why:** the owner: "ability to make a region out of a loop, and loop a region. We need to implement a more general right clicking menu for stuff like this." It's added to 0.4.0 at the owner's call, designed fresh (not from the rejected `backup/testing-2026-10-12` work), with just these two items for now. More can come one at a time; the ideas are in the scratchpad and the assistant's notes.
+- **How:**
+  - **`src/ui/context-menu.js`** (new): one `#contextMenu` popover, filled on each right-click.
+    - Features add providers with `addContextMenu(provider)`. A provider gets the `contextmenu` event and returns its items (`{ label, keys?, run }`) or `null`, and the first to answer wins. An unanswered right-click isn't `preventDefault`ed.
+    - It opens at a 0×0 anchor (`#contextMenuAnchor`, anchor name `--context-menu`) moved to the pointer, or under the focused element from the keyboard. The existing `.menu` CSS (`position-area`, `position-try-fallbacks`) flips it at the window's edges.
+    - **On Linux and a Mac, `contextmenu` comes with the press of the right button,** and the release that follows counted as a click outside the popover and closed it at once. So while the right button is held, the menu opens on its release (`openWhenLetGo`). The first test run caught this.
+    - `moveFocus` is exported from `ui/menu.js` and shared. `isContextMenuOpen()` joins `keysBlocked` in `app.js`.
+  - **`src/features/marks.js`:**
+    - `loopRegion(region)`: `setLoopRegion` and a seek when paused, as `moveLoopBy` does;
+    - `saveLoopAsRegion()`: `marks.addRegion`, or the region already there, within 1 ms;
+    - their providers in `bindContextItems()`: a region by `#marksLane [data-mark-id]` or `#marksList .mark-row[data-id]`; the loop by `#loopInfo`, or `#waveform` with `player.waveform.timeAtClientX` inside the loop. marks.js now imports `getLoopRegion` and `setLoopRegion` from `features/playback.js`, which imports nothing from marks.js.
+- **Where:** `src/ui/context-menu.js`, `src/ui/menu.js`, `src/features/marks.js`, `src/app.js` (wiring, the header's FILES and COMMON CHANGES), `index.html`, `style.css` (Menus), `docs/glossary.md` ("Right-click menu"), `tests/e2e/14-marks.cjs`.
+- **Verified by:** `npm run check`; `npm run test:unit` (483 pass); `TB_TOPICS=03,14 npm test` (101 pass, smoke 39 pass), then `TB_TOPICS=14` (48 pass). New in topic 14, with real right-clicks (the button pressed, then let go):
+  - on a region in the lane, the menu has just "Loop this region", which loops 2–5 s, on, with the cursor at 2 s and the region selected;
+  - the same from its row;
+  - a point: no menu;
+  - inside the loop on the waveform, "Save the loop as a region" adds an 8–11 s region, selected; from the loop chip again, nothing more is added;
+  - outside the loop: no menu;
+  - while it's open, M adds no point, and Esc closes it;
+  - Shift+F10 in the region's row opens it by the row, its item focused.
+
+  Before `openWhenLetGo`, four of those failed because the menu closed on the release. Screenshots looked at: `context-menu.png` (dark) and `context-menu-light.png`. Not checked: a Mac and Windows; by hand in a real window.
+
 ## 2026-11-20: Checks for closing after a failed save and for an unneeded stems copy; stale copies go at start
 
 - **What:**

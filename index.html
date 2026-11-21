@@ -846,6 +846,12 @@
       </button>
     </div>
 
+    <!-- The right-click menu (src/ui/context-menu.js): filled on each
+         right-click with what was clicked offers; it opens at the anchor,
+         which is moved to the pointer. -->
+    <div id="contextMenuAnchor" class="context-menu-anchor" aria-hidden="true"></div>
+    <div id="contextMenu" class="menu context-menu" role="menu" aria-label="Actions" popover></div>
+
     <!-- Save project as (see saveProjectAs in features/project/index.js):
          link to the media or put it inside. -->
     <dialog id="saveDialog" class="download-dialog" aria-labelledby="saveTitle">

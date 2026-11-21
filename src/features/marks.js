@@ -3,14 +3,19 @@
 // region being marked, and the marks list in the sidebar. The marks
 // themselves are in the store (`marks`, context.js; src/marks); the
 // timeline draws them in its lane and reports drags on them (timeline.js).
-// Every change to the store redraws both views.
+// Every change to the store redraws both views. Right-clicking a region
+// (in the lane or the list) offers to loop it, and right-clicking the loop
+// (on the waveform, or its chip) to save it as a region (ui/context-menu.js).
 import { CONFIG } from "../config.js";
 import { marks, player } from "../context.js";
 import { formatTrackTime } from "../core/format.js";
 import { MAX_LABEL_LENGTH } from "../marks/index.js";
 import { MARK_COLORS } from "../themes/index.js";
+import { addContextMenu } from "../ui/context-menu.js";
 import { dom, element, onClick } from "../ui/dom.js";
+import { notify } from "../ui/toast.js";
 import { snapToBeat } from "./beats.js";
+import { getLoopRegion, setLoopRegion } from "./playback.js";
 
 /** @typedef {import("../marks/index.js").Mark} Mark */
 
@@ -93,6 +98,70 @@ export function markRegion(event) {
   pendingStart = null;
   if (region) selectMark(region.id);
   else drawMarks();
+}
+
+/* ---------- The loop and regions ---------- */
+
+// Loop this region: the loop becomes it, on. Paused, the cursor goes to its
+// start (playing, the transport jumps in by itself).
+/** @param {Mark} region */
+function loopRegion(region) {
+  if (region.end === null) return;
+  setLoopRegion({ start: region.start, end: region.end, enabled: true });
+  if (!player.transport.playing) player.transport.seek(region.start);
+  selectMark(region.id);
+}
+
+// Save the loop as a region: a new region with the loop's times, selected;
+// if there's one with those times already, that one.
+function saveLoopAsRegion() {
+  const loop = getLoopRegion();
+  if (!loop) return;
+  const same = (a, b) => Math.abs(a - b) < 0.001;
+  const existing = marks
+    .list()
+    .find((mark) => mark.end !== null && same(mark.start, loop.start) && same(mark.end, loop.end));
+  if (existing) {
+    selectMark(existing.id);
+    notify(`The loop is already the region “${existing.label}”`);
+    return;
+  }
+  const region = marks.addRegion(loop.start, loop.end);
+  if (!region) return;
+  selectMark(region.id);
+  notify(`Saved the loop as the region “${region.label}”`);
+}
+
+// The right-click items: on a region (its bar in the lane, or its row in
+// the list), and on the loop (on the waveform, or the loop chip).
+/** @param {MouseEvent} event */
+function regionAt(event) {
+  const target = /** @type {Element} */ (event.target);
+  const node = target.closest?.("#marksLane [data-mark-id], #marksList .mark-row[data-id]");
+  if (!(node instanceof HTMLElement)) return null;
+  const mark = marks.get(node.dataset.markId ?? node.dataset.id ?? "");
+  return mark && mark.end !== null ? mark : null;
+}
+
+/** @param {MouseEvent} event */
+function onTheLoop(event) {
+  const loop = getLoopRegion();
+  if (!loop) return false;
+  const target = /** @type {Element} */ (event.target);
+  if (target.closest?.("#loopInfo")) return true;
+  if (!target.closest?.("#waveform")) return false;
+  const time = player.waveform.timeAtClientX(event.clientX);
+  return time > loop.start && time < loop.end;
+}
+
+function bindContextItems() {
+  addContextMenu((event) => {
+    const region = regionAt(event);
+    return region ? [{ label: "Loop this region", run: () => loopRegion(region) }] : null;
+  });
+  addContextMenu((event) =>
+    onTheLoop(event) ? [{ label: "Save the loop as a region", run: saveLoopAsRegion }] : null,
+  );
 }
 
 // Shift+← / Shift+→. While playing, "previous" skips a mark just passed,
@@ -223,6 +292,7 @@ export function bindMarks() {
   // The marks Shift+← / Shift+→ would go to are the video's ready points.
   marks.on("change", readyNearestMarks);
   player.transport.on("position", readyNearestMarks);
+  bindContextItems();
   renderList();
 }
 

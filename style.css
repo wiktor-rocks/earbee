@@ -1885,6 +1885,22 @@ body.dragging .welcome-hint {
   box-shadow: 0 12px 32px color-mix(in srgb, var(--bg) 70%, transparent);
 }
 
+/* The right-click menu (ui/context-menu.js): anchored to a point moved to
+   where the click was, so it opens there and flips at the window's edges
+   like the other menus. */
+.context-menu-anchor {
+  position: fixed;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+  anchor-name: --context-menu;
+}
+
+.context-menu {
+  position-anchor: --context-menu;
+  margin: 2px 0;
+}
+
 .menu hr {
   margin: 6px 4px;
   border: 0;

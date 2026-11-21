@@ -15,8 +15,9 @@ const ownItems = (/** @type {HTMLElement} */ menu, /** @type {string} */ itemSel
   );
 
 // ↑ / ↓ move between a menu's items; Home / End jump to the ends. Keys
-// pressed in a side menu inside it are the side menu's.
-function moveFocus(
+// pressed in a side menu inside it are the side menu's. (Also the
+// right-click menu's: ui/context-menu.js.)
+export function moveFocus(
   /** @type {HTMLElement} */ menu,
   /** @type {string} */ itemSelector,
   /** @type {KeyboardEvent} */ event,

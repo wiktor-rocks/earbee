@@ -6,7 +6,8 @@
 const path = require("path");
 
 module.exports = async function (h) {
-  const { wc, js, openFile, key, xAt, rect, click, shot, pos, ensurePaused, check, sleep, near, FIXTURES } = h;
+  const { wc, js, openFile, key, xAt, rect, click, shot, pos, ensurePaused, check, sleep, near, loopRange, FIXTURES } =
+    h;
   const shadow = `document.querySelector("#waveform > div").shadowRoot`;
 
   // The list, as shown: [{ id, name, start, end, selected }].
@@ -452,6 +453,149 @@ module.exports = async function (h) {
   await js(`earbee.prefs.set("layout", "hiddenSections", [])`);
   await js(`import("./src/features/panel-order.js").then(({ resetPanelOrder }) => resetPanelOrder())`);
   await sleep(300);
+
+  /* ---------- The right-click menu: a region and the loop ---------- */
+
+  await ensurePaused();
+  const store = `import("./src/context.js").then(({ marks }) => marks)`;
+  const setLoop = (loop) =>
+    js(`import("./src/features/playback.js").then(({ setLoopRegion }) => setLoopRegion(${JSON.stringify(loop)}))`);
+  const regionId = await js(`${store}.then((marks) => marks.addRegion(2, 5, { label: "Riff" }).id)`);
+  const pointId = await js(`${store}.then((marks) => marks.addPoint(7).id)`);
+  await setLoop(null);
+  await sleep(200);
+  // A right-click, as real input: the button pressed, then let go. (The
+  // menu opens once it's let go: ui/context-menu.js.)
+  const rightClickAt = async ({ x, y }) => {
+    wc.sendInputEvent({ type: "mouseDown", x, y, button: "right", clickCount: 1 });
+    await sleep(50);
+    wc.sendInputEvent({ type: "mouseUp", x, y, button: "right", clickCount: 1 });
+    await sleep(200);
+  };
+  // The menu's items, as shown; null while it's closed.
+  const menuItems = () =>
+    js(
+      `contextMenu.matches(":popover-open") ? [...contextMenu.querySelectorAll(".menu-item .menu-label")].map((l) => l.textContent) : null`,
+    );
+  const centreOf = (selector) =>
+    js(
+      `(() => { const r = document.querySelector(${JSON.stringify(selector)}).getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`,
+    );
+  const choose = async (label) => {
+    const at = await js(`(() => {
+      const item = [...contextMenu.querySelectorAll(".menu-item")].find((i) => i.textContent.includes(${JSON.stringify(label)}));
+      const r = item.getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) };
+    })()`);
+    await pressAt(at.x, at.y);
+  };
+  const closeMenu = async () => {
+    key("Escape");
+    await sleep(150);
+  };
+
+  // On a region's bar in the lane.
+  await rightClickAt(await centreOf(`#marksLane [data-mark-id="${regionId}"]`));
+  const onRegion = await menuItems();
+  await shot("context-menu.png");
+  await choose("Loop this region");
+  const looped = await loopRange();
+  check(
+    "right-click on a region in the lane: Loop this region loops it, on, from its start",
+    JSON.stringify(onRegion) === JSON.stringify(["Loop this region"]) &&
+      looped &&
+      near(looped.start, 2, 0.01) &&
+      near(looped.end, 5, 0.01) &&
+      looped.enabled &&
+      near(await pos(), 2, 0.01) &&
+      (await menuItems()) === null &&
+      (await byName("Riff"))?.selected,
+    JSON.stringify({ onRegion, looped, pos: await pos() }),
+  );
+
+  // On its row in the list, after the loop has moved elsewhere.
+  await setLoop({ start: 10, end: 12, enabled: false });
+  await rightClickAt(await centreOf(`#marksList .mark-row[data-id="${regionId}"] .mark-time`));
+  const onRow = await menuItems();
+  await choose("Loop this region");
+  const fromRow = await loopRange();
+  check(
+    "…and on its row in the marks list",
+    JSON.stringify(onRow) === JSON.stringify(["Loop this region"]) &&
+      fromRow &&
+      near(fromRow.start, 2, 0.01) &&
+      near(fromRow.end, 5, 0.01) &&
+      fromRow.enabled,
+    JSON.stringify({ onRow, fromRow }),
+  );
+
+  // A point offers nothing (yet).
+  await rightClickAt(await flagBox(pointId));
+  const onPoint = await menuItems();
+  check("right-click on a point: no menu", onPoint === null, JSON.stringify(onPoint));
+
+  // Inside the loop on the waveform: save it as a region; again: that one.
+  await setLoop({ start: 8, end: 11, enabled: true });
+  await sleep(150);
+  const waveY = (await rect()).y;
+  const regionsBefore = (await listed()).length;
+  await rightClickAt({ x: await xAt(9.5), y: waveY });
+  const onLoop = await menuItems();
+  await choose("Save the loop as a region");
+  const saved = (await listed()).find((mark) => near(mark.start, 8, 0.01) && near(mark.end ?? 0, 11, 0.01));
+  await rightClickAt(await centreOf("#loopInfo"));
+  const onChip = await menuItems();
+  await choose("Save the loop as a region");
+  const regionsAfter = await listed();
+  check(
+    "right-click inside the loop: Save the loop as a region adds it, selected; from the loop chip again: that one, not another",
+    JSON.stringify(onLoop) === JSON.stringify(["Save the loop as a region"]) &&
+      JSON.stringify(onChip) === JSON.stringify(["Save the loop as a region"]) &&
+      Boolean(saved) &&
+      regionsAfter.length === regionsBefore + 1 &&
+      regionsAfter.find((mark) => mark.id === saved?.id)?.selected,
+    JSON.stringify({ onLoop, onChip, saved, regionsBefore, after: regionsAfter.length }),
+  );
+
+  // Outside the loop on the waveform: nothing.
+  await rightClickAt({ x: await xAt(1), y: waveY });
+  const outside = await menuItems();
+  check("right-click on the waveform outside the loop: no menu", outside === null, JSON.stringify(outside));
+
+  // While it's open the app's keys wait (M adds no point); Esc closes it.
+  await rightClickAt(await centreOf(`#marksLane [data-mark-id="${regionId}"]`));
+  const marksBefore = (await listed()).length;
+  key("M");
+  await sleep(150);
+  const keyWaited = (await listed()).length === marksBefore && (await menuItems()) !== null;
+  await closeMenu();
+  check("…while it's open, M adds no point; Esc closes it", keyWaited && (await menuItems()) === null);
+
+  // From the keyboard: Shift+F10 in a region's row opens it there.
+  await js(`document.querySelector('#marksList .mark-row[data-id="${regionId}"] .mark-name').focus()`);
+  key("F10", ["shift"]);
+  await sleep(200);
+  const fromKeys = await menuItems();
+  const placed = await js(`(() => {
+    const m = contextMenu.getBoundingClientRect();
+    const row = document.querySelector('#marksList .mark-row[data-id="${regionId}"]').getBoundingClientRect();
+    return { near: Math.abs(m.top - row.bottom) < 40 || Math.abs(m.bottom - row.top) < 40, focused: contextMenu.contains(document.activeElement) };
+  })()`);
+  await closeMenu();
+  check(
+    "Shift+F10 in a region's row opens the menu by the row, its item focused",
+    JSON.stringify(fromKeys) === JSON.stringify(["Loop this region"]) && placed.near && placed.focused,
+    JSON.stringify({ fromKeys, placed }),
+  );
+
+  // In a light theme, for the screenshot.
+  const themeBefore = await js(`import("./src/ui/prefs.js").then(({ getPrefs }) => getPrefs("theme").choice)`);
+  await js(`earbee.prefs.set("theme", "choice", "earbee-light")`);
+  await sleep(300);
+  await rightClickAt(await centreOf(`#marksLane [data-mark-id="${regionId}"]`));
+  await shot("context-menu-light.png");
+  await closeMenu();
+  await js(`earbee.prefs.set("theme", "choice", ${JSON.stringify(themeBefore)})`);
+  await setLoop(null);
 
   // Another file: no marks.
   await openFile(path.join(FIXTURES, "long-chirp.m4a"));

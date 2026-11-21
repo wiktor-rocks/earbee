@@ -128,7 +128,9 @@
  *                  handling, giving focus back), theme.js (applying a
  *                  theme), prefs.js (the settings: values, changes,
  *                  listeners), pref-fields.js (one Settings control per
- *                  field type), menu.js (popover menus), storage.js
+ *                  field type), menu.js (popover menus),
+ *                  context-menu.js (the right-click menu, its items
+ *                  added by each feature: addContextMenu), storage.js
  *                  (browser storage that never throws), toast.js
  *                  (notifications: every message, in one stack above the
  *                  transport, and their log)
@@ -192,6 +194,9 @@
  *                             so project files save it.
  *   New keyboard shortcut     Add an entry to SHORTCUTS (below), with its
  *                             group; the shortcuts dialog (?) lists it.
+ *   New right-click item      addContextMenu(provider) in the feature it
+ *                             belongs to (ui/context-menu.js says how);
+ *                             e.g. bindContextItems in features/marks.js.
  *   Layout and look           style.css: the tokens at the top (colours,
  *                             radii, shadows, --sidebar-width) and section 5
  *                             (the page's grid, the bars and the side panel,
@@ -358,6 +363,7 @@ import {
   nudgeSpeed,
   setEqEnabled,
 } from "./ui/controls.js";
+import { bindContextMenu, isContextMenuOpen } from "./ui/context-menu.js";
 import { $, dom, renderStepSize, renderTrackTime, renderTransportState, reportError, showNotice } from "./ui/dom.js";
 import { bindFocus, bindShortcuts, renderShortcutLegend } from "./ui/shortcuts.js";
 import { getPrefs, onPrefsChange } from "./ui/prefs.js";
@@ -741,6 +747,7 @@ function start() {
   bindSettings();
   bindMarks();
   bindBeats();
+  bindContextMenu(); // the right-click menu; each feature adds its items (addContextMenu)
   bindLayout();
   bindBigVideo(); // Big video (src/features/big-video.js)
   bindStageSplit(); // Stage split (src/features/stage-split.js)
@@ -759,6 +766,7 @@ function start() {
     isSaveDialogOpen() ||
     isFileMenuOpen() ||
     isBeatMenuOpen() ||
+    isContextMenuOpen() ||
     isSettingsOpen() ||
     dom.shortcutsDialog.open;
   bindShortcuts(SHORTCUTS, keysBlocked);
