@@ -21,6 +21,7 @@
 //   a time: starting another stops the one before, and the page reloading,
 //   closing or crashing stops it too.
 const path = require("path");
+const { forwardStderr } = require("../main-log");
 const { createModelFile, ModelFileError } = require("./model-file");
 const { onnxRuntimeAvailable } = require("../onnx-runtime");
 
@@ -66,7 +67,12 @@ function handleStems(
     if (!model) return { ok: false, error: "The stem model isn't there yet." };
     stop();
     const sender = event.sender;
-    const child = utilityProcess.fork(SCRIPT, [model], { serviceName: "EarBee stem separation" });
+    // stderr piped: its warnings go to the page's log too (main-log.js).
+    const child = utilityProcess.fork(SCRIPT, [model], {
+      serviceName: "EarBee stem separation",
+      stdio: ["ignore", "inherit", "pipe"],
+    });
+    forwardStderr(child, "Stems");
     const started = { child, sender };
     job = started;
     // The page reloading, closing or crashing: nobody wants the stems any

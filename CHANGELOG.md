@@ -43,6 +43,51 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-27: The notification log is the master log, with Copy
+
+- **What:** Settings › Notifications now keeps everything, so a user can be told "open Settings › Notifications, press Copy, paste it into the bug report":
+  - every notification, as before;
+  - every problem behind the scenes, marked ⚠ and quieter. These are only in the log, never a card: console warnings and errors, an error nothing caught, a promise nobody handled, the main process's warnings and errors (from before the page loaded too, so a crash of the page shows after the reload), the beat model's and the stems' processes' error output, and the video worker's warnings;
+  - an error card's stack and causes, in the log only (the card keeps its short text).
+
+  **Copy** puts it all on the clipboard as text, oldest first: a line with EarBee's version, the system, Electron and Chrome, when it was copied, then one line per entry with its detail indented beneath. The same problem several times in a row is one entry, "×N". A long detail (a stack) shows folded; a click opens it. The log keeps the newest 500 (was 200).
+
+- **Why:** the owner: "add a copy button to notifications, and put every single type of notification, error etc, in those notifications. I want notifications to be a master log for every single thing, so that if there is some error, a user can be told to go into notifications and copy it in case of a bug report." On cards: "the more behind the scenes console logs should only appear in the notifications menu in the settings … Only when an error stops the user from using the program properly should an actual notification appear." Added to 0.4.0 at the owner's call.
+- **How:**
+  - **`src/ui/problems.js`** (new), `captureProblems()`, first thing in `start()`:
+    - wraps `console.warn` and `console.error` (they still print) into `logProblem`;
+    - adds `window` `error` and `unhandledrejection` listeners, logged as errors with no card;
+    - takes the main process's entries, `earbee.mainLog.pending()` then `onEntry`.
+    - A flag keeps a failing log from logging itself. `quietly(fn)` lets `reportError` (`ui/dom.js`) log its own error, with `describe(error)` as the detail, without a second entry.
+  - **`src/ui/toast.js`:**
+    - `logEntry` and `logProblem`; `showMessage` takes a log-only detail.
+    - A warning is written to storage a second later, so a burst is one write and never in playback's way; what's waiting is written on `pagehide`.
+    - A detail is cut at `CONFIG.notifications.detailMax` (4000 characters).
+  - **`src/core/notification-log.js`:** the `"warning"` kind, `repeat` (`appendEntry` counts the same entry again), `describe`, `consoleEntry`, `stamp` and `formatLog`.
+  - **`electron/main-log.js`** (new), installed at the top of `main.js`:
+    - wraps the main process's console;
+    - sends each entry to the page that asked, or keeps it (the newest 100) while there's none: before the page loads, while it reloads after a crash;
+    - `forwardStderr`: the utility processes are forked with stderr piped (`stdio: ["ignore", "inherit", "pipe"]`), a burst of lines as one warning;
+    - IPC `log:pending`, `app:info` and `clipboard:write`. Copy goes through the main process's clipboard: the page's own needs the window focused.
+  - **The video worker** wraps its console to post `{ type: "log" }`; `video/view.js` gives it to the page's `console.warn`.
+  - **Kept out of playback's way, and within the storage** (after a code review of the first version):
+    - the list in Settings is drawn only while it's on screen, at most once a frame, and an opened stack stays open;
+    - only an error is stored at once, anything else a second later;
+    - what's stored is at most `CONFIG.notifications.storeMax` (1,000,000 characters; `storedLog` drops the oldest details first, then the oldest entries);
+    - an entry's text is cut at `textMax` (500) and its detail at `detailMax` (3000), and samples and big arrays are given by their size.
+  - **Its order and kinds:**
+    - entries go in by their time, so the main process's that waited (a crash before the reload) land where they happened;
+    - the main process's `console.error` stays an error;
+    - the utility processes' lines are under their own name ("Stems: …"), not "Main: Stems: …".
+    - The new limits are in `CONFIG.notifications` (`foldedLines`, `saveAfterMs`, `copiedMs`).
+  - Not logged: deliberately silent catches (expected, e.g. storage refused), `console.log` and `console.debug`, and anything before `start()` runs.
+- **Where:** `src/ui/problems.js`, `src/ui/toast.js`, `src/ui/dom.js` (`reportError`), `src/core/notification-log.js`, `src/config.js`, `src/features/notification-log.js`, `src/app.js` (start, the file map, COMMON CHANGES), `src/video/video-worker.js`, `src/video/view.js`, `style.css` (Settings dialog), `electron/main-log.js`, `electron/main.js`, `electron/preload.js`, `electron/beat-model.js`, `electron/stems/index.js`, `docs/glossary.md`, `tests/e2e/harness.cjs` (the main log and `clipboardText`), `tests/e2e/13-settings.cjs`, `tests/unit/notification-log.test.mjs`, `tests/unit/main-log.test.mjs` (new).
+- **Verified by:**
+  - `npm run check`; `npm run test:unit` (497 pass, with the time order, `storedLog`, big arrays, and a utility process's line under its own name);
+  - `TB_TOPICS=13 npm test` (72 pass, smoke 39), with new checks: a console warning logged with its detail; an uncaught error and an unhandled rejection logged as errors with their stacks; a main-process warning reaching the log; `reportError` logged once with its stack and cause, and the only new card; the same warning twice as one entry ×2; the ⚠ mark and a folded detail; Copy putting the header and the entries, oldest first, on the clipboard, and its label reading "Copied"; the newest 500 kept;
+  - `TB_TOPICS=03,08,13,20,21 npm test` after the review's fixes (video, beats, stems: the worker and the utility processes' piped stderr): 319 of 320; the one failure was the new list's frame of delay in a check, fixed, then `TB_TOPICS=13` 72 pass, smoke 39.
+  - Not checked: by hand in a real window; Windows and the Mac; a real page crash.
+
 ## 2026-11-27: Show in the side panel: the sections ticked when shown
 
 - **What:** Settings › Layout › "Hide in the side panel" is now "Show in the side panel". Every section is ticked at first, and unticking one puts it away (its shortcuts still work). Before, all were unticked and ticking one hid it.

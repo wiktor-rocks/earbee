@@ -257,9 +257,24 @@ export const CONFIG = {
   },
 
   // The notifications (ui/toast.js): how long a confirmation shows, how
-  // many at once (a new one pushes out the oldest), and how many the log
-  // keeps (Settings › Notifications; the oldest go).
-  notifications: { showMs: 4000, max: 3, logMax: 200 },
+  // many at once (a new one pushes out the oldest). Their log (Settings ›
+  // Notifications, the master log): how many entries it keeps (the oldest
+  // go), how long an entry's text and its detail (a stack) may be, how
+  // much of the browser's storage it may take (in characters: the oldest
+  // details go first), and how long anything but an error waits to be
+  // stored (a burst is one write). Its list: a detail longer than
+  // `foldedLines` shows folded; Copy reads "Copied" for `copiedMs`.
+  notifications: {
+    showMs: 4000,
+    max: 3,
+    logMax: 500,
+    textMax: 500,
+    detailMax: 3000,
+    storeMax: 1_000_000,
+    saveAfterMs: 1000,
+    foldedLines: 3,
+    copiedMs: 2000,
+  },
 
   // Searching by words in the From YouTube dialog (features/download.js):
   // how many past searches it keeps (the oldest go).

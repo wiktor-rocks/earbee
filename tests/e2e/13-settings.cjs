@@ -462,6 +462,7 @@ module.exports = async function (h) {
     await js(`document.getElementById("settingsButton").click()`);
     await sleep(200);
     await tab("notifications");
+    await sleep(100); // drawn once it shows (features/notification-log.js)
     check(
       "Settings › Notifications lists them, newest first",
       JSON.stringify(await logShown()) ===
@@ -472,20 +473,98 @@ module.exports = async function (h) {
     await toast(`m.notify("While it's open")`);
     await sleep(100);
     check("…as they come", (await logShown())[0] === "While it's open", JSON.stringify(await logShown()));
-    await toast(`for (let i = 0; i < 205; i++) m.notify("Many " + i)`);
+    await toast(`for (let i = 0; i < 505; i++) m.notify("Many " + i)`);
+    await sleep(1300); // stored a moment later (CONFIG.notifications.saveAfterMs)
     check(
-      "…keeping the newest 200",
-      (await logShown()).length === 200 &&
-        (await logShown())[0] === "Many 204" &&
-        JSON.parse(await js(`localStorage.getItem("earbee.notificationLog")`)).length === 200,
+      "…keeping the newest 500",
+      (await logShown()).length === 500 &&
+        (await logShown())[0] === "Many 504" &&
+        JSON.parse(await js(`localStorage.getItem("earbee.notificationLog")`)).length === 500,
     );
-    await js(`document.querySelector("#settings-notifications .notification-log-head button").click()`);
+    await js(`document.querySelector("#settings-notifications .notification-log-clear").click()`);
     await sleep(100);
     check(
       "Clear empties it",
       (await logShown()).length === 0 &&
         (await js(`document.querySelector(".notification-log-empty").checkVisibility()`)),
     );
+
+    // The master log (ui/problems.js, electron/main-log.js): problems
+    // behind the scenes are logged, with no card; Copy takes it all.
+    const logged = () => js(`import("./src/ui/toast.js").then((m) => m.notificationLog().map((e) => ({ ...e })))`);
+    await js(`document.querySelectorAll("#notices .toast").forEach((t) => t.click())`);
+    await js(`console.warn("A test warning:", "its detail")`);
+    await js(`setTimeout(() => { throw new Error("A test throw") }, 0)`);
+    await js(`setTimeout(() => Promise.reject(new Error("A test rejection")), 0)`);
+    h.mainLog.add("Main: a test warning", "from the main process");
+    await js(
+      `import("./src/ui/dom.js").then((m) => m.reportError(new Error("A test report", { cause: new Error("its cause") })))`,
+    );
+    await sleep(300);
+    // Made on purpose: not the problems topic 12 counts.
+    await js(`__problems = __problems.filter((problem) => !/A test (throw|rejection)/.test(problem))`);
+    let entries = await logged();
+    const find = (text) => entries.filter((e) => e.text.includes(text));
+    check(
+      "a console warning is logged as a warning, with its detail",
+      find("A test warning:").length === 1 &&
+        find("A test warning:")[0].kind === "warning" &&
+        find("A test warning:")[0].detail === "its detail",
+      JSON.stringify(entries),
+    );
+    check(
+      "an uncaught error and an unhandled rejection are logged as errors, with their stacks",
+      find("A test throw")[0]?.kind === "error" &&
+        /Error: A test throw\n\s+at /.test(find("A test throw")[0]?.detail ?? "") &&
+        find("A test rejection")[0]?.kind === "error",
+      JSON.stringify(entries),
+    );
+    check(
+      "the main process's warnings reach it",
+      find("Main: a test warning")[0]?.detail === "from the main process",
+      JSON.stringify(entries),
+    );
+    check(
+      "reportError logs once, as an error with its stack and cause",
+      find("A test report").length === 1 &&
+        find("A test report")[0].kind === "error" &&
+        /Caused by:\nError: its cause/.test(find("A test report")[0].detail ?? ""),
+      JSON.stringify(entries),
+    );
+    check(
+      "…and only reportError's card shows: nothing behind the scenes gets one",
+      JSON.stringify(await cards()) === JSON.stringify(["error:Something went wrong: A test report"]),
+      JSON.stringify(await cards()),
+    );
+    await js(`console.warn("Again")`);
+    await js(`console.warn("Again")`);
+    entries = await logged();
+    check(
+      "the same problem twice in a row is one entry, ×2",
+      find("Again").length === 1 && find("Again")[0].repeat === 2,
+    );
+    check(
+      "the list shows the warnings, ⚠, with a long detail folded",
+      (await js(`document.querySelector("#settings-notifications .toast-warning .toast-mark")?.textContent`)) === "⚠" &&
+        (await js(`!!document.querySelector("#settings-notifications .notification-log-detail:not([open])")`)),
+    );
+    await shot("notification-log-master.png");
+    await js(`document.querySelector("#settings-notifications .notification-log-copy").click()`);
+    await sleep(300);
+    // The label first: reading the clipboard back can take a few seconds (X11).
+    const label = await js(`document.querySelector("#settings-notifications .notification-log-copy").textContent`);
+    const copied = String(await h.clipboardText());
+    check(
+      "Copy puts the log on the clipboard: the version and system first, oldest first, details indented",
+      label === "Copied" &&
+        copied.startsWith(`EarBee ${require("../../package.json").version} · `) &&
+        /Electron \d+/.test(copied.split("\n")[0]) &&
+        copied.indexOf("A test warning:") < copied.indexOf("Again (×2)") &&
+        copied.includes("\n    its detail\n"),
+      `${label}\n${copied.slice(0, 600)}`,
+    );
+    await js(`document.querySelector("#settings-notifications .notification-log-clear").click()`);
+    await js(`document.querySelectorAll("#notices .toast").forEach((t) => t.click())`);
     await js(`document.getElementById("settingsDialog").close()`);
     await js(`document.querySelectorAll("#notices .toast").forEach((t) => t.click())`);
     await toast(`m.showMessage("Kept over a reload", "error")`);

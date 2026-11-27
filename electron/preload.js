@@ -12,7 +12,9 @@
 //   - the recent files (see recent-files.js): listed and opened by id;
 //   - the settings (see prefs-store.js): read at startup, changed one at a
 //     time, and every change heard; the saved colour theme is applied here,
-//     before the page renders, so it never flashes the default colours.
+//     before the page renders, so it never flashes the default colours;
+//   - the main process's warnings and errors, for the page's log (see
+//     main-log.js), and the app's version and system, for a bug report.
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 // The path of a File the user chose or dropped; "" if it has none.
@@ -115,6 +117,25 @@ contextBridge.exposeInMainWorld("earbee", {
       return () => ipcRenderer.removeListener("stems:stopped", listener);
     },
   },
+
+  // The main process's warnings and errors (main-log.js), for Settings ›
+  // Notifications: pending() resolves to those from before the page asked
+  // (oldest first), then onEntry calls `callback` with each new one. Each
+  // is { time, text, detail? }.
+  mainLog: {
+    pending: () => ipcRenderer.invoke("log:pending"),
+    onEntry(callback) {
+      const listener = (_event, entry) => callback(entry);
+      ipcRenderer.on("log:entry", listener);
+      return () => ipcRenderer.removeListener("log:entry", listener);
+    },
+  },
+  // { version, platform, arch, osRelease, electron, chrome }, for the top
+  // of a copied log.
+  appInfo: () => ipcRenderer.invoke("app:info"),
+  // Text onto the clipboard (the log's Copy), whether or not the window
+  // has the focus.
+  copyText: (text) => ipcRenderer.invoke("clipboard:write", String(text)),
 
   // The page is built: the window shows and the splash closes.
   ready: () => ipcRenderer.send("app:ready"),

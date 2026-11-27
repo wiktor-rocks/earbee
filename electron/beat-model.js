@@ -13,6 +13,7 @@
 //     { ok: false, error } (e.g. no ONNX Runtime for this system: the page
 //     then falls back to its simpler beat finder)
 const path = require("path");
+const { forwardStderr } = require("./main-log");
 
 const FRAMES = 1500;
 const WINDOW = FRAMES * 128;
@@ -31,9 +32,14 @@ function createBeatModel(utilityProcess) {
 
   function start() {
     const started = {
-      process: utilityProcess.fork(SCRIPT, [MODEL], { serviceName: "EarBee beat model" }),
+      // stderr piped: its warnings go to the page's log too (main-log.js).
+      process: utilityProcess.fork(SCRIPT, [MODEL], {
+        serviceName: "EarBee beat model",
+        stdio: ["ignore", "inherit", "pipe"],
+      }),
       pending: new Map(),
     };
+    forwardStderr(started.process, "Beat model");
     started.process.on("message", (message) => {
       const resolve = started.pending.get(message?.id);
       started.pending.delete(message?.id);

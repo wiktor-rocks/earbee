@@ -13,17 +13,20 @@
  *
  * Every message is also logged, kept between runs in the browser's
  * storage, for Settings › Notifications (features/notification-log.js).
- * Nothing here throws: a message that can't be shown is only logged to
- * the console.
+ * So are problems behind the scenes, which never get a card (logProblem;
+ * ui/problems.js catches them): the log is the master log a bug report
+ * copies. Nothing here throws: a message that can't be shown is only
+ * logged to the console.
  * ===================================================================== */
 
 import { CONFIG } from "../config.js";
 import { createEmitter } from "../core/emitter.js";
-import { appendEntry, parseLog } from "../core/notification-log.js";
+import { appendEntry, parseLog, storedLog } from "../core/notification-log.js";
 import { getPrefs } from "./prefs.js";
 import { readStored, store } from "./storage.js";
 
 /** @typedef {import("../core/notification-log.js").NoticeKind} NoticeKind */
+/** @typedef {import("../core/notification-log.js").LogKind} LogKind */
 /** @typedef {import("../core/notification-log.js").LogEntry} LogEntry */
 
 const LOG_KEY = "earbee.notificationLog";
@@ -114,26 +117,60 @@ let log = null;
 
 const loadLog = () => (log ??= parseLog(readStored(LOG_KEY), CONFIG.notifications.logMax));
 
-/** @param {NoticeKind} kind @param {string} text @param {string} [detail] */
-function record(kind, text, detail) {
+// Written to storage at once for an error (the page may be about to
+// crash); anything else waits a moment, so a burst is one write, never in
+// playback's way. Leaving the page writes what's waiting. What's stored is
+// at most CONFIG.notifications.storeMax characters (storedLog): a full
+// storage would keep nothing new.
+let storeTimer = 0;
+function save() {
+  clearTimeout(storeTimer);
+  storeTimer = 0;
+  store(LOG_KEY, storedLog(loadLog(), CONFIG.notifications.storeMax));
+}
+function saveSoon() {
+  storeTimer ||= setTimeout(save, CONFIG.notifications.saveAfterMs);
+}
+window.addEventListener("pagehide", () => storeTimer && save());
+
+/** @param {string} text @param {number} max */
+const clip = (text, max) => (text.length > max ? `${text.slice(0, max)}…` : text);
+
+/**
+ * Adds an entry to the log (no card).
+ * @param {{ kind: LogKind, text: string, detail?: string, time?: number }} entry
+ */
+export function logEntry({ kind, text, detail, time = Date.now() }) {
   try {
     /** @type {LogEntry} */
-    const entry = { time: Date.now(), kind, text };
-    if (detail) entry.detail = detail;
-    log = appendEntry(loadLog(), entry, CONFIG.notifications.logMax);
-    store(LOG_KEY, JSON.stringify(log));
+    const next = { time, kind, text: clip(String(text), CONFIG.notifications.textMax) };
+    if (detail) next.detail = clip(String(detail), CONFIG.notifications.detailMax);
+    log = appendEntry(loadLog(), next, CONFIG.notifications.logMax);
+    if (kind === "error") save();
+    else saveSoon();
     changes.emit("change");
   } catch (error) {
     console.warn("Couldn't log a notification:", error);
   }
 }
 
+/** @param {LogKind} kind @param {string} text @param {string} [detail] */
+const record = (kind, text, detail) => logEntry({ kind, text, detail });
+
+/**
+ * A problem behind the scenes: logged for Settings › Notifications, never
+ * shown as a card.
+ * @param {string} text
+ * @param {string} [detail]
+ */
+export const logProblem = (text, detail) => record("warning", text, detail);
+
 /** Oldest first. @returns {readonly LogEntry[]} */
 export const notificationLog = () => loadLog();
 
 export function clearNotificationLog() {
   log = [];
-  store(LOG_KEY, "[]");
+  save();
   changes.emit("change");
 }
 
@@ -166,14 +203,16 @@ export function notify(text, detail) {
 /**
  * The notice or error, in place of the one showing; empty `text` only
  * removes that one (a load that went fine clears an earlier problem).
+ * `detail` goes only to the log (an error's stack), not on the card.
  * @param {string} text
  * @param {"notice" | "error"} kind
+ * @param {string} [detail]
  */
-export function showMessage(text, kind) {
+export function showMessage(text, kind, detail) {
   try {
     if (standing) remove(standing);
     if (!text) return;
-    record(kind, text);
+    record(kind, text, detail);
     standing = card(kind, text);
     stack().append(standing);
     trim();

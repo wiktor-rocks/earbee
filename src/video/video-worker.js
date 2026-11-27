@@ -55,12 +55,29 @@ import {
 } from "../../node_modules/mediabunny/dist/bundles/mediabunny.mjs";
 import { CONFIG } from "../config.js";
 import { mediaSource } from "../core/media.js";
+import { consoleEntry } from "../core/notification-log.js";
 import { createVideoProxy } from "./proxy.js";
 import { readyPointsFor } from "./ready-budget.js";
 import { WHOLE, cropPixels, safeView, wholeCrop, zoomedView } from "./zoom.js";
 
 const scope = /** @type {any} */ (self);
 const post = (message) => scope.postMessage(message);
+
+// The worker's warnings also go to the page ({ type: "log" }), whose
+// console.warn puts them in the log, Settings › Notifications
+// (video/view.js, ui/problems.js). An Error can't always be sent as it
+// is, so it goes as text.
+for (const method of /** @type {const} */ (["warn", "error"])) {
+  const original = console[method].bind(console);
+  console[method] = (...args) => {
+    original(...args);
+    try {
+      post({ type: "log", ...consoleEntry(args) });
+    } catch {
+      // The page can't be told: the worker's console has it.
+    }
+  };
+}
 const { maxLagSeconds } = CONFIG.video;
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 

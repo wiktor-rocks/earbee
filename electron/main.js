@@ -35,6 +35,10 @@
 //              runs (windows.js). The title follows the page's
 //              <title>, which names the open file. While the page loads,
 //              hidden, a splash shows the bee and a loader (windows.js).
+//   Log        The warnings and errors here and in the utility processes
+//              also go to the page's log, Settings › Notifications
+//              (main-log.js); with the app's version and system for a
+//              copied log.
 //   GPU        Chromium picks the GPU itself and falls back to software
 //              rendering if the GPU process keeps crashing.
 //              `npm run start:no-gpu` forces software rendering;
@@ -42,6 +46,7 @@
 const {
   app,
   BrowserWindow,
+  clipboard,
   dialog,
   ipcMain,
   MessageChannelMain,
@@ -52,7 +57,12 @@ const {
   utilityProcess,
 } = require("electron");
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
+// First, so every warning from here on reaches the page's log.
+const { captureConsole, createMainLog, handleMainLog } = require("./main-log");
+const mainLog = createMainLog();
+captureConsole(mainLog);
 const { handleBeatModel } = require("./beat-model");
 const { handleDownloads } = require("./downloader");
 const { createMediaFiles, registerMediaScheme } = require("./media-files");
@@ -290,6 +300,17 @@ app.whenReady().then(() => {
   });
   prefsStore.onChange((section) => section === "theme" && followTheme());
   handleSystem(ipcMain);
+  handleMainLog(ipcMain, mainLog, {
+    clipboard,
+    appInfo: () => ({
+      version: app.getVersion(),
+      platform: process.platform,
+      arch: process.arch,
+      osRelease: os.release(),
+      electron: process.versions.electron,
+      chrome: process.versions.chrome,
+    }),
+  });
   handleBeatModel(ipcMain, { utilityProcess });
   // Stems (src/features/stems/): from the source, the model exported into models/ is used.
   stems = handleStems(ipcMain, {

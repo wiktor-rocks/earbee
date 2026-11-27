@@ -1562,14 +1562,22 @@ body.dragging .welcome-hint {
   display: none;
 }
 
-/* Settings › Notifications (features/notification-log.js): every message
-   shown, newest first, in the notifications' own look (the mark), with
-   its time on the right. The text can be selected, to copy a path. */
+/* Settings › Notifications (features/notification-log.js): the master
+   log, newest first, in the notifications' own look (the mark), with its
+   time on the right. Problems behind the scenes (⚠) are quieter. A long
+   detail (a stack) is folded. The text can be selected, to copy a path;
+   Copy takes it all. */
 .notification-log-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+}
+
+.notification-log-buttons {
+  display: flex;
+  flex: none;
+  gap: 6px;
 }
 
 .notification-log-head .pref-help {
@@ -1624,6 +1632,27 @@ body.dragging .welcome-hint {
   flex: none;
   color: var(--muted);
   font: 11px/1.5 var(--mono);
+}
+
+.notification-log-entry.toast-warning {
+  color: var(--muted);
+}
+
+.notification-log-entry.toast-warning .toast-mark {
+  border-color: transparent;
+  font-size: 13px;
+}
+
+.notification-log-detail summary {
+  cursor: pointer;
+}
+
+.notification-log-detail summary::after {
+  content: " …";
+}
+
+.notification-log-detail[open] summary::after {
+  content: "";
 }
 
 /* One setting: a card with its label, help, control and Reset. */

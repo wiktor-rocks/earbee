@@ -133,7 +133,9 @@
  *                  added by each feature: addContextMenu), storage.js
  *                  (browser storage that never throws), toast.js
  *                  (notifications: every message, in one stack above the
- *                  transport, and their log)
+ *                  transport, and their log), problems.js (problems
+ *                  behind the scenes into that log: console warnings,
+ *                  uncaught errors, the main process's)
  *   features/      playback.js (and the A–B loop), beats.js (finding the
  *                  beats on demand: the worker, then the beat model window
  *                  by window; the ♩ chip and its menu of edits; the
@@ -223,6 +225,9 @@
  *                             showNotice / reportError (ui/dom.js), which
  *                             stay until closed. All of them land in the
  *                             same stack and in Settings › Notifications.
+ *                             A problem behind the scenes, no card:
+ *                             console.warn (ui/problems.js logs it) or
+ *                             logProblem(text, detail?) from ui/toast.js.
  *   New kind of setting       An entry in TYPES (src/prefs/fields.js) and a
  *                             renderer in ui/pref-fields.js.
  *   New colour theme          Add one to src/themes/palettes.js and list it
@@ -365,6 +370,7 @@ import {
 } from "./ui/controls.js";
 import { bindContextMenu, isContextMenuOpen } from "./ui/context-menu.js";
 import { $, dom, renderStepSize, renderTrackTime, renderTransportState, reportError, showNotice } from "./ui/dom.js";
+import { captureProblems } from "./ui/problems.js";
 import { bindFocus, bindShortcuts, renderShortcutLegend } from "./ui/shortcuts.js";
 import { getPrefs, onPrefsChange } from "./ui/prefs.js";
 import { followThemePrefs, onThemeChange } from "./ui/theme.js";
@@ -723,6 +729,9 @@ const SHORTCUTS = [
  * ===================================================================== */
 
 function start() {
+  // First: from here on every problem, behind the scenes too, goes into
+  // the log (Settings › Notifications; ui/problems.js).
+  captureProblems();
   // Warm up so the first file opens faster: start the audio engine (which
   // compiles the Signalsmith worklet) and fetch the waveform and video code
   // now. Failures are reported when a file is opened, which retries them.

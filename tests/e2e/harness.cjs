@@ -155,6 +155,22 @@ async function createHarness() {
     memory.available === undefined ? null : (memory.available ?? availableMemory()),
   );
   ipcMain.handle("system:total-memory", () => memory.total ?? totalMemory());
+  // The main process's log (electron/main-log.js), as main.js has it, but
+  // without the harness's own console: a test adds an entry with
+  // `mainLog.add(text, detail)`.
+  const { createMainLog, handleMainLog } = require(path.join(PROJECT, "electron", "main-log.js"));
+  const mainLog = createMainLog();
+  handleMainLog(ipcMain, mainLog, {
+    clipboard: require("electron").clipboard,
+    appInfo: () => ({
+      version: require(path.join(PROJECT, "package.json")).version, // the harness isn't EarBee: app.getVersion() is Electron's
+      platform: process.platform,
+      arch: process.arch,
+      osRelease: require("os").release(),
+      electron: process.versions.electron,
+      chrome: process.versions.chrome,
+    }),
+  });
   // Updates (src/features/updates.js): main.js only checks when packaged,
   // so nothing is checked here. A test shows the pill with
   // `updates.set(state)` and counts what its clicks asked for.
@@ -403,6 +419,8 @@ async function createHarness() {
     prefsFile,
     prefsStore,
     folderChoice,
+    mainLog, // the main process's log (electron/main-log.js)
+    clipboardText: () => require("electron").clipboard.readText(),
     projectDialogs,
     recentFiles,
     recentFilesPath,

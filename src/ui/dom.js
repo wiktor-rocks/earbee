@@ -9,6 +9,8 @@ import { beats, hasAudio, player, settings, totalSemitones } from "../context.js
 import { AppError } from "../core/errors.js";
 import { focusPresetFor } from "../core/focus.js";
 import { formatPitchTotal, formatSpeed, formatStepSize, formatTrackTime, noteName } from "../core/format.js";
+import { describe } from "../core/notification-log.js";
+import { quietly } from "./problems.js";
 import { showMessage } from "./toast.js";
 
 /** @param {string} id */
@@ -121,13 +123,16 @@ const transportButtons = () => [dom.playButton, dom.stopButton, dom.stepBackButt
 // something failed; a notice means something works only partly. Either
 // stays until it's closed or the next one replaces it. Confirmations that
 // something worked are notify() there.
-const showError = (text) => showMessage(text, "error");
 export const showNotice = (text) => showMessage(text, "notice");
 export const clearMessage = () => showMessage("", "notice");
 
+// The card has the short text; the log (Settings › Notifications) also
+// the stack and causes, for a bug report. Its console.error is quiet, so
+// the log doesn't have it twice (ui/problems.js).
 export function reportError(error) {
-  console.error(error);
-  showError(error instanceof AppError ? error.message : `Something went wrong: ${error?.message ?? error}`);
+  quietly(() => console.error(error));
+  const text = error instanceof AppError ? error.message : `Something went wrong: ${error?.message ?? error}`;
+  showMessage(text, "error", describe(error));
 }
 
 // Wraps an event handler so its failures are shown instead of dropped.

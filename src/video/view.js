@@ -193,6 +193,8 @@ export function createVideoView({ pane, canvas, onVisibilityChange, onProblem, o
         // The worker draws the whole picture again; so do the controls.
         setZoom(WHOLE);
         return onProblem("Zooming into the picture failed, so it shows all of it again.");
+      case "log": // the worker's warning, into the log (ui/problems.js)
+        return console.warn(`Video worker: ${data.text}`, ...(data.detail ? [data.detail] : []));
       case "ready-points":
         readyText = data.times.length ? data.times.map((time) => time.toFixed(3)).join(" ") : null;
         allowedText = showing ? String(data.allowed) : null;
