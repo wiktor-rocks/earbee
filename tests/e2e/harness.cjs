@@ -157,10 +157,17 @@ async function createHarness() {
   ipcMain.handle("system:total-memory", () => memory.total ?? totalMemory());
   // The main process's log (electron/main-log.js), as main.js has it, but
   // without the harness's own console: a test adds an entry with
-  // `mainLog.add(text, detail)`.
+  // `mainLog.add(text, detail)`. Report a bug's mail app and browser are a
+  // list of the links they were asked to open (`report.opened`); with
+  // `report.fails` they can't open.
   const { createMainLog, handleMainLog } = require(path.join(PROJECT, "electron", "main-log.js"));
   const mainLog = createMainLog();
+  const report = { opened: [], fails: false };
   handleMainLog(ipcMain, mainLog, {
+    openExternal: async (url) => {
+      report.opened.push(url);
+      if (report.fails) throw new Error("No mail app or browser (a test)");
+    },
     clipboard: require("electron").clipboard,
     appInfo: () => ({
       version: require(path.join(PROJECT, "package.json")).version, // the harness isn't EarBee: app.getVersion() is Electron's
@@ -420,6 +427,7 @@ async function createHarness() {
     prefsStore,
     folderChoice,
     mainLog, // the main process's log (electron/main-log.js)
+    report, // Report a bug: { opened: the links asked for, fails: whether they can't open }
     clipboardText: () => require("electron").clipboard.readText(),
     projectDialogs,
     recentFiles,

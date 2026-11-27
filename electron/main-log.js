@@ -11,7 +11,12 @@
 //
 // forwardStderr does the same for a utility process (the beat model, the
 // stems): its stderr, a burst of lines at a time, as one warning.
+//
+// Report a bug (src/features/report-bug.js) opens its email or its GitHub
+// issue here (report:open): the page names the way, and the link comes
+// from src/core/bug-report.js, so the page can't open any other.
 const util = require("util");
+const { reportLink } = require("../src/core/bug-report.js");
 
 /** @typedef {{ time: number, kind: "warning" | "error", text: string, detail?: string }} MainLogEntry */
 
@@ -165,17 +170,32 @@ function forwardStderr(child, name, { gapMs = 500, warn = report } = {}) {
 
 /**
  * The log's IPC: what waited (log:pending), the app and system for the
- * top of a copied log (app:info), and Copy itself (clipboard:write: the
+ * top of a copied log (app:info), Copy itself (clipboard:write: the
  * page's own clipboard needs the window focused, and a bug report's copy
- * must work).
+ * must work), and a bug report's email or issue (report:open: "email" or
+ * "github"; resolves to whether it opened, so the page can show the
+ * address instead).
  * @param {Electron.IpcMain} ipcMain
  * @param {ReturnType<typeof createMainLog>} log
- * @param {{ appInfo: () => object, clipboard: { writeText: (text: string) => void } }} options
+ * @param {{ appInfo: () => object, clipboard: { writeText: (text: string) => void },
+ *   openExternal: (url: string) => Promise<unknown> }} options
+ *   openExternal: the system's mail app or browser (shell.openExternal); rejects if it can't.
  */
-function handleMainLog(ipcMain, log, { appInfo, clipboard }) {
+function handleMainLog(ipcMain, log, { appInfo, clipboard, openExternal }) {
   ipcMain.handle("log:pending", (event) => log.take(event.sender));
   ipcMain.handle("app:info", () => appInfo());
   ipcMain.handle("clipboard:write", (_event, text) => clipboard.writeText(String(text)));
+  ipcMain.handle("report:open", async (_event, way) => {
+    const url = reportLink(way);
+    if (!url) return false;
+    try {
+      await openExternal(url);
+      return true;
+    } catch (error) {
+      console.warn(`Couldn't open the bug report's ${way === "email" ? "email" : "page"}:`, error);
+      return false;
+    }
+  });
 }
 
 module.exports = { createMainLog, captureConsole, forwardStderr, handleMainLog, entryFor };

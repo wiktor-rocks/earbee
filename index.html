@@ -34,6 +34,11 @@
     <!-- Shown until the first file loads; then the player (#app) replaces it. -->
     <main id="welcome" class="welcome">
       <div class="welcome-corner">
+        <!-- Report a bug (src/features/report-bug.js): shown in the app, not in a plain browser. -->
+        <button id="welcomeReportBug" class="welcome-report" type="button" aria-haspopup="dialog" hidden>
+          <svg class="icon" aria-hidden="true"><use href="#i-bug" /></svg>
+          Report a bug…
+        </button>
         <!-- Updates (src/features/updates.js): shown once there's one. -->
         <button id="welcomeUpdatePill" class="update-pill" type="button" hidden></button>
         <button
@@ -270,6 +275,16 @@
       <symbol id="i-search" viewBox="0 0 16 16">
         <circle cx="7" cy="7" r="4.3" fill="none" stroke="currentColor" stroke-width="1.5" />
         <path d="m10.2 10.2 3.3 3.3" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" />
+      </symbol>
+      <symbol id="i-bug" viewBox="0 0 16 16">
+        <path
+          d="M6 5.2a2 2 0 0 1 4 0M4.8 5.5h6.4v3.7a3.2 3.2 0 0 1-6.4 0ZM8 6.5v5.6M4.8 8.3H2.3M13.7 8.3h-2.5M4.9 10.6l-2 1.3M11.1 10.6l2 1.3M5 5.9 3.3 4.4M11 5.9l1.7-1.5M6.8 3.6 6 2.3M9.2 3.6l.8-1.3"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.3"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
       </symbol>
       <symbol id="i-close" viewBox="0 0 16 16">
         <path d="m4 4 8 8M12 4l-8 8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
@@ -729,6 +744,37 @@
         </button>
       </div>
       <div id="shortcutList" class="shortcut-groups"></div>
+    </dialog>
+
+    <!-- Report a bug (src/features/report-bug.js): opened by "Report a bug…"
+         on the welcome screen and in Settings › Notifications, once the log
+         is on the clipboard. -->
+    <dialog id="reportDialog" class="report-dialog" aria-labelledby="reportTitle">
+      <div class="settings-head">
+        <h2 id="reportTitle">Report a bug</h2>
+        <button id="reportClose" class="icon-button" type="button" title="Close (Esc)" aria-label="Close">
+          <svg class="icon" aria-hidden="true"><use href="#i-close" /></svg>
+        </button>
+      </div>
+      <div class="report-body">
+        <p id="reportCopied" class="report-copied"></p>
+        <p class="report-note">
+          Paste it into your report: it shows what EarBee did before the problem. It may contain the names of files you
+          opened and the folders they're in, so take out anything you'd rather not share.
+        </p>
+        <p class="report-note">Tell us what you did, what happened, and what you expected.</p>
+        <div class="report-ways">
+          <button id="reportEmail" class="report-way" type="button">
+            <b>Email us</b>
+            <small>In your mail app, to contact@earbee.org</small>
+          </button>
+          <button id="reportGithub" class="report-way" type="button">
+            <b>Open an issue on GitHub</b>
+            <small>In your browser; needs a GitHub account</small>
+          </button>
+        </div>
+        <p id="reportMessage" class="report-message" role="alert"></p>
+      </div>
     </dialog>
 
     <div id="loadingOverlay" class="loading-overlay" role="status" hidden>

@@ -4,11 +4,13 @@
 // and is saved at once (ui/prefs.js); there's no OK or Cancel. The colour
 // theme is chosen here too (Settings › Theme); there's no other way. Last,
 // a tab that isn't a section: the notification log
-// (features/notification-log.js).
+// (features/notification-log.js), with "Report a bug…" beside its Copy
+// (features/report-bug.js).
 import { SECTIONS } from "../prefs/index.js";
 import { $, element, onClick } from "../ui/dom.js";
 import { renderField } from "../ui/pref-fields.js";
 import { buildNotificationLog } from "./notification-log.js";
+import { reportBugButton } from "./report-bug.js";
 import {
   chooseFolder,
   defaultPaths,
@@ -98,7 +100,11 @@ function addTab(section, panel) {
 
 function build() {
   for (const section of sections()) addTab(section, buildPanel(section));
-  addTab({ id: "notifications", title: "Notifications", icon: "bell" }, buildNotificationLog("settings-notifications"));
+  const report = reportBugButton(); // null in a plain browser
+  addTab(
+    { id: "notifications", title: "Notifications", icon: "bell" },
+    buildNotificationLog("settings-notifications", report ? [report] : []),
+  );
   selectTab(sections()[0].id);
 }
 

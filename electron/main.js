@@ -38,7 +38,8 @@
 //   Log        The warnings and errors here and in the utility processes
 //              also go to the page's log, Settings › Notifications
 //              (main-log.js); with the app's version and system for a
-//              copied log.
+//              copied log. Report a bug opens its email or GitHub issue
+//              there too, by a fixed link (src/core/bug-report.js).
 //   GPU        Chromium picks the GPU itself and falls back to software
 //              rendering if the GPU process keeps crashing.
 //              `npm run start:no-gpu` forces software rendering;
@@ -302,6 +303,9 @@ app.whenReady().then(() => {
   handleSystem(ipcMain);
   handleMainLog(ipcMain, mainLog, {
     clipboard,
+    // Report a bug's email or issue: the mail app or the browser (the
+    // handler says if it couldn't).
+    openExternal: (url) => shell.openExternal(url),
     appInfo: () => ({
       version: app.getVersion(),
       platform: process.platform,

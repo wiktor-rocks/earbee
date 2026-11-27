@@ -43,6 +43,28 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-27: Report a bug: on the welcome screen and in Settings
+
+- **What:** a "Report a bug…" button on the welcome screen (top right, a quiet one left of the gear) and in Settings › Notifications (beside Copy and Clear). A click puts the whole notification log on the clipboard, the same text as Copy, and opens a small "Report a bug" dialog:
+  - "✓ EarBee's log is on your clipboard." (or, if it couldn't be copied, to use Settings › Notifications › Copy instead);
+  - "Paste it into your report: it shows what EarBee did before the problem. It may contain the names of files you opened and the folders they're in, so take out anything you'd rather not share." and "Tell us what you did, what happened, and what you expected.";
+  - **Email us** ("In your mail app, to contact@earbee.org"): the mail app opens a message to contact@earbee.org, subject "EarBee bug report", with "What I did:", "What happened:", "What I expected:" and "EarBee's log (it's on the clipboard: paste it below):" to fill in;
+  - **Open an issue on GitHub** ("In your browser; needs a GitHub account"): the browser opens the repository's bug report form (`issues/new?template=bug_report.yml`).
+  - Once the mail app or browser opens, the dialog closes. If it can't, the dialog stays and gives the address to go to by hand (contact@earbee.org, or github.com/wiktor-rocks/earbee/issues). Esc, ✕ or a click outside close it; over Settings, Esc closes only it.
+  - In a plain browser (no main process to open them) the buttons don't show.
+- **Why:** the owner: "let's add a \"report a bug\" button to the welcome screen, and maybe somewhere in the settings". Copying the log first, then the choice between an email and a GitHub issue, was the owner's decision. In Settings it sits in Notifications because that's where the log it sends is, next to the Copy it repeats.
+- **How:**
+  - **`src/core/bug-report.js`** (new, pure): the address, the issue form's URL, the email's subject and body, `mailtoLink` (encoded per RFC 6068: `%20`, line breaks `%0D%0A`), `reportLink(way)` ("email" or "github"; anything else `null`) and `reportAddress(way)` for the by-hand fallback.
+  - **The main process opens them**, by name only: IPC `report:open` in `handleMainLog` (`electron/main-log.js`) takes "email" or "github", looks the link up in `src/core/bug-report.js` (required from CommonJS, as `prefs-store.js` does `src/prefs`) and calls `shell.openExternal`; it resolves to whether that worked, and a failure is logged as a warning. The page can't pass a link, so it can't open anything else. `window.earbee.openReport(way)` in the preload.
+  - **`src/features/report-bug.js`** (new): `bindReportBug()` (from `start()`) shows and wires the welcome button and the dialog; `reportBugButton()` makes Settings' button; `isReportOpen()` blocks the shortcuts while it's open. The dialog opens first, then the log is copied: a dialog opened without the user's activation (e.g. after a slow copy) is grouped with Settings by Chromium, and one Esc would close both.
+  - **`copyLog(from)`** is now exported from `src/features/notification-log.js` and used by both Copy and Report a bug; the copied header says where it was copied from ("from Report a bug"). `buildNotificationLog(id, more)` takes extra buttons for its head.
+  - A bug icon (`#i-bug`) in `index.html`'s sprite; the dialog (`#reportDialog`) uses the other dialogs' header and ✕.
+- **Where:** `src/core/bug-report.js` (new), `src/features/report-bug.js` (new), `src/features/notification-log.js` (`copyLog`, `header`, `buildNotificationLog`), `src/features/settings.js` (`build`), `src/app.js` (`start`, `keysBlocked`, the file map), `index.html` (`#welcomeReportBug`, `#reportDialog`, `#i-bug`), `style.css` ("Menus (File, beats), and the welcome corner": `.welcome-report`; new section "Report a bug dialog"), `electron/main-log.js` (`report:open`), `electron/main.js` (its `openExternal`, the header), `electron/preload.js` (`openReport`), `docs/glossary.md`, `tests/e2e/harness.cjs` (`report`: the links asked for, and `fails`), `tests/e2e/02-welcome.cjs`, `tests/e2e/13-settings.cjs`, `tests/unit/bug-report.test.mjs` (new).
+- **Verified by:**
+  - `npm run check`; `npm run test:unit` (504 pass, 5 of them new: the mailto encoding, the email's address, subject and body read back, the issue form's URL, nothing for any other way, the by-hand addresses);
+  - `TB_TOPICS=02,13 npm test`: 114 pass, smoke 39 pass. New checks: on the welcome screen, the button left of the gear; a click copies the log (the version line first, "from Report a bug", an entry and its detail) and opens the dialog, which says so; Email us asks the main process for the mailto link to contact@earbee.org and closes; Open an issue on GitHub asks for the issue form and closes; Esc closes it; when they can't open, it stays open with contact@earbee.org or github.com/wiktor-rocks/earbee/issues; ✕ closes it. In Settings › Notifications: the button after Copy and Clear; a click copies the log and opens the dialog over Settings; GitHub asked for, Settings still open; after a real (mouse) click, Esc closes only the report dialog.
+  - Not checked: a real mail app or browser opening (the harness records the links instead; the smoke test runs the real `main.js`, which registers the handler), by hand in a real window, Windows and the Mac.
+
 ## 2026-11-27: The notification log is the master log, with Copy
 
 - **What:** Settings › Notifications now keeps everything, so a user can be told "open Settings › Notifications, press Copy, paste it into the bug report":

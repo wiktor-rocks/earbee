@@ -563,6 +563,59 @@ module.exports = async function (h) {
         copied.includes("\n    its detail\n"),
       `${label}\n${copied.slice(0, 600)}`,
     );
+
+    // Report a bug… beside Copy and Clear (features/report-bug.js): the
+    // same copy, then its dialog over Settings (topic 02 checks the rest).
+    {
+      const report = () =>
+        js(`({ open: reportDialog.open, settings: settingsDialog.open, copied: reportCopied.textContent })`);
+      const buttons = await js(
+        `[...document.querySelectorAll("#settings-notifications .notification-log-buttons button")].map((b) => b.textContent)`,
+      );
+      check(
+        "Settings › Notifications: Report a bug… beside Copy and Clear",
+        /^Cop(y|ied)$/.test(buttons[0]) && buttons[1] === "Clear" && buttons[2] === "Report a bug…",
+        JSON.stringify(buttons),
+      );
+      require("electron").clipboard.writeText(""); // so what's read back is the new copy
+      await js(`document.querySelector("#settings-notifications .report-bug").click()`);
+      await sleep(300);
+      const opened = await report();
+      const reported = String(await h.clipboardText());
+      check(
+        "…a click copies the log and opens its dialog over Settings",
+        opened.open &&
+          opened.settings &&
+          opened.copied === "EarBee's log is on your clipboard." &&
+          reported.split("\n")[1].includes("from Report a bug") &&
+          reported.includes("Again (×2)"),
+        `${JSON.stringify(opened)}\n${reported.slice(0, 300)}`,
+      );
+      const asked = h.report.opened.length;
+      await js(`reportGithub.click()`);
+      await sleep(200);
+      check(
+        "…Open an issue on GitHub asks the main process for the issue form; Settings stays open",
+        h.report.opened.length === asked + 1 &&
+          h.report.opened.at(-1).startsWith("https://github.com/wiktor-rocks/earbee/issues/new") &&
+          !(await report()).open &&
+          (await report()).settings,
+        JSON.stringify(h.report.opened),
+      );
+      // A real click this time: a dialog opened without the user's
+      // activation (a script's click()) would close with Settings on Esc.
+      const at = await js(
+        `(() => { const r = document.querySelector("#settings-notifications .report-bug").getBoundingClientRect(); return { x: Math.round(r.left + r.width / 2), y: Math.round(r.top + r.height / 2) }; })()`,
+      );
+      h.wc.sendInputEvent({ type: "mouseDown", ...at, button: "left", clickCount: 1 });
+      h.wc.sendInputEvent({ type: "mouseUp", ...at, button: "left", clickCount: 1 });
+      await sleep(300);
+      check("…a real click opens it too", (await report()).open);
+      h.key("Escape");
+      await sleep(200);
+      const escaped = await report();
+      check("…Esc closes only the report dialog", !escaped.open && escaped.settings, JSON.stringify(escaped));
+    }
     await js(`document.querySelector("#settings-notifications .notification-log-clear").click()`);
     await js(`document.querySelectorAll("#notices .toast").forEach((t) => t.click())`);
     await js(`document.getElementById("settingsDialog").close()`);

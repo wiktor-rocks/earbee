@@ -7,7 +7,9 @@
 // told "open Settings › Notifications, press Copy" for a bug report. Copy
 // puts the whole log on the clipboard as text, oldest first, under a line
 // with EarBee's version and the system (core/notification-log.js
-// formatLog). Clear empties it.
+// formatLog; copyLog, which Report a bug uses too). Clear empties it.
+// "Report a bug…" beside them (features/report-bug.js) copies it and
+// offers the ways to send it.
 import { CONFIG } from "../config.js";
 import { formatLog, stamp } from "../core/notification-log.js";
 import { element, onClick } from "../ui/dom.js";
@@ -70,10 +72,11 @@ const SYSTEMS = { linux: "Linux", win32: "Windows", darwin: "macOS (Darwin)" };
 
 /**
  * The lines above a copied log: EarBee's version and the system (from the
- * main process), and when it was copied.
+ * main process), and when and from where it was copied.
+ * @param {string} from
  * @returns {Promise<string[]>}
  */
-async function header() {
+async function header(from) {
   const bridge = /** @type {any} */ (window).earbee;
   let app = "EarBee";
   try {
@@ -86,14 +89,28 @@ async function header() {
     // No main process to ask: the browser's own description, below.
   }
   if (app === "EarBee") app = `EarBee · ${navigator.userAgent}`;
-  return [app, `Copied ${stamp(Date.now())}, from Settings › Notifications (oldest first)`];
+  return [app, `Copied ${stamp(Date.now())}, from ${from} (oldest first)`];
+}
+
+/**
+ * The whole log onto the clipboard, as text: the main process's clipboard
+ * (it doesn't need the window focused), the browser's outside Electron.
+ * Rejects if it couldn't.
+ * @param {string} [from] where it was copied from, for its header
+ */
+export async function copyLog(from = "Settings › Notifications") {
+  const text = formatLog(notificationLog(), await header(from));
+  const bridge = /** @type {any} */ (window).earbee;
+  if (bridge?.copyText) await bridge.copyText(text);
+  else await navigator.clipboard.writeText(text);
 }
 
 /**
  * The tab's panel, kept up to date while the app runs.
  * @param {string} id the panel's id (the tab points at it)
+ * @param {HTMLElement[]} [more] buttons after Copy and Clear (Report a bug…)
  */
-export function buildNotificationLog(id) {
+export function buildNotificationLog(id, more = []) {
   const list = element("ol", { className: "notification-log" });
   const empty = element("p", { className: "notification-log-empty", textContent: "No notifications yet." });
   const copy = element("button", { type: "button", className: "small notification-log-copy", textContent: "Copy" });
@@ -107,7 +124,7 @@ export function buildNotificationLog(id) {
       textContent:
         "Everything EarBee has told you, and every problem behind the scenes (⚠), newest first, kept between runs. Copy puts it all on the clipboard, for a bug report.",
     }),
-    element("div", { className: "notification-log-buttons" }, copy, clear),
+    element("div", { className: "notification-log-buttons" }, copy, clear, ...more),
   );
   const panel = element("section", { className: "settings-panel", id }, head, empty, list);
 
@@ -141,12 +158,7 @@ export function buildNotificationLog(id) {
 
   let copiedTimer = 0;
   onClick(copy, async () => {
-    const text = formatLog(notificationLog(), await header());
-    const bridge = /** @type {any} */ (window).earbee;
-    // The main process's clipboard (it doesn't need the window focused);
-    // the browser's outside Electron.
-    if (bridge?.copyText) await bridge.copyText(text);
-    else await navigator.clipboard.writeText(text);
+    await copyLog();
     copy.textContent = "Copied";
     clearTimeout(copiedTimer);
     copiedTimer = window.setTimeout(() => (copy.textContent = "Copy"), CONFIG.notifications.copiedMs);

@@ -1897,6 +1897,23 @@ body.dragging .welcome-hint {
   gap: 8px;
 }
 
+/* Report a bug… (features/report-bug.js), left of the gear: quiet, as
+   tall as the gear, so it's there when needed and out of the way. */
+.welcome-report {
+  height: 34px;
+  padding: 0 12px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.welcome-report:hover {
+  background: var(--surface-hover);
+  color: var(--text);
+}
+
 /* A popover menu (ui/menu.js), anchored by CSS to the button that opened
    it (each menu has its anchor name), so it never shifts while you choose;
    a short window scrolls it inside. */
@@ -3932,6 +3949,88 @@ button.toast-close {
     opacity: 0;
     transform: translateY(6px);
   }
+}
+
+/* ---------- Report a bug dialog (src/features/report-bug.js) ----------
+   Small: the header bar and ✕ of the other dialogs, a line that the log
+   is on the clipboard, what to say, and the two ways as large buttons. */
+
+.report-dialog {
+  width: min(460px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  padding: 0;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: var(--shadow-lifted);
+}
+
+.report-dialog::backdrop {
+  background: var(--overlay-bg);
+}
+
+.report-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 22px 20px;
+}
+
+.report-body p {
+  margin: 0;
+}
+
+.report-copied {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.report-copied.report-done {
+  color: var(--start);
+}
+
+.report-copied.report-done::before {
+  content: "✓ ";
+}
+
+.report-copied.report-failed {
+  color: var(--danger);
+}
+
+.report-note {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+
+.report-ways {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+/* Each way: its name, and where it opens underneath. */
+.report-way {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 14px;
+  text-align: left;
+}
+
+.report-way small {
+  color: var(--muted);
+  font-weight: 400;
+  font-size: 12px;
+}
+
+.report-message {
+  color: var(--danger);
+}
+
+.report-message:empty {
+  display: none;
 }
 
 /* ---------- Keyboard shortcuts dialog ---------- */

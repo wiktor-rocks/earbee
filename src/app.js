@@ -92,7 +92,10 @@
  *                  and resample (the model's input), fft, timeline (and the
  *                  Segment / Loop / LoopRegion types), emitter, errors,
  *                  media (the Media type, the memory check, waveform
- *                  levels, splitting and joining a parallel decode)
+ *                  levels, splitting and joining a parallel decode),
+ *                  notification-log (the log's entries and its copied
+ *                  text), bug-report (where Report a bug sends: the
+ *                  email and GitHub links; the main process opens them)
  *   themes/        Colour themes: palettes.js (every theme) and index.js
  *                  (the pure logic, the marks' colours); independent of
  *                  everything else (the main process uses it too)
@@ -142,7 +145,11 @@
  *                  beat click), marks.js (actions,
  *                  selection, the marks list), open-file.js, download.js
  *                  (and searching in the download dialog), settings.js
- *                  (the Settings dialog, where the theme is chosen), file-menu.js
+ *                  (the Settings dialog, where the theme is chosen),
+ *                  notification-log.js (Settings › Notifications, Copy),
+ *                  report-bug.js ("Report a bug…" on the welcome screen
+ *                  and in Settings › Notifications: copies the log, then
+ *                  an email or a GitHub issue), file-menu.js
  *                  (the File menu), recent.js (the recent files, on the
  *                  welcome screen and in that menu), layout.js (the shortcuts dialog, the
  *                  sidebar toggle), project/ (saving and opening project
@@ -335,6 +342,7 @@ import { bindStems } from "./features/stems/index.js"; // Stems (src/features/st
 import { bindFileDrop, bindFileInput, bindLoadCancel, isLoading } from "./features/open-file.js";
 import { bindProject, isSaveDialogOpen, openFile, saveProject, saveProjectAs } from "./features/project/index.js";
 import { bindSettings, isSettingsOpen } from "./features/settings.js";
+import { bindReportBug, isReportOpen } from "./features/report-bug.js";
 import { bindFileMenu, isFileMenuOpen } from "./features/file-menu.js";
 import { bindRecent } from "./features/recent.js";
 import {
@@ -760,6 +768,7 @@ function start() {
   bindFileMenu();
   const recentShown = bindRecent();
   bindSettings();
+  bindReportBug();
   bindMarks();
   bindBeats();
   bindContextMenu(); // the right-click menu; each feature adds its items (addContextMenu)
@@ -783,6 +792,7 @@ function start() {
     isBeatMenuOpen() ||
     isContextMenuOpen() ||
     isSettingsOpen() ||
+    isReportOpen() ||
     dom.shortcutsDialog.open;
   bindShortcuts(SHORTCUTS, keysBlocked);
   // Video window (src/features/video-window/): the same keys there.

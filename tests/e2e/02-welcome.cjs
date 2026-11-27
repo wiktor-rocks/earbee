@@ -4,7 +4,7 @@ const fs = require("fs");
 const path = require("path");
 
 module.exports = async function (h) {
-  const { js, wc, dbg, setFiles, shot, check, sleep, FIXTURES } = h;
+  const { js, wc, dbg, key, setFiles, shot, check, sleep, FIXTURES } = h;
 
   const screens = () =>
     js(
@@ -81,6 +81,91 @@ module.exports = async function (h) {
   await dbg.sendCommand("Emulation.setEmulatedMedia", { features: [] });
   await sleep(100);
   await shot("welcome.png");
+
+  // Report a bug (src/features/report-bug.js): in the corner, left of the
+  // gear. A click puts the log on the clipboard, then the dialog offers the
+  // email or the GitHub issue, which the main process opens (the harness
+  // records the links instead: h.report).
+  {
+    const corner = await js(
+      `(() => { const b = document.getElementById("welcomeReportBug"); const g = document.getElementById("welcomeSettingsButton").getBoundingClientRect(); const r = b.getBoundingClientRect(); return { shown: !b.hidden && r.width > 0, text: b.textContent.trim(), leftOfGear: r.right <= g.left, sameRow: Math.abs(r.top - g.top) < 2 }; })()`,
+    );
+    check(
+      "Report a bug… is on the welcome screen, left of the gear",
+      corner.shown && corner.text === "Report a bug…" && corner.leftOfGear && corner.sameRow,
+      JSON.stringify(corner),
+    );
+    const reportState = () =>
+      js(
+        `({ open: reportDialog.open, copied: reportCopied.textContent, message: reportMessage.textContent, focused: document.activeElement?.id })`,
+      );
+    await js(`import("./src/ui/toast.js").then((m) => m.logProblem("A test for the bug report", "its detail"))`);
+    await js(`welcomeReportBug.click()`);
+    await sleep(300);
+    const shown = await reportState();
+    // The dialog first: reading the clipboard back can take a few seconds (X11).
+    const copied = String(await h.clipboardText());
+    check(
+      "a click copies the log and opens the dialog, which says so",
+      shown.open && shown.copied === "EarBee's log is on your clipboard." && shown.message === "",
+      JSON.stringify(shown),
+    );
+    check(
+      "…the whole log: the version and system first, from Report a bug",
+      copied.startsWith(`EarBee ${require("../../package.json").version} · `) &&
+        copied.split("\n")[1].includes("from Report a bug") &&
+        copied.includes("A test for the bug report\n    its detail\n"),
+      copied.slice(0, 400),
+    );
+    await shot("report-bug.png");
+    await js(`reportEmail.click()`);
+    await sleep(200);
+    check(
+      "Email us asks the main process for the email to contact@earbee.org, and closes",
+      /^mailto:contact@earbee\.org\?subject=EarBee%20bug%20report&body=What%20I%20did/.test(h.report.opened.at(-1)) &&
+        !(await reportState()).open,
+      JSON.stringify({ opened: h.report.opened, state: await reportState() }),
+    );
+    await js(`welcomeReportBug.click()`);
+    await sleep(300);
+    await js(`reportGithub.click()`);
+    await sleep(200);
+    check(
+      "Open an issue on GitHub asks for the bug report form, and closes",
+      h.report.opened.at(-1) === "https://github.com/wiktor-rocks/earbee/issues/new?template=bug_report.yml" &&
+        !(await reportState()).open,
+      JSON.stringify({ opened: h.report.opened, state: await reportState() }),
+    );
+    await js(`welcomeReportBug.click()`);
+    await sleep(300);
+    key("Escape");
+    await sleep(200);
+    const escaped = await reportState();
+    check("Esc closes it, asking for nothing", !escaped.open && h.report.opened.length === 2, JSON.stringify(escaped));
+    h.report.fails = true;
+    await js(`welcomeReportBug.click()`);
+    await sleep(300);
+    await js(`reportEmail.click()`);
+    await sleep(200);
+    const failed = await reportState();
+    await js(`reportGithub.click()`);
+    await sleep(200);
+    const failedGithub = await reportState();
+    h.report.fails = false;
+    await js(`reportClose.click()`);
+    await sleep(100);
+    check(
+      "if the mail app or browser can't open, it stays open and gives the address",
+      failed.open &&
+        failed.message.includes("contact@earbee.org") &&
+        failedGithub.open &&
+        failedGithub.message.includes("github.com/wiktor-rocks/earbee/issues"),
+      JSON.stringify({ failed, failedGithub }),
+    );
+    check("✕ closes it", !(await reportState()).open);
+    await js(`import("./src/ui/toast.js").then((m) => m.clearNotificationLog())`);
+  }
+
   const opened = await js(
     `(() => { const input = document.getElementById("file"); let n = 0; const orig = input.click; input.click = () => n++; document.getElementById("welcomeOpen").click(); input.click = orig; return n; })()`,
   );

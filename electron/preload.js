@@ -14,7 +14,9 @@
 //     time, and every change heard; the saved colour theme is applied here,
 //     before the page renders, so it never flashes the default colours;
 //   - the main process's warnings and errors, for the page's log (see
-//     main-log.js), and the app's version and system, for a bug report.
+//     main-log.js), and the app's version and system, for a bug report;
+//     and the bug report's email or GitHub issue, opened by name ("email"
+//     or "github"), never by a link the page gives.
 const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 // The path of a File the user chose or dropped; "" if it has none.
@@ -136,6 +138,10 @@ contextBridge.exposeInMainWorld("earbee", {
   // Text onto the clipboard (the log's Copy), whether or not the window
   // has the focus.
   copyText: (text) => ipcRenderer.invoke("clipboard:write", String(text)),
+  // Report a bug (src/features/report-bug.js): the mail app with an email
+  // to EarBee ("email"), or the browser at a new GitHub issue ("github");
+  // resolves to whether it opened.
+  openReport: (way) => ipcRenderer.invoke("report:open", String(way)),
 
   // The page is built: the window shows and the splash closes.
   ready: () => ipcRenderer.send("app:ready"),
