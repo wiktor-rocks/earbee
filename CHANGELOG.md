@@ -43,6 +43,20 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-27: The last session: a failed write doesn't stop the next; the final write stays
+
+- **What:** two fixes to keeping the last session (2026-11-20):
+  - one write that fails (a full disk, a file held by a virus scanner on Windows) no longer stops the session from being kept for the rest of the run: the next write runs as usual;
+  - closing the window just as a background write lands no longer leaves the session a few seconds older.
+- **Why:** a code review found both. The owner said to fix them in 0.4.0.
+- **How:** in `writeFile`:
+  - the write queue never stays failed: each write is `queue.then(…)`, returned to its caller, and `queue` is that step with its failure caught. Before, one rejection skipped every later write;
+  - a background write checks it's still the newest and renames its temporary file in one go (`fs.renameSync`, a quick metadata change). With `fs.promises.rename`, the rename ran on libuv's threadpool, so the final write (synchronous, as the window closes) could land first and then be replaced by the older copy.
+- **Where:** `electron/session-store.js` (`writeFile`), `tests/unit/session-store.test.mjs`.
+- **Verified by:**
+  - two new unit tests, each failing on the code before the fix and passing after: a write that fails with EBUSY, then the next one kept; a final write made while a background one renames, still there afterwards;
+  - `npm run check`; `npm run test:unit` (504 pass); `TB_TOPICS=03,23,24 npm test` (109 pass, smoke 39).
+
 ## 2026-11-27: Report a bug: on the welcome screen and in Settings
 
 - **What:** a "Report a bug…" button on the welcome screen (top right, a quiet one left of the gear) and in Settings › Notifications (beside Copy and Clear). A click puts the whole notification log on the clipboard, the same text as Copy, and opens a small "Report a bug" dialog:

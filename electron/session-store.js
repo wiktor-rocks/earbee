@@ -130,6 +130,9 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now, 
 
   // Each write has its number; a write that a newer one has overtaken
   // doesn't land (the final write, synchronous, overtakes any still going).
+  // `queue` never stays failed: one write that fails (a full disk, a file
+  // held by a virus scanner) fails only for its caller, and the next write
+  // still runs.
   let latest = 0;
   let queue = Promise.resolve();
 
@@ -148,20 +151,24 @@ function createSessionStore(folder, { mediaFiles, projectFiles, now = Date.now, 
       onDisk = owner;
       return Promise.resolve();
     }
-    queue = queue.then(async () => {
+    const step = queue.then(async () => {
       if (number !== latest || discarded.has(owner)) return;
       try {
         await fs.promises.mkdir(folder, { recursive: true });
         await fs.promises.writeFile(temporary, text);
+        // The check and the rename in one go (renameSync, quick): an
+        // asynchronous rename could land after a final write that came
+        // meanwhile, and put this older copy over it.
         if (number === latest && !discarded.has(owner)) {
-          await fs.promises.rename(temporary, file);
+          fs.renameSync(temporary, file);
           onDisk = owner;
         }
       } finally {
         await fs.promises.rm(temporary, { force: true });
       }
     });
-    return queue;
+    queue = step.catch(() => {});
+    return step;
   }
 
   // Stems files nobody uses any more: not in session.json, not a window's,

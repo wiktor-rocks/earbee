@@ -217,6 +217,62 @@ describe("the last session", () => {
     assert.deepEqual(fs.readdirSync(folder), ["session.json"], "no temporary file left");
   });
 
+  test("one write that fails doesn't stop the ones after it", async () => {
+    const { store, mediaFiles } = setup();
+    const url = mediaFiles.share(songFile);
+    const realWrite = fs.promises.writeFile;
+    let failures = 1;
+    fs.promises.writeFile = async (...args) => {
+      if (failures-- > 0) throw Object.assign(new Error("EBUSY: held by a virus scanner"), { code: "EBUSY" });
+      return realWrite(...args);
+    };
+    try {
+      const write = (n) =>
+        store.write(sender, { mediaUrl: url, sections: sections({ step: { version: 1, n } }), unsaved: true });
+      await assert.rejects(write(1), /EBUSY/);
+      assert.equal(await write(2), true);
+      assert.equal(sessionJson().sections.step.n, 2, "kept again after the failure");
+    } finally {
+      fs.promises.writeFile = realWrite;
+    }
+  });
+
+  test("a final write that comes while a background one is landing isn't put back by it", async () => {
+    const { store, mediaFiles } = setup();
+    const url = mediaFiles.share(songFile);
+    const write = (n, options) =>
+      store.write(sender, { mediaUrl: url, sections: sections({ step: { version: 1, n } }), unsaved: true }, options);
+    // The window closes just as the background write's temporary file is
+    // written: if that write then renamed it asynchronously, its rename
+    // would land after the final write.
+    const realWrite = fs.promises.writeFile;
+    const realRename = fs.promises.rename;
+    let closing = null;
+    fs.promises.writeFile = async (...args) => {
+      await realWrite(...args);
+      fs.promises.writeFile = realWrite;
+      closing = () => write(2, { final: true });
+    };
+    const close = () => {
+      const now = closing;
+      closing = null;
+      now?.();
+    };
+    fs.promises.rename = async (...args) => {
+      close();
+      return realRename(...args);
+    };
+    try {
+      const background = write(1);
+      await background;
+      close(); // when the background write didn't rename asynchronously
+      assert.equal(sessionJson().sections.step.n, 2);
+    } finally {
+      fs.promises.writeFile = realWrite;
+      fs.promises.rename = realRename;
+    }
+  });
+
   test("a copy that's abandoned leaves nothing behind; nor does a window closing in the middle of one", async () => {
     const { store } = setup();
     const token = store.beginStems(sender);
