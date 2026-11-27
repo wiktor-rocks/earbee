@@ -1,7 +1,8 @@
 /* =====================================================================
  * THE SIDE PANEL'S SECTIONS, SHOWN OR HIDDEN
- * Settings › Layout › Hide in the side panel: the sections ticked there
- * (Speed, Pitch, Mixer, EQ, Beats, Points, Loop, Marks) are put away,
+ * Settings › Layout › Show in the side panel: the sections unticked there
+ * (Speed, Pitch, Mixer, EQ, Beats, Points, Loop, Marks; kept as
+ * layout.hiddenSections) are put away,
  * with the `hidden` attribute, on the elements panel-order.js moves
  * about: each .<key>-group, and #sidebar for the marks. Their shortcuts
  * still work. panel-order.js skips hidden sections, and a dock whose

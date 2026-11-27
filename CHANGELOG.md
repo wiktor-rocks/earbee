@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-27: Show in the side panel: the sections ticked when shown
+
+- **What:** Settings › Layout › "Hide in the side panel" is now "Show in the side panel". Every section is ticked at first, and unticking one puts it away (its shortcuts still work). Before, all were unticked and ticking one hid it.
+- **Why:** the owner: "Everything is ON in the beginning, turning it off disables it. Right now you're turning on to hide." Added to 0.4.0 at the owner's call.
+- **How:** the setting is still kept as the hidden ones (`layout.hiddenSections`), so a section added later shows and saved settings carry over unchanged. Only the dialog flips: a `set` field may have `inverted: true`, and its boxes then tick the options not in the value, and a change saves the unticked ones.
+- **Where:** `src/prefs/fields.js` (`inverted`, its typedef and the comment on field types), `src/ui/pref-fields.js` (`set`), `src/prefs/index.js` (the `hiddenSections` field), `src/features/panel-sections.js` (header), `tests/e2e/13-settings.cjs`.
+- **Verified by:** `npm run check`; `TB_TOPICS=13 npm test` (64 pass, smoke 39), with a new check that every box is ticked at first, and the existing ones (a click on Loop, then Marks, puts them away and saves `["loop"]`, then `["loop","marks"]`; clicking again brings them back, `[]`) passing unchanged apart from their names, plus a check that Loop's box is unticked once it's put away.
+
 ## 2026-11-27: No text highlighting in Settings and the other dialogs
 
 - **What:** text in Settings (button labels, the options, the help lines, the tabs) can't be highlighted any more, and neither can text in the other dialogs (From YouTube, Save, the shortcuts) or the popovers. The notification log in Settings › Notifications stays selectable, so a path in a message can still be copied, and so do text fields.

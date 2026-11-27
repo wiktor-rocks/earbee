@@ -19,7 +19,10 @@
 // ui/pref-fields.js):
 //   choice   one of `options` [{ value, label, detail?, swatch? }]
 //   set      any number of `options`, as an array of their values (in
-//            the options' order, each once)
+//            the options' order, each once). `inverted: true`: the
+//            dialog ticks the options *not* in it (the side panel's
+//            sections are kept as the hidden ones, but shown ticked
+//            when shown)
 //   boolean  true or false
 //   number   `min` … `max`, rounded to `step`; `unit` is shown after it
 //   folder   an absolute path, or null for the default. Only the main
@@ -45,6 +48,7 @@ import { clamp } from "../core/format.js";
  * @property {string} [help]
  * @property {any} default
  * @property {Option[]} [options] choice, set
+ * @property {boolean} [inverted] set: the dialog ticks the options not in the value.
  * @property {number} [min] number
  * @property {number} [max] number
  * @property {number} [step] number

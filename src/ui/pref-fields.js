@@ -66,7 +66,7 @@ const RENDERERS = {
   },
 
   // Checkboxes in a row of tiles, like choice's, one per option; the
-  // value is the ticked ones.
+  // value is the ticked ones, or with `inverted` the unticked ones.
   set(field, actions, id) {
     const group = element("div", { className: "pref-options pref-options-row", role: "group" });
     group.setAttribute("aria-labelledby", `${id}-label`);
@@ -84,12 +84,15 @@ const RENDERERS = {
     });
     group.addEventListener(
       "change",
-      guarded(() => actions.set(inputs.filter(({ input }) => input.checked).map(({ value }) => value))),
+      guarded(() =>
+        actions.set(inputs.filter(({ input }) => input.checked !== Boolean(field.inverted)).map(({ value }) => value)),
+      ),
     );
     return {
       element: group,
       update(values) {
-        for (const { input, value } of inputs) input.checked = values[field.key].includes(value);
+        for (const { input, value } of inputs)
+          input.checked = values[field.key].includes(value) !== Boolean(field.inverted);
       },
     };
   },

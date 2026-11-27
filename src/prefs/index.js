@@ -192,7 +192,8 @@ export const waveformSection = defineSection({
 // pointer is on the picture (features/video-buttons.js). `hiddenSections`:
 // the side panel's sections put away (features/panel-sections.js), by
 // their keys in features/panel-order.js; kept as the hidden ones, so a
-// section added later shows.
+// section added later shows, but shown in the dialog as the ones shown
+// ("Show in the side panel", all ticked at first; `inverted`).
 const layoutSection = defineSection({
   id: "layout",
   title: "Layout",
@@ -231,8 +232,9 @@ const layoutSection = defineSection({
     {
       key: "hiddenSections",
       type: "set",
-      label: "Hide in the side panel",
-      help: "The sections ticked here are put away. Their shortcuts still work.",
+      inverted: true,
+      label: "Show in the side panel",
+      help: "Untick a section to put it away. Its shortcuts still work.",
       default: [],
       options: [
         { value: "speed", label: "Speed" },

@@ -310,11 +310,13 @@ module.exports = async function (h) {
   await sleep(300);
   check("turned off, the bar is back in the layout", JSON.stringify(await bars()) === JSON.stringify(inLayout));
 
-  // Hide in the side panel (features/panel-sections.js): a ticked section
-  // is put away, and comes back when unticked.
+  // Show in the side panel (features/panel-sections.js): all ticked at
+  // first; an unticked section is put away, and comes back when ticked.
+  // Kept as the hidden ones (layout.hiddenSections).
   {
+    const box = (value) => `${row("layout", "hiddenSections")}.querySelector('input[value="${value}"]')`;
     const tick = async (value) => {
-      await js(`${row("layout", "hiddenSections")}.querySelector('input[value="${value}"]').click()`);
+      await js(`${box(value)}.click()`);
       await sleep(300);
     };
     const shown = () =>
@@ -324,12 +326,17 @@ module.exports = async function (h) {
     await js(`document.getElementById("settingsButton").click()`);
     await sleep(200);
     await tab("layout");
+    check(
+      "Show in the side panel: every section ticked at first",
+      await js(`[...${row("layout", "hiddenSections")}.querySelectorAll("input")].every((input) => input.checked)`),
+    );
     await tick("loop");
     check(
-      "Hide in the side panel: Loop ticked puts its section away; saved, Reset shown",
+      "…Loop unticked puts its section away; saved, Reset shown",
       JSON.stringify(await shown()) === JSON.stringify({ loop: false, marks: true }) &&
         JSON.stringify(saved().layout?.hiddenSections) === '["loop"]' &&
-        (await resetShown("layout", "hiddenSections")),
+        (await resetShown("layout", "hiddenSections")) &&
+        !(await js(`${box("loop")}.checked`)),
       JSON.stringify({ shown: await shown(), saved: saved().layout }),
     );
     await tick("marks");
@@ -343,7 +350,7 @@ module.exports = async function (h) {
     await tick("loop");
     await tick("marks");
     check(
-      "…unticked, both come back, and Reset goes",
+      "…ticked again, both come back, and Reset goes",
       JSON.stringify(await shown()) === JSON.stringify({ loop: true, marks: true }) &&
         JSON.stringify(saved().layout?.hiddenSections) === "[]" &&
         !(await resetShown("layout", "hiddenSections")),
