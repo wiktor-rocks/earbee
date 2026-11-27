@@ -43,6 +43,16 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-27: A flaky check: the minimap wheel waits for playback to start
+
+- **What:** the end-to-end checks "wheel on the minimap scrolls, doesn't zoom" and "minimap wheel pauses following" (topic 06) now wheel the minimap once playback has really started, instead of after a fixed 250 ms. Nothing in the app changed.
+- **Why:** "minimap wheel pauses following" failed the full `npm test` before `testing` moved up (2863 → 1490: the view jumped back after the wheel), though it passed alone. The owner asked for the test to be fixed.
+- **How:** a probe of the scroll position every 25 ms showed that Space moves the view twice: at once to the start point, then again when the sound starts (about 110–140 ms later, after the output's delay; longer when the computer is busy). A wheel before that second move is undone by it. Waiting for the scroll to change wasn't enough (it stopped at the first move, and then the first check failed in two runs of three). So the test now waits until the position moves on from the start point (up to 2 s), then 100 ms to settle.
+- **Where:** `tests/e2e/06-zoom.cjs`.
+- **Verified by:**
+  - `TB_TOPICS=03,06 npm test` four times (74 each), then twice more with all 8 CPUs kept busy (74 each);
+  - then the full `npm test`: 504 unit, 864 of 864 e2e, smoke 39.
+
 ## 2026-11-27: A flaky check: M while playing allows two frames
 
 - **What:** the end-to-end check "M while playing marks where it was heard" (topic 14) now allows the mark up to 40 ms past the position the test read, instead of 20 ms. Nothing in the app changed.

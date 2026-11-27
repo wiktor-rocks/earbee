@@ -156,9 +156,15 @@ module.exports = async function (h) {
       `(() => { const r = document.getElementById("waveform-minimap").getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`,
     );
     key("Space");
-    // Until the view has gone back to where Space plays from: that takes the
-    // output's delay (CONFIG.audio.latencyHint), about 0.1 s.
-    await sleep(250);
+    // Until playback has really started and the view has followed it. Space
+    // moves the view twice: at once to the start point, then again when the
+    // sound starts (after the output's delay, CONFIG.audio.latencyHint:
+    // about 0.1 s, longer in a busy full run). A wheel before the second
+    // move is undone by it, as a fixed 250 ms wait sometimes was. So: until
+    // the position moves on from the start point, then a moment to settle.
+    const from = await pos();
+    for (let i = 0; i < 40 && (await pos()) <= from; i++) await sleep(50);
+    await sleep(100);
     wheel(Math.round(mini.x), Math.round(mini.y), -1500 * zoomSign);
     await sleep(100);
     check(
