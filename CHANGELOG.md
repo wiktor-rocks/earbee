@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-27: A flaky check: M while playing allows two frames
+
+- **What:** the end-to-end check "M while playing marks where it was heard" (topic 14) now allows the mark up to 40 ms past the position the test read, instead of 20 ms. Nothing in the app changed.
+- **Why:** it failed one full `npm test` before `testing` moved up (the mark 23 ms after the read position). Rerun three times, it failed once on `dev` and once on `dev` as it was before the day's changes (`60a4062`), so it's the check, not the app. The owner chose to widen it.
+- **How:** the test reads the position as last drawn, which can be a frame behind the key's own time; both reads now and then land in the same frame. Two frames' leeway covers that; the lower bound (100 ms before) is unchanged.
+- **Where:** `tests/e2e/14-marks.cjs`.
+- **Verified by:** `TB_TOPICS=03,14 npm test` three times, all passing (101 each). Then the full `npm test`: 504 unit, 863 of 864 e2e. This check passed; another timing check failed, "minimap wheel pauses following" (topic 06): the view's jump back to where Space plays from came after the test's fixed 250 ms wait in the busy full run. It passed 3 of 3 alone. The owner chose to move `testing` up as it was; that check's wait is still to fix.
+
 ## 2026-11-27: The last session: a failed write doesn't stop the next; the final write stays
 
 - **What:** two fixes to keeping the last session (2026-11-20):

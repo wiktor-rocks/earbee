@@ -83,7 +83,10 @@ module.exports = async function (h) {
   );
   check("the empty hint is gone", await js(`document.getElementById("marksEmpty").hidden`));
 
-  // M while playing: where it was heard.
+  // M while playing: where it was heard. `before` and `after` are the
+  // position as last drawn, which may be a frame behind the key's own
+  // time (both read the same frame now and then): so up to two frames
+  // (40 ms) past `after`. One frame (20 ms) failed about one run in three.
   await click(1);
   key("Space");
   await sleep(700);
@@ -94,7 +97,7 @@ module.exports = async function (h) {
   const tapped = await byName("Mark 2");
   check(
     "M while playing marks where it was heard",
-    tapped && tapped.start >= before - 0.1 && tapped.start <= after + 0.02,
+    tapped && tapped.start >= before - 0.1 && tapped.start <= after + 0.04,
     `${before}…${after}: ${tapped?.start}`,
   );
 
