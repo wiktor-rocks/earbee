@@ -187,10 +187,12 @@ export function setLoopRegion(region) {
   renderLoopInfo(loopRegion);
 }
 
-// [ and ]: move one end of the loop to the cursor (onto a beat close by),
-// keeping the other end if it still makes a loop, and turn the loop on.
+// [ and ]: move one end of the loop (onto a beat close by), keeping the
+// other end if it still makes a loop, and turn the loop on. [ puts the
+// start at the start point (where you started listening, the green line),
+// ] the end at the cursor: together they loop what you just heard.
 export function setLoopStart() {
-  const start = snapToBeat(player.transport.position);
+  const start = snapToBeat(startPoint());
   const end = loopRegion && loopRegion.end > start ? loopRegion.end : player.transport.duration;
   setLoopRegion({ start, end, enabled: true });
 }

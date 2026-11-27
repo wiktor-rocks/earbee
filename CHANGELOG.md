@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-27: [ sets the loop start at the start point
+
+- **What:** `[` (Loop start) puts the loop's start at the start point, the green line where Space plays from next, instead of at the cursor. While playing, or after pausing, that's where you started listening, so `[` then `]` loops what you just heard. Paused after a click, the two are in the same place, so nothing changes there. `]` still puts the end at the cursor. The shortcuts list says "Loop start, at the start point".
+- **Why:** the owner: "When setting the loop start shortcut, make that from the start point, not from the play head." Added to 0.4.0 at the owner's call.
+- **How:** `setLoopStart` takes `startPoint()` (the start point as shown, with "from the top after the end") instead of `player.transport.position`. It still snaps onto a beat close by and keeps the loop's end if it's after the new start, otherwise the end of the track.
+- **Where:** `src/features/playback.js` (`setLoopStart`), `src/app.js` (the `SHORTCUTS` table), `docs/glossary.md` (Loop).
+- **Verified by:** `npm run check`. The e2e checks that press `[` (topics 03, 06, 16, 20, 23) click first, which moves the start point there too; they weren't run. Not checked: by hand in a real window.
+
 ## 2026-11-21: Right-click menus: loop a region, save the loop as a region
 
 - **What:** right-clicking now opens a menu of what you can do with what you clicked. The first two items:

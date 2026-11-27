@@ -584,7 +584,13 @@ const SHORTCUTS = [
     description: "A click on each beat, on / off",
     down: toggleBeatClick,
   },
-  { group: "A–B loop", codes: ["BracketLeft"], keys: ["["], description: "Loop start", down: setLoopStart },
+  {
+    group: "A–B loop",
+    codes: ["BracketLeft"],
+    keys: ["["],
+    description: "Loop start, at the start point",
+    down: setLoopStart,
+  },
   { group: "A–B loop", codes: ["BracketRight"], keys: ["]"], description: "Loop end", down: setLoopEnd },
   {
     group: "A–B loop",
