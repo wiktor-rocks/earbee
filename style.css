@@ -162,6 +162,14 @@ body {
   user-select: none;
 }
 
+/* An open dialog doesn't take that from the page (Chromium starts it again
+   as selectable), so everything in Settings and the other dialogs could be
+   highlighted; they say it again. Popovers too, to be sure. */
+dialog,
+[popover] {
+  user-select: none;
+}
+
 input,
 textarea {
   user-select: text;

@@ -43,6 +43,14 @@ The architecture overview, the file map and a list of where to make common chang
 
 ---
 
+## 2026-11-27: No text highlighting in Settings and the other dialogs
+
+- **What:** text in Settings (button labels, the options, the help lines, the tabs) can't be highlighted any more, and neither can text in the other dialogs (From YouTube, Save, the shortcuts) or the popovers. The notification log in Settings › Notifications stays selectable, so a path in a message can still be copied, and so do text fields.
+- **Why:** the owner: "text highlighting works on text in the settings. This needs to be turned off", for example inside buttons.
+- **How:** the page's `user-select: none` is on `body`, but an open dialog doesn't take it: Chromium starts it again as selectable (the open Settings dialog reported `text`, and so did everything inside it). `dialog, [popover] { user-select: none; }` says it again.
+- **Where:** `style.css` (the base rules at the top, next to the `body` and `input, textarea` ones).
+- **Verified by:** `npm run check`; a temporary probe in topic 13 (removed afterwards) read `getComputedStyle(...).userSelect` with Settings open. Before the fix: `text` for the dialog and everything in it. After: `none` for every dialog and popover and all of Settings' text, leaving `text` only for its checkboxes, radios and sliders, which have no text. `TB_TOPICS=13 npm test` passed with the probe (63, smoke 39). Not checked: dragging across the text by hand in a real window.
+
 ## 2026-11-27: [ sets the loop start at the start point
 
 - **What:** `[` (Loop start) puts the loop's start at the start point, the green line where Space plays from next, instead of at the cursor. While playing, or after pausing, that's where you started listening, so `[` then `]` loops what you just heard. Paused after a click, the two are in the same place, so nothing changes there. `]` still puts the end at the cursor. The shortcuts list says "Loop start, at the start point".
